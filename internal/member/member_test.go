@@ -3,6 +3,7 @@ package member_test
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"path/filepath"
 	"testing"
 	"utxo/internal/member"
@@ -138,5 +139,40 @@ func TestQ01CertificateCanBeSpentBeforeInstall(t *testing.T) {
 		if _, e := members[i].Approve(member.Request{Tx: conflict, Parents: []protocol.TXCer{c}}); e == nil {
 			t.Fatal("late install revived consumed child input")
 		}
+	}
+}
+
+func TestRepeatedInstallDoesNotReopenCompletedOutbox(t *testing.T) {
+	f := setup(t)
+	m, db := f.node(t, 0, filepath.Join(t.TempDir(), "member.db"))
+	defer db.Close()
+	tx := f.tx(1)
+	var c protocol.TXCer
+	for i := 0; i < 3; i++ {
+		other, otherDB := f.node(t, i, filepath.Join(t.TempDir(), "vote.db"))
+		a, e := other.Approve(member.Request{Tx: tx})
+		otherDB.Close()
+		if e != nil {
+			t.Fatal(e)
+		}
+		c.Tx = tx
+		c.Admission = a.Admission
+		c.Effects = a.Effects
+		c.QC.Fact = a.Fact
+		c.QC.Votes = append(c.QC.Votes, a.Vote)
+	}
+	if e := m.Install(c); e != nil {
+		t.Fatal(e)
+	}
+	if e := db.Update(func(state.ReadView) ([]state.Change, error) {
+		return []state.Change{{Key: state.Key(state.KeyOutbox, c.QC.Fact[:]), Delete: true}}, nil
+	}); e != nil {
+		t.Fatal(e)
+	}
+	if e := m.Install(c); e != nil {
+		t.Fatal(e)
+	}
+	if e := db.View(func(v state.ReadView) error { _, e := v.Get(state.Key(state.KeyOutbox, c.QC.Fact[:])); return e }); !errors.Is(e, state.ErrNotFound) {
+		t.Fatalf("completed outbox reopened: %v", e)
 	}
 }

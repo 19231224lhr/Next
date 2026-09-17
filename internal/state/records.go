@@ -16,6 +16,13 @@ const (
 	KeyGrant    uint8 = 31
 	KeyOutbox   uint8 = 40
 	KeyGenesis  uint8 = 50
+	KeyPayment  uint8 = 80
+	KeyAccount  uint8 = 81
+	KeyReward   uint8 = 82
+	KeyBurned   uint8 = 83
+	KeyUsage    uint8 = 84
+	KeyCredit   uint8 = 85
+	KeyObserved uint8 = 86
 )
 
 func Key(kind uint8, parts ...[]byte) []byte {
@@ -78,6 +85,7 @@ func (g Genesis) Hash() protocol.Hash {
 type Creation struct {
 	Output protocol.Output
 	Fact   protocol.Hash
+	Source protocol.Hash
 	Final  bool
 }
 type Spend struct {
@@ -102,4 +110,26 @@ type Outbox struct {
 	Fact        protocol.SpendFactID
 	Certificate []byte
 	Origin      protocol.Hash
+}
+
+type Transition struct {
+	Changes []Change
+	Facts   []protocol.FinalFact
+}
+
+const KeyDirect uint8 = 87
+
+const KeyCollected uint8 = 88
+
+const (
+	KeyWalletIntent      uint8 = 89
+	KeyWalletSpend       uint8 = 90
+	KeyWalletCertificate uint8 = 91
+)
+
+const KeyCustody uint8 = 92
+
+type Custody struct {
+	Fact, Certificate, Effects protocol.Hash
+	Proof                      []byte
 }

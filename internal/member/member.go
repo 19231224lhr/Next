@@ -3,6 +3,8 @@ package member
 import (
 	"bytes"
 	"crypto/ed25519"
+	"errors"
+	"utxo/finality"
 	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/internal/store"
@@ -10,6 +12,7 @@ import (
 )
 
 type Config struct {
+	Committee    finality.Trust
 	Organization protocol.OrgConfig
 	Index        uint16
 	Key          ed25519.PrivateKey
@@ -17,16 +20,8 @@ type Config struct {
 	Schedule     rules.Schedule
 	Workers      uint32
 }
-type Request struct {
-	Tx      protocol.SignedTx
-	Parents []protocol.TXCer
-}
-type Approval struct {
-	Fact      protocol.SpendFactID
-	Vote      protocol.SpendVote
-	Admission protocol.AdmissionVector
-	Effects   protocol.CertifiedEffects
-}
+type Request = protocol.PaymentRequest
+type Approval = protocol.Approval
 type Member struct {
 	cfg   Config
 	db    store.Store
@@ -39,6 +34,12 @@ func New(cfg Config, db store.Store, gen state.Genesis) (*Member, error) {
 	}
 	if !bytes.Equal(cfg.Key.Public().(ed25519.PublicKey), cfg.Organization.Members[cfg.Index][:]) {
 		return nil, protocol.ErrAuth
+	}
+	if cfg.Committee.Validators != nil {
+		if cfg.Committee.Validate() != nil || cfg.Committee.Network != gen.Network {
+			return nil, protocol.ErrAuth
+		}
+		cfg.Committee.Validators = cfg.Committee.Validators.Copy()
 	}
 	cfg.Key = bytes.Clone(cfg.Key)
 	m := &Member{cfg: cfg, db: db, peers: make(map[protocol.Hash]protocol.OrgConfig)}
@@ -57,7 +58,17 @@ func New(cfg Config, db store.Store, gen state.Genesis) (*Member, error) {
 func (m *Member) bootstrap(gen state.Genesis) error {
 	return m.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		key := state.Key(state.KeyGenesis)
-		hash := gen.Hash()
+		genHash := gen.Hash()
+		orgHash := m.cfg.Organization.Hash()
+		ids := m.cfg.Schedule.IDs()
+		layout := new(protocol.Encoder)
+		layout.U16(m.cfg.Index)
+		layout.U32(m.cfg.Workers)
+		var committeeHash []byte
+		if m.cfg.Committee.Validators != nil {
+			committeeHash = m.cfg.Committee.Validators.Hash()
+		}
+		hash := protocol.Digest("MEMBER_INITIAL_STATE", genHash[:], orgHash[:], ids.Fee[:], ids.Work[:], ids.Accounting[:], layout.Data(), committeeHash, []byte(m.cfg.Committee.ChainID))
 		if old, found, e := state.Load[protocol.Hash](v, key); e != nil {
 			return nil, e
 		} else if found {
@@ -234,6 +245,20 @@ func (m *Member) Install(c protocol.TXCer) error {
 	}
 	if c.Tx.Body.Certifier != m.cfg.Organization.Org {
 		return protocol.ErrAuth
+	}
+	var installed bool
+	if err := m.db.View(func(v state.ReadView) error {
+		_, err := v.Get(state.Key(state.KeyInstall, c.QC.Fact[:]))
+		if errors.Is(err, state.ErrNotFound) {
+			return nil
+		}
+		installed = err == nil
+		return err
+	}); err != nil {
+		return err
+	}
+	if installed {
+		return nil
 	}
 	raw, e := c.MarshalBinary()
 	if e != nil {

@@ -8,21 +8,26 @@ import (
 	"fmt"
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/crypto/merkle"
+	cmttypes "github.com/cometbft/cometbft/types"
+	"sort"
 	"sync"
+	"utxo/finality"
 	"utxo/internal/state"
 	"utxo/internal/store"
 	"utxo/protocol"
 )
 
 var ErrBlock = errors.New("inconsistent block height or identity")
-var metaKey = []byte{0, 2, 'c', 'o', 'm', 'm', 'i', 't'}
+var metaKey = []byte{0xff, 2, 'c', 'o', 'm', 'm', 'i', 't'}
 
 type CheckFunc func([]byte) error
-type ExecuteFunc func(state.ReadView, []byte) ([]state.Change, error)
+type ExecuteFunc func(state.ReadView, []byte) (state.Transition, error)
 type commitRecord struct {
-	Height   int64
-	BlockID  []byte
-	Response []byte
+	Commitment finality.Commitment
+	Leaves     [][]byte
+	Height     int64
+	BlockID    []byte
+	Response   []byte
 }
 
 // App provides ABCI commit isolation. Business execution is supplied by the
@@ -51,6 +56,13 @@ func NewApp(chain string, db store.Store, check CheckFunc, execute ExecuteFunc) 
 	e := db.View(func(v state.ReadView) error {
 		raw, e := v.Get(metaKey)
 		if errors.Is(e, state.ErrNotFound) {
+			genesis, found, err := state.Load[protocol.Hash](v, state.Key(state.KeyGenesis))
+			if err != nil {
+				return err
+			}
+			if found {
+				a.response.AppHash = bytes.Clone(genesis[:])
+			}
 			return nil
 		}
 		if e != nil {
@@ -75,7 +87,7 @@ func (a *App) InitChain(_ context.Context, r *abci.RequestInitChain) (*abci.Resp
 	if r.ChainId != a.chain || r.InitialHeight > 1 {
 		return nil, ErrBlock
 	}
-	return &abci.ResponseInitChain{}, nil
+	return &abci.ResponseInitChain{AppHash: bytes.Clone(a.response.AppHash)}, nil
 }
 func (a *App) CheckTx(_ context.Context, r *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
 	if e := a.check(r.Tx); e != nil {
@@ -136,6 +148,9 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 	}
 	response := &abci.ResponseFinalizeBlock{TxResults: make([]*abci.ExecTxResult, len(r.Txs)), AppHash: bytes.Clone(a.response.AppHash)}
 	var changes []state.Change
+	facts := make(map[string]protocol.FinalFact)
+	var commitment finality.Commitment
+	var leaves [][]byte
 	e := a.db.View(func(v state.ReadView) error {
 		overlay := state.NewOverlay(v)
 		for i, tx := range r.Txs {
@@ -145,24 +160,76 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 				response.TxResults[i].Log = "invalid command"
 				continue
 			}
-			cs, err := a.execute(overlay, tx)
+			transition, err := a.execute(overlay, tx)
 			if err != nil {
 				response.TxResults[i].Code = 2
 				response.TxResults[i].Log = "business rejected"
 				continue
 			}
-			for _, c := range cs {
-				if len(c.Key) == 0 || c.Key[0] == 0 {
+			for _, c := range transition.Changes {
+				if len(c.Key) == 0 || c.Key[0] == 0xff {
 					return errors.New("executor used reserved state key")
 				}
 			}
-			overlay.Apply(cs)
+			candidate := state.NewOverlay(overlay)
+			candidate.Apply(transition.Changes)
+			for _, f := range transition.Facts {
+				if f.Network != protocol.Digest("NETWORK", []byte(a.chain)) {
+					return finality.ErrProof
+				}
+				raw, err := f.MarshalBinary()
+				if err != nil {
+					return err
+				}
+				key := f.SortKey()[:34]
+				latest := state.Key(70, key)
+				old, found, err := state.Load[protocol.FinalFact](candidate, latest)
+				if err != nil {
+					return err
+				}
+				if found && old.Revision >= f.Revision {
+					if old.Revision == f.Revision && old.ID() == f.ID() {
+						continue
+					}
+					return finality.ErrProof
+				}
+				if err = state.Put(candidate, latest, f); err != nil {
+					return err
+				}
+				candidate.Set(state.Key(71, f.SortKey()), raw)
+				facts[string(key)] = f
+			}
+			overlay.Apply(candidate.Changes())
 		}
-		changes = overlay.Changes()
+		for _, c := range overlay.Changes() {
+			old, err := v.Get(c.Key)
+			if err != nil && !errors.Is(err, state.ErrNotFound) {
+				return err
+			}
+			if c.Delete && errors.Is(err, state.ErrNotFound) {
+				continue
+			}
+			if !c.Delete && err == nil && bytes.Equal(old, c.Value) {
+				continue
+			}
+			changes = append(changes, c)
+		}
 		return nil
 	})
 	if e != nil {
 		return nil, e
+	}
+	ordered := make([]protocol.FinalFact, 0, len(facts))
+	for _, f := range facts {
+		ordered = append(ordered, f)
+	}
+	sort.Slice(ordered, func(i, j int) bool { return bytes.Compare(ordered[i].SortKey(), ordered[j].SortKey()) < 0 })
+	for _, f := range ordered {
+		raw, e := f.MarshalBinary()
+		if e != nil {
+			return nil, e
+		}
+		leaves = append(leaves, raw)
 	}
 	if len(changes) > 0 {
 		enc := new(protocol.Encoder)
@@ -171,17 +238,19 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 			enc.Optional(c.Delete)
 			enc.Bytes(c.Value)
 		}
-		writeHash := protocol.Digest("WRITE_SET", enc.Data())
-		height := new(protocol.Encoder)
-		height.U64(uint64(r.Height))
-		root := protocol.Digest("APP_V2", []byte(a.chain), height.Data(), a.response.AppHash, writeHash[:], merkle.HashFromByteSlices(nil))
+		commitment = finality.Commitment{Network: protocol.Digest("NETWORK", []byte(a.chain)), Height: r.Height, Previous: bytes.Clone(a.response.AppHash), WriteSet: protocol.Digest("WRITE_SET", enc.Data()), FactRoot: merkle.HashFromByteSlices(leaves)}
+		root, e := commitment.Hash()
+		if e != nil {
+			return nil, e
+		}
 		response.AppHash = bytes.Clone(root[:])
 	}
+
 	raw, e := response.Marshal()
 	if e != nil {
 		return nil, e
 	}
-	a.pending = &commitRecord{Height: r.Height, BlockID: bytes.Clone(r.Hash), Response: raw}
+	a.pending = &commitRecord{Height: r.Height, BlockID: bytes.Clone(r.Hash), Response: raw, Commitment: commitment, Leaves: leaves}
 	a.pendingChanges = changes
 	return cloneResponse(response), nil
 }
@@ -199,7 +268,15 @@ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit
 		return nil, e
 	}
 	cs := append([]state.Change(nil), a.pendingChanges...)
-	cs = append(cs, state.Change{Key: metaKey, Value: raw})
+	cs = append(cs, state.Change{Key: metaKey, Value: raw}, state.Change{Key: blockKey(a.pending.Height), Value: raw})
+	for i, rawFact := range a.pending.Leaves {
+		f, e := protocol.DecodeFact(rawFact)
+		if e != nil {
+			return nil, e
+		}
+		location, _ := json.Marshal(factLocation{Height: a.pending.Height, Index: i})
+		cs = append(cs, state.Change{Key: proofKey(f.ID()), Value: location})
+	}
 	e = a.db.Update(func(state.ReadView) ([]state.Change, error) { return cs, nil })
 	if e != nil {
 		a.halted = e
@@ -219,7 +296,7 @@ func (a *App) Query(_ context.Context, r *abci.RequestQuery) (*abci.ResponseQuer
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	out := &abci.ResponseQuery{Height: a.committed.Height}
-	if len(r.Data) == 0 || r.Data[0] == 0 {
+	if len(r.Data) == 0 || r.Data[0] == 0xff {
 		return &abci.ResponseQuery{Code: 1, Log: "invalid key"}, nil
 	}
 	e := a.db.View(func(v state.ReadView) error {
@@ -244,4 +321,57 @@ func (a *App) OfferSnapshot(context.Context, *abci.RequestOfferSnapshot) (*abci.
 }
 func (a *App) ApplySnapshotChunk(context.Context, *abci.RequestApplySnapshotChunk) (*abci.ResponseApplySnapshotChunk, error) {
 	return &abci.ResponseApplySnapshotChunk{Result: abci.ResponseApplySnapshotChunk_ABORT}, nil
+}
+
+type factLocation struct {
+	Height int64
+	Index  int
+}
+
+func blockKey(height int64) []byte {
+	e := new(protocol.Encoder)
+	e.U64(uint64(height))
+	return append([]byte{0xff, 'b'}, e.Data()...)
+}
+func proofKey(id protocol.Hash) []byte { return append([]byte{0xff, 'p'}, id[:]...) }
+
+// Proof returns committed material only. Clients still verify the pinned committee.
+func (a *App) Proof(id protocol.Hash, header cmttypes.SignedHeader) (finality.FactProof, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	var result finality.FactProof
+	err := a.db.View(func(v state.ReadView) error {
+		loc, found, e := state.Load[factLocation](v, proofKey(id))
+		if e != nil {
+			return e
+		}
+		if !found {
+			return state.ErrNotFound
+		}
+		record, found, e := state.Load[commitRecord](v, blockKey(loc.Height))
+		if e != nil {
+			return e
+		}
+		if !found || loc.Index < 0 || loc.Index >= len(record.Leaves) {
+			return finality.ErrProof
+		}
+		if header.Header == nil || header.Height != loc.Height+1 {
+			return finality.ErrProof
+		}
+		root, e := record.Commitment.Hash()
+		if e != nil || !bytes.Equal(root[:], header.AppHash) {
+			return finality.ErrProof
+		}
+		_, paths := merkle.ProofsFromByteSlices(record.Leaves)
+		f, e := protocol.DecodeFact(record.Leaves[loc.Index])
+		if e != nil {
+			return e
+		}
+		if f.ID() != id {
+			return finality.ErrProof
+		}
+		result = finality.FactProof{Fact: f, Commitment: record.Commitment, Path: *paths[loc.Index], Header: header}
+		return nil
+	})
+	return result, err
 }

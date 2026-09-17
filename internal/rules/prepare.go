@@ -115,6 +115,9 @@ func ValidateTransfer(t protocol.SignedTx, inputs []state.Creation) error {
 	if e := t.VerifyAuth(); e != nil {
 		return e
 	}
+	return validateTransferValues(t, inputs)
+}
+func validateTransferValues(t protocol.SignedTx, inputs []state.Creation) error {
 	if len(inputs) != len(t.Body.Inputs) {
 		return ErrMissing
 	}
@@ -147,7 +150,7 @@ func ValidateTransfer(t protocol.SignedTx, inputs []state.Creation) error {
 }
 func EqualCreation(a, b state.Creation) bool {
 	// Both records originate from verified canonical objects, not arbitrary JSON.
-	return a.Output == b.Output && a.Fact == b.Fact
+	return a.Output == b.Output && (a.Fact == b.Fact || a.Final && a.Source == b.Fact || b.Final && b.Source == a.Fact)
 }
 func EvaluatePrepare(v state.ReadView, tx protocol.SignedTx, inputs []state.Creation, vector protocol.AdmissionVector, effects protocol.CertifiedEffects, worker uint32, parents []state.Outbox) ([]state.Change, protocol.SpendFactID, error) {
 	fact := protocol.SpendID(tx.Body.ID(), vector, effects.Hash(), tx.Body.Rules)
@@ -159,6 +162,11 @@ func EvaluatePrepare(v state.ReadView, tx protocol.SignedTx, inputs []state.Crea
 			return nil, fact, protocol.ErrRule
 		}
 		return nil, fact, nil
+	}
+	if observed, _, e := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); e != nil {
+		return nil, fact, e
+	} else if observed {
+		return nil, fact, ErrConflict
 	}
 	id := tx.Body.ID()
 	if prior, found, e := state.Load[protocol.TxID](o, state.Key(state.KeyIntent, tx.Body.Intent[:])); e != nil {
@@ -203,7 +211,7 @@ func EvaluatePrepare(v state.ReadView, tx protocol.SignedTx, inputs []state.Crea
 		if e != nil {
 			return nil, fact, e
 		}
-		if !found || grant.ID != ref.Grant || grant.Key != x.Key {
+		if !found || grant.ID != ref.Grant || grant.Key != x.Key || grant.Organization != tx.Body.Config {
 			return nil, fact, protocol.ErrAuth
 		}
 		if x.Key.Kind == protocol.ResourcePolicy && grant.Subject != tx.Body.Subject {

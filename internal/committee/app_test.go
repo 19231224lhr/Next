@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	abci "github.com/cometbft/cometbft/abci/types"
+	cmttypes "github.com/cometbft/cometbft/types"
 	"path/filepath"
 	"testing"
 	"utxo/internal/state"
 	"utxo/internal/store"
+	"utxo/protocol"
 )
 
 func TestP01P04CommitBoundaryAndReplay(t *testing.T) {
@@ -24,11 +26,11 @@ func TestP01P04CommitBoundaryAndReplay(t *testing.T) {
 		}
 		return nil
 	}
-	execute := func(v state.ReadView, tx []byte) ([]state.Change, error) {
+	execute := func(v state.ReadView, tx []byte) (state.Transition, error) {
 		if tx[0] == 0 {
-			return nil, errors.New("business reject")
+			return state.Transition{}, errors.New("business reject")
 		}
-		return []state.Change{{Key: tx[:1], Value: tx[1:]}}, nil
+		return state.Transition{Changes: []state.Change{{Key: tx[:1], Value: tx[1:]}}}, nil
 	}
 	app, e := NewApp("network", db, check, execute)
 	if e != nil {
@@ -93,7 +95,7 @@ func TestProposalNeverMutatesAndRejectsMalformed(t *testing.T) {
 			return errors.New("invalid")
 		}
 		return nil
-	}, func(state.ReadView, []byte) ([]state.Change, error) { panic("proposal executed") })
+	}, func(state.ReadView, []byte) (state.Transition, error) { panic("proposal executed") })
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -104,5 +106,64 @@ func TestProposalNeverMutatesAndRejectsMalformed(t *testing.T) {
 	r, e = app.ProcessProposal(context.Background(), &abci.RequestProcessProposal{Txs: [][]byte{{1}}})
 	if e != nil || r.Status != abci.ResponseProcessProposal_ACCEPT {
 		t.Fatal("valid rejected")
+	}
+}
+
+func TestFactProofMaterialOnlyAfterCommit(t *testing.T) {
+	db := store.NewMemory()
+	defer db.Close()
+	network := protocol.Digest("NETWORK", []byte("network"))
+	fact := protocol.FinalFact{Kind: protocol.FactOutputCreated, Key: protocol.Digest("output", nil), Revision: 1, Network: network, Payload: []byte("created")}
+	app, e := NewApp("network", db, func([]byte) error { return nil }, func(state.ReadView, []byte) (state.Transition, error) {
+		return state.Transition{Facts: []protocol.FinalFact{fact}}, nil
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
+	response, e := app.FinalizeBlock(context.Background(), &abci.RequestFinalizeBlock{Height: 1, Hash: bytes.Repeat([]byte{1}, 32), Txs: [][]byte{{1}}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	header := cmttypes.SignedHeader{Header: &cmttypes.Header{Height: 2, AppHash: response.AppHash}}
+	if _, e := app.Proof(fact.ID(), header); e == nil {
+		t.Fatal("uncommitted proof")
+	}
+	if _, e = app.Commit(context.Background(), &abci.RequestCommit{}); e != nil {
+		t.Fatal(e)
+	}
+	proof, e := app.Proof(fact.ID(), header)
+	if e != nil {
+		t.Fatal(e)
+	}
+	leaf, _ := fact.MarshalBinary()
+	if e = proof.Path.Verify(proof.Commitment.FactRoot, leaf); e != nil {
+		t.Fatal(e)
+	}
+	root, _ := proof.Commitment.Hash()
+	if !bytes.Equal(root[:], response.AppHash) {
+		t.Fatal("root mismatch")
+	}
+}
+
+func TestBusinessSchemaPrefixDoesNotOverlapLocalMetadata(t *testing.T) {
+	for _, key := range [][]byte{state.Key(state.KeyAccount, []byte("account")), []byte{0xff, 'p', 1}} {
+		db := store.NewMemory()
+		app, e := NewApp("network", db, func([]byte) error { return nil }, func(state.ReadView, []byte) (state.Transition, error) {
+			return state.Transition{Changes: []state.Change{{Key: key, Value: []byte{1}}}}, nil
+		})
+		if e != nil {
+			t.Fatal(e)
+		}
+		_, e = app.FinalizeBlock(context.Background(), &abci.RequestFinalizeBlock{Height: 1, Hash: bytes.Repeat([]byte{1}, 32), Txs: [][]byte{{1}}})
+		if key[0] == 0xff {
+			if e == nil {
+				t.Fatal("metadata write allowed")
+			}
+		} else {
+			if e != nil {
+				t.Fatalf("business schema rejected: %v", e)
+			}
+		}
+		db.Close()
 	}
 }

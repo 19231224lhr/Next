@@ -138,3 +138,15 @@ func TestX01CrossOrganizationWithoutParentInstall(t *testing.T) {
 		}
 	}
 }
+
+func TestReopenRejectsChangedSigningConfiguration(t *testing.T) {
+	f := setup(t)
+	_, db := f.node(t, 0, filepath.Join(t.TempDir(), "m.db"))
+	defer db.Close()
+	altered := f.cfg
+	altered.Epoch++
+	_, e := member.New(member.Config{Organization: altered, Index: 0, Key: f.keys[0], Peers: []protocol.OrgConfig{altered}, Schedule: f.schedule, Workers: 1}, db, f.gen)
+	if e == nil {
+		t.Fatal("changed signing configuration accepted on existing state")
+	}
+}

@@ -8,11 +8,11 @@ This ledger records actual capability; unimplemented items are not test passes.
 | Module | Status | Evidence / remaining work |
 |---|---|---|
 | Protocol, engineering and storage | in progress | Explicit amount/codec/identity/transaction/certificate types; memory+bbolt atomicity/restart contracts. Full schema/golden corpus still expanding. |
-| Organization signing and background INSTALL | in progress | Durable approval, no double vote, parent import, no-ACK child approval, INSTALL, fixed Worker slices. Runtime queues, rebalancing, proof-driven credit and service interfaces remain. |
-| Committee settlement and guarantees | in progress | Real Comet ABCI types; pending/committed isolation, deterministic state writes, replay. Payment execution, typed fact root/proof service and actual four-node consensus integration remain. |
-| Fees, cumulative credit and refill | in progress | Pure residual/credit and fee escrow rules tested. Public accounts, actual funding/claims, proof application and refill still missing. |
-| Gateway, peers and wallet | not started | Member verifier accepts only supplied trusted historical configurations; no network registry or wallet process yet. |
-| Scheduling, archive and operations | not started | Durable outbox records exist; no dispatcher/archive or capacity feedback yet. |
+| Organization signing and background INSTALL | in progress | Durable approval, no double vote, parent import, no-ACK child approval, INSTALL, fixed Worker slices. Bounded group commit, HTTP interfaces and proof-driven credit wired; quota rebalancing remains. |
+| Committee settlement and guarantees | in progress | Real Comet ABCI types; pending/committed isolation, deterministic state writes, replay. Typed facts, authenticated h+1 proofs, real four-node payment settlement, deferred child registration and retail direct execution tested. Root and funding commands remain. |
+| Fees, cumulative credit and refill | in progress | Pure residual/credit and fee escrow rules tested. Finite reserve accounts and fee stages wired; proof-driven original-member credit tested. Real refill/reward claims and B handoff remain. |
+| Gateway, peers and wallet | in progress | Trusted genesis configurations, HTTP quorum collector, durable intents/received certificates and independent gateway processes. Dynamic first-contact registration and wallet retry UI remain. |
+| Scheduling, archive and operations | in progress | Durable paged outbox relay, separate HTTP foreground/background capacity and public custody replacement. Physical archive, capacity feedback and optimized dependency scheduling remain. |
 | Tests, benchmarks and architecture reference tool | in progress | Foundational and member scenarios implemented; no complete sustained benchmark or archgen yet. |
 
 ## Verified increments
@@ -33,18 +33,40 @@ architecture TestID has passed. The full C/M/B/R/F/P/A/X/S/L/O/Q matrix remains 
 
 ## Current implementation limits
 - Ordinary finalized-CAL inputs and valid parent certificates; fast fees use the configured reserve policy.
-- Root issuance/fulfilment, fast self-funded fees and committee direct transfers are not yet wired.
-- Final inputs currently originate from trusted finite genesis state; public proof import is pending.
+- Root issuance/fulfilment and fast self-funded fees are not yet wired; retail direct fees are self-funded.
+- Final inputs originate from finite trusted genesis or verified public output-creation proofs.
 - Fixed Worker partitions; no automatic quota redistribution yet.
-- No completed public fact proofs or cumulative member-credit application yet.
-- No production listeners, automatic cancellation, retirement release, state repair or online migration.
+- B release now atomically persists a verified public-custody replacement binding the certificate object and effects. Local original data remains as history; physical archive and disk limits are still required.
+- Laboratory HTTP listeners exist; no automatic cancellation, retirement release, state repair or online migration.
 - Current byte reservations use a conservative certificate-envelope upper bound independent of QC subset.
   This is deterministic and bounded; measure and refine before claiming capital/storage efficiency.
-- Comet adapter's fact-tree integration is pending; its current empty-fact root is only a commit-boundary scaffold,
-  not a finality proof exposed to clients.
+- Reward totals currently accumulate in explicit organization/committee reward accounts; individual beneficiary allocation/claim commands remain.
 - No end-to-end TPS result exists.
 
 ## Environment
 - Go 1.27.1 on macOS arm64; bbolt v1.5.0 and CometBFT v0.38.26.
 - Default module proxy timed out from the Mac; reachable per-command GOPROXY used with checksum verification.
 - Linux deployment validation must use matching Go; Windows remains the control endpoint.
+
+
+## Second implementation increment
+- Real four-validator CometBFT, separate identities and bbolt application stores: certificate settlement at h, authenticated receipt at h+1, original member applies only six unused FUEL units.
+- Synthetic proof tests additionally reject foreign committees, wrong heights, altered facts, insufficient signatures and wrong original caps.
+- INSTALL-only members cannot claim credit or establish a first debit after observing public completion.
+- Public payment registration survives a missing parent, then settlement/close run once when dependencies arrive.
+- Direct committee transactions consume principal and fee inputs atomically, preserve route restrictions and produce deterministic FUEL change without TXCer.
+- Genesis funds and fixed authorization/configuration are bound into persistent identities and the initial application root.
+- Integration caught a local-metadata/business-key namespace collision; a dedicated regression test now separates them.
+- This integration runs four nodes inside one Go test process. Separate executable processes and network service acceptance are still required.
+
+
+## Multiprocess laboratory increment
+- Added member, committee, gateway and payctl executables; init-lab, lab-run, demo and stopped-database audit.
+- Actual 14-process, two-organization lab completed 8 alternating transfers, then restarted the same databases and completed another 8.
+- First functional run wallet READY observations: approximately 52–225 ms. These are sequential smoke measurements, not a sustained throughput result.
+- Initial stopped-state audit: every committee had 8 closed payments, 672 FUEL rewards and 80 burned; CAL supply 12,800 and total FUEL accounting 2,000,000,000,000 remained conserved.
+- The audit exposed unnecessary repeated INSTALL enqueueing after public completion. INSTALL now returns idempotently without reopening a completed outbox; a regression test covers it.
+- Validated opportunistic group commit: 32 successful concurrent operations and one business rejection used two underlying commits; signatures still wait for durable success.
+- Added delivery-attempt envelopes to retry a deferred command without changing its payment or fee identity despite Comet mempool byte caching.
+- Existing laboratory origin inputs 0 and 1 were reserved by failed demo attempts before the first service startup; no locks or databases were cleared. Demo now checks gateway availability before reserving a new input. General wallet resume remains to be implemented.
+- Current relay is correctness-oriented and still polls/duplicates work more than desired. Its throughput is not yet the target architecture's optimized backend.
