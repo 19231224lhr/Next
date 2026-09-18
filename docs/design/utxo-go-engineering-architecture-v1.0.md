@@ -1,5 +1,7 @@
 # UTXO 快速转账系统 Go 工程架构规范
 
+> **2026-09-19 工程增量：** [v1.2 直接担保与输入替换方案](./utxo-direct-liability-amendment-v1.2.md) 第 2–8 节规定新对象、身份、预算、责任、迟到及历史改写；第 9–10 节规定包级改动和验收。沿用下述 Go 分层与 bbolt，不新增根责任服务。涉及旧 TXCer 内嵌父交易、RootRecord、DEFERRED、零 CAL 转手和不可变交易字节的定义，以 v1.2 为准。现代码仍是 v1.1；真实改写需限定的 Comet 适配和密码实现验证，不能声称已有依赖直接支持。
+
 版本：工程规范 v1.1 · 一轮取证与后台 INSTALL  
 协议基线：`utxo-fast-payment-system-design-final.md`，协议 v1.1  
 日期：2026-09-18  
