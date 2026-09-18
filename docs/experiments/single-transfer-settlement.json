@@ -1,0 +1,641 @@
+{
+  "Network": "utxo-lab-ed8db09e67e287b8",
+  "Processes": 14,
+  "Scope": "Timing origin wallet_http_submit_v2: immediately before HTTP Client.Do; wallet-ready ends after recipient verification and synchronous persistence. Excludes sender preparation, signing, persistence and encoding; includes HTTP transport waiting and connection setup. Sequential cross-organization functional run, synchronous bbolt; final-proof times include polling after the fast chain. CommitObservedMicros, when requested, is the first SETTLED observation from committee 0 (10ms polling plus query delay), not an exact consensus timestamp or an independently verified proof. SettlementHeight and ProofHeaderHeight are obtained from the subsequently verified output proof. Not a sustained TPS benchmark.",
+  "Samples": [
+    {
+      "BackendTrace": [
+        {
+          "Attempt": "008940b942f0a89c105218aabf8f1905d5b12329a417a88d633f32003d90cd90",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620904752000,
+          "ReceivedUnixNS": 1789699620904842000,
+          "AcceptedUnixNS": 1789699620904954000,
+          "ExecuteStartUnixNS": 1789699621242941000,
+          "ExecuteDoneUnixNS": 1789699621242946000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "04c35c363e7564115237b41f15f583061f20fa58e1a0f303b5752ad81248a73f",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "gateway",
+          "Height": 0,
+          "DeliveredUnixNS": 1789699621108558000,
+          "ReceivedUnixNS": 1789699621108616000,
+          "AcceptedUnixNS": 1789699621108716000,
+          "ExecuteStartUnixNS": 0,
+          "ExecuteDoneUnixNS": 0,
+          "FinalizeDoneUnixNS": 0,
+          "CommitStartUnixNS": 0,
+          "CommittedUnixNS": 0
+        },
+        {
+          "Attempt": "0562224ad6938f48d0bc39cc3df0a8174e78ef511effc3493f3f8fc5a7418d1a",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620508963000,
+          "ReceivedUnixNS": 1789699620509007000,
+          "AcceptedUnixNS": 1789699620509244000,
+          "ExecuteStartUnixNS": 1789699621242885000,
+          "ExecuteDoneUnixNS": 1789699621242891000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "06f629ec2abc9a2fdeaa33561f08e3c97ac2498ba974daf20c59d4c9ac53bdca",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620708683000,
+          "ReceivedUnixNS": 1789699620708735000,
+          "AcceptedUnixNS": 1789699620708980000,
+          "ExecuteStartUnixNS": 1789699621242921000,
+          "ExecuteDoneUnixNS": 1789699621242926000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "12b0e39141e3a3a529a05cdc1861b5610fec15e442213efc17124485cfe5e5eb",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620709002000,
+          "ReceivedUnixNS": 1789699620709200000,
+          "AcceptedUnixNS": 1789699620709319000,
+          "ExecuteStartUnixNS": 1789699621242928000,
+          "ExecuteDoneUnixNS": 1789699621242933000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "2e83fab9fe59be58033edd9164345a5a83ded58e06e011b507a28b4ad7186a4b",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "gateway",
+          "Height": 2768,
+          "DeliveredUnixNS": 1789699620107902000,
+          "ReceivedUnixNS": 1789699620108141000,
+          "AcceptedUnixNS": 1789699620109048000,
+          "ExecuteStartUnixNS": 1789699620833084000,
+          "ExecuteDoneUnixNS": 1789699620833202000,
+          "FinalizeDoneUnixNS": 1789699620833299000,
+          "CommitStartUnixNS": 1789699620841152000,
+          "CommittedUnixNS": 1789699620855112000
+        },
+        {
+          "Attempt": "38a0f94e93d12d3faebba077a487645d3ca567ec228823bae0c61fd21f81297d",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "gateway",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620508845000,
+          "ReceivedUnixNS": 1789699620508896000,
+          "AcceptedUnixNS": 1789699620508998000,
+          "ExecuteStartUnixNS": 1789699621242863000,
+          "ExecuteDoneUnixNS": 1789699621242869000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "488d7459e4660c7f3a49338acdf66193fd63937dbba6e1bd0e13a155c5c6bf10",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 0,
+          "DeliveredUnixNS": 1789699621106202000,
+          "ReceivedUnixNS": 1789699621106318000,
+          "AcceptedUnixNS": 1789699621106444000,
+          "ExecuteStartUnixNS": 0,
+          "ExecuteDoneUnixNS": 0,
+          "FinalizeDoneUnixNS": 0,
+          "CommitStartUnixNS": 0,
+          "CommittedUnixNS": 0
+        },
+        {
+          "Attempt": "49668a10bb638d00beb19c6656f5e3ea1a869c217082462e6c9dd6b8e812f1e9",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "payctl",
+          "Height": 2768,
+          "DeliveredUnixNS": 1789699620368057000,
+          "ReceivedUnixNS": 1789699620368207000,
+          "AcceptedUnixNS": 1789699620368326000,
+          "ExecuteStartUnixNS": 1789699620833263000,
+          "ExecuteDoneUnixNS": 1789699620833268000,
+          "FinalizeDoneUnixNS": 1789699620833299000,
+          "CommitStartUnixNS": 1789699620841152000,
+          "CommittedUnixNS": 1789699620855112000
+        },
+        {
+          "Attempt": "4bd1e0bbf9cd70dafad01902d6a261b1c172b4395a4bd24b73687c49f03f36fc",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "gateway",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620708556000,
+          "ReceivedUnixNS": 1789699620708660000,
+          "AcceptedUnixNS": 1789699620708872000,
+          "ExecuteStartUnixNS": 1789699621242914000,
+          "ExecuteDoneUnixNS": 1789699621242919000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "51b1275376f8ec912aa09874f032f5c5ac63735c4759f231da7e49465932ff89",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 0,
+          "DeliveredUnixNS": 1789699621108650000,
+          "ReceivedUnixNS": 1789699621108694000,
+          "AcceptedUnixNS": 1789699621108827000,
+          "ExecuteStartUnixNS": 0,
+          "ExecuteDoneUnixNS": 0,
+          "FinalizeDoneUnixNS": 0,
+          "CommitStartUnixNS": 0,
+          "CommittedUnixNS": 0
+        },
+        {
+          "Attempt": "546400177391591b5fabf97508b8e8301da9a793b12ff5b610f32fba1ec50a16",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "payctl",
+          "Height": 0,
+          "DeliveredUnixNS": 1789699620967816000,
+          "ReceivedUnixNS": 1789699620967948000,
+          "AcceptedUnixNS": 1789699620968072000,
+          "ExecuteStartUnixNS": 0,
+          "ExecuteDoneUnixNS": 0,
+          "FinalizeDoneUnixNS": 0,
+          "CommitStartUnixNS": 0,
+          "CommittedUnixNS": 0
+        },
+        {
+          "Attempt": "63056e176a17ad14eb1cf2890306d1cdbb2d12ebd9b53084ce130a6bdfee7dee",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "payctl",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620768913000,
+          "ReceivedUnixNS": 1789699620769064000,
+          "AcceptedUnixNS": 1789699620769181000,
+          "ExecuteStartUnixNS": 1789699621242934000,
+          "ExecuteDoneUnixNS": 1789699621242939000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "79bfca77b793d0b74e55e1e28fd1259fc996d9c59bc7ff53ad2686264e1f31ef",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620908817000,
+          "ReceivedUnixNS": 1789699620908856000,
+          "AcceptedUnixNS": 1789699620908976000,
+          "ExecuteStartUnixNS": 1789699621242962000,
+          "ExecuteDoneUnixNS": 1789699621242967000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "7a6a7f2e849d3fa4eabb43205aa43af081471111f31701c44d02d1eea531e2fd",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620909095000,
+          "ReceivedUnixNS": 1789699620909146000,
+          "AcceptedUnixNS": 1789699620909252000,
+          "ExecuteStartUnixNS": 1789699621242968000,
+          "ExecuteDoneUnixNS": 1789699621242973000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "7ecd7daa91b98edea1d48cf7900e90d345993fb26ffa722c962ee11f75c5cbf7",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620908651000,
+          "ReceivedUnixNS": 1789699620908704000,
+          "AcceptedUnixNS": 1789699620908808000,
+          "ExecuteStartUnixNS": 1789699621242954000,
+          "ExecuteDoneUnixNS": 1789699621242960000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "81d361cca1895bbb5c35cf4ff2da9223f4e7b15facab7d51ed241e12d43dd836",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 0,
+          "DeliveredUnixNS": 1789699621108749000,
+          "ReceivedUnixNS": 1789699621108801000,
+          "AcceptedUnixNS": 1789699621109070000,
+          "ExecuteStartUnixNS": 0,
+          "ExecuteDoneUnixNS": 0,
+          "FinalizeDoneUnixNS": 0,
+          "CommitStartUnixNS": 0,
+          "CommittedUnixNS": 0
+        },
+        {
+          "Attempt": "8a97123dfb9e9bd24c3443b31ea9721bfa945b836cf46f5deeb2f7871f14be83",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620505501000,
+          "ReceivedUnixNS": 1789699620505586000,
+          "AcceptedUnixNS": 1789699620505713000,
+          "ExecuteStartUnixNS": 1789699621242843000,
+          "ExecuteDoneUnixNS": 1789699621242861000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "99caa5454cdbe04bafcce1d3b50414b6ef54d77b001e24297e55221d94916be7",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "payctl",
+          "Height": 0,
+          "DeliveredUnixNS": 1789699621167478000,
+          "ReceivedUnixNS": 1789699621167615000,
+          "AcceptedUnixNS": 1789699621167719000,
+          "ExecuteStartUnixNS": 0,
+          "ExecuteDoneUnixNS": 0,
+          "FinalizeDoneUnixNS": 0,
+          "CommitStartUnixNS": 0,
+          "CommittedUnixNS": 0
+        },
+        {
+          "Attempt": "ac25eb4664a276a2e78887e1b29c6f77bf821cf2b128fe955226cde7859889bf",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2768,
+          "DeliveredUnixNS": 1789699620308698000,
+          "ReceivedUnixNS": 1789699620308765000,
+          "AcceptedUnixNS": 1789699620308910000,
+          "ExecuteStartUnixNS": 1789699620833255000,
+          "ExecuteDoneUnixNS": 1789699620833260000,
+          "FinalizeDoneUnixNS": 1789699620833299000,
+          "CommitStartUnixNS": 1789699620841152000,
+          "CommittedUnixNS": 1789699620855112000
+        },
+        {
+          "Attempt": "ad2aed72e01e0c47618755b1b14e0043e7660bf2e46abbb3fd61d15dd86c0b54",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "payctl",
+          "Height": 2768,
+          "DeliveredUnixNS": 1789699620167175000,
+          "ReceivedUnixNS": 1789699620167321000,
+          "AcceptedUnixNS": 1789699620167458000,
+          "ExecuteStartUnixNS": 1789699620833238000,
+          "ExecuteDoneUnixNS": 1789699620833245000,
+          "FinalizeDoneUnixNS": 1789699620833299000,
+          "CommitStartUnixNS": 1789699620841152000,
+          "CommittedUnixNS": 1789699620855112000
+        },
+        {
+          "Attempt": "afccd6928651baf5acf8f8bbae4bd6adacc6e6767dbc386e72b388fb5fe422a4",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620708578000,
+          "ReceivedUnixNS": 1789699620708650000,
+          "AcceptedUnixNS": 1789699620708767000,
+          "ExecuteStartUnixNS": 1789699621242907000,
+          "ExecuteDoneUnixNS": 1789699621242912000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "b0d550c2bf2a2f9f1b00cc12ebe71a548f7cac552c2253f13c0881b28f15a32d",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620705747000,
+          "ReceivedUnixNS": 1789699620705843000,
+          "AcceptedUnixNS": 1789699620705949000,
+          "ExecuteStartUnixNS": 1789699621242900000,
+          "ExecuteDoneUnixNS": 1789699621242905000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "cccd6861cc591950c9cb8f72b5919e385f06f674cc0fc4affc49a101f3ab028c",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "payctl",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620567272000,
+          "ReceivedUnixNS": 1789699620567430000,
+          "AcceptedUnixNS": 1789699620567547000,
+          "ExecuteStartUnixNS": 1789699621242894000,
+          "ExecuteDoneUnixNS": 1789699621242899000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "d4a40665f947c3ae8f8b68bc030ffbec55dc85e039b9935eaceba973a76f5632",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 0,
+          "DeliveredUnixNS": 1789699621108683000,
+          "ReceivedUnixNS": 1789699621108725000,
+          "AcceptedUnixNS": 1789699621108964000,
+          "ExecuteStartUnixNS": 0,
+          "ExecuteDoneUnixNS": 0,
+          "FinalizeDoneUnixNS": 0,
+          "CommitStartUnixNS": 0,
+          "CommittedUnixNS": 0
+        },
+        {
+          "Attempt": "efc96b86b6d3d575fc8a881fff842b12d63f891b97724a4e4dbfcb1c5510fe76",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "member",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620508945000,
+          "ReceivedUnixNS": 1789699620508990000,
+          "AcceptedUnixNS": 1789699620509107000,
+          "ExecuteStartUnixNS": 1789699621242871000,
+          "ExecuteDoneUnixNS": 1789699621242876000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        },
+        {
+          "Attempt": "fcb8b22e6041e68f5539945f2cd3e9452634d4ec6470f7e16bad7612b5bbb568",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "gateway",
+          "Height": 2768,
+          "DeliveredUnixNS": 1789699620308612000,
+          "ReceivedUnixNS": 1789699620308680000,
+          "AcceptedUnixNS": 1789699620308795000,
+          "ExecuteStartUnixNS": 1789699620833247000,
+          "ExecuteDoneUnixNS": 1789699620833253000,
+          "FinalizeDoneUnixNS": 1789699620833299000,
+          "CommitStartUnixNS": 1789699620841152000,
+          "CommittedUnixNS": 1789699620855112000
+        },
+        {
+          "Attempt": "fcf77c51b509194ba861ff5327e217502e5e46fec2feaf105d5242b9672a368b",
+          "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+          "Sender": "gateway",
+          "Height": 2769,
+          "DeliveredUnixNS": 1789699620907734000,
+          "ReceivedUnixNS": 1789699620907831000,
+          "AcceptedUnixNS": 1789699620907944000,
+          "ExecuteStartUnixNS": 1789699621242948000,
+          "ExecuteDoneUnixNS": 1789699621242953000,
+          "FinalizeDoneUnixNS": 1789699621242976000,
+          "CommitStartUnixNS": 1789699621250741000,
+          "CommittedUnixNS": 1789699621264740000
+        }
+      ],
+      "CommitObservedMicros": 782480,
+      "SettlementHeight": 2768,
+      "ProofHeaderHeight": 2769,
+      "Trace": [
+        {
+          "node": "wallet",
+          "stage": "http_submit",
+          "unix_ns": 1789699620076725000,
+          "local_ns": 2084
+        },
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789699620076858000,
+          "local_ns": 292
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789699620077218000,
+          "local_ns": 360750
+        },
+        {
+          "node": "gateway",
+          "stage": "fanout_start",
+          "unix_ns": 1789699620077281000,
+          "local_ns": 423709
+        },
+        {
+          "node": "http://127.0.0.1:20002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789699620078395000,
+          "local_ns": 83
+        },
+        {
+          "node": "http://127.0.0.1:20001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789699620078473000,
+          "local_ns": 83
+        },
+        {
+          "node": "http://127.0.0.1:20000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789699620078480000,
+          "local_ns": 250
+        },
+        {
+          "node": "http://127.0.0.1:20002",
+          "stage": "request_decoded",
+          "unix_ns": 1789699620078731000,
+          "local_ns": 336000
+        },
+        {
+          "node": "http://127.0.0.1:20000",
+          "stage": "request_decoded",
+          "unix_ns": 1789699620078746000,
+          "local_ns": 266083
+        },
+        {
+          "node": "http://127.0.0.1:20001",
+          "stage": "request_decoded",
+          "unix_ns": 1789699620078750000,
+          "local_ns": 277291
+        },
+        {
+          "node": "http://127.0.0.1:20002",
+          "stage": "validation_complete",
+          "unix_ns": 1789699620078920000,
+          "local_ns": 525291
+        },
+        {
+          "node": "http://127.0.0.1:20000",
+          "stage": "validation_complete",
+          "unix_ns": 1789699620078920000,
+          "local_ns": 439792
+        },
+        {
+          "node": "http://127.0.0.1:20002",
+          "stage": "store_enter",
+          "unix_ns": 1789699620078925000,
+          "local_ns": 530708
+        },
+        {
+          "node": "http://127.0.0.1:20000",
+          "stage": "store_enter",
+          "unix_ns": 1789699620078925000,
+          "local_ns": 444875
+        },
+        {
+          "node": "http://127.0.0.1:20001",
+          "stage": "validation_complete",
+          "unix_ns": 1789699620078925000,
+          "local_ns": 452958
+        },
+        {
+          "node": "http://127.0.0.1:20001",
+          "stage": "store_enter",
+          "unix_ns": 1789699620078930000,
+          "local_ns": 457583
+        },
+        {
+          "node": "http://127.0.0.1:20000",
+          "stage": "state_checks_complete",
+          "unix_ns": 1789699620079061000,
+          "local_ns": 580958
+        },
+        {
+          "node": "http://127.0.0.1:20002",
+          "stage": "state_checks_complete",
+          "unix_ns": 1789699620079062000,
+          "local_ns": 666833
+        },
+        {
+          "node": "http://127.0.0.1:20001",
+          "stage": "state_checks_complete",
+          "unix_ns": 1789699620079352000,
+          "local_ns": 879458
+        },
+        {
+          "node": "http://127.0.0.1:20000",
+          "stage": "commit_returned",
+          "unix_ns": 1789699620091332000,
+          "local_ns": 12851625
+        },
+        {
+          "node": "http://127.0.0.1:20002",
+          "stage": "commit_returned",
+          "unix_ns": 1789699620091334000,
+          "local_ns": 12939708
+        },
+        {
+          "node": "http://127.0.0.1:20000",
+          "stage": "vote_signed",
+          "unix_ns": 1789699620091352000,
+          "local_ns": 12871625
+        },
+        {
+          "node": "http://127.0.0.1:20002",
+          "stage": "vote_signed",
+          "unix_ns": 1789699620091353000,
+          "local_ns": 12957958
+        },
+        {
+          "node": "http://127.0.0.1:20002",
+          "stage": "response_ready",
+          "unix_ns": 1789699620091356000,
+          "local_ns": 12961375
+        },
+        {
+          "node": "http://127.0.0.1:20000",
+          "stage": "response_ready",
+          "unix_ns": 1789699620091357000,
+          "local_ns": 12876792
+        },
+        {
+          "node": "gateway",
+          "stage": "vote_2_accepted",
+          "unix_ns": 1789699620092704000,
+          "local_ns": 15847000
+        },
+        {
+          "node": "gateway",
+          "stage": "vote_0_accepted",
+          "unix_ns": 1789699620092797000,
+          "local_ns": 15939500
+        },
+        {
+          "node": "http://127.0.0.1:20001",
+          "stage": "commit_returned",
+          "unix_ns": 1789699620095278000,
+          "local_ns": 16805250
+        },
+        {
+          "node": "http://127.0.0.1:20001",
+          "stage": "vote_signed",
+          "unix_ns": 1789699620095295000,
+          "local_ns": 16823000
+        },
+        {
+          "node": "http://127.0.0.1:20001",
+          "stage": "response_ready",
+          "unix_ns": 1789699620095299000,
+          "local_ns": 16826750
+        },
+        {
+          "node": "gateway",
+          "stage": "vote_1_accepted",
+          "unix_ns": 1789699620095500000,
+          "local_ns": 18642709
+        },
+        {
+          "node": "gateway",
+          "stage": "quorum_collected",
+          "unix_ns": 1789699620095500000,
+          "local_ns": 18642792
+        },
+        {
+          "node": "gateway",
+          "stage": "certificate_verified",
+          "unix_ns": 1789699620095646000,
+          "local_ns": 18788917
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789699620095736000,
+          "local_ns": 18878875
+        },
+        {
+          "node": "wallet",
+          "stage": "response_headers_received",
+          "unix_ns": 1789699620095914000,
+          "local_ns": 19190792
+        },
+        {
+          "node": "wallet",
+          "stage": "response_body_received",
+          "unix_ns": 1789699620096053000,
+          "local_ns": 19330250
+        },
+        {
+          "node": "wallet",
+          "stage": "certificate_verified",
+          "unix_ns": 1789699620097568000,
+          "local_ns": 20845167
+        },
+        {
+          "node": "wallet",
+          "stage": "recipient_persisted",
+          "unix_ns": 1789699620121311000,
+          "local_ns": 44588084
+        }
+      ],
+      "Hop": 0,
+      "Spend": "e53d03916a4fdd765219a574b5e9f141ced3dc6578d6dafb57c66bb6e0e523ac",
+      "FastMicros": 20843,
+      "WalletReadyMicros": 44584,
+      "FinalProofMicros": 1188861
+    }
+  ]
+}

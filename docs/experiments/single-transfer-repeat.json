@@ -1,0 +1,868 @@
+{
+  "conditions": "Three separate single-payment diagnostic runs on the same running 14-process Mac lab. Inputs 0, 1, 2 are separate finalized genesis UTXOs, 100 CAL each. New runs wait for the preceding run to observe a final proof; this does not assert all background work was fully drained. Wallet-ready uses a monotonic client clock; cross-process stage offsets use same-host wall time. Three samples are not a latency distribution.",
+  "summary": [
+    {
+      "report": "demo-1789698416865072000.json",
+      "gateway_enter_ms": 0.202,
+      "quorum_ms": 19.444,
+      "body_received_ms": 19.932,
+      "verified_ms": 21.156,
+      "ready_ms": 36.328,
+      "wallet_receive_phase_ms": 15.172,
+      "quorum_to_response_ready_ms": 0.234,
+      "final_proof_observed_ms": 1060.992
+    },
+    {
+      "report": "demo-1789698616418494000.json",
+      "gateway_enter_ms": 0.199,
+      "quorum_ms": 19.554,
+      "body_received_ms": 20.102,
+      "verified_ms": 21.054,
+      "ready_ms": 39.422,
+      "wallet_receive_phase_ms": 18.368,
+      "quorum_to_response_ready_ms": 0.242,
+      "final_proof_observed_ms": 1266.991
+    },
+    {
+      "report": "demo-1789698630130985000.json",
+      "gateway_enter_ms": 0.054,
+      "quorum_ms": 17.089,
+      "body_received_ms": 17.572,
+      "verified_ms": 18.531,
+      "ready_ms": 45.893,
+      "wallet_receive_phase_ms": 27.362,
+      "quorum_to_response_ready_ms": 0.24,
+      "final_proof_observed_ms": 1371.159
+    }
+  ],
+  "raw_reports": [
+    {
+      "Network": "utxo-lab-ed8db09e67e287b8",
+      "Processes": 14,
+      "Scope": "Timing origin wallet_http_submit_v2: immediately before HTTP Client.Do; wallet-ready ends after recipient verification and synchronous persistence. Excludes sender preparation, signing, persistence and encoding; includes HTTP transport waiting and connection setup. Sequential cross-organization functional run, synchronous bbolt; final-proof times include polling after the fast chain. Not a sustained TPS benchmark.",
+      "Samples": [
+        {
+          "Trace": [
+            {
+              "node": "wallet",
+              "stage": "http_submit",
+              "unix_ns": 1789698415804080000,
+              "local_ns": 2750
+            },
+            {
+              "node": "gateway",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698415804282000,
+              "local_ns": 83
+            },
+            {
+              "node": "gateway",
+              "stage": "request_decoded",
+              "unix_ns": 1789698415804663000,
+              "local_ns": 381291
+            },
+            {
+              "node": "gateway",
+              "stage": "fanout_start",
+              "unix_ns": 1789698415804733000,
+              "local_ns": 451958
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698415805429000,
+              "local_ns": 1166
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "request_decoded",
+              "unix_ns": 1789698415805576000,
+              "local_ns": 147583
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698415805644000,
+              "local_ns": 209
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698415805710000,
+              "local_ns": 292
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "request_decoded",
+              "unix_ns": 1789698415805773000,
+              "local_ns": 129042
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "validation_complete",
+              "unix_ns": 1789698415805774000,
+              "local_ns": 345958
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "store_enter",
+              "unix_ns": 1789698415805780000,
+              "local_ns": 352375
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698415805815000,
+              "local_ns": 209
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "request_decoded",
+              "unix_ns": 1789698415805831000,
+              "local_ns": 120750
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "state_checks_complete",
+              "unix_ns": 1789698415805929000,
+              "local_ns": 500791
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "request_decoded",
+              "unix_ns": 1789698415805929000,
+              "local_ns": 114417
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "validation_complete",
+              "unix_ns": 1789698415805946000,
+              "local_ns": 301417
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "store_enter",
+              "unix_ns": 1789698415805954000,
+              "local_ns": 310042
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "validation_complete",
+              "unix_ns": 1789698415805998000,
+              "local_ns": 288375
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "store_enter",
+              "unix_ns": 1789698415806007000,
+              "local_ns": 296750
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "state_checks_complete",
+              "unix_ns": 1789698415806097000,
+              "local_ns": 453167
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "validation_complete",
+              "unix_ns": 1789698415806101000,
+              "local_ns": 286375
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "store_enter",
+              "unix_ns": 1789698415806106000,
+              "local_ns": 291875
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "state_checks_complete",
+              "unix_ns": 1789698415806138000,
+              "local_ns": 427917
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "state_checks_complete",
+              "unix_ns": 1789698415806244000,
+              "local_ns": 429500
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "commit_returned",
+              "unix_ns": 1789698415815369000,
+              "local_ns": 9941208
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "vote_signed",
+              "unix_ns": 1789698415815392000,
+              "local_ns": 9963916
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "response_ready",
+              "unix_ns": 1789698415815394000,
+              "local_ns": 9965500
+            },
+            {
+              "node": "gateway",
+              "stage": "vote_3_accepted",
+              "unix_ns": 1789698415815629000,
+              "local_ns": 11347625
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "commit_returned",
+              "unix_ns": 1789698415819303000,
+              "local_ns": 13659125
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "vote_signed",
+              "unix_ns": 1789698415819321000,
+              "local_ns": 13676917
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "response_ready",
+              "unix_ns": 1789698415819323000,
+              "local_ns": 13679292
+            },
+            {
+              "node": "gateway",
+              "stage": "vote_2_accepted",
+              "unix_ns": 1789698415819530000,
+              "local_ns": 15248250
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "commit_returned",
+              "unix_ns": 1789698415823288000,
+              "local_ns": 17473709
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "commit_returned",
+              "unix_ns": 1789698415823290000,
+              "local_ns": 17580125
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "vote_signed",
+              "unix_ns": 1789698415823305000,
+              "local_ns": 17490459
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "vote_signed",
+              "unix_ns": 1789698415823307000,
+              "local_ns": 17596875
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "response_ready",
+              "unix_ns": 1789698415823309000,
+              "local_ns": 17599375
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "response_ready",
+              "unix_ns": 1789698415823310000,
+              "local_ns": 17495250
+            },
+            {
+              "node": "gateway",
+              "stage": "vote_1_accepted",
+              "unix_ns": 1789698415823523000,
+              "local_ns": 19241416
+            },
+            {
+              "node": "gateway",
+              "stage": "quorum_collected",
+              "unix_ns": 1789698415823524000,
+              "local_ns": 19242291
+            },
+            {
+              "node": "gateway",
+              "stage": "certificate_verified",
+              "unix_ns": 1789698415823670000,
+              "local_ns": 19388375
+            },
+            {
+              "node": "gateway",
+              "stage": "response_ready",
+              "unix_ns": 1789698415823758000,
+              "local_ns": 19476083
+            },
+            {
+              "node": "wallet",
+              "stage": "response_headers_received",
+              "unix_ns": 1789698415823927000,
+              "local_ns": 19850250
+            },
+            {
+              "node": "wallet",
+              "stage": "response_body_received",
+              "unix_ns": 1789698415824012000,
+              "local_ns": 19934875
+            },
+            {
+              "node": "wallet",
+              "stage": "certificate_verified",
+              "unix_ns": 1789698415825237000,
+              "local_ns": 21159583
+            },
+            {
+              "node": "wallet",
+              "stage": "recipient_persisted",
+              "unix_ns": 1789698415840409000,
+              "local_ns": 36332333
+            }
+          ],
+          "Hop": 0,
+          "Spend": "7fe7b9b67d8c3dc45ddcdd31f7af6d89ca1d520467511f0c1e0431bc950642f3",
+          "FastMicros": 21156,
+          "WalletReadyMicros": 36328,
+          "FinalProofMicros": 1060992
+        }
+      ]
+    },
+    {
+      "Network": "utxo-lab-ed8db09e67e287b8",
+      "Processes": 14,
+      "Scope": "Timing origin wallet_http_submit_v2: immediately before HTTP Client.Do; wallet-ready ends after recipient verification and synchronous persistence. Excludes sender preparation, signing, persistence and encoding; includes HTTP transport waiting and connection setup. Sequential cross-organization functional run, synchronous bbolt; final-proof times include polling after the fast chain. Not a sustained TPS benchmark.",
+      "Samples": [
+        {
+          "Trace": [
+            {
+              "node": "wallet",
+              "stage": "http_submit",
+              "unix_ns": 1789698615151504000,
+              "local_ns": 2666
+            },
+            {
+              "node": "gateway",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698615151703000,
+              "local_ns": 292
+            },
+            {
+              "node": "gateway",
+              "stage": "request_decoded",
+              "unix_ns": 1789698615151823000,
+              "local_ns": 120209
+            },
+            {
+              "node": "gateway",
+              "stage": "fanout_start",
+              "unix_ns": 1789698615151884000,
+              "local_ns": 181042
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698615152416000,
+              "local_ns": 209
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698615152456000,
+              "local_ns": 167
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698615152462000,
+              "local_ns": 208
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698615152498000,
+              "local_ns": 416
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "request_decoded",
+              "unix_ns": 1789698615152542000,
+              "local_ns": 125959
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "request_decoded",
+              "unix_ns": 1789698615152571000,
+              "local_ns": 114875
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "request_decoded",
+              "unix_ns": 1789698615152576000,
+              "local_ns": 114041
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "request_decoded",
+              "unix_ns": 1789698615152670000,
+              "local_ns": 171833
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "validation_complete",
+              "unix_ns": 1789698615152716000,
+              "local_ns": 300417
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "store_enter",
+              "unix_ns": 1789698615152722000,
+              "local_ns": 306084
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "validation_complete",
+              "unix_ns": 1789698615152738000,
+              "local_ns": 281917
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "store_enter",
+              "unix_ns": 1789698615152743000,
+              "local_ns": 287000
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "validation_complete",
+              "unix_ns": 1789698615152746000,
+              "local_ns": 284208
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "store_enter",
+              "unix_ns": 1789698615152752000,
+              "local_ns": 290458
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "state_checks_complete",
+              "unix_ns": 1789698615152808000,
+              "local_ns": 391875
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "state_checks_complete",
+              "unix_ns": 1789698615152830000,
+              "local_ns": 368291
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "validation_complete",
+              "unix_ns": 1789698615152839000,
+              "local_ns": 341041
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "store_enter",
+              "unix_ns": 1789698615152844000,
+              "local_ns": 346375
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "state_checks_complete",
+              "unix_ns": 1789698615152924000,
+              "local_ns": 425708
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "state_checks_complete",
+              "unix_ns": 1789698615153002000,
+              "local_ns": 545833
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "commit_returned",
+              "unix_ns": 1789698615166950000,
+              "local_ns": 14488541
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "vote_signed",
+              "unix_ns": 1789698615166966000,
+              "local_ns": 14504708
+            },
+            {
+              "node": "http://127.0.0.1:20000",
+              "stage": "response_ready",
+              "unix_ns": 1789698615166969000,
+              "local_ns": 14507708
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "commit_returned",
+              "unix_ns": 1789698615166997000,
+              "local_ns": 14541125
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "vote_signed",
+              "unix_ns": 1789698615167013000,
+              "local_ns": 14557208
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "response_ready",
+              "unix_ns": 1789698615167016000,
+              "local_ns": 14560542
+            },
+            {
+              "node": "gateway",
+              "stage": "vote_0_accepted",
+              "unix_ns": 1789698615167185000,
+              "local_ns": 15482959
+            },
+            {
+              "node": "gateway",
+              "stage": "vote_3_accepted",
+              "unix_ns": 1789698615167280000,
+              "local_ns": 15577459
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "commit_returned",
+              "unix_ns": 1789698615170858000,
+              "local_ns": 18360166
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "vote_signed",
+              "unix_ns": 1789698615170873000,
+              "local_ns": 18375583
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "response_ready",
+              "unix_ns": 1789698615170876000,
+              "local_ns": 18378125
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "commit_returned",
+              "unix_ns": 1789698615170912000,
+              "local_ns": 18496042
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "vote_signed",
+              "unix_ns": 1789698615170928000,
+              "local_ns": 18512250
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "response_ready",
+              "unix_ns": 1789698615170931000,
+              "local_ns": 18515250
+            },
+            {
+              "node": "gateway",
+              "stage": "vote_1_accepted",
+              "unix_ns": 1789698615171058000,
+              "local_ns": 19355125
+            },
+            {
+              "node": "gateway",
+              "stage": "quorum_collected",
+              "unix_ns": 1789698615171058000,
+              "local_ns": 19355542
+            },
+            {
+              "node": "gateway",
+              "stage": "certificate_verified",
+              "unix_ns": 1789698615171212000,
+              "local_ns": 19509917
+            },
+            {
+              "node": "gateway",
+              "stage": "response_ready",
+              "unix_ns": 1789698615171300000,
+              "local_ns": 19597250
+            },
+            {
+              "node": "wallet",
+              "stage": "response_headers_received",
+              "unix_ns": 1789698615171498000,
+              "local_ns": 19996000
+            },
+            {
+              "node": "wallet",
+              "stage": "response_body_received",
+              "unix_ns": 1789698615171606000,
+              "local_ns": 20104833
+            },
+            {
+              "node": "wallet",
+              "stage": "certificate_verified",
+              "unix_ns": 1789698615172559000,
+              "local_ns": 21057375
+            },
+            {
+              "node": "wallet",
+              "stage": "recipient_persisted",
+              "unix_ns": 1789698615190927000,
+              "local_ns": 39426041
+            }
+          ],
+          "Hop": 0,
+          "Spend": "90ba7b8225b35ab28f7541da5f175005fdc64ceea8f5213a6cb89a31a62ccb95",
+          "FastMicros": 21054,
+          "WalletReadyMicros": 39422,
+          "FinalProofMicros": 1266991
+        }
+      ]
+    },
+    {
+      "Network": "utxo-lab-ed8db09e67e287b8",
+      "Processes": 14,
+      "Scope": "Timing origin wallet_http_submit_v2: immediately before HTTP Client.Do; wallet-ready ends after recipient verification and synchronous persistence. Excludes sender preparation, signing, persistence and encoding; includes HTTP transport waiting and connection setup. Sequential cross-organization functional run, synchronous bbolt; final-proof times include polling after the fast chain. Not a sustained TPS benchmark.",
+      "Samples": [
+        {
+          "Trace": [
+            {
+              "node": "wallet",
+              "stage": "http_submit",
+              "unix_ns": 1789698628759828000,
+              "local_ns": 792
+            },
+            {
+              "node": "gateway",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698628759882000,
+              "local_ns": 167
+            },
+            {
+              "node": "gateway",
+              "stage": "request_decoded",
+              "unix_ns": 1789698628760002000,
+              "local_ns": 120833
+            },
+            {
+              "node": "gateway",
+              "stage": "fanout_start",
+              "unix_ns": 1789698628760063000,
+              "local_ns": 181333
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698628760255000,
+              "local_ns": 459
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698628760255000,
+              "local_ns": 375
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "http_handler_enter",
+              "unix_ns": 1789698628760361000,
+              "local_ns": 84
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "request_decoded",
+              "unix_ns": 1789698628760362000,
+              "local_ns": 106917
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "request_decoded",
+              "unix_ns": 1789698628760364000,
+              "local_ns": 108875
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "request_decoded",
+              "unix_ns": 1789698628760476000,
+              "local_ns": 115709
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "validation_complete",
+              "unix_ns": 1789698628760540000,
+              "local_ns": 285167
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "validation_complete",
+              "unix_ns": 1789698628760542000,
+              "local_ns": 286834
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "store_enter",
+              "unix_ns": 1789698628760546000,
+              "local_ns": 291042
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "store_enter",
+              "unix_ns": 1789698628760548000,
+              "local_ns": 292584
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "state_checks_complete",
+              "unix_ns": 1789698628760614000,
+              "local_ns": 358584
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "state_checks_complete",
+              "unix_ns": 1789698628760615000,
+              "local_ns": 360250
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "validation_complete",
+              "unix_ns": 1789698628760648000,
+              "local_ns": 287125
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "store_enter",
+              "unix_ns": 1789698628760654000,
+              "local_ns": 293542
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "state_checks_complete",
+              "unix_ns": 1789698628760719000,
+              "local_ns": 358209
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "commit_returned",
+              "unix_ns": 1789698628772812000,
+              "local_ns": 12557084
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "commit_returned",
+              "unix_ns": 1789698628772815000,
+              "local_ns": 12559750
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "vote_signed",
+              "unix_ns": 1789698628772828000,
+              "local_ns": 12573417
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "vote_signed",
+              "unix_ns": 1789698628772830000,
+              "local_ns": 12575500
+            },
+            {
+              "node": "http://127.0.0.1:20001",
+              "stage": "response_ready",
+              "unix_ns": 1789698628772831000,
+              "local_ns": 12575834
+            },
+            {
+              "node": "http://127.0.0.1:20003",
+              "stage": "response_ready",
+              "unix_ns": 1789698628772833000,
+              "local_ns": 12577834
+            },
+            {
+              "node": "gateway",
+              "stage": "vote_3_accepted",
+              "unix_ns": 1789698628773021000,
+              "local_ns": 13139167
+            },
+            {
+              "node": "gateway",
+              "stage": "vote_1_accepted",
+              "unix_ns": 1789698628773120000,
+              "local_ns": 13238667
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "commit_returned",
+              "unix_ns": 1789698628776734000,
+              "local_ns": 16373667
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "vote_signed",
+              "unix_ns": 1789698628776750000,
+              "local_ns": 16389417
+            },
+            {
+              "node": "http://127.0.0.1:20002",
+              "stage": "response_ready",
+              "unix_ns": 1789698628776753000,
+              "local_ns": 16392000
+            },
+            {
+              "node": "gateway",
+              "stage": "vote_2_accepted",
+              "unix_ns": 1789698628776917000,
+              "local_ns": 17035458
+            },
+            {
+              "node": "gateway",
+              "stage": "quorum_collected",
+              "unix_ns": 1789698628776917000,
+              "local_ns": 17035625
+            },
+            {
+              "node": "gateway",
+              "stage": "certificate_verified",
+              "unix_ns": 1789698628777068000,
+              "local_ns": 17186667
+            },
+            {
+              "node": "gateway",
+              "stage": "response_ready",
+              "unix_ns": 1789698628777157000,
+              "local_ns": 17275750
+            },
+            {
+              "node": "wallet",
+              "stage": "response_headers_received",
+              "unix_ns": 1789698628777307000,
+              "local_ns": 17480458
+            },
+            {
+              "node": "wallet",
+              "stage": "response_body_received",
+              "unix_ns": 1789698628777400000,
+              "local_ns": 17573417
+            },
+            {
+              "node": "wallet",
+              "stage": "certificate_verified",
+              "unix_ns": 1789698628778359000,
+              "local_ns": 18532583
+            },
+            {
+              "node": "wallet",
+              "stage": "recipient_persisted",
+              "unix_ns": 1789698628805722000,
+              "local_ns": 45895167
+            }
+          ],
+          "Hop": 0,
+          "Spend": "2d363655a16ca7404e922ae720b0f2d14107e49dc8917ca9e1236112c91e7bee",
+          "FastMicros": 18531,
+          "WalletReadyMicros": 45893,
+          "FinalProofMicros": 1371159
+        }
+      ]
+    }
+  ]
+}
