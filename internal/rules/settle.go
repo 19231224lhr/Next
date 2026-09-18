@@ -173,6 +173,17 @@ func EvaluateSettlement(v state.ReadView, verified VerifiedCertificate, s Schedu
 			return state.Transition{}, e
 		}
 		if !found || !creation.Final {
+			waiting := state.Key(state.KeyWaiting, in.Output[:])
+			old, present, err := state.Load[protocol.SpendFactID](o, waiting)
+			if err != nil {
+				return state.Transition{}, err
+			}
+			if present && old != c.QC.Fact {
+				return state.Transition{}, ErrConflict
+			}
+			if err = state.Put(o, waiting, c.QC.Fact); err != nil {
+				return state.Transition{}, err
+			}
 			deferred = true
 			continue
 		}
@@ -207,6 +218,7 @@ func EvaluateSettlement(v state.ReadView, verified VerifiedCertificate, s Schedu
 		return protocol.FinalFact{Kind: kind, Key: key, Revision: 1, Network: t.Network, Rules: t.Rules, Payload: payload}
 	}
 	for _, in := range t.Inputs {
+		o.Delete(state.Key(state.KeyWaiting, in.Output[:]))
 		if e = state.Put(o, state.Key(state.KeySpend, in.Output[:]), state.Spend{Consumed: c.QC.Fact}); e != nil {
 			return state.Transition{}, e
 		}

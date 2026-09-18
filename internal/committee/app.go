@@ -12,6 +12,7 @@ import (
 	"sort"
 	"sync"
 	"utxo/finality"
+	"utxo/internal/requesttrace"
 	"utxo/internal/state"
 	"utxo/internal/store"
 	"utxo/protocol"
@@ -20,6 +21,7 @@ import (
 var ErrBlock = errors.New("inconsistent block height or identity")
 var metaKey = []byte{0xff, 2, 'c', 'o', 'm', 'm', 'i', 't'}
 
+type MaintenanceFunc func(state.ReadView) (state.Transition, error)
 type CheckFunc func([]byte) error
 type ExecuteFunc func(state.ReadView, []byte) (state.Transition, error)
 type commitRecord struct {
@@ -33,6 +35,7 @@ type commitRecord struct {
 // App provides ABCI commit isolation. Business execution is supplied by the
 // deterministic payment rules; no standalone node accepts arbitrary key writes.
 type App struct {
+	maintenance MaintenanceFunc
 	abci.BaseApplication
 	mu             sync.Mutex
 	chain          string
@@ -48,11 +51,14 @@ type App struct {
 
 var _ abci.Application = (*App)(nil)
 
-func NewApp(chain string, db store.Store, check CheckFunc, execute ExecuteFunc) (*App, error) {
-	if chain == "" || db == nil || check == nil || execute == nil {
+func NewApp(chain string, db store.Store, check CheckFunc, execute ExecuteFunc, maintenance ...MaintenanceFunc) (*App, error) {
+	if chain == "" || db == nil || check == nil || execute == nil || len(maintenance) > 1 {
 		return nil, protocol.ErrRule
 	}
 	a := &App{chain: chain, db: db, check: check, execute: execute, response: &abci.ResponseFinalizeBlock{}}
+	if len(maintenance) == 1 {
+		a.maintenance = maintenance[0]
+	}
 	e := db.View(func(v state.ReadView) error {
 		raw, e := v.Get(metaKey)
 		if errors.Is(e, state.ErrNotFound) {
@@ -153,19 +159,7 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 	var leaves [][]byte
 	e := a.db.View(func(v state.ReadView) error {
 		overlay := state.NewOverlay(v)
-		for i, tx := range r.Txs {
-			response.TxResults[i] = &abci.ExecTxResult{}
-			if err := a.check(tx); err != nil {
-				response.TxResults[i].Code = 1
-				response.TxResults[i].Log = "invalid command"
-				continue
-			}
-			transition, err := a.execute(overlay, tx)
-			if err != nil {
-				response.TxResults[i].Code = 2
-				response.TxResults[i].Log = "business rejected"
-				continue
-			}
+		apply := func(transition state.Transition) error {
 			for _, c := range transition.Changes {
 				if len(c.Key) == 0 || c.Key[0] == 0xff {
 					return errors.New("executor used reserved state key")
@@ -200,6 +194,35 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 				facts[string(key)] = f
 			}
 			overlay.Apply(candidate.Changes())
+			return nil
+		}
+		for i, tx := range r.Txs {
+			response.TxResults[i] = &abci.ExecTxResult{}
+			if err := a.check(tx); err != nil {
+				response.TxResults[i].Code = 1
+				response.TxResults[i].Log = "invalid command"
+				continue
+			}
+			requesttrace.Settlement.Command(tx, "execute_start", r.Height)
+			transition, err := a.execute(overlay, tx)
+			requesttrace.Settlement.Command(tx, "execute_done", r.Height)
+			if err != nil {
+				response.TxResults[i].Code = 2
+				response.TxResults[i].Log = "business rejected"
+				continue
+			}
+			if err = apply(transition); err != nil {
+				return err
+			}
+		}
+		if a.maintenance != nil {
+			transition, err := a.maintenance(overlay)
+			if err != nil {
+				return err
+			}
+			if err = apply(transition); err != nil {
+				return err
+			}
 		}
 		for _, c := range overlay.Changes() {
 			old, err := v.Get(c.Key)
@@ -252,6 +275,7 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 	}
 	a.pending = &commitRecord{Height: r.Height, BlockID: bytes.Clone(r.Hash), Response: raw, Commitment: commitment, Leaves: leaves}
 	a.pendingChanges = changes
+	requesttrace.Settlement.Block(r.Height, "finalize_done")
 	return cloneResponse(response), nil
 }
 func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit, error) {
@@ -263,6 +287,7 @@ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit
 	if a.pending == nil {
 		return &abci.ResponseCommit{}, nil
 	}
+	requesttrace.Settlement.Block(a.pending.Height, "commit_start")
 	raw, e := json.Marshal(a.pending)
 	if e != nil {
 		return nil, e
@@ -288,6 +313,7 @@ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit
 		a.halted = e
 		return nil, e
 	}
+	requesttrace.Settlement.Block(a.pending.Height, "commit_done")
 	a.pending = nil
 	a.pendingChanges = nil
 	return &abci.ResponseCommit{}, nil

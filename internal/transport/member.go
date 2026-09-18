@@ -3,14 +3,17 @@ package transport
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"utxo/finality"
 	"utxo/internal/member"
+	"utxo/internal/requesttrace"
 	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/internal/store"
@@ -65,6 +68,11 @@ func MemberHandler(m *member.Member, foreground, background int) http.Handler {
 		}
 	}
 	mux.HandleFunc("POST /v1/transactions", wrap(fg, func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if r.Header.Get(requesttrace.HeaderName) == "1" {
+			ctx = requesttrace.Start(ctx, "member")
+		}
+		requesttrace.Mark(ctx, "http_handler_enter")
 		raw, e := binaryBody(w, r, protocol.MaxRequestBytes)
 		if e != nil {
 			fail(w, e)
@@ -75,7 +83,8 @@ func MemberHandler(m *member.Member, foreground, background int) http.Handler {
 			fail(w, e)
 			return
 		}
-		approval, e := m.Approve(request)
+		requesttrace.Mark(ctx, "request_decoded")
+		approval, e := m.ApproveContext(ctx, request)
 		if e != nil {
 			fail(w, e)
 			return
@@ -84,6 +93,10 @@ func MemberHandler(m *member.Member, foreground, background int) http.Handler {
 		if e != nil {
 			fail(w, e)
 			return
+		}
+		requesttrace.Mark(ctx, "response_ready")
+		if requesttrace.Enabled(ctx) {
+			w.Header().Set(requesttrace.HeaderName, requesttrace.Header(ctx))
 		}
 		binaryResponse(w, raw)
 	}))
@@ -119,6 +132,20 @@ func MemberHandler(m *member.Member, foreground, background int) http.Handler {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
+	mux.HandleFunc("GET /v1/outcomes/{spend}", func(w http.ResponseWriter, r *http.Request) {
+		var id protocol.Hash
+		if e := id.UnmarshalText([]byte(r.PathValue("spend"))); e != nil {
+			fail(w, e)
+			return
+		}
+		result, e := m.Outcome(protocol.SpendFactID(id))
+		if e != nil {
+			fail(w, e)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"approved": result.Approved, "installed": result.Installed, "publicObserved": result.PublicObserved, "custody": result.Custody, "fuelResidual": strconv.FormatUint(result.FuelResidual, 10), "policyResidual": strconv.FormatUint(result.PolicyResidual, 10), "executionResidual": strconv.FormatUint(result.ExecutionResidual, 10), "bytesResidual": strconv.FormatUint(result.BytesResidual, 10)})
+	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("alive\n"))
@@ -140,11 +167,15 @@ func (c *MemberClient) post(ctx context.Context, path string, raw []byte, limit 
 		return nil, e
 	}
 	request.Header.Set("Content-Type", MediaType)
+	if path == "/v1/transactions" && requesttrace.Enabled(ctx) {
+		request.Header.Set(requesttrace.HeaderName, "1")
+	}
 	response, e := c.HTTP.Do(request)
 	if e != nil {
 		return nil, e
 	}
 	defer response.Body.Close()
+	requesttrace.Import(ctx, response.Header.Get(requesttrace.HeaderName), c.BaseURL)
 	body, e := io.ReadAll(io.LimitReader(response.Body, int64(limit+1)))
 	if e != nil {
 		return nil, e

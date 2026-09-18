@@ -2,9 +2,11 @@ package member
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"errors"
 	"utxo/finality"
+	"utxo/internal/requesttrace"
 	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/internal/store"
@@ -131,6 +133,9 @@ func (m *Member) verify(c protocol.TXCer) error {
 	return c.Verify(p)
 }
 func (m *Member) Approve(req Request) (Approval, error) {
+	return m.ApproveContext(context.Background(), req)
+}
+func (m *Member) ApproveContext(ctx context.Context, req Request) (Approval, error) {
 	tx := req.Tx
 	t := tx.Body
 	cfg := m.cfg.Organization
@@ -224,20 +229,28 @@ func (m *Member) Approve(req Request) (Approval, error) {
 	if e = rules.ValidateTransfer(tx, inputs); e != nil {
 		return Approval{}, e
 	}
+	requesttrace.Mark(ctx, "validation_complete")
 	effects := protocol.EffectsFor(t, depth, uint32(ancestors))
 	id := t.ID()
 	worker := uint32(id[0]) % m.cfg.Workers
 	var fact protocol.SpendFactID
+	requesttrace.Mark(ctx, "store_enter")
 	e = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		cs, f, err := rules.EvaluatePrepare(v, tx, inputs, vector, effects, worker, materials)
 		fact = f
+		if err == nil {
+			requesttrace.Mark(ctx, "state_checks_complete")
+		}
 		return cs, err
 	})
 	if e != nil {
 		return Approval{}, e
 	}
+	requesttrace.Mark(ctx, "commit_returned")
 	// Signing occurs only after the authoritative storage commit succeeds.
-	return Approval{Fact: fact, Vote: protocol.SignSpend(fact, m.cfg.Index, m.cfg.Key), Admission: vector, Effects: effects}, nil
+	result := Approval{Fact: fact, Vote: protocol.SignSpend(fact, m.cfg.Index, m.cfg.Key), Admission: vector, Effects: effects}
+	requesttrace.Mark(ctx, "vote_signed")
+	return result, nil
 }
 func (m *Member) Install(c protocol.TXCer) error {
 	if e := m.verify(c); e != nil {

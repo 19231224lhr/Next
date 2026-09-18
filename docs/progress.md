@@ -70,3 +70,62 @@ architecture TestID has passed. The full C/M/B/R/F/P/A/X/S/L/O/Q matrix remains 
 - Added delivery-attempt envelopes to retry a deferred command without changing its payment or fee identity despite Comet mempool byte caching.
 - Existing laboratory origin inputs 0 and 1 were reserved by failed demo attempts before the first service startup; no locks or databases were cleared. Demo now checks gateway availability before reserving a new input. General wallet resume remains to be implemented.
 - Current relay is correctness-oriented and still polls/duplicates work more than desired. Its throughput is not yet the target architecture's optimized backend.
+
+## Single-payment diagnostic instrumentation
+
+Added opt-in `payctl demo -trace` stage timestamps across wallet, gateway and
+member HTTP approval. No extra quorum wait or per-event disk log. Race tests for
+member/transport/gateway/tracing pass; diagnostic mode also covers one-offline
+member quorum. First real-process single finalized-UTXO sample after restart:
+54.275 ms certificate verified, 81.256 ms recipient persisted, 1.410354 s final
+proof observed. Raw trace: `experiments/profile-001/reports/demo-1789697834159121000.json`.
+Timing definitions and limitations are in README. This adds measurement only;
+no fast-path optimization is claimed.
+
+## Gateway persistence removed from foreground
+
+Collector now returns after quorum verification. HTTP sends an exact-length full
+body and flushes before background Persist, reusing its existing bounded handler.
+Wallet demo/bench start the existing relay; standalone wallet-relay resumes saved
+outboxes without the original gateway. Protocol, architecture and execution-plan
+copies are synchronized with the Windows documents.
+
+Validation: full race suite and four-member Comet integration passed; after HTTP
+handler extraction, affected race tests and command vet/build passed again.
+Tests cover return with failed gateway storage, complete HTTP body while gateway
+storage is blocked, persisted replay, and wallet-store reopen followed by relay
+delivery without installation acknowledgements.
+A new single-payment diagnostic sample measured 21.156 ms first verification,
+36.328 ms wallet READY and 1.060992 s observed final proof. Report:
+experiments/single-async-001/reports/demo-1789698416865072000.json.
+This is one new-lab sample, not a controlled speedup or sustained-TPS claim.
+
+## Single finalized-UTXO block observation
+
+One new transaction on single-async-001 (input 3): wallet READY 50.240 ms,
+committee 0 committed SETTLED first observed at 796.527 ms, output proof verified
+at 1304.771 ms. Authenticated settlement height 1405; proof header height 1406.
+Observation includes 10 ms polling plus query delay and all delivery/consensus/
+storage time from wallet submission. This is not pure BFT execution time.
+Raw report: experiments/single-async-001/reports/demo-1789699007412202000.json.
+The command observer test, race check, vet and build passed. No performance or
+consensus parameters were changed for this measurement.
+
+## Backend stage timing: one payment
+
+Opt-in bounded in-memory timing now links delivery attempts through committee
+reception, admission, rule execution and application commit. Enabled-mode
+four-validator integration, affected race tests and vet/build passed.
+One single-UTXO run: delivery 31.177 ms, committee receive
+31.416 ms, execution 756.359 ms,
+application commit 778.387 ms; observed final proof
+1188.861 ms. Receive-to-execution is
+724.943 ms, rule execution
+0.118 ms, application commit
+13.960 ms. Dominant interval is before business execution;
+individual consensus stages remain unmeasured.
+Snapshot shows 28 attempts for the same payment, 21
+executed by then; duplicate delivery is a concrete optimization candidate,
+not evidence of extra payments. No timing parameters or retries changed.
+Evidence: experiments/single-async-001/reports/demo-1789699621265965000.json
+and single-transfer-settlement.md.

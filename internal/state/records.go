@@ -133,3 +133,10 @@ type Custody struct {
 	Fact, Certificate, Effects protocol.Hash
 	Proof                      []byte
 }
+
+const (
+	KeyWaiting          uint8 = 93
+	KeyDependencyQueue  uint8 = 94
+	KeyDependencyItem   uint8 = 95
+	KeyDependencyQueued uint8 = 96
+)

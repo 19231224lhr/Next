@@ -7,9 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 	"utxo/finality"
+	"utxo/internal/requesttrace"
 	"utxo/protocol"
 )
 
@@ -47,6 +51,10 @@ func (c *CommitteeClient) Submit(ctx context.Context, raw []byte) error {
 		return e
 	}
 	request.Header.Set("Content-Type", MediaType)
+	if requesttrace.Settlement != nil {
+		request.Header.Set(requesttrace.DeliverySourceHeader, filepath.Base(os.Args[0]))
+		request.Header.Set(requesttrace.DeliveryTimeHeader, strconv.FormatInt(time.Now().UnixNano(), 10))
+	}
 	response, e := c.HTTP.Do(request)
 	if e != nil {
 		return e

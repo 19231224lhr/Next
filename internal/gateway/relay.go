@@ -95,25 +95,28 @@ func (r *Relay) deliver(ctx context.Context, key []byte, pending state.Outbox) e
 	}
 	// Public submission does not wait for any member INSTALL acknowledgement.
 	_ = r.Public.Submit(ctx, raw)
+
 	if clients, ok := r.Members[c.Tx.Body.Certifier]; ok {
+		installCtx, cancel := context.WithCancel(ctx)
 		done := make(chan struct{}, 4)
-		for _, m := range clients {
-			go func(m MemberClient) {
-				if m != nil {
-					_ = m.Install(ctx, c)
+		for _, client := range clients {
+			go func(client MemberClient) {
+				if client != nil {
+					_ = client.Install(installCtx, c)
 				}
 				done <- struct{}{}
-			}(m)
+			}(client)
 		}
-		// Bound each delivery pass while reserving independent foreground handlers.
-		for i := 0; i < 4; i++ {
-			select {
-			case <-done:
-			case <-ctx.Done():
-				return ctx.Err()
+		// Receipt/custody processing is independent of acknowledgements. Bound the
+		// four attempts to this pass, cancelling and joining them on return.
+		defer func() {
+			cancel()
+			for i := 0; i < 4; i++ {
+				<-done
 			}
-		}
+		}()
 	}
+
 	var custody bool
 	for _, allocation := range c.Admission {
 		kind := protocol.FactCredit

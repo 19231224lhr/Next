@@ -22,6 +22,7 @@ type EngineConfig struct {
 	Accounts      []GenesisAccount
 }
 type Engine struct {
+	cache   certificateCache
 	cfg     EngineConfig
 	db      store.Store
 	orgs    map[protocol.Hash]protocol.OrgConfig
@@ -131,6 +132,11 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 	return engine, e
 }
 func (e *Engine) verified(raw []byte) (rules.VerifiedCertificate, error) {
+	key := protocol.Digest("VERIFIED_CERTIFICATE_BYTES", raw)
+	if verified, ok := e.cache.get(key); ok {
+		return verified, nil
+	}
+
 	c, err := protocol.DecodeCertificate(raw)
 	if err != nil {
 		return rules.VerifiedCertificate{}, err
@@ -139,7 +145,11 @@ func (e *Engine) verified(raw []byte) (rules.VerifiedCertificate, error) {
 	if !found {
 		return rules.VerifiedCertificate{}, protocol.ErrAuth
 	}
-	return rules.VerifyCertificate(c, org, e.cfg.Schedule)
+	verified, err := rules.VerifyCertificate(c, org, e.cfg.Schedule)
+	if err == nil {
+		e.cache.put(key, verified, len(raw))
+	}
+	return verified, err
 }
 func isDirect(raw []byte) bool { return len(raw) >= 2 && binary.BigEndian.Uint16(raw[:2]) == 2 }
 func (e *Engine) unwrap(raw []byte) ([]byte, error) {
@@ -189,13 +199,21 @@ func (e *Engine) Execute(v state.ReadView, raw []byte) (state.Transition, error)
 		if err != nil {
 			return state.Transition{}, err
 		}
-		return rules.EvaluateDirectTransfer(v, verified, e.cfg.Schedule)
+		tr, err := rules.EvaluateDirectTransfer(v, verified, e.cfg.Schedule)
+		if err != nil {
+			return tr, err
+		}
+		return e.enqueue(v, tr)
 	}
 	verified, err := e.verified(raw)
 	if err != nil {
 		return state.Transition{}, err
 	}
-	return rules.EvaluateSettlement(v, verified, e.cfg.Schedule)
+	tr, err := rules.EvaluateSettlement(v, verified, e.cfg.Schedule)
+	if err != nil {
+		return tr, err
+	}
+	return e.enqueue(v, tr)
 }
 func (e *Engine) Account(owner protocol.Hash, asset protocol.Asset) (uint64, error) {
 	var balance uint64

@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"time"
 
@@ -132,6 +133,14 @@ func HTTP(listen string, handler http.Handler, t TLS) (*http.Server, error) {
 	if e != nil {
 		return nil, e
 	}
+	host, _, _ := net.SplitHostPort(listen)
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		debug := http.NewServeMux()
+		debug.Handle("/", handler)
+		debug.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
+		debug.Handle("GET /debug/pprof/goroutine", pprof.Handler("goroutine"))
+		handler = debug
+	}
 	return &http.Server{Addr: listen, Handler: handler, TLSConfig: secure, ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}, nil
 }
 func Serve(server *http.Server) error {
@@ -145,4 +154,12 @@ func Serve(server *http.Server) error {
 		return nil
 	}
 	return fmt.Errorf("HTTP service: %w", e)
+}
+
+type NodeSpec struct{ Name, Binary, Config, URL string }
+type Lab struct {
+	Network  string
+	Nodes    []NodeSpec
+	Owners   [2]string
+	Gateways [2]string
 }

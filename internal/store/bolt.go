@@ -12,6 +12,8 @@ import (
 	"utxo/internal/state"
 )
 
+var errNoWrites = errors.New("no logical changes")
+
 var dataBucket = []byte("state.v2")
 var metaBucket = []byte("identity.v2")
 
@@ -81,7 +83,16 @@ func (b *Bolt) Update(fn func(state.ReadView) ([]state.Change, error)) error {
 			businessErr = e
 			return e
 		}
+		changed := false
 		for _, c := range cs {
+			old := bucket.Get(c.Key)
+			if c.Delete && old == nil {
+				continue
+			}
+			if !c.Delete && old != nil && bytes.Equal(old, c.Value) {
+				continue
+			}
+			changed = true
 			if c.Delete {
 				e = bucket.Delete(c.Key)
 			} else {
@@ -91,8 +102,14 @@ func (b *Bolt) Update(fn func(state.ReadView) ([]state.Change, error)) error {
 				return e
 			}
 		}
+		if !changed {
+			return errNoWrites
+		}
 		return nil
 	})
+	if errors.Is(err, errNoWrites) {
+		return nil
+	}
 	if err != nil && businessErr == nil {
 		b.uncertain = true
 		return errors.Join(ErrUncertain, err)

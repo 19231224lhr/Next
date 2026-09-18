@@ -27,6 +27,7 @@ import (
 	"time"
 	cfg "utxo/cmd/internal/config"
 	"utxo/internal/committee"
+	"utxo/internal/requesttrace"
 	"utxo/internal/store"
 	"utxo/internal/transport"
 	"utxo/protocol"
@@ -71,7 +72,7 @@ func run() error {
 	if e != nil {
 		return e
 	}
-	app, e := committee.NewApp(network.ChainID, db, engine.Check, engine.Execute)
+	app, e := committee.NewApp(network.ChainID, db, engine.Check, engine.Execute, engine.Drain)
 	if e != nil {
 		return e
 	}
@@ -128,6 +129,10 @@ func run() error {
 	client := local.New(consensus)
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/commands", func(w http.ResponseWriter, r *http.Request) {
+		var received int64
+		if requesttrace.Settlement != nil {
+			received = time.Now().UnixNano()
+		}
 		if r.Header.Get("Content-Type") != transport.MediaType {
 			http.Error(w, "INVALID_ENCODING", 400)
 			return
@@ -136,6 +141,10 @@ func run() error {
 		if e != nil {
 			http.Error(w, "INVALID_ENCODING", 400)
 			return
+		}
+		if requesttrace.Settlement != nil {
+			sent, _ := strconv.ParseInt(r.Header.Get(requesttrace.DeliveryTimeHeader), 10, 64)
+			requesttrace.Settlement.Receive(raw, sent, received, r.Header.Get(requesttrace.DeliverySourceHeader))
 		}
 		result, e := client.BroadcastTxSync(r.Context(), ct.Tx(raw))
 		if e != nil {
@@ -146,6 +155,7 @@ func run() error {
 			http.Error(w, "INVALID_COMMAND", 400)
 			return
 		}
+		requesttrace.Settlement.Command(raw, "accepted", 0)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusAccepted)
 		_ = json.NewEncoder(w).Encode(map[string]string{"command": fmt.Sprintf("%X", result.Hash), "status": "SUBMITTED"})
@@ -231,6 +241,17 @@ func run() error {
 		info, _ := app.Info(r.Context(), &abci.RequestInfo{})
 		_ = json.NewEncoder(w).Encode(map[string]string{"height": strconv.FormatInt(info.LastBlockHeight, 10)})
 	})
+	if requesttrace.Settlement != nil {
+		mux.HandleFunc("GET /debug/settlement/{spend}", func(w http.ResponseWriter, r *http.Request) {
+			var id protocol.Hash
+			if err := id.UnmarshalText([]byte(r.PathValue("spend"))); err != nil {
+				http.Error(w, "INVALID_ID", 400)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(requesttrace.Settlement.ForSpend(id.String()))
+		})
+	}
 	server, e := cfg.HTTP(c.Listen, mux, c.TLS)
 	if e != nil {
 		return e

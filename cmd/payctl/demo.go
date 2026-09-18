@@ -14,6 +14,7 @@ import (
 	"time"
 	cfg "utxo/cmd/internal/config"
 	"utxo/finality"
+	"utxo/internal/requesttrace"
 	"utxo/internal/store"
 	"utxo/internal/transport"
 	"utxo/internal/wallet"
@@ -21,6 +22,11 @@ import (
 )
 
 type sample struct {
+	BackendTrace                                    []requesttrace.SettlementTiming `json:",omitempty"`
+	CommitObservedMicros                            int64                           `json:",omitempty"`
+	SettlementHeight                                int64
+	ProofHeaderHeight                               int64
+	Trace                                           []requesttrace.Event `json:",omitempty"`
 	Hop                                             int
 	Spend                                           string
 	FastMicros, WalletReadyMicros, FinalProofMicros int64
@@ -29,10 +35,15 @@ type sample struct {
 func demo(args []string) error {
 	flags := flag.NewFlagSet("demo", flag.ContinueOnError)
 	dir := flags.String("dir", "", "laboratory directory")
+	observeBlock := flags.Bool("observe-block", false, "poll committed state before final proof (single hop only)")
+	traceEnabled := flags.Bool("trace", false, "include diagnostic stage timestamps (same-host comparison only)")
 	hops := flags.Int("hops", 8, "alternating cross-organization transfers")
 	input := flags.Int("input", 0, "unused genesis output index for owner zero")
 	if e := flags.Parse(args); e != nil {
 		return e
+	}
+	if *observeBlock && *hops != 1 {
+		return fmt.Errorf("observe-block requires one hop")
 	}
 	if *hops < 1 || *hops > 32 {
 		return fmt.Errorf("demo supports 1..32 hops; sustained workloads use bench")
@@ -81,6 +92,11 @@ func demo(args []string) error {
 			return e
 		}
 		defer db.Close()
+		stopRelay, err := network.StartWalletRelay(db)
+		if err != nil {
+			return err
+		}
+		defer stopRelay()
 		var owner protocol.PublicKey
 		copy(owner[:], keys[i][32:])
 		wallets[i], e = wallet.New(db, network.Genesis.Network, owner, network.Organizations)
@@ -133,7 +149,6 @@ func demo(args []string) error {
 		if parent != nil {
 			request.Parents = []protocol.TXCer{*parent}
 		}
-		start := time.Now()
 		if e = wallets[sender].SaveRequest(request); e != nil {
 			return e
 		}
@@ -146,10 +161,19 @@ func demo(args []string) error {
 			return e
 		}
 		httpRequest.Header.Set("Content-Type", transport.MediaType)
+		traceCtx := ctx
+		if *traceEnabled {
+			traceCtx = requesttrace.Start(ctx, "wallet")
+			httpRequest.Header.Set(requesttrace.HeaderName, "1")
+		}
+		start := time.Now() // Wallet HTTP submission, after durable preparation and encoding.
+		requesttrace.Mark(traceCtx, "http_submit")
 		response, e := client.Do(httpRequest)
 		if e != nil {
 			return e
 		}
+		requesttrace.Mark(traceCtx, "response_headers_received")
+		requesttrace.Import(traceCtx, response.Header.Get(requesttrace.HeaderName), "")
 		raw, e = io.ReadAll(io.LimitReader(response.Body, protocol.MaxCertificateBytes+1))
 		response.Body.Close()
 		if e != nil {
@@ -158,6 +182,7 @@ func demo(args []string) error {
 		if response.StatusCode != 200 {
 			return fmt.Errorf("hop %d: HTTP %d: %s", hop, response.StatusCode, raw)
 		}
+		requesttrace.Mark(traceCtx, "response_body_received")
 		c, e := protocol.DecodeCertificate(raw)
 		if e != nil {
 			return e
@@ -166,16 +191,25 @@ func demo(args []string) error {
 			return e
 		}
 		fast := time.Since(start).Microseconds()
+		requesttrace.Mark(traceCtx, "certificate_verified")
 		if e = wallets[recipient].Receive(c, 0); e != nil {
 			return e
 		}
-		samples = append(samples, sample{Hop: hop, Spend: protocol.Hash(c.QC.Fact).String(), FastMicros: fast, WalletReadyMicros: time.Since(start).Microseconds()})
+		ready := time.Since(start).Microseconds()
+		requesttrace.Mark(traceCtx, "recipient_persisted")
+		samples = append(samples, sample{Trace: requesttrace.Events(traceCtx), Hop: hop, Spend: protocol.Hash(c.QC.Fact).String(), FastMicros: fast, WalletReadyMicros: ready})
 		starts = append(starts, start)
 		certificates = append(certificates, c)
 		parent = &certificates[len(certificates)-1]
 		current = protocol.Input{Kind: protocol.CertificateInput, Output: c.Effects.Outputs[0], Evidence: protocol.Hash(c.QC.Fact)}
 	}
 	for i, c := range certificates {
+		if *observeBlock {
+			if err := observeCommit(ctx, client, network.CommitteeURLs[0]+"/v1/outcomes/"+protocol.Hash(c.QC.Fact).String()); err != nil {
+				return err
+			}
+			samples[i].CommitObservedMicros = time.Since(starts[i]).Microseconds()
+		}
 		key := protocol.Hash(c.Effects.Outputs[0])
 		verified := false
 		for ctx.Err() == nil {
@@ -190,12 +224,33 @@ func demo(args []string) error {
 					return fmt.Errorf("unexpected settled output")
 				}
 				samples[i].FinalProofMicros = time.Since(starts[i]).Microseconds()
+				samples[i].SettlementHeight = proof.Commitment.Height
+				samples[i].ProofHeaderHeight = proof.Header.Height
 				verified = true
 				break
 			}
 			select {
 			case <-ctx.Done():
 			case <-time.After(100 * time.Millisecond):
+			}
+		}
+		if verified && *observeBlock && requesttrace.Settlement != nil {
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, network.CommitteeURLs[0]+"/debug/settlement/"+protocol.Hash(c.QC.Fact).String(), nil)
+			if err != nil {
+				return err
+			}
+			response, err := client.Do(req)
+			if err != nil {
+				return err
+			}
+			if response.StatusCode == http.StatusOK {
+				err = json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&samples[i].BackendTrace)
+			} else {
+				err = fmt.Errorf("backend trace HTTP %d", response.StatusCode)
+			}
+			response.Body.Close()
+			if err != nil {
+				return err
 			}
 		}
 		if !verified {
@@ -207,7 +262,7 @@ func demo(args []string) error {
 		Processes int
 		Scope     string
 		Samples   []sample
-	}{network.ChainID, len(lab.Nodes), "Sequential cross-organization functional run, synchronous bbolt; final-proof times include polling after the fast chain. Not a sustained TPS benchmark.", samples}
+	}{network.ChainID, len(lab.Nodes), "Timing origin wallet_http_submit_v2: immediately before HTTP Client.Do; wallet-ready ends after recipient verification and synchronous persistence. Excludes sender preparation, signing, persistence and encoding; includes HTTP transport waiting and connection setup. Sequential cross-organization functional run, synchronous bbolt; final-proof times include polling after the fast chain. CommitObservedMicros, when requested, is the first SETTLED observation from committee 0 (10ms polling plus query delay), not an exact consensus timestamp or an independently verified proof. SettlementHeight and ProofHeaderHeight are obtained from the subsequently verified output proof. Not a sustained TPS benchmark.", samples}
 	path := filepath.Join(*dir, "reports", fmt.Sprintf("demo-%d.json", time.Now().UnixNano()))
 	if e = cfg.Write(path, report); e != nil {
 		return e

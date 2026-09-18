@@ -9,6 +9,7 @@ import (
 	"time"
 	"utxo/internal/gateway"
 	"utxo/internal/member"
+	"utxo/internal/requesttrace"
 	"utxo/internal/state"
 	"utxo/internal/store"
 	"utxo/internal/testkit"
@@ -80,7 +81,10 @@ func TestHTTPCollectorOneOfflineAndChildWithoutInstall(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
-	// Durable collector replay needs no live members and creates no new identity.
+	// Background persistence makes replay independent of live members.
+	if e = collector.Persist(certificate); e != nil {
+		t.Fatal(e)
+	}
 	for i := range clients {
 		clients[i] = unavailable{}
 	}
@@ -91,5 +95,89 @@ func TestHTTPCollectorOneOfflineAndChildWithoutInstall(t *testing.T) {
 	replay, e := restarted.Collect(ctx, protocol.PaymentRequest{Tx: f.Transaction(0, 1)})
 	if e != nil || replay.QC.Fact != certificate.QC.Fact {
 		t.Fatalf("replay %v", e)
+	}
+}
+
+func TestDiagnosticTraceIncludesThreeMembersWithoutWaitingForFourth(t *testing.T) {
+	f := testkit.NewFixture("trace", "a", 1)
+	var clients [4]gateway.MemberClient
+	for i := 0; i < 3; i++ {
+		db := store.NewMemory()
+		defer db.Close()
+		m, e := f.Member(i, db)
+		if e != nil {
+			t.Fatal(e)
+		}
+		server := httptest.NewServer(transport.MemberHandler(m, 4, 4))
+		defer server.Close()
+		clients[i] = transport.NewMemberClient(server.URL)
+	}
+	clients[3] = unavailable{}
+	db := store.NewMemory()
+	defer db.Close()
+	collector, e := gateway.New(f.Org, clients, db)
+	if e != nil {
+		t.Fatal(e)
+	}
+	ctx := requesttrace.Start(context.Background(), "gateway")
+	cert, e := collector.Collect(ctx, protocol.PaymentRequest{Tx: f.Transaction(0, 1)})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = cert.Verify(f.Org); e != nil {
+		t.Fatal(e)
+	}
+	stages := make(map[string]int)
+	for _, event := range requesttrace.Events(ctx) {
+		stages[event.Stage]++
+	}
+	for stage, want := range map[string]int{"http_handler_enter": 3, "validation_complete": 3, "state_checks_complete": 3, "commit_returned": 3, "vote_signed": 3, "quorum_collected": 1, "certificate_verified": 1} {
+		if stages[stage] != want {
+			t.Fatalf("%s count=%d want %d", stage, stages[stage], want)
+		}
+	}
+}
+
+type failedWriter struct {
+	store.Store
+	writes int
+}
+
+func (s *failedWriter) Update(func(state.ReadView) ([]state.Change, error)) error {
+	s.writes++
+	return errors.New("disk unavailable")
+}
+func TestCollectDoesNotWaitForOrRequireGatewayPersistence(t *testing.T) {
+	f := testkit.NewFixture("no-gateway-write", "a", 1)
+	var clients [4]gateway.MemberClient
+	for i := range clients {
+		db := store.NewMemory()
+		defer db.Close()
+		m, e := f.Member(i, db)
+		if e != nil {
+			t.Fatal(e)
+		}
+		server := httptest.NewServer(transport.MemberHandler(m, 4, 4))
+		defer server.Close()
+		clients[i] = transport.NewMemberClient(server.URL)
+	}
+	db := &failedWriter{Store: store.NewMemory()}
+	defer db.Close()
+	collector, e := gateway.New(f.Org, clients, db)
+	if e != nil {
+		t.Fatal(e)
+	}
+	cert, e := collector.Collect(context.Background(), protocol.PaymentRequest{Tx: f.Transaction(0, 1)})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = cert.Verify(f.Org); e != nil {
+		t.Fatal(e)
+	}
+	if db.writes != 0 {
+		t.Fatal("foreground performed a storage write")
+	}
+	if e = collector.Persist(cert); e == nil {
+		t.Fatal("background persistence failure hidden")
 	}
 }

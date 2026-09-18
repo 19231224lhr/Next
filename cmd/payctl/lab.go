@@ -23,13 +23,8 @@ import (
 	"utxo/protocol"
 )
 
-type nodeSpec struct{ Name, Binary, Config, URL string }
-type labConfig struct {
-	Network  string
-	Nodes    []nodeSpec
-	Owners   [2]string
-	Gateways [2]string
-}
+type nodeSpec = cfg.NodeSpec
+type labConfig = cfg.Lab
 
 func initialize(args []string) error {
 	flags := flag.NewFlagSet("init-lab", flag.ContinueOnError)

@@ -113,7 +113,7 @@ func TestFourNodePaymentSettlementAndCredit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		apps[i], err = committee.NewApp(chain, db, engine.Check, engine.Execute)
+		apps[i], err = committee.NewApp(chain, db, engine.Check, engine.Execute, engine.Drain)
 		if err != nil {
 			t.Fatal(err)
 		}

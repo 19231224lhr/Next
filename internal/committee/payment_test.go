@@ -1,6 +1,9 @@
 package committee_test
 
 import (
+	"bytes"
+	"context"
+	abci "github.com/cometbft/cometbft/abci/types"
 	"testing"
 	"utxo/internal/committee"
 	"utxo/internal/rules"
@@ -121,5 +124,61 @@ func TestDeferredChildRetainsRegistrationAndThenSettles(t *testing.T) {
 	balance, _ := engine.Account(f.Org.Org, protocol.AssetFUEL)
 	if balance != 1_000_000_000-188 {
 		t.Fatalf("balance %d", balance)
+	}
+}
+
+func TestMissingAncestorsWakeWithinBoundedBlockMaintenance(t *testing.T) {
+	f := testkit.NewFixture("wake", "a", 1)
+	db := store.NewMemory()
+	defer db.Close()
+	engine, e := committee.NewEngine(committee.EngineConfig{Network: f.Org.Network, Organizations: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Genesis: f.Genesis, Accounts: []committee.GenesisAccount{{Owner: f.Org.Org, Asset: protocol.AssetFUEL, Balance: 1_000_000_000}}}, db)
+	if e != nil {
+		t.Fatal(e)
+	}
+	first, e := f.Certify(f.Transaction(0, 1))
+	if e != nil {
+		t.Fatal(e)
+	}
+	chain := []protocol.TXCer{first}
+	for i := 0; i < 2; i++ {
+		previous := chain[len(chain)-1]
+		body := f.Transaction(0, uint64(i+2)).Body
+		body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: previous.Effects.Outputs[0], Evidence: protocol.Hash(previous.QC.Fact)}}
+		c, e := f.Certify(f.Sign(body), previous)
+		if e != nil {
+			t.Fatal(e)
+		}
+		chain = append(chain, c)
+	}
+	app, e := committee.NewApp("wake", db, engine.Check, engine.Execute, engine.Drain)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var commands [][]byte
+	for i := len(chain) - 1; i >= 0; i-- {
+		raw, _ := chain[i].MarshalBinary()
+		commands = append(commands, raw)
+	}
+	response, e := app.FinalizeBlock(context.Background(), &abci.RequestFinalizeBlock{Height: 1, Hash: bytes.Repeat([]byte{1}, 32), Txs: commands})
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, result := range response.TxResults {
+		if result.Code != 0 {
+			t.Fatal("command rejected")
+		}
+	}
+	if _, e = app.Commit(context.Background(), &abci.RequestCommit{}); e != nil {
+		t.Fatal(e)
+	}
+	for _, c := range chain {
+		p, e := engine.Payment(c.QC.Fact)
+		if e != nil || !p.Settled || !p.Fee.Closed {
+			t.Fatalf("dependency never woken: %+v %v", p, e)
+		}
+	}
+	balance, _ := engine.Account(f.Org.Org, protocol.AssetFUEL)
+	if balance != 1_000_000_000-3*94 {
+		t.Fatalf("duplicate fee: %d", balance)
 	}
 }

@@ -7,7 +7,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: payctl init-lab | lab-run | demo")
+		fmt.Fprintln(os.Stderr, "usage: payctl init-lab | lab-run | demo | audit | wallet-relay")
 		os.Exit(2)
 	}
 	var err error
@@ -18,6 +18,8 @@ func main() {
 		err = runLab(os.Args[2:])
 	case "audit":
 		err = audit(os.Args[2:])
+	case "wallet-relay":
+		err = relayWallet(os.Args[2:])
 	case "demo":
 		err = demo(os.Args[2:])
 	default:
