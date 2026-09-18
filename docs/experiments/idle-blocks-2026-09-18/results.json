@@ -1,0 +1,66 @@
+{
+  "baseline": {
+    "mode": "continuous_empty_blocks",
+    "seconds": 5.009635583,
+    "before": [
+      20722,
+      20722,
+      20722,
+      20722
+    ],
+    "after": [
+      20748,
+      20748,
+      20748,
+      20748
+    ]
+  },
+  "idle_before_payment": {
+    "seconds": 5,
+    "before": [
+      20838,
+      20838,
+      20838,
+      20838
+    ],
+    "after": [
+      20838,
+      20838,
+      20838,
+      20838
+    ]
+  },
+  "payment": {
+    "Network": "utxo-lab-704a9a9ad75fa327",
+    "Processes": 14,
+    "Scope": "Timing origin wallet_http_submit_v2: immediately before HTTP Client.Do; wallet-ready ends after recipient verification and synchronous persistence. Excludes sender preparation, signing, persistence and encoding; includes HTTP transport waiting and connection setup. Sequential cross-organization functional run, synchronous bbolt; final-proof times include polling after the fast chain. CommitObservedMicros, when requested, is the first SETTLED observation from committee 0 (10ms polling plus query delay), not an exact consensus timestamp or an independently verified proof. SettlementHeight and ProofHeaderHeight are obtained from the subsequently verified output proof. Not a sustained TPS benchmark.",
+    "Samples": [
+      {
+        "CommitObservedMicros": 236292,
+        "SettlementHeight": 20839,
+        "ProofHeaderHeight": 20840,
+        "Hop": 0,
+        "Spend": "18d8067aac2fe9a5cb38459aa413b8818740022aaf081767618b29b5bfe94fe1",
+        "FastMicros": 12841,
+        "WalletReadyMicros": 24904,
+        "FinalProofMicros": 441969
+      }
+    ]
+  },
+  "source_report": "/Users/richz/lab/man/utxo-fastpay/experiments/fresh-active-001/reports/demo-1789718023243230000.json",
+  "idle_after_payment": {
+    "seconds": 5,
+    "before": [
+      20840,
+      20840,
+      20840,
+      20840
+    ],
+    "after": [
+      20840,
+      20840,
+      20840,
+      20840
+    ]
+  }
+}

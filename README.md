@@ -11,6 +11,7 @@ Primary development checkout: Mac Studio, `/Users/richz/lab/man/utxo-fastpay`.
 - Durable member approval, three-vote certificates, background INSTALL, direct-parent import.
 - Same/cross-organization pre-settlement spending, persistent conflict locks and local budgets.
 - CometBFT 0.38 with typed Merkle facts, next-height authenticated proofs and real four-node tests.
+- On-demand blocks: idle consensus waits for transactions; necessary proof/maintenance blocks finish before it becomes idle again.
 - Ordinary CAL payment settlement, deferred child registration, finite FUEL reserves and idempotent fee stages.
 - Proof-driven FUEL/policy/E member credits and finalized-output import.
 - Retail direct transfers with atomic CAL/FUEL consumption and deterministic fee change.

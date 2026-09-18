@@ -86,7 +86,9 @@ func run() error {
 	cc.P2P.AddrBookStrict = false
 	cc.P2P.PexReactor = false
 	cc.Consensus.TimeoutCommit = 100 * time.Millisecond
-	cc.Consensus.CreateEmptyBlocks = true
+	// Wait when idle; CometBFT still produces blocks needed to authenticate AppHash changes.
+	cc.Consensus.CreateEmptyBlocks = false
+	cc.Consensus.CreateEmptyBlocksInterval = 0
 	// Diagnostic A/B overrides only; defaults and consensus durability are unchanged.
 	if value := os.Getenv("UTXO_EXPERIMENT_FLUSH"); value != "" {
 		d, err := time.ParseDuration(value)

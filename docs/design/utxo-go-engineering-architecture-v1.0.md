@@ -414,6 +414,8 @@ AppHash_h     = H(RootScheme, NetworkID, h, PreviousAppHash,
 
 逻辑修改排除物理页、节点本地 outbox、缓存、观测指标和本地提交高度；事实历史记录也是公共逻辑状态。无权威变化且无新事实的空块沿用原 AppHash，仅更新本地提交元数据，避免为了认证上一空块又不断制造新的状态根。创世根和空叶根在 RootScheme 明确固定，不能由不同库的默认空值决定。
 
+采用 CometBFT 原生按需出块：`CreateEmptyBlocks=false`、`CreateEmptyBlocksInterval=0`，由交易可用通知和 `needProofBlock` 推进。持久依赖队列的实际出队和游标变化纳入上述逻辑修改，使有界 Drain 在必要区块中分批收尾；队列无工作时不制造伪变化。中继投递与取证由本地时间驱动，不依赖空闲高度持续增长。无需新增周期唤醒命令；共识超时和客户端轮询分别调优。
+
 采用锁定版本的 Comet Merkle 算法构树和验路径，[S7] 不自行发明另一套树算法。`finality` 包隔离该依赖；`protocol` 保存规范类型，不导入 Comet。最初用普通单叶证明与共享头即可，不预先实现复杂多证明压缩。保存每块叶值与位置/内部树索引，按需组装路径；不必永久重复保存所有叶的完整路径。
 
 证明包包括 Fact、Total/Index/路径、RootScheme、实际变化高度、PreviousAppHash、WriteSetHash、FactRoot，以及 h+1 认证头和 commit。验证器从受信 NetworkID/ChainID 与固定委员会配置出发，验证委员会 commit、头高度和 AppHash，再验证应用承诺及事实路径、事实类型/键/版本/上限。不能相信证明包自带的一组陌生验证者。应用保持四个等权委员会成员，不启用动态验证者集更新。
