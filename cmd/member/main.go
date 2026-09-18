@@ -79,7 +79,7 @@ func run() error {
 		}
 		relay.Members[organization.Org] = endpoints
 	}
-	relay.Apply = m.ApplyProof
+	relay.ApplyReceipts = m.ApplyReceipts
 	relay.Install = func(c protocol.TXCer) error {
 		if c.Tx.Body.Certifier == org.Org {
 			return m.Install(c)

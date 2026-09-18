@@ -31,6 +31,7 @@ type measurement struct {
 	Spend                      string
 	Started                    time.Time
 	Fast, Ready, Proof, Closed time.Duration
+	ProofQueue, CreditQueue    time.Duration
 	Error                      string
 }
 type job struct {
@@ -143,8 +144,9 @@ func (r *runner) anchor(c protocol.TXCer, nextOrg int) (protocol.Input, error) {
 	}
 	return protocol.Input{}, r.ctx.Err()
 }
-func (r *runner) track(j job) measurement {
+func (r *runner) trackProof(j job) measurement {
 	m := j.sample
+	m.ProofQueue = time.Since(m.Started) - m.Ready
 	c := j.cert
 	// Verify FeeClosed before treating a payment as publicly complete.
 	for r.ctx.Err() == nil {
@@ -172,6 +174,12 @@ func (r *runner) track(j job) measurement {
 		m.Error = "final proof timeout"
 		return m
 	}
+	return m
+}
+func (r *runner) trackCredit(j job) measurement {
+	m := j.sample
+	m.CreditQueue = time.Since(m.Started) - m.Ready
+	c := j.cert
 	// These node observations measure application progress, not financial proof.
 	for r.ctx.Err() == nil {
 		complete := true
@@ -232,9 +240,10 @@ func run() error {
 	duration := flag.Duration("duration", 10*time.Second, "generation duration")
 	drain := flag.Duration("drain", 90*time.Second, "completion drain limit")
 	lanes := flag.Int("lanes", 8, "parallel closed-loop chains")
+	count := flag.Int("transactions-per-lane", 0, "fixed transfers per chain; zero runs for duration")
 	offset := flag.Int("input", 0, "first unused genesis input index")
 	flag.Parse()
-	if *lanes < 1 || *lanes > 256 || *duration <= 0 || *drain <= 0 {
+	if *lanes < 1 || *lanes > 256 || *duration <= 0 || *drain <= 0 || *count < 0 {
 		return fmt.Errorf("invalid benchmark bounds")
 	}
 	var lab cfg.Lab
@@ -308,19 +317,57 @@ func run() error {
 	ctx, cancel := context.WithDeadline(context.Background(), end.Add(*drain))
 	defer cancel()
 	r.ctx = ctx
-	jobs := make(chan job, *lanes*16)
+	proofJobs := make(chan job, *lanes*16)
+	creditJobs := make(chan job, *lanes*16)
 	var trackWG, generateWG sync.WaitGroup
 	var mu sync.Mutex
 	var samples []measurement
-	appendSample := func(m measurement) { mu.Lock(); samples = append(samples, m); mu.Unlock() }
-	for i := 0; i < *lanes*2; i++ {
-		trackWG.Add(1)
-		go func() {
-			defer trackWG.Done()
-			for j := range jobs {
-				appendSample(r.track(j))
+	indices := make(map[string]int)
+	appendSample := func(m measurement) {
+		mu.Lock()
+		defer mu.Unlock()
+		if i, ok := indices[m.Spend]; ok && m.Spend != "" {
+			saved := &samples[i]
+			if m.Proof > 0 {
+				saved.Proof = m.Proof
 			}
-		}()
+			if m.Closed > 0 {
+				saved.Closed = m.Closed
+			}
+			if m.ProofQueue > 0 {
+				saved.ProofQueue = m.ProofQueue
+			}
+			if m.CreditQueue > 0 {
+				saved.CreditQueue = m.CreditQueue
+			}
+			if m.Error != "" {
+				if saved.Error != "" {
+					saved.Error += "; "
+				}
+				saved.Error += m.Error
+			}
+		} else {
+			if m.Spend != "" {
+				indices[m.Spend] = len(samples)
+			}
+			samples = append(samples, m)
+		}
+	}
+	for _, observer := range []struct {
+		jobs  <-chan job
+		track func(job) measurement
+	}{
+		{proofJobs, r.trackProof}, {creditJobs, r.trackCredit},
+	} {
+		for i := 0; i < *lanes*2; i++ {
+			trackWG.Add(1)
+			go func(jobs <-chan job, track func(job) measurement) {
+				defer trackWG.Done()
+				for j := range jobs {
+					appendSample(track(j))
+				}
+			}(observer.jobs, observer.track)
+		}
 	}
 	for lane := 0; lane < *lanes; lane++ {
 		generateWG.Add(1)
@@ -329,24 +376,26 @@ func run() error {
 			origin := origins[*offset+lane]
 			input := protocol.Input{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}
 			var parent *protocol.TXCer
-			for sequence := 0; time.Now().Before(end) && ctx.Err() == nil; sequence++ {
+			for sequence := 0; ((*count == 0 && time.Now().Before(end)) || (*count > 0 && sequence < *count)) && ctx.Err() == nil; sequence++ {
 				j, e := r.request(lane, sequence, input, parent)
 				if e != nil {
 					j.sample.Error = e.Error()
 					appendSample(j.sample)
 					return
 				}
-				select {
-				case jobs <- j:
-				case <-ctx.Done():
-					j.sample.Error = "completion queue timed out"
-					appendSample(j.sample)
-					return
+				for _, queue := range []chan job{proofJobs, creditJobs} {
+					select {
+					case queue <- j:
+					case <-ctx.Done():
+						j.sample.Error = "completion queue timed out"
+						appendSample(j.sample)
+						return
+					}
 				}
 				copy := j.cert
 				parent = &copy
 				input = protocol.Input{Kind: protocol.CertificateInput, Output: copy.Effects.Outputs[0], Evidence: protocol.Hash(copy.QC.Fact)}
-				if (sequence+1)%16 == 0 && time.Now().Before(end) {
+				if (sequence+1)%16 == 0 && ((*count == 0 && time.Now().Before(end)) || (*count > 0 && sequence+1 < *count)) {
 					input, e = r.anchor(copy, (sequence+1)%2)
 					if e != nil {
 						appendSample(measurement{Lane: lane, Sequence: sequence, Started: time.Now(), Error: "anchor: " + e.Error()})
@@ -358,7 +407,9 @@ func run() error {
 		}(lane)
 	}
 	generateWG.Wait()
-	close(jobs)
+	generationFinished := time.Now()
+	close(proofJobs)
+	close(creditJobs)
 	trackWG.Wait()
 	finished := time.Now()
 	sort.Slice(samples, func(i, j int) bool { return samples[i].Started.Before(samples[j].Started) })
@@ -393,9 +444,9 @@ func run() error {
 		return e
 	}
 	csvWriter := csv.NewWriter(file)
-	_ = csvWriter.Write([]string{"lane", "sequence", "spend", "start_unix_ns", "fast_us", "wallet_ready_us", "final_proof_us", "credit_closed_us", "error"})
+	_ = csvWriter.Write([]string{"lane", "sequence", "spend", "start_unix_ns", "fast_us", "wallet_ready_us", "final_proof_us", "credit_closed_us", "proof_queue_us", "credit_queue_us", "error"})
 	for _, m := range samples {
-		_ = csvWriter.Write([]string{strconv.Itoa(m.Lane), strconv.Itoa(m.Sequence), m.Spend, strconv.FormatInt(m.Started.UnixNano(), 10), strconv.FormatInt(m.Fast.Microseconds(), 10), strconv.FormatInt(m.Ready.Microseconds(), 10), strconv.FormatInt(m.Proof.Microseconds(), 10), strconv.FormatInt(m.Closed.Microseconds(), 10), m.Error})
+		_ = csvWriter.Write([]string{strconv.Itoa(m.Lane), strconv.Itoa(m.Sequence), m.Spend, strconv.FormatInt(m.Started.UnixNano(), 10), strconv.FormatInt(m.Fast.Microseconds(), 10), strconv.FormatInt(m.Ready.Microseconds(), 10), strconv.FormatInt(m.Proof.Microseconds(), 10), strconv.FormatInt(m.Closed.Microseconds(), 10), strconv.FormatInt(m.ProofQueue.Microseconds(), 10), strconv.FormatInt(m.CreditQueue.Microseconds(), 10), m.Error})
 	}
 	csvWriter.Flush()
 	e = csvWriter.Error()
@@ -407,13 +458,16 @@ func run() error {
 		return closeErr
 	}
 	report := map[string]any{
-		"timing_origin": "wallet_http_submit_v2",
-		"timing_scope":  "Immediately before HTTP Client.Do through recipient certificate verification and synchronous wallet persistence; excludes sender preparation, signing, persistence and encoding. HTTP transport waiting and connection setup are included. Proof and credit observations use the same origin.",
-		"network":       network.ChainID, "lanes": *lanes, "generation_seconds": duration.Seconds(), "total_seconds": finished.Sub(started).Seconds(), "finite_initial_fuel": "2000000000000",
+		"transactions_per_lane": *count, "generation_elapsed_seconds": generationFinished.Sub(started).Seconds(),
+		"proof_observer_queue":  quantiles(samples, func(m measurement) time.Duration { return m.ProofQueue }),
+		"credit_observer_queue": quantiles(samples, func(m measurement) time.Duration { return m.CreditQueue }),
+		"timing_origin":         "wallet_http_submit_v2",
+		"timing_scope":          "Immediately before HTTP Client.Do through recipient certificate verification and synchronous wallet persistence; excludes sender preparation, signing, persistence and encoding. HTTP transport waiting and connection setup are included. Proof and credit observations use the same origin.",
+		"network":               network.ChainID, "lanes": *lanes, "generation_seconds": duration.Seconds(), "total_seconds": finished.Sub(started).Seconds(), "finite_initial_fuel": "2000000000000",
 		"ready": fast, "public_proven": proof, "credit_closed": closed, "failures": failures,
 		"ready_tps_in_generation_window": float64(fastWindow) / duration.Seconds(), "public_proof_tps_in_generation_window": float64(proofWindow) / duration.Seconds(), "credit_closed_tps_in_generation_window": float64(closedWindow) / duration.Seconds(),
 		"ready_latency": quantiles(samples, func(m measurement) time.Duration { return m.Ready }), "proof_observed_latency": quantiles(samples, func(m measurement) time.Duration { return m.Proof }), "credit_observed_latency": quantiles(samples, func(m measurement) time.Duration { return m.Closed }),
-		"conditions": "14 independent processes on one host; synchronous bbolt; cross-organization 100-CAL chains; final-anchor import each 16 transfers; no warmup exclusion; bounded completion workers include observer queue/polling delay; node observations are not financial proofs; FUEL cost 94 per transaction is retained.",
+		"conditions": "14 independent processes on one host; synchronous bbolt; cross-organization 100-CAL chains; final-anchor import each 16 transfers; no warmup exclusion; independent bounded proof and credit observers; each includes its separately reported queue and polling delay; node observations are not financial proofs; FUEL cost 94 per transaction is retained.",
 	}
 	if e = cfg.Write(prefix+".json", report); e != nil {
 		return e
@@ -421,7 +475,7 @@ func run() error {
 	raw, _ := json.MarshalIndent(report, "", "  ")
 	fmt.Println(string(raw))
 	fmt.Println("Raw samples:", prefix+".csv")
-	if failures > 0 || closed != fast {
+	if failures > 0 || closed != fast || proof != fast || (*count > 0 && fast != *count**lanes) {
 		return fmt.Errorf("benchmark incomplete: ready=%d closed=%d failures=%d", fast, closed, failures)
 	}
 	return nil

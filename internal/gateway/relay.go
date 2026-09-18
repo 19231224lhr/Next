@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"sync"
 	"time"
 	"utxo/finality"
+	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/internal/store"
 	"utxo/protocol"
@@ -23,10 +25,43 @@ type Relay struct {
 	Trust         finality.Trust
 	Organizations map[protocol.Hash]protocol.OrgConfig
 	Members       map[protocol.Hash][4]MemberClient
-	Apply         func(finality.FactProof) error
+	ApplyReceipts func(protocol.TXCer, []finality.FactProof) (rules.ReceiptProgress, error)
 	// Reconciles a certificate obtained from the committee when only an original
 	// local vote remained. A local member supplies Install for its own issuer.
-	Install func(protocol.TXCer) error
+	Install   func(protocol.TXCer) error
+	installMu sync.Mutex
+	installs  map[protocol.SpendFactID]installProgress
+}
+type installProgress struct {
+	acked uint8
+	next  time.Time
+}
+
+func (r *Relay) installTargets(id protocol.SpendFactID) uint8 {
+	r.installMu.Lock()
+	defer r.installMu.Unlock()
+	if r.installs == nil {
+		r.installs = make(map[protocol.SpendFactID]installProgress)
+	}
+	p := r.installs[id]
+	if time.Now().Before(p.next) {
+		return 0
+	}
+	p.next = time.Now().Add(time.Second)
+	r.installs[id] = p
+	return 15 &^ p.acked
+}
+func (r *Relay) installAck(id protocol.SpendFactID, index int) {
+	r.installMu.Lock()
+	defer r.installMu.Unlock()
+	p := r.installs[id]
+	p.acked |= 1 << index
+	r.installs[id] = p
+}
+func (r *Relay) forgetInstall(id protocol.SpendFactID) {
+	r.installMu.Lock()
+	defer r.installMu.Unlock()
+	delete(r.installs, id)
 }
 
 func (r *Relay) Run(ctx context.Context) error {
@@ -49,20 +84,38 @@ func (r *Relay) Run(ctx context.Context) error {
 				cursor = nil
 				continue
 			}
-			for _, entry := range entries {
+			// Keep the existing ordered scan. Join each group before advancing,
+			// so one durable task can never overlap its next retry.
+			for start := 0; start < len(entries); start += 4 {
 				if ctx.Err() != nil {
 					return nil
 				}
-				cursor = entry.Key
-				var pending state.Outbox
-				if e = json.Unmarshal(entry.Value, &pending); e != nil {
-					return e
+				end := min(start+4, len(entries))
+				done := make(chan error, end-start)
+				for _, entry := range entries[start:end] {
+					cursor = entry.Key
+					go func(key, value []byte) {
+						var pending state.Outbox
+						if err := json.Unmarshal(value, &pending); err != nil {
+							done <- err
+							return
+						}
+						operation, cancel := context.WithTimeout(ctx, 5*time.Second)
+						// Failed delivery stays durable for a later pass.
+						_ = r.deliver(operation, key, pending)
+						cancel()
+						done <- nil
+					}(entry.Key, entry.Value)
 				}
-				// Retry errors are retained in the durable queue; transport failures do not
-				// cancel financial commitments.
-				operation, cancel := context.WithTimeout(ctx, 5*time.Second)
-				_ = r.deliver(operation, entry.Key, pending)
-				cancel()
+				var failure error
+				for i := start; i < end; i++ {
+					if err := <-done; err != nil {
+						failure = err
+					}
+				}
+				if failure != nil {
+					return failure
+				}
 			}
 		}
 	}
@@ -92,44 +145,43 @@ func (r *Relay) deliver(ctx context.Context, key []byte, pending state.Outbox) (
 	}
 
 	if clients, ok := r.Members[c.Tx.Body.Certifier]; ok {
+		mask := r.installTargets(c.QC.Fact)
 		installCtx, cancel := context.WithCancel(ctx)
 		done := make(chan struct{}, 4)
-		for _, client := range clients {
-			go func(client MemberClient) {
-				if client != nil {
-					_ = client.Install(installCtx, c)
+		count := 0
+		for i, client := range clients {
+			if mask&(1<<i) == 0 || client == nil {
+				continue
+			}
+			count++
+			go func(i int, client MemberClient) {
+				if client.Install(installCtx, c) == nil {
+					r.installAck(c.QC.Fact, i)
 				}
 				done <- struct{}{}
-			}(client)
+			}(i, client)
 		}
-		// Receipt/custody processing is independent of acknowledgements. Bound the
-		// four attempts to this pass, cancelling and joining them on return.
 		defer func() {
 			cancel()
-			for i := 0; i < 4; i++ {
+			for i := 0; i < count; i++ {
 				<-done
+			}
+			if err == nil {
+				r.forgetInstall(c.QC.Fact)
 			}
 		}()
 	}
 
-	// Query proofs before retrying, including after restart. Register this defer
-	// after INSTALL cleanup so public submission never waits for INSTALL ACKs.
-	publicComplete := false
+	// Only verified, persisted completion may suppress retries.
 	defer func() {
-		if err == nil || ctx.Err() != nil {
-			return
-		}
-		if publicComplete {
-			if e := r.markPublicComplete(key); e != nil {
-				err = e
+		if err != nil && ctx.Err() == nil {
+			if e := r.submitDue(ctx, key, c); e != nil {
+				err = errors.Join(err, e)
 			}
-			return
-		}
-		if e := r.submitDue(ctx, key, c); e != nil {
-			err = e
 		}
 	}()
-	var custody bool
+	var proofs []finality.FactProof
+	var queryErr error
 	for _, allocation := range c.Admission {
 		kind := protocol.FactCredit
 		if allocation.Key.Kind == protocol.ResourceExecution {
@@ -138,65 +190,49 @@ func (r *Relay) deliver(ctx context.Context, key []byte, pending state.Outbox) (
 		if allocation.Key.Kind == protocol.ResourceBytes {
 			kind = protocol.FactCustody
 		}
-		keyReceipt := (protocol.CreditReceipt{Spend: c.QC.Fact, Resource: allocation.Key}).Key()
-		// Reserve time for submission if the proof endpoint stalls.
-		queryCtx, cancelQuery := context.WithTimeout(ctx, time.Second)
-		proof, e := r.Public.Receipt(queryCtx, kind, keyReceipt)
-		cancelQuery()
+		receiptKey := (protocol.CreditReceipt{Spend: c.QC.Fact, Resource: allocation.Key}).Key()
+		queryCtx, cancel := context.WithTimeout(ctx, time.Second)
+		proof, e := r.Public.Receipt(queryCtx, kind, receiptKey)
+		cancel()
 		if e != nil {
-			return e
+			queryErr = e
+			break
 		}
-		verified, e := finality.Verify(r.Trust, proof)
-		if e != nil {
-			return e
-		}
-		fact := verified.Fact()
-		receipt, e := protocol.DecodeCredit(fact.Payload)
-		if kind == protocol.FactCustody {
-			custodyReceipt, err := protocol.DecodeCustody(fact.Payload)
-			e = err
-			receipt = custodyReceipt.Credit
-			if e == nil && custodyReceipt.Effects != c.Effects.Hash() {
-				return protocol.ErrAuth
+		proofs = append(proofs, proof)
+	}
+	var progress rules.ReceiptProgress
+	if r.ApplyReceipts != nil {
+		progress, e = r.ApplyReceipts(c, proofs)
+	} else {
+		var facts []protocol.FinalFact
+		for _, proof := range proofs {
+			verified, err := finality.Verify(r.Trust, proof)
+			if err != nil {
+				return err
 			}
+			facts = append(facts, verified.Fact())
 		}
-		if e != nil {
-			return e
-		}
-		if fact.Kind != kind || fact.Key != keyReceipt || fact.Rules != c.Tx.Body.Rules || receipt.Spend != c.QC.Fact || receipt.Resource != allocation.Key || receipt.Original != allocation.Cap {
-			return protocol.ErrAuth
-		}
-		if kind == protocol.FactCustody {
-			custody = true
-		}
-		// A terminal execution receipt proves the business work completed. Other
-		// receipts may still be unavailable and must continue to be fetched.
-		if kind == protocol.FactWork && receipt.Remaining == 0 && receipt.Discharged == receipt.Original && receipt.Paid == 0 && receipt.Returned == 0 {
-			publicComplete = true
-		}
-		if r.Apply != nil {
-			if e = r.Apply(proof); e != nil {
-				return e
-			}
+		progress, e = rules.CheckReceipts(c, facts)
+		if e == nil && (progress.Complete || progress.PublicComplete) {
+			e = r.DB.Update(func(v state.ReadView) ([]state.Change, error) {
+				o := state.NewOverlay(v)
+				if e := rules.FinishOutbox(o, c.QC.Fact, progress); e != nil {
+					return nil, e
+				}
+				return o.Changes(), nil
+			})
 		}
 	}
-	if !custody {
-		return errors.New("public custody not established")
+	if e != nil {
+		return e
 	}
-	return r.DB.Update(func(v state.ReadView) ([]state.Change, error) {
-		// The queue's fact identity cannot be repurposed by an alternative QC subset.
-		old, found, e := state.Load[state.Outbox](v, key)
-		if e != nil {
-			return nil, e
-		}
-		if !found {
-			return nil, nil
-		}
-		if old.Fact != pending.Fact {
-			return nil, protocol.ErrAuth
-		}
-		return []state.Change{{Key: key, Delete: true}}, nil
-	})
+	if progress.Complete {
+		return nil
+	}
+	if queryErr != nil {
+		return queryErr
+	}
+	return errors.New("public custody not established")
 }
 
 const retryInterval = time.Second
@@ -247,19 +283,4 @@ func (r *Relay) submitDue(ctx context.Context, key []byte, c protocol.TXCer) err
 		return err
 	}
 	return r.Public.Submit(ctx, raw)
-}
-
-func (r *Relay) markPublicComplete(key []byte) error {
-	return r.DB.Update(func(v state.ReadView) ([]state.Change, error) {
-		p, found, err := state.Load[state.Outbox](v, key)
-		if err != nil || !found || p.PublicComplete {
-			return nil, err
-		}
-		p.PublicComplete = true
-		o := state.NewOverlay(v)
-		if err = state.Put(o, key, p); err != nil {
-			return nil, err
-		}
-		return o.Changes(), nil
-	})
 }

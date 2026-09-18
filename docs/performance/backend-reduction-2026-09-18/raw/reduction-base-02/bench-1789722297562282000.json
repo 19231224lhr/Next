@@ -1,0 +1,44 @@
+{
+  "conditions": "14 independent processes on one host; synchronous bbolt; cross-organization 100-CAL chains; final-anchor import each 16 transfers; no warmup exclusion; independent bounded proof and credit observers; each includes its separately reported queue and polling delay; node observations are not financial proofs; FUEL cost 94 per transaction is retained.",
+  "credit_closed": 128,
+  "credit_closed_tps_in_generation_window": 4.266666666666667,
+  "credit_observed_latency": {
+    "p50_ms": 18099.270459,
+    "p95_ms": 20085.857667,
+    "p99_ms": 20437.620958
+  },
+  "credit_observer_queue": {
+    "p50_ms": 16585.431958,
+    "p95_ms": 18158.34875,
+    "p99_ms": 18191.304084
+  },
+  "failures": 0,
+  "finite_initial_fuel": "2000000000000",
+  "generation_elapsed_seconds": 5.218620875,
+  "generation_seconds": 30,
+  "lanes": 8,
+  "network": "utxo-lab-70913793db06c65f",
+  "proof_observed_latency": {
+    "p50_ms": 4553.739792,
+    "p95_ms": 5830.340291,
+    "p99_ms": 6044.157792
+  },
+  "proof_observer_queue": {
+    "p50_ms": 3230.42375,
+    "p95_ms": 4806.008541,
+    "p99_ms": 4835.148417
+  },
+  "public_proof_tps_in_generation_window": 4.266666666666667,
+  "public_proven": 128,
+  "ready": 128,
+  "ready_latency": {
+    "p50_ms": 206.758958,
+    "p95_ms": 414.864583,
+    "p99_ms": 416.763083
+  },
+  "ready_tps_in_generation_window": 4.266666666666667,
+  "timing_origin": "wallet_http_submit_v2",
+  "timing_scope": "Immediately before HTTP Client.Do through recipient certificate verification and synchronous wallet persistence; excludes sender preparation, signing, persistence and encoding. HTTP transport waiting and connection setup are included. Proof and credit observations use the same origin.",
+  "total_seconds": 23.68961525,
+  "transactions_per_lane": 16
+}

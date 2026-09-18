@@ -249,7 +249,27 @@ func EvaluatePrepare(v state.ReadView, tx protocol.SignedTx, inputs []state.Crea
 		return nil, fact, e
 	}
 	for _, material := range parents {
-		if e := state.Put(o, state.Key(state.KeyOutbox, material.Fact[:]), material); e != nil {
+		key := state.Key(state.KeyOutbox, material.Fact[:])
+		pending, exists, err := state.Load[state.Outbox](o, key)
+		if err != nil {
+			return nil, fact, err
+		}
+		if exists {
+			if pending.Fact != material.Fact {
+				return nil, fact, protocol.ErrAuth
+			}
+			if len(pending.Certificate) > 0 {
+				continue
+			}
+			// Enrich an existing signing intent without resetting its retry state.
+			pending.Certificate = material.Certificate
+			material = pending
+		} else if _, done, err := state.Load[state.Custody](o, state.Key(state.KeyCustody, material.Fact[:])); err != nil {
+			return nil, fact, err
+		} else if done {
+			continue
+		}
+		if e := state.Put(o, key, material); e != nil {
 			return nil, fact, e
 		}
 	}

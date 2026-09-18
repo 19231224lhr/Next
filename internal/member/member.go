@@ -278,6 +278,12 @@ func (m *Member) Install(c protocol.TXCer) error {
 		return e
 	}
 	return m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		// A competing INSTALL may have committed after the optimistic read.
+		if _, err := v.Get(state.Key(state.KeyInstall, c.QC.Fact[:])); err == nil {
+			return nil, nil
+		} else if !errors.Is(err, state.ErrNotFound) {
+			return nil, err
+		}
 		o := state.NewOverlay(v)
 		for _, id := range c.Effects.Inputs {
 			spend, _, e := state.Load[state.Spend](o, state.Key(state.KeySpend, id[:]))
@@ -307,7 +313,19 @@ func (m *Member) Install(c protocol.TXCer) error {
 			}
 		}
 		o.Set(state.Key(state.KeyInstall, c.QC.Fact[:]), raw)
-		if e := state.Put(o, state.Key(state.KeyOutbox, c.QC.Fact[:]), state.Outbox{Fact: c.QC.Fact, Certificate: raw, Origin: c.Tx.Body.Certifier}); e != nil {
+		outboxKey := state.Key(state.KeyOutbox, c.QC.Fact[:])
+		pending, found, e := state.Load[state.Outbox](o, outboxKey)
+		if e != nil {
+			return nil, e
+		}
+		if !found {
+			pending = state.Outbox{Fact: c.QC.Fact, Origin: c.Tx.Body.Certifier}
+		}
+		if pending.Fact != c.QC.Fact {
+			return nil, protocol.ErrAuth
+		}
+		pending.Certificate = raw
+		if e = state.Put(o, outboxKey, pending); e != nil {
 			return nil, e
 		}
 		return o.Changes(), nil

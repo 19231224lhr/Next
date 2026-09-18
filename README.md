@@ -181,3 +181,23 @@ Proof requests have their own timeout, so an unavailable proof endpoint does not
 consume the entire delivery deadline. HTTP acceptance and cache hits never release
 budget or permanently retire a pending payment. See the [fresh-genesis comparison](docs/experiments/relay-retry-2026-09-18/README.md)
 for measured latency, command amplification, and restart verification.
+
+
+### Backend work reduction
+
+Member relays authenticate receipt batches once and apply all resource credits,
+public custody, and outbox completion in one synchronous transaction. INSTALL
+acknowledgements only suppress redundant transport; original proof and retry
+requirements remain. Each relay handles at most four distinct tasks at a time.
+
+`bench -transactions-per-lane 16 -lanes 8` generates exactly 128 payments;
+zero retains the duration-based workload. Proof and credit observers have
+separate bounded workers. Their queue delays are reported separately and remain
+included in the observed completion latencies. `generation_elapsed_seconds`
+records actual generation time, while generation-window TPS uses the configured
+window; fixed-count window rates are not saturation-throughput measurements.
+
+The [paired measurements and raw evidence](docs/performance/backend-reduction-2026-09-18/README.md)
+show reduced backend drain time, with a foreground-latency tradeoff under four-way
+parallelism on this single host. Continuous input still uses final anchors and
+bounded queues; it does not establish a maximum sustainable TPS.

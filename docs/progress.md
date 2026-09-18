@@ -129,3 +129,29 @@ executed by then; duplicate delivery is a concrete optimization candidate,
 not evidence of extra payments. No timing parameters or retries changed.
 Evidence: experiments/single-async-001/reports/demo-1789699621265965000.json
 and single-transfer-settlement.md.
+
+
+## Backend reduction and bounded parallel relay (2026-09-18)
+
+Implemented shared-overlay receipt application, single verification inside the
+member trust boundary, INSTALL hint-based transport suppression, and preservation
+of delivery progress on concurrent/first INSTALL and repeated parent admission.
+One completed payment now applies its four credits, custody and outbox retirement
+in one logical Store.Update. All durability and financial checks remain enabled.
+Four relay tasks may overlap; the next scan does not overlap the same task.
+
+Full race tests, vet, command builds and real four-validator integration passed.
+Eight fixed-load runs all completed 128 payments; average whole-run times were
+23.393 s baseline, 12.335 s reduced serial, 11.985 s reduced dual, 10.345 s reduced
+four-way. The four-way setting increased READY latency in this single-host test;
+it is retained for the current backend-drain objective, not claimed to improve
+all latency metrics. A 30 s closed-loop workload completed 454 payments and
+finished observing credits 3.314 s after generation ended. All nine stopped-state
+audits passed and every outbox was empty.
+
+Proof and credit observers are now independent. Their remaining queue/polling
+delays are explicit; precise consensus commit time is not inferred from these
+observations. Role-specific minimal receipt queries and committed-block proof
+reuse remain separate future experiments. Root fulfilment, archive, actual
+refills/reward claims and sustained high-TPS validation are still incomplete.
+See [implementation report and reproducible data](performance/backend-reduction-2026-09-18/README.md).
