@@ -102,6 +102,7 @@ func (a *App) CheckTx(_ context.Context, r *abci.RequestCheckTx) (*abci.Response
 	return &abci.ResponseCheckTx{}, nil
 }
 func (a *App) PrepareProposal(_ context.Context, r *abci.RequestPrepareProposal) (*abci.ResponsePrepareProposal, error) {
+	requesttrace.Consensus.Mark("prepare_enter", "height", r.Height, "candidates", len(r.Txs))
 	out := &abci.ResponsePrepareProposal{}
 	var size int64
 	for _, tx := range r.Txs {
@@ -113,15 +114,20 @@ func (a *App) PrepareProposal(_ context.Context, r *abci.RequestPrepareProposal)
 		}
 		size += int64(len(tx))
 		out.Txs = append(out.Txs, bytes.Clone(tx))
+		requesttrace.Settlement.Command(tx, "prepared", r.Height)
 	}
+	requesttrace.Consensus.Mark("prepare_done", "height", r.Height, "selected", len(out.Txs))
 	return out, nil
 }
 func (a *App) ProcessProposal(_ context.Context, r *abci.RequestProcessProposal) (*abci.ResponseProcessProposal, error) {
+	requesttrace.Consensus.Mark("process_enter", "height", r.Height, "transactions", len(r.Txs))
 	for _, tx := range r.Txs {
+		requesttrace.Settlement.Command(tx, "proposal_seen", r.Height)
 		if a.check(tx) != nil {
 			return &abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_REJECT}, nil
 		}
 	}
+	requesttrace.Consensus.Mark("process_done", "height", r.Height)
 	return &abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_ACCEPT}, nil
 }
 func cloneResponse(r *abci.ResponseFinalizeBlock) *abci.ResponseFinalizeBlock {
@@ -131,8 +137,10 @@ func cloneResponse(r *abci.ResponseFinalizeBlock) *abci.ResponseFinalizeBlock {
 	return c
 }
 func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
+	requesttrace.Consensus.Mark("finalize_enter", "height", r.Height)
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	requesttrace.Consensus.Mark("finalize_locked", "height", r.Height)
 	if a.halted != nil {
 		return nil, a.halted
 	}

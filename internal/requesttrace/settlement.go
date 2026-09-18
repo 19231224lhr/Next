@@ -22,6 +22,10 @@ var Settlement = func() *SettlementRecorder {
 }()
 
 type SettlementTiming struct {
+	PreparedUnixNS     int64
+	PreparedHeight     int64
+	ProposalSeenUnixNS int64
+	ProposalHeight     int64
 	Attempt            string
 	Spend              string
 	Sender             string
@@ -104,6 +108,16 @@ func (r *SettlementRecorder) Command(raw []byte, stage string, height int64) {
 		return
 	}
 	switch stage {
+	case "prepared":
+		if event.PreparedUnixNS == 0 {
+			event.PreparedUnixNS = now
+			event.PreparedHeight = height
+		}
+	case "proposal_seen":
+		if event.ProposalSeenUnixNS == 0 {
+			event.ProposalSeenUnixNS = now
+			event.ProposalHeight = height
+		}
 	case "accepted":
 		if event.AcceptedUnixNS == 0 {
 			event.AcceptedUnixNS = now

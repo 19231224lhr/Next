@@ -13,3 +13,5 @@ included. See the project README for the laboratory commands and timing scopes.
 The backend trace observed 28 delivery attempts for one immutable payment.
 Its longest measured interval was committee admission to block execution;
 individual Comet consensus phases had not yet been instrumented.
+
+- [35-payment phase diagnosis](latency-phase-2026-09-18/README.md): reversible propagation-parameter experiments, raw four-node traces and scripts. Defaults and delivery logic remain unchanged.

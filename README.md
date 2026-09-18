@@ -152,3 +152,16 @@ clocks before comparing machines. Commit marks successful application database
 commit, not completion by all committee members. The acceptance-to-execution
 interval includes consensus scheduling; it does not identify individual Comet
 round stages. Duplicate delivery attempts do not represent separate payments.
+
+### Optional consensus phase diagnostics
+
+With `UTXO_SETTLEMENT_TRACE=1`, `/debug/consensus` exposes a bounded 4096-event
+in-memory history of selected Comet stages and ABCI boundaries. Per-attempt
+settlement records also include proposal selection and receipt times. These are
+local observations, not finality proofs.
+
+`UTXO_EXPERIMENT_FLUSH=10ms` and `UTXO_EXPERIMENT_GOSSIP=10ms` override the
+corresponding Comet propagation intervals for controlled experiments. Without
+these variables the defaults remain 100 ms; no consensus timeout or durability
+setting is changed. See [the phase diagnosis](docs/experiments/latency-phase-2026-09-18/README.md)
+for measured results, limitations and the separate delivery-retry repair plan.

@@ -87,6 +87,22 @@ func run() error {
 	cc.P2P.PexReactor = false
 	cc.Consensus.TimeoutCommit = 100 * time.Millisecond
 	cc.Consensus.CreateEmptyBlocks = true
+	// Diagnostic A/B overrides only; defaults and consensus durability are unchanged.
+	if value := os.Getenv("UTXO_EXPERIMENT_FLUSH"); value != "" {
+		d, err := time.ParseDuration(value)
+		if err != nil || d <= 0 {
+			return fmt.Errorf("invalid UTXO_EXPERIMENT_FLUSH")
+		}
+		cc.P2P.FlushThrottleTimeout = d
+	}
+	if value := os.Getenv("UTXO_EXPERIMENT_GOSSIP"); value != "" {
+		d, err := time.ParseDuration(value)
+		if err != nil || d <= 0 {
+			return fmt.Errorf("invalid UTXO_EXPERIMENT_GOSSIP")
+		}
+		cc.Consensus.PeerGossipSleepDuration = d
+	}
+	requesttrace.Consensus.Mark("configuration", "flush", cc.P2P.FlushThrottleTimeout, "gossip", cc.Consensus.PeerGossipSleepDuration, "commit", cc.Consensus.TimeoutCommit)
 	cc.StateSync.Enable = false
 	var validator *privval.FilePV
 	_, keyErr := os.Stat(cc.PrivValidatorKeyFile())
@@ -118,6 +134,7 @@ func run() error {
 		genesis.Validators = append(genesis.Validators, ct.GenesisValidator{Address: public.Address(), PubKey: public, Power: 1, Name: fmt.Sprint(i)})
 	}
 	logger := log.NewFilter(log.NewTMLogger(log.NewSyncWriter(os.Stderr)), log.AllowError())
+	logger = requesttrace.Consensus.Logger(logger)
 	consensus, e := node.NewNode(cc, validator, nk, proxy.NewLocalClientCreator(app), func() (*ct.GenesisDoc, error) { return genesis, nil }, cmtcfg.DefaultDBProvider, node.DefaultMetricsProvider(cc.Instrumentation), logger)
 	if e != nil {
 		return e
@@ -242,6 +259,10 @@ func run() error {
 		_ = json.NewEncoder(w).Encode(map[string]string{"height": strconv.FormatInt(info.LastBlockHeight, 10)})
 	})
 	if requesttrace.Settlement != nil {
+		mux.HandleFunc("GET /debug/consensus", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(requesttrace.Consensus.Snapshot())
+		})
 		mux.HandleFunc("GET /debug/settlement/{spend}", func(w http.ResponseWriter, r *http.Request) {
 			var id protocol.Hash
 			if err := id.UnmarshalText([]byte(r.PathValue("spend"))); err != nil {
