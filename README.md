@@ -165,3 +165,18 @@ corresponding Comet propagation intervals for controlled experiments. Without
 these variables the defaults remain 100 ms; no consensus timeout or durability
 setting is changed. See [the phase diagnosis](docs/experiments/latency-phase-2026-09-18/README.md)
 for measured results, limitations and the separate delivery-retry repair plan.
+
+### Durable relay retry pacing
+
+Relays keep the delivery envelope and retry timing in the existing outbox. Proof
+polling does not itself resubmit a payment. Retries are spaced by one second;
+only five seconds without verified completion permit a new delivery nonce. An
+identical certificate uses the same initial envelope across its holders. The
+immutable payment identity and accounting remain unchanged. A verified terminal
+work receipt stops resubmission while remaining proofs continue to be fetched;
+the original custody/credit requirements still govern queue retirement.
+
+Proof requests have their own timeout, so an unavailable proof endpoint does not
+consume the entire delivery deadline. HTTP acceptance and cache hits never release
+budget or permanently retire a pending payment. See the [fresh-genesis comparison](docs/experiments/relay-retry-2026-09-18/README.md)
+for measured latency, command amplification, and restart verification.

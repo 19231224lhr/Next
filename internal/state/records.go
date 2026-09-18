@@ -107,9 +107,13 @@ type Approval struct {
 	Parents   [][]byte
 }
 type Outbox struct {
-	Fact        protocol.SpendFactID
-	Certificate []byte
-	Origin      protocol.Hash
+	Fact                 protocol.SpendFactID
+	Certificate          []byte
+	Origin               protocol.Hash
+	Attempt              []byte `json:",omitempty"`
+	AttemptStartedUnixNS int64  `json:",omitempty"`
+	NextSubmitUnixNS     int64  `json:",omitempty"`
+	PublicComplete       bool   `json:",omitempty"`
 }
 
 type Transition struct {

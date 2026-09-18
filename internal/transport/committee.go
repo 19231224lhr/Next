@@ -26,24 +26,27 @@ func NewCommitteeClient(url string) *CommitteeClient {
 	return &CommitteeClient{BaseURL: strings.TrimRight(url, "/"), HTTP: &http.Client{Timeout: 5 * time.Second}}
 }
 func (c *CommitteeClient) Submit(ctx context.Context, raw []byte) error {
-	var network protocol.Hash
-	cert, e := protocol.DecodeCertificate(raw)
-	if e == nil {
-		network = cert.Tx.Body.Network
-	} else {
-		tx, e := protocol.DecodeSignedTx(raw)
+	// A relay already persisted its envelope. Network retries must preserve it.
+	if _, err := protocol.DecodeSubmission(raw); err != nil {
+		var network protocol.Hash
+		cert, e := protocol.DecodeCertificate(raw)
+		if e == nil {
+			network = cert.Tx.Body.Network
+		} else {
+			tx, e := protocol.DecodeSignedTx(raw)
+			if e != nil {
+				return e
+			}
+			network = tx.Body.Network
+		}
+		attempt := protocol.Submission{Network: network, Body: raw}
+		if _, e = rand.Read(attempt.Nonce[:]); e != nil {
+			return e
+		}
+		raw, e = attempt.MarshalBinary()
 		if e != nil {
 			return e
 		}
-		network = tx.Body.Network
-	}
-	attempt := protocol.Submission{Network: network, Body: raw}
-	if _, e = rand.Read(attempt.Nonce[:]); e != nil {
-		return e
-	}
-	raw, e = attempt.MarshalBinary()
-	if e != nil {
-		return e
 	}
 
 	request, e := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/v1/commands", bytes.NewReader(raw))

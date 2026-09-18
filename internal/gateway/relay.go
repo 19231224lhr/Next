@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"time"
@@ -66,7 +67,7 @@ func (r *Relay) Run(ctx context.Context) error {
 		}
 	}
 }
-func (r *Relay) deliver(ctx context.Context, key []byte, pending state.Outbox) error {
+func (r *Relay) deliver(ctx context.Context, key []byte, pending state.Outbox) (err error) {
 	var c protocol.TXCer
 	var e error
 	if len(pending.Certificate) == 0 {
@@ -89,12 +90,6 @@ func (r *Relay) deliver(ctx context.Context, key []byte, pending state.Outbox) e
 			return e
 		}
 	}
-	raw, e := c.MarshalBinary()
-	if e != nil {
-		return e
-	}
-	// Public submission does not wait for any member INSTALL acknowledgement.
-	_ = r.Public.Submit(ctx, raw)
 
 	if clients, ok := r.Members[c.Tx.Body.Certifier]; ok {
 		installCtx, cancel := context.WithCancel(ctx)
@@ -117,6 +112,23 @@ func (r *Relay) deliver(ctx context.Context, key []byte, pending state.Outbox) e
 		}()
 	}
 
+	// Query proofs before retrying, including after restart. Register this defer
+	// after INSTALL cleanup so public submission never waits for INSTALL ACKs.
+	publicComplete := false
+	defer func() {
+		if err == nil || ctx.Err() != nil {
+			return
+		}
+		if publicComplete {
+			if e := r.markPublicComplete(key); e != nil {
+				err = e
+			}
+			return
+		}
+		if e := r.submitDue(ctx, key, c); e != nil {
+			err = e
+		}
+	}()
 	var custody bool
 	for _, allocation := range c.Admission {
 		kind := protocol.FactCredit
@@ -127,7 +139,10 @@ func (r *Relay) deliver(ctx context.Context, key []byte, pending state.Outbox) e
 			kind = protocol.FactCustody
 		}
 		keyReceipt := (protocol.CreditReceipt{Spend: c.QC.Fact, Resource: allocation.Key}).Key()
-		proof, e := r.Public.Receipt(ctx, kind, keyReceipt)
+		// Reserve time for submission if the proof endpoint stalls.
+		queryCtx, cancelQuery := context.WithTimeout(ctx, time.Second)
+		proof, e := r.Public.Receipt(queryCtx, kind, keyReceipt)
+		cancelQuery()
 		if e != nil {
 			return e
 		}
@@ -154,6 +169,11 @@ func (r *Relay) deliver(ctx context.Context, key []byte, pending state.Outbox) e
 		if kind == protocol.FactCustody {
 			custody = true
 		}
+		// A terminal execution receipt proves the business work completed. Other
+		// receipts may still be unavailable and must continue to be fetched.
+		if kind == protocol.FactWork && receipt.Remaining == 0 && receipt.Discharged == receipt.Original && receipt.Paid == 0 && receipt.Returned == 0 {
+			publicComplete = true
+		}
 		if r.Apply != nil {
 			if e = r.Apply(proof); e != nil {
 				return e
@@ -176,5 +196,70 @@ func (r *Relay) deliver(ctx context.Context, key []byte, pending state.Outbox) e
 			return nil, protocol.ErrAuth
 		}
 		return []state.Change{{Key: key, Delete: true}}, nil
+	})
+}
+
+const retryInterval = time.Second
+const attemptLifetime = 5 * time.Second
+
+func (r *Relay) submitDue(ctx context.Context, key []byte, c protocol.TXCer) error {
+	var raw []byte
+	err := r.DB.Update(func(v state.ReadView) ([]state.Change, error) {
+		p, found, err := state.Load[state.Outbox](v, key)
+		if err != nil || !found {
+			return nil, err
+		}
+		if p.Fact != c.QC.Fact {
+			return nil, protocol.ErrAuth
+		}
+		now := time.Now()
+		if p.PublicComplete || now.UnixNano() < p.NextSubmitUnixNS {
+			return nil, nil
+		}
+		if len(p.Attempt) == 0 || now.Sub(time.Unix(0, p.AttemptStartedUnixNS)) >= attemptLifetime {
+			body, err := c.MarshalBinary()
+			if err != nil {
+				return nil, err
+			}
+			attempt := protocol.Submission{Network: c.Tx.Body.Network, Body: body}
+			// Identical holders share the initial envelope. Only prolonged lack of
+			// progress creates a new nonce to escape a stale Comet transaction cache.
+			if len(p.Attempt) != 0 {
+				if _, err = rand.Read(attempt.Nonce[:]); err != nil {
+					return nil, err
+				}
+			}
+			p.Attempt, err = attempt.MarshalBinary()
+			if err != nil {
+				return nil, err
+			}
+			p.AttemptStartedUnixNS = now.UnixNano()
+		}
+		p.NextSubmitUnixNS = now.Add(retryInterval).UnixNano()
+		raw = p.Attempt
+		o := state.NewOverlay(v)
+		if err := state.Put(o, key, p); err != nil {
+			return nil, err
+		}
+		return o.Changes(), nil
+	})
+	if err != nil || len(raw) == 0 {
+		return err
+	}
+	return r.Public.Submit(ctx, raw)
+}
+
+func (r *Relay) markPublicComplete(key []byte) error {
+	return r.DB.Update(func(v state.ReadView) ([]state.Change, error) {
+		p, found, err := state.Load[state.Outbox](v, key)
+		if err != nil || !found || p.PublicComplete {
+			return nil, err
+		}
+		p.PublicComplete = true
+		o := state.NewOverlay(v)
+		if err = state.Put(o, key, p); err != nil {
+			return nil, err
+		}
+		return o.Changes(), nil
 	})
 }

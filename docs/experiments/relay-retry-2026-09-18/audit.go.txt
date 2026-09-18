@@ -1,0 +1,98 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	abci "github.com/cometbft/cometbft/abci/types"
+	bolt "go.etcd.io/bbolt"
+	"os"
+	"path/filepath"
+	"time"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+)
+
+// Run only after the lab stops. Read-only database audit, with tracing disabled.
+func main() {
+	for _, lab := range os.Args[1:] {
+		out := map[string]any{"lab": filepath.Base(lab)}
+		for i := 0; i < 4; i++ {
+			db, e := bolt.Open(filepath.Join(lab, fmt.Sprintf("committee%d/committee.db", i)), 0600, &bolt.Options{ReadOnly: true, Timeout: time.Second})
+			if e != nil {
+				panic(e)
+			}
+			commands, payments, settled := 0, 0, 0
+			var charged, refund, burn uint64
+			e = db.View(func(tx *bolt.Tx) error {
+				return tx.Bucket([]byte("state.v2")).ForEach(func(k, v []byte) error {
+					if bytes.HasPrefix(k, []byte{0xff, 'b'}) {
+						var rec struct{ Response []byte }
+						if e := json.Unmarshal(v, &rec); e != nil {
+							return e
+						}
+						var r abci.ResponseFinalizeBlock
+						if e := r.Unmarshal(rec.Response); e != nil {
+							return e
+						}
+						commands += len(r.TxResults)
+					}
+					if bytes.HasPrefix(k, state.Key(state.KeyPayment)) {
+						var p rules.PublicPayment
+						if e := json.Unmarshal(v, &p); e != nil {
+							return e
+						}
+						payments++
+						if p.Settled && p.Fee.Closed {
+							settled++
+						}
+						charged += p.Fee.Rewards + p.Fee.Burned
+						refund += p.Fee.Refunded
+						burn += p.Fee.Burned
+					}
+					return nil
+				})
+			})
+			db.Close()
+			if e != nil {
+				panic(e)
+			}
+			out[fmt.Sprintf("committee%d", i)] = map[string]any{"commands": commands, "payments": payments, "settled_closed": settled, "charged": charged, "refund": refund, "burn": burn}
+		}
+		pending := map[string]int{}
+		files, _ := filepath.Glob(filepath.Join(lab, "*", "*.db"))
+		wallets, _ := filepath.Glob(filepath.Join(lab, "wallet*.db"))
+		files = append(files, wallets...)
+		for _, p := range files {
+			db, e := bolt.Open(p, 0600, &bolt.Options{ReadOnly: true, Timeout: time.Second})
+			if e != nil {
+				panic(e)
+			}
+			n := 0
+			e = db.View(func(tx *bolt.Tx) error {
+				b := tx.Bucket([]byte("state.v2"))
+				if b == nil {
+					return nil
+				}
+				c := b.Cursor()
+				prefix := state.Key(state.KeyOutbox)
+				for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+					n++
+				}
+				return nil
+			})
+			db.Close()
+			if e != nil {
+				panic(e)
+			}
+			name, _ := filepath.Rel(lab, p)
+			pending[name] = n
+		}
+		out["outbox"] = pending
+		b, _ := json.MarshalIndent(out, "", "  ")
+		fmt.Println(string(b))
+		if e := os.WriteFile(filepath.Join(lab, "audit.json"), b, 0600); e != nil {
+			panic(e)
+		}
+	}
+}

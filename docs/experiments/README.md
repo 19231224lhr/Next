@@ -15,3 +15,5 @@ Its longest measured interval was committee admission to block execution;
 individual Comet consensus phases had not yet been instrumented.
 
 - [35-payment phase diagnosis](latency-phase-2026-09-18/README.md): reversible propagation-parameter experiments, raw four-node traces and scripts. Defaults and delivery logic remain unchanged.
+
+- [Fresh-genesis retry repair](relay-retry-2026-09-18/README.md): tracing-off paired runs, stable retry envelopes, offline financial audit, and wallet restart/drain.
