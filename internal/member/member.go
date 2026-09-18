@@ -21,13 +21,15 @@ type Config struct {
 	Peers        []protocol.OrgConfig
 	Schedule     rules.Schedule
 	Workers      uint32
+	Direct       *rules.DirectSettings
 }
 type Request = protocol.PaymentRequest
 type Approval = protocol.Approval
 type Member struct {
-	cfg   Config
-	db    store.Store
-	peers map[protocol.Hash]protocol.OrgConfig
+	cfg    Config
+	db     store.Store
+	peers  map[protocol.Hash]protocol.OrgConfig
+	direct *rules.DirectPolicy
 }
 
 func New(cfg Config, db store.Store, gen state.Genesis) (*Member, error) {
@@ -52,6 +54,14 @@ func New(cfg Config, db store.Store, gen state.Genesis) (*Member, error) {
 		m.peers[p.Hash()] = p
 	}
 	m.peers[cfg.Organization.Hash()] = cfg.Organization
+	if cfg.Direct != nil {
+		orgs := append(append([]protocol.OrgConfig{}, cfg.Peers...), cfg.Organization)
+		p, err := cfg.Direct.Policy(cfg.Schedule, orgs)
+		if err != nil {
+			return nil, err
+		}
+		m.direct = &p
+	}
 	if e := m.bootstrap(gen); e != nil {
 		return nil, e
 	}
@@ -63,6 +73,9 @@ func (m *Member) bootstrap(gen state.Genesis) error {
 		genHash := gen.Hash()
 		orgHash := m.cfg.Organization.Hash()
 		ids := m.cfg.Schedule.IDs()
+		if m.direct != nil {
+			ids = m.direct.Rules()
+		}
 		layout := new(protocol.Encoder)
 		layout.U16(m.cfg.Index)
 		layout.U32(m.cfg.Workers)
@@ -71,6 +84,10 @@ func (m *Member) bootstrap(gen state.Genesis) error {
 			committeeHash = m.cfg.Committee.Validators.Hash()
 		}
 		hash := protocol.Digest("MEMBER_INITIAL_STATE", genHash[:], orgHash[:], ids.Fee[:], ids.Work[:], ids.Accounting[:], layout.Data(), committeeHash, []byte(m.cfg.Committee.ChainID))
+		if m.direct != nil {
+			key := m.direct.Key.KeyID()
+			hash = protocol.Digest("MEMBER_INITIAL_STATE_V3", hash[:], key[:])
+		}
 		if old, found, e := state.Load[protocol.Hash](v, key); e != nil {
 			return nil, e
 		} else if found {
@@ -86,7 +103,11 @@ func (m *Member) bootstrap(gen state.Genesis) error {
 				return nil, protocol.ErrRule
 			}
 			seen[g.ID] = true
-			if e := state.Put(o, state.Key(state.KeyCreation, g.ID[:]), state.Creation{Output: g.Output, Fact: g.Fact, Final: true}); e != nil {
+			creationKey := state.Key(state.KeyCreation, g.ID[:])
+			if m.direct != nil {
+				creationKey = rules.DirectCreationKey(g.ID, 0)
+			}
+			if e := state.Put(o, creationKey, state.Creation{Output: g.Output, Fact: g.Fact, Final: true}); e != nil {
 				return nil, e
 			}
 		}
@@ -94,7 +115,11 @@ func (m *Member) bootstrap(gen state.Genesis) error {
 			if g.Organization != m.cfg.Organization.Hash() {
 				continue
 			}
-			if g.ID == (protocol.Hash{}) || g.Key.Kind < protocol.ResourceFUEL || g.Key.Kind > protocol.ResourcePolicy || g.Key.Version == 0 {
+			minimum := protocol.ResourceFUEL
+			if m.direct != nil {
+				minimum = protocol.ResourceCAL
+			}
+			if g.ID == (protocol.Hash{}) || g.Key.Kind < minimum || g.Key.Kind > protocol.ResourcePolicy || g.Key.Version == 0 {
 				return nil, protocol.ErrRule
 			}
 			if _, found, e := state.Load[state.Grant](o, state.Key(state.KeyGrant, g.Key.Encode())); e != nil {
@@ -136,6 +161,9 @@ func (m *Member) Approve(req Request) (Approval, error) {
 	return m.ApproveContext(context.Background(), req)
 }
 func (m *Member) ApproveContext(ctx context.Context, req Request) (Approval, error) {
+	if m.direct != nil {
+		return Approval{}, protocol.ErrUnsupported
+	}
 	tx := req.Tx
 	t := tx.Body
 	cfg := m.cfg.Organization

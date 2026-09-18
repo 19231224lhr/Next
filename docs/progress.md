@@ -1,3 +1,23 @@
+# Direct-liability v1.2 implementation (2026-09-19)
+
+The isolated wire-v3 branch now runs detached TXCer, one-round approval,
+background INSTALL, child-before-parent settlement, direct CAL coverage,
+automatic compensation, real Comet block/part revision, original-history replay
+and independently spendable late-output instances. Existing v1.1 data is intact.
+
+Full default/v3 tests, v3 race tests, vet and builds passed. A 14-process network
+and stopped audits verified 588 closed payments, zero pending outboxes/gaps,
+identical application state on all four committee nodes, balanced CAL/FUEL and
+one real historical revision per node. Application reconstruction from genesis
+against already-redacted Comet history also passed.
+
+Short closed-loop experiments complete about 13 payments/s; they do not establish
+high TPS. Latest-revision light-client proofs, v3 retail, real refill/reward
+operations, physical archive and sustained/fault-matrix tests remain incomplete.
+See [implementation, reproducible commands and raw reports](implementation-v1.2.md).
+
+The entries below are retained v1.1 history, not current v3 behavior.
+
 # Implementation progress
 
 Baseline: protocol v1.1, ProtocolVersion=2 / WireVersion=2.

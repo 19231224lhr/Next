@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 	cfg "utxo/cmd/internal/config"
+	"utxo/crypto/chameleon"
 	"utxo/internal/committee"
 	"utxo/internal/rules"
 	"utxo/internal/state"
@@ -31,6 +32,7 @@ func initialize(args []string) error {
 	dir := flags.String("dir", "", "new laboratory directory")
 	base := flags.Int("port", 18000, "base loopback port")
 	outputs := flags.Int("outputs", 1024, "finite initial CAL outputs per owner")
+	direct := flags.Bool("v3", false, "new direct-liability genesis with a 3-of-4 repair key")
 	if e := flags.Parse(args); e != nil {
 		return e
 	}
@@ -56,6 +58,20 @@ func initialize(args []string) error {
 	}
 	network := cfg.Network{ChainID: fmt.Sprintf("utxo-lab-%x", entropy[:8]), GenesisTime: time.Now().Add(-time.Second).UTC(), Schedule: rules.DefaultSchedule(), Members: make(map[protocol.Hash][4]string)}
 	network.Genesis.Network = protocol.Digest("NETWORK", []byte(network.ChainID))
+	var repairFiles [4]string
+	if *direct {
+		public, shares, err := chameleon.GenerateDealer()
+		if err != nil {
+			return err
+		}
+		network.Direct = &rules.DirectSettings{Modulus: public.Modulus(), TimeoutSeconds: 30, RepairCost: 5}
+		for i, b := range shares {
+			repairFiles[i] = filepath.Join(root, "keys", fmt.Sprintf("committee%d-repair.key", i))
+			if err = os.WriteFile(repairFiles[i], b, 0600); err != nil {
+				return err
+			}
+		}
+	}
 	keyFile := func(name string) (string, ed25519.PrivateKey, error) {
 		_, key, e := ed25519.GenerateKey(rand.Reader)
 		if e != nil {
@@ -88,7 +104,11 @@ func initialize(args []string) error {
 			id := protocol.OutputID(protocol.Digest("GENESIS_OUTPUT", org.Org[:], []byte(fmt.Sprint(i))))
 			network.Genesis.Outputs = append(network.Genesis.Outputs, state.OriginOutput{ID: id, Output: protocol.Output{Asset: protocol.AssetCAL, Amount: 100, Recipient: descriptor}, Fact: protocol.Digest("GENESIS_OUTPUT_FACT", id[:])})
 		}
-		for _, kind := range []protocol.ResourceKind{protocol.ResourceFUEL, protocol.ResourceExecution, protocol.ResourceBytes, protocol.ResourcePolicy} {
+		kinds := []protocol.ResourceKind{protocol.ResourceFUEL, protocol.ResourceExecution, protocol.ResourceBytes, protocol.ResourcePolicy}
+		if *direct {
+			kinds = append([]protocol.ResourceKind{protocol.ResourceCAL}, kinds...)
+		}
+		for _, kind := range kinds {
 			account := org.Org
 			if kind == protocol.ResourcePolicy {
 				account = protocol.Digest("POLICY", org.Org[:], descriptor.Owner[:])
@@ -96,6 +116,9 @@ func initialize(args []string) error {
 			network.Genesis.Grants = append(network.Genesis.Grants, state.Grant{ID: protocol.Digest("GENESIS_GRANT", org.Org[:], []byte{byte(kind)}), Organization: org.Hash(), Key: protocol.ResourceKey{Kind: kind, Account: account, Version: 1}, Amount: 1_000_000_000_000, Subject: descriptor.Owner})
 		}
 		network.Accounts = append(network.Accounts, committee.GenesisAccount{Owner: org.Org, Asset: protocol.AssetFUEL, Balance: 1_000_000_000_000})
+		if *direct {
+			network.Accounts = append(network.Accounts, committee.GenesisAccount{Owner: org.Org, Asset: protocol.AssetCAL, Balance: 1000000000000})
+		}
 		network.Organizations = append(network.Organizations, org)
 		network.Members[org.Org] = urls
 		for i := 0; i < 4; i++ {
@@ -146,6 +169,9 @@ func initialize(args []string) error {
 			}
 		}
 		c := map[string]any{"Network": lab.Network, "DataDir": filepath.Join(root, name), "KeyFile": committeeFiles[i], "P2PListen": fmt.Sprintf("tcp://127.0.0.1:%d", *base+200+i), "Peers": strings.Join(others, ","), "Listen": strings.TrimPrefix(network.CommitteeURLs[i], "http://"), "Index": i}
+		if *direct {
+			c["RepairKeyFile"] = repairFiles[i]
+		}
 		if e = cfg.Write(file, c); e != nil {
 			return e
 		}

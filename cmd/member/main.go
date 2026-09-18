@@ -49,7 +49,7 @@ func run() error {
 	if e != nil {
 		return e
 	}
-	db, e := store.Open(filepath.Join(c.DataDir, "member.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "member", Node: fmt.Sprintf("%s/%d", org.Org, c.Index), Schema: 2})
+	db, e := store.Open(filepath.Join(c.DataDir, "member.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "member", Node: fmt.Sprintf("%s/%d", org.Org, c.Index), Schema: n.Schema()})
 	if e != nil {
 		return e
 	}
@@ -59,7 +59,7 @@ func run() error {
 		return e
 	}
 	defer group.Close()
-	m, e := member.New(member.Config{Organization: org, Index: c.Index, Key: key, Peers: n.Organizations, Committee: trust, Schedule: n.Schedule, Workers: c.Workers}, group, n.Genesis)
+	m, e := member.New(member.Config{Organization: org, Index: c.Index, Key: key, Peers: n.Organizations, Committee: trust, Schedule: n.Schedule, Workers: c.Workers, Direct: n.Direct}, group, n.Genesis)
 	if e != nil {
 		return e
 	}
@@ -80,6 +80,10 @@ func run() error {
 		relay.Members[organization.Org] = endpoints
 	}
 	relay.ApplyReceipts = m.ApplyReceipts
+	if n.Direct != nil {
+		relay.Direct = true
+		relay.ApplyDirectReceipts = m.ApplyDirectReceipts
+	}
 	relay.Install = func(c protocol.TXCer) error {
 		if c.Tx.Body.Certifier == org.Org {
 			return m.Install(c)

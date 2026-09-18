@@ -1,7 +1,30 @@
 # UTXO FastPay
 
-Research implementation of protocol v1.1 (wire/protocol version 2).
-Primary development checkout: Mac Studio, `/Users/richz/lab/man/utxo-fastpay`.
+Research implementation of protocol v1.2 (wire/protocol version 3), with the
+v1.1 implementation retained as a separate-network baseline.
+Active Mac checkout: `/Users/richz/lab/man/utxo-fastpay-v12`.
+
+## Direct-liability implementation
+
+The v3 path implements detached TXCer, immediate child settlement with a missing
+certified parent, direct CAL coverage, automatic compensation, actual historical
+Comet block/part revision, original-history replay and late-output instances.
+One-round wallet delivery and background INSTALL remain in place.
+
+**Start with [v1.2 build instructions and measured results](docs/implementation-v1.2.md).**
+Before any build, run `python3 third_party/cometbft/overlay.py` with Go on PATH;
+the root module replaces Comet with its generated `.scratch/comet-src` fork.
+Build v3 commands with `-tags=comet_v3` and initialize a fresh `init-lab -v3`.
+Do not reuse a v2 genesis or database. A clean-source bootstrap has been tested.
+
+The 14-process laboratory passed payment, compensation, real history revision,
+replay and stopped-state accounting checks. Short closed-loop runs completed
+about 13 payments/s; **high throughput and long-term bounded storage have not
+been demonstrated**. The report distinguishes implemented features from pending
+retail migration, latest-revision light-client proofs and sustained tests.
+
+The sections below describe the **v1.1 baseline**; their old root/custody rules
+and commands are not the v3 runtime path.
 
 ## Current implementation
 

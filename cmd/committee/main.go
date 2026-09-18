@@ -35,6 +35,7 @@ import (
 
 type configuration struct {
 	Network, DataDir, KeyFile, P2PListen, Peers, Listen string
+	RepairKeyFile                                       string
 	Index                                               uint16
 	TLS                                                 cfg.TLS
 }
@@ -63,7 +64,7 @@ func run() error {
 	if _, e = network.Trust(); e != nil {
 		return e
 	}
-	db, e := store.Open(filepath.Join(c.DataDir, "committee.db"), store.Identity{Network: network.Genesis.Network.String(), Role: "committee", Node: fmt.Sprint(c.Index), Schema: 2})
+	db, e := store.Open(filepath.Join(c.DataDir, "committee.db"), store.Identity{Network: network.Genesis.Network.String(), Role: "committee", Node: fmt.Sprint(c.Index), Schema: network.Schema()})
 	if e != nil {
 		return e
 	}
@@ -72,7 +73,15 @@ func run() error {
 	if e != nil {
 		return e
 	}
-	app, e := committee.NewApp(network.ChainID, db, engine.Check, engine.Execute, engine.Drain)
+	if e = configureDirect(network, engine); e != nil {
+		return e
+	}
+	var app *committee.App
+	if network.Direct != nil {
+		app, e = committee.NewTimedApp(network.ChainID, db, engine.Check, engine.ExecuteAt, engine.BeginBlock)
+	} else {
+		app, e = committee.NewApp(network.ChainID, db, engine.Check, engine.Execute, engine.Drain)
+	}
 	if e != nil {
 		return e
 	}
@@ -147,6 +156,9 @@ func run() error {
 	defer func() { consensus.Stop(); consensus.Wait() }()
 	client := local.New(consensus)
 	mux := http.NewServeMux()
+	if network.Direct != nil {
+		mux.HandleFunc("GET /v3/receipts/{spend}", directReceiptsHandler(app, engine, client))
+	}
 	mux.HandleFunc("POST /v1/commands", func(w http.ResponseWriter, r *http.Request) {
 		var received int64
 		if requesttrace.Settlement != nil {
@@ -156,7 +168,11 @@ func run() error {
 			http.Error(w, "INVALID_ENCODING", 400)
 			return
 		}
-		raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, protocol.MaxCertificateBytes+128))
+		limit := int64(protocol.MaxCertificateBytes + 128)
+		if network.Direct != nil {
+			limit = protocol.MaxRequestBytes
+		}
+		raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 		if e != nil {
 			http.Error(w, "INVALID_ENCODING", 400)
 			return
@@ -281,6 +297,11 @@ func run() error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	repairStop, e := startRepairRuntime(ctx, c, network, db, app, consensus, mux)
+	if e != nil {
+		return e
+	}
+	defer repairStop()
 	done := make(chan error, 1)
 	go func() { done <- cfg.Serve(server) }()
 	slog.Info("committee started", "listen", c.Listen, "index", c.Index)

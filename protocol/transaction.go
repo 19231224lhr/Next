@@ -147,7 +147,11 @@ type TxBody struct {
 
 func (t TxBody) IntentID() Hash { return Digest("INTENT", t.Network[:], t.Subject[:], t.Nonce[:]) }
 func (t TxBody) Validate() error {
-	if t.Wire != WireVersion || t.Version != ProtocolVersion {
+	return t.validateVersion(WireVersion, ProtocolVersion)
+}
+
+func (t TxBody) validateVersion(wire, version uint64) error {
+	if t.Wire != wire || t.Version != version {
 		return ErrUnsupported
 	}
 	if t.Network == (Hash{}) || t.Intent != t.IntentID() || t.Subject == (PublicKey{}) || t.Rules.Fee == (Hash{}) || t.Rules.Work == (Hash{}) || t.Rules.Accounting == (Hash{}) {
@@ -288,6 +292,10 @@ func (t TxBody) MarshalBinary() ([]byte, error) {
 // ID is meaningful only after Validate succeeds at the trust boundary.
 func (t TxBody) ID() TxID { return TxID(sha256.Sum256(t.encode())) }
 func DecodeTx(b []byte) (t TxBody, err error) {
+	return decodeTxVersion(b, WireVersion, ProtocolVersion)
+}
+
+func decodeTxVersion(b []byte, wire, version uint64) (t TxBody, err error) {
 	if len(b) > MaxTxBytes {
 		return t, ErrEncoding
 	}
@@ -338,7 +346,7 @@ func DecodeTx(b []byte) (t TxBody, err error) {
 	if e := d.Done(); e != nil {
 		return t, e
 	}
-	return t, t.Validate()
+	return t, t.validateVersion(wire, version)
 }
 
 type OwnerAuth struct {

@@ -34,6 +34,7 @@ type Network struct {
 	Schedule      rules.Schedule
 	Genesis       state.Genesis
 	Accounts      []committee.GenesisAccount
+	Direct        *rules.DirectSettings `json:",omitempty"`
 }
 
 func (n Network) Trust() (finality.Trust, error) {
@@ -51,7 +52,14 @@ func (n Network) Trust() (finality.Trust, error) {
 	return trust, nil
 }
 func (n Network) Engine() committee.EngineConfig {
-	return committee.EngineConfig{Network: n.Genesis.Network, Organizations: n.Organizations, Schedule: n.Schedule, Genesis: n.Genesis, Accounts: n.Accounts}
+	return committee.EngineConfig{Network: n.Genesis.Network, Organizations: n.Organizations, Schedule: n.Schedule, Genesis: n.Genesis, Accounts: n.Accounts, Direct: n.Direct}
+}
+
+func (n Network) Schema() uint64 {
+	if n.Direct != nil {
+		return 3
+	}
+	return 2
 }
 func (n Network) Organization(id protocol.Hash) (protocol.OrgConfig, error) {
 	for _, o := range n.Organizations {

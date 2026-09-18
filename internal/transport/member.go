@@ -67,6 +67,7 @@ func MemberHandler(m *member.Member, foreground, background int) http.Handler {
 			}
 		}
 	}
+	addDirectHandlers(mux, m, fg, bg, wrap)
 	mux.HandleFunc("POST /v1/transactions", wrap(fg, func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if r.Header.Get(requesttrace.HeaderName) == "1" {
@@ -159,7 +160,7 @@ type MemberClient struct {
 }
 
 func NewMemberClient(url string) *MemberClient {
-	return &MemberClient{BaseURL: strings.TrimRight(url, "/"), HTTP: &http.Client{Timeout: 10 * time.Second}}
+	return &MemberClient{BaseURL: strings.TrimRight(url, "/"), HTTP: NewHTTPClient(10 * time.Second)}
 }
 func (c *MemberClient) post(ctx context.Context, path string, raw []byte, limit int) ([]byte, error) {
 	request, e := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+path, bytes.NewReader(raw))

@@ -55,8 +55,11 @@ func audit(args []string) error {
 		Name                                 string
 		Approvals, Pending, Payments, Closed int
 		CAL, FUEL, Rewards, Burned           string
+		StateHash, Gap                       string `json:",omitempty"`
+		Revisions                            int    `json:",omitempty"`
 	}
 	var report []nodeReport
+	var directState string
 	for _, node := range lab.Nodes {
 		item := nodeReport{Name: node.Name}
 		file := node.Binary + ".db"
@@ -124,6 +127,26 @@ func audit(args []string) error {
 				}
 			}
 			if node.Binary == "committee" {
+				if network.Direct != nil {
+					result, err := auditDirectLedger(v, network)
+					if err != nil {
+						return err
+					}
+					item.CAL = fmt.Sprint(result.CAL)
+					item.FUEL = fmt.Sprint(result.FUEL)
+					item.Gap = fmt.Sprint(result.Gap)
+					item.Rewards = fmt.Sprint(result.Rewards)
+					item.Burned = fmt.Sprint(result.Burned)
+					item.Payments = result.Payments
+					item.Closed = result.Closed
+					item.StateHash = result.StateHash
+					if directState != "" && directState != result.StateHash {
+						return fmt.Errorf("committee application states differ")
+					}
+					directState = result.StateHash
+					item.Revisions, err = auditDirectHistory(v, network, filepath.Join(*dir, node.Name, "comet", "data"))
+					return err
+				}
 				var initialCAL, initialFUEL, currentCAL, currentFUEL uint64
 				add := func(target *uint64, n uint64) error { var e error; *target, e = protocol.Add(*target, n); return e }
 				for _, o := range network.Genesis.Outputs {

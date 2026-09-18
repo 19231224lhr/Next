@@ -1,0 +1,240 @@
+package member
+
+import (
+	"context"
+	"utxo/finality"
+	"utxo/internal/requesttrace"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+func (m *Member) ApplyDirectReceipts(proofs []finality.FactProof) error {
+	if m.direct == nil || len(proofs) > protocol.MaxAdmission {
+		return protocol.ErrRule
+	}
+	prepared := make([]preparedProof, len(proofs))
+	for i, p := range proofs {
+		var err error
+		prepared[i], err = m.prepareProof(p)
+		if err != nil {
+			return err
+		}
+	}
+	return m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		o := state.NewOverlay(v)
+		for _, p := range prepared {
+			if err := m.applyProof(o, p); err != nil {
+				return nil, err
+			}
+		}
+		return o.Changes(), nil
+	})
+}
+
+// ApproveDirect retains the one-round contract: input locks and all five
+// resource debits reach durable storage before the vote is returned.
+func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest) (protocol.DirectApproval, error) {
+	if m.direct == nil {
+		return protocol.DirectApproval{}, protocol.ErrUnsupported
+	}
+	raw, err := req.MarshalBinary()
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	req, err = protocol.DecodeDirectRequest(raw)
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	tx := req.Tx
+	t := tx.Body
+	cfg := m.cfg.Organization
+	if t.Network != cfg.Network || t.Certifier != cfg.Org || t.Config != cfg.Hash() || t.Epoch != cfg.Epoch {
+		return protocol.DirectApproval{}, protocol.ErrAuth
+	}
+	vector, err := rules.PrepareDirectVector(tx, *m.direct)
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	summary := protocol.SummaryFor(tx, vector)
+	fact := summary.Fact()
+	parents := map[protocol.OutputID]protocol.DirectParent{}
+	for _, parent := range req.Parents {
+		c := parent.Certificate
+		org, ok := m.peers[c.Summary.Config]
+		if !ok || c.Verify(org) != nil || c.Summary.Rules != m.direct.Rules() || int(parent.Index) >= len(c.Summary.Outputs) {
+			return protocol.DirectApproval{}, protocol.ErrAuth
+		}
+		id := c.Summary.OutputID(parent.Index)
+		if _, exists := parents[id]; exists {
+			return protocol.DirectApproval{}, protocol.ErrRule
+		}
+		parents[id] = parent
+	}
+	var totalIn, totalOut uint64
+	used := map[protocol.OutputID]bool{}
+	for i, in := range t.Inputs {
+		claim := tx.Claims[i]
+		if in.Kind == protocol.CertificateInput {
+			p, ok := parents[in.Output]
+			if !ok || in.Evidence != protocol.Hash(p.Certificate.QC.Fact) || p.Certificate.VerifyOutput(m.peers[p.Certificate.Summary.Config], p.Index, claim.Output) != nil {
+				return protocol.DirectApproval{}, protocol.ErrAuth
+			}
+			used[in.Output] = true
+		}
+		totalIn, err = protocol.Add(totalIn, claim.Output.Amount)
+		if err != nil {
+			return protocol.DirectApproval{}, err
+		}
+	}
+	for _, out := range t.Outputs {
+		totalOut, err = protocol.Add(totalOut, out.Amount)
+		if err != nil {
+			return protocol.DirectApproval{}, err
+		}
+	}
+	if totalIn != totalOut || len(used) != len(parents) {
+		return protocol.DirectApproval{}, protocol.ErrRule
+	}
+	requesttrace.Mark(ctx, "validation_complete")
+	id := tx.ID()
+	worker := uint32(id[0]) % m.cfg.Workers
+	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		o := state.NewOverlay(v)
+		key := state.Key(state.KeyApproval, fact[:])
+		if _, found, err := state.Load[state.Approval](o, key); err != nil {
+			return nil, err
+		} else if found {
+			return nil, nil
+		}
+		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
+			return nil, err
+		} else if found {
+			return nil, rules.ErrConflict
+		}
+		if old, found, err := state.Load[protocol.TxID](o, state.Key(state.KeyIntent, t.Intent[:])); err != nil {
+			return nil, err
+		} else if found && old != id {
+			return nil, rules.ErrConflict
+		}
+		for i, in := range t.Inputs {
+			claim := tx.Claims[i]
+			key := rules.DirectSpendKey(in.Output, claim.Instance)
+			spend, _, err := state.Load[state.Spend](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if spend.Consumed != (protocol.SpendFactID{}) || (spend.Candidate != (protocol.SpendFactID{}) && spend.Candidate != fact) {
+				return nil, rules.ErrConflict
+			}
+			if in.Kind == protocol.FinalInput {
+				created, found, err := state.Load[state.Creation](o, rules.DirectCreationKey(in.Output, claim.Instance))
+				if err != nil {
+					return nil, err
+				}
+				if !found || !created.Final || created.Fact != in.Evidence || created.Output != claim.Output {
+					return nil, rules.ErrMissing
+				}
+			}
+			spend.Candidate = fact
+			if err = state.Put(o, key, spend); err != nil {
+				return nil, err
+			}
+		}
+		a := state.Approval{Fact: fact, Direct: &tx, Admission: vector}
+		for i, allocation := range vector {
+			ref := t.Admission[i]
+			g, found, err := state.Load[state.Grant](o, state.Key(state.KeyGrant, allocation.Key.Encode()))
+			if err != nil {
+				return nil, err
+			}
+			if !found || g.ID != ref.Grant || g.Organization != cfg.Hash() || (g.Key.Kind == protocol.ResourcePolicy && g.Subject != t.Subject) {
+				return nil, protocol.ErrAuth
+			}
+			key := state.SliceKey(allocation.Key, worker)
+			slice, found, err := state.Load[state.Slice](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if !found || slice.Available < allocation.Cap {
+				return nil, rules.ErrLimited
+			}
+			slice.Available -= allocation.Cap
+			slice.Reserved, err = protocol.Add(slice.Reserved, allocation.Cap)
+			if err != nil {
+				return nil, err
+			}
+			if err = state.Put(o, key, slice); err != nil {
+				return nil, err
+			}
+			a.Debits = append(a.Debits, state.Debit{Key: allocation.Key, Cap: allocation.Cap, Worker: worker})
+		}
+		if err := state.Put(o, key, a); err != nil {
+			return nil, err
+		}
+		if err := state.Put(o, state.Key(state.KeyIntent, t.Intent[:]), id); err != nil {
+			return nil, err
+		}
+		return o.Changes(), nil
+	})
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	requesttrace.Mark(ctx, "commit_returned")
+	vote := protocol.SignSpend(fact, m.cfg.Index, m.cfg.Key)
+	requesttrace.Mark(ctx, "vote_signed")
+	return protocol.DirectApproval{Summary: summary, Vote: vote}, nil
+}
+
+// InstallDirect saves a full relay command in the background. It does not
+// reserve a second budget or make an unvoted local output spendable.
+func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
+	if m.direct == nil || payment.Tx.Body.Config != m.cfg.Organization.Hash() {
+		return protocol.ErrAuth
+	}
+	if _, err := rules.VerifyDirectPayment(payment, *m.direct); err != nil {
+		return err
+	}
+	raw, err := payment.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	fact := payment.Certificate.QC.Fact
+	return m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		o := state.NewOverlay(v)
+		key := state.Key(state.KeyInstall, fact[:])
+		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
+			return nil, err
+		} else if found {
+			return nil, nil
+		}
+		for i, in := range payment.Tx.Body.Inputs {
+			key := rules.DirectSpendKey(in.Output, payment.Tx.Claims[i].Instance)
+			s, _, err := state.Load[state.Spend](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if s.Consumed != (protocol.SpendFactID{}) && s.Consumed != fact {
+				return nil, rules.ErrConflict
+			}
+			s.Consumed = fact
+			if err = state.Put(o, key, s); err != nil {
+				return nil, err
+			}
+		}
+		o.Set(key, raw)
+		outkey := state.Key(state.KeyOutbox, fact[:])
+		pending, found, err := state.Load[state.Outbox](o, outkey)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			pending = state.Outbox{Fact: fact, Origin: payment.Tx.Body.Certifier}
+		}
+		pending.Certificate = raw
+		if err = state.Put(o, outkey, pending); err != nil {
+			return nil, err
+		}
+		return o.Changes(), nil
+	})
+}

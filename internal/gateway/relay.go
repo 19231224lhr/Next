@@ -20,12 +20,14 @@ type PublicClient interface {
 	Certificate(context.Context, protocol.SpendFactID) (protocol.TXCer, error)
 }
 type Relay struct {
-	DB            store.Store
-	Public        PublicClient
-	Trust         finality.Trust
-	Organizations map[protocol.Hash]protocol.OrgConfig
-	Members       map[protocol.Hash][4]MemberClient
-	ApplyReceipts func(protocol.TXCer, []finality.FactProof) (rules.ReceiptProgress, error)
+	Direct              bool
+	ApplyDirectReceipts func([]finality.FactProof) error
+	DB                  store.Store
+	Public              PublicClient
+	Trust               finality.Trust
+	Organizations       map[protocol.Hash]protocol.OrgConfig
+	Members             map[protocol.Hash][4]MemberClient
+	ApplyReceipts       func(protocol.TXCer, []finality.FactProof) (rules.ReceiptProgress, error)
 	// Reconciles a certificate obtained from the committee when only an original
 	// local vote remained. A local member supplies Install for its own issuer.
 	Install   func(protocol.TXCer) error
@@ -121,6 +123,9 @@ func (r *Relay) Run(ctx context.Context) error {
 	}
 }
 func (r *Relay) deliver(ctx context.Context, key []byte, pending state.Outbox) (err error) {
+	if r.Direct {
+		return r.deliverDirect(ctx, key, pending)
+	}
 	var c protocol.TXCer
 	var e error
 	if len(pending.Certificate) == 0 {

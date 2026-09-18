@@ -20,13 +20,17 @@ type EngineConfig struct {
 	Schedule      rules.Schedule
 	Genesis       state.Genesis
 	Accounts      []GenesisAccount
+	Direct        *rules.DirectSettings `json:",omitempty"`
 }
 type Engine struct {
-	cache   certificateCache
-	cfg     EngineConfig
-	db      store.Store
-	orgs    map[protocol.Hash]protocol.OrgConfig
-	genesis protocol.Hash
+	cache         certificateCache
+	cfg           EngineConfig
+	db            store.Store
+	orgs          map[protocol.Hash]protocol.OrgConfig
+	genesis       protocol.Hash
+	direct        *rules.DirectPolicy
+	repairCheck   CheckFunc
+	repairExecute TimedExecuteFunc
 }
 
 func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
@@ -42,6 +46,14 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 		return nil, e
 	}
 	engine := &Engine{cfg: c, db: db, orgs: make(map[protocol.Hash]protocol.OrgConfig), genesis: protocol.Digest("PUBLIC_GENESIS_V2", b)}
+	if c.Direct != nil {
+		p, err := c.Direct.Policy(c.Schedule, c.Organizations)
+		if err != nil {
+			return nil, err
+		}
+		engine.direct = &p
+		engine.genesis = protocol.Digest("PUBLIC_GENESIS_V3", b)
+	}
 	for _, org := range c.Organizations {
 		if org.Validate() != nil || org.Network != c.Network {
 			return nil, protocol.ErrAuth
@@ -65,7 +77,7 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 		}
 		o := state.NewOverlay(v)
 		for _, a := range c.Accounts {
-			if a.Owner == (protocol.Hash{}) || a.Asset != protocol.AssetFUEL || a.Balance == 0 {
+			if a.Owner == (protocol.Hash{}) || (a.Asset != protocol.AssetFUEL && (c.Direct == nil || a.Asset != protocol.AssetCAL)) || a.Balance == 0 {
 				return nil, protocol.ErrRule
 			}
 			k := rules.AccountKey(a.Owner, a.Asset)
@@ -83,6 +95,9 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 				return nil, protocol.ErrRule
 			}
 			k := state.Key(state.KeyCreation, out.ID[:])
+			if c.Direct != nil {
+				k = rules.DirectCreationKey(out.ID, 0)
+			}
 			if _, found, e := state.Load[state.Creation](o, k); e != nil {
 				return nil, e
 			} else if found {
@@ -92,12 +107,16 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 				return nil, e
 			}
 		}
-		backing := make(map[protocol.Hash]uint64)
+		backing := make(map[string]uint64)
 		for _, g := range c.Genesis.Grants {
 			if _, ok := engine.orgs[g.Organization]; !ok {
 				return nil, protocol.ErrAuth
 			}
-			if g.ID == (protocol.Hash{}) || g.Key.Version == 0 || g.Amount == 0 || g.Key.Kind < protocol.ResourceFUEL || g.Key.Kind > protocol.ResourcePolicy {
+			minimum := protocol.ResourceFUEL
+			if c.Direct != nil {
+				minimum = protocol.ResourceCAL
+			}
+			if g.ID == (protocol.Hash{}) || g.Key.Version == 0 || g.Amount == 0 || g.Key.Kind < minimum || g.Key.Kind > protocol.ResourcePolicy {
 				return nil, protocol.ErrRule
 			}
 			k := state.Key(state.KeyGrant, g.Key.Encode())
@@ -106,13 +125,18 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 			} else if found {
 				return nil, protocol.ErrRule
 			}
-			if g.Key.Kind == protocol.ResourceFUEL {
-				total, e := protocol.Add(backing[g.Key.Account], g.Amount)
+			if g.Key.Kind == protocol.ResourceFUEL || g.Key.Kind == protocol.ResourceCAL {
+				asset := protocol.AssetFUEL
+				if g.Key.Kind == protocol.ResourceCAL {
+					asset = protocol.AssetCAL
+				}
+				accountKey := rules.AccountKey(g.Key.Account, asset)
+				total, e := protocol.Add(backing[string(accountKey)], g.Amount)
 				if e != nil {
 					return nil, e
 				}
-				backing[g.Key.Account] = total
-				balance, _, e := state.Load[uint64](o, rules.AccountKey(g.Key.Account, protocol.AssetFUEL))
+				backing[string(accountKey)] = total
+				balance, _, e := state.Load[uint64](o, accountKey)
 				if e != nil {
 					return nil, e
 				}
@@ -166,6 +190,19 @@ func (e *Engine) unwrap(raw []byte) ([]byte, error) {
 	return raw, nil
 }
 func (e *Engine) Check(raw []byte) error {
+	if e.direct != nil {
+		if protocol.IsClockTick(raw, e.cfg.Network) {
+			return nil
+		}
+		if protocol.IsRepairInput(raw) {
+			if e.repairCheck == nil {
+				return protocol.ErrUnsupported
+			}
+			return e.repairCheck(raw)
+		}
+		_, err := e.verifyV3(raw)
+		return err
+	}
 	var err error
 	raw, err = e.unwrap(raw)
 	if err != nil {
@@ -184,6 +221,9 @@ func (e *Engine) Check(raw []byte) error {
 	return err
 }
 func (e *Engine) Execute(v state.ReadView, raw []byte) (state.Transition, error) {
+	if e.direct != nil {
+		return state.Transition{}, protocol.ErrRule
+	} // v3 requires consensus time
 	var err error
 	raw, err = e.unwrap(raw)
 	if err != nil {

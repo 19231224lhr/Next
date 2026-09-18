@@ -103,7 +103,7 @@ func run() error {
 	if e != nil {
 		return e
 	}
-	db, e := store.Open(filepath.Join(c.DataDir, "gateway.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: 2})
+	db, e := store.Open(filepath.Join(c.DataDir, "gateway.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: n.Schema()})
 	if e != nil {
 		return e
 	}
@@ -118,6 +118,9 @@ func run() error {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/transactions", paymentHandler(collector))
+	if n.Direct != nil {
+		mux.HandleFunc("POST /v3/transactions", directPaymentHandler(collector))
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("alive\n")) })
 	server, e := cfg.HTTP(c.Listen, mux, c.TLS)
 	if e != nil {
@@ -127,6 +130,7 @@ func run() error {
 	defer stop()
 	relayCtx, relayCancel := context.WithCancel(ctx)
 	relay := &gateway.Relay{DB: db, Public: transport.NewCommitteeClient(n.CommitteeURLs[0]), Trust: trust, Organizations: make(map[protocol.Hash]protocol.OrgConfig), Members: make(map[protocol.Hash][4]gateway.MemberClient)}
+	relay.Direct = n.Direct != nil
 	for _, organization := range n.Organizations {
 		relay.Organizations[organization.Hash()] = organization
 		var endpoints [4]gateway.MemberClient

@@ -11,6 +11,7 @@ import (
 	cmttypes "github.com/cometbft/cometbft/types"
 	"sort"
 	"sync"
+	"time"
 	"utxo/finality"
 	"utxo/internal/requesttrace"
 	"utxo/internal/state"
@@ -24,6 +25,13 @@ var metaKey = []byte{0xff, 2, 'c', 'o', 'm', 'm', 'i', 't'}
 type MaintenanceFunc func(state.ReadView) (state.Transition, error)
 type CheckFunc func([]byte) error
 type ExecuteFunc func(state.ReadView, []byte) (state.Transition, error)
+type BlockContext struct {
+	Height int64
+	Index  uint32
+	Time   time.Time
+}
+type TimedExecuteFunc func(state.ReadView, []byte, BlockContext) (state.Transition, error)
+type BeginBlockFunc func(state.ReadView, BlockContext) (state.Transition, error)
 type commitRecord struct {
 	Commitment finality.Commitment
 	Leaves     [][]byte
@@ -42,6 +50,8 @@ type App struct {
 	db             store.Store
 	check          CheckFunc
 	execute        ExecuteFunc
+	executeAt      TimedExecuteFunc
+	beginBlock     BeginBlockFunc
 	committed      commitRecord
 	response       *abci.ResponseFinalizeBlock
 	pending        *commitRecord
@@ -50,6 +60,21 @@ type App struct {
 }
 
 var _ abci.Application = (*App)(nil)
+
+// NewTimedApp supplies committed consensus time, never a node's wall clock.
+func NewTimedApp(chain string, db store.Store, check CheckFunc, execute TimedExecuteFunc, begin ...BeginBlockFunc) (*App, error) {
+	if execute == nil || len(begin) > 1 {
+		return nil, protocol.ErrRule
+	}
+	app, err := NewApp(chain, db, check, func(state.ReadView, []byte) (state.Transition, error) { return state.Transition{}, protocol.ErrRule })
+	if err == nil {
+		app.executeAt = execute
+		if len(begin) == 1 {
+			app.beginBlock = begin[0]
+		}
+	}
+	return app, err
+}
 
 func NewApp(chain string, db store.Store, check CheckFunc, execute ExecuteFunc, maintenance ...MaintenanceFunc) (*App, error) {
 	if chain == "" || db == nil || check == nil || execute == nil || len(maintenance) > 1 {
@@ -87,7 +112,12 @@ func NewApp(chain string, db store.Store, check CheckFunc, execute ExecuteFunc, 
 func (a *App) Info(context.Context, *abci.RequestInfo) (*abci.ResponseInfo, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return &abci.ResponseInfo{Version: "utxo-v2", AppVersion: 2, LastBlockHeight: a.committed.Height, LastBlockAppHash: bytes.Clone(a.response.AppHash)}, nil
+	version, name := uint64(2), "utxo-v2"
+	if a.executeAt != nil {
+		version = 3
+		name = "utxo-v3"
+	}
+	return &abci.ResponseInfo{Version: name, AppVersion: version, LastBlockHeight: a.committed.Height, LastBlockAppHash: bytes.Clone(a.response.AppHash)}, nil
 }
 func (a *App) InitChain(_ context.Context, r *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
 	if r.ChainId != a.chain || r.InitialHeight > 1 {
@@ -204,6 +234,15 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 			overlay.Apply(candidate.Changes())
 			return nil
 		}
+		if a.beginBlock != nil {
+			tr, err := a.beginBlock(v, BlockContext{Height: r.Height, Time: r.Time})
+			if err != nil {
+				return err
+			}
+			if err = apply(tr); err != nil {
+				return err
+			}
+		}
 		for i, tx := range r.Txs {
 			response.TxResults[i] = &abci.ExecTxResult{}
 			if err := a.check(tx); err != nil {
@@ -212,7 +251,13 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 				continue
 			}
 			requesttrace.Settlement.Command(tx, "execute_start", r.Height)
-			transition, err := a.execute(overlay, tx)
+			var transition state.Transition
+			var err error
+			if a.executeAt != nil {
+				transition, err = a.executeAt(overlay, tx, BlockContext{Height: r.Height, Index: uint32(i), Time: r.Time})
+			} else {
+				transition, err = a.execute(overlay, tx)
+			}
 			requesttrace.Settlement.Command(tx, "execute_done", r.Height)
 			if err != nil {
 				response.TxResults[i].Code = 2

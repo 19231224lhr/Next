@@ -29,7 +29,11 @@ func (m *Member) prepareProof(input finality.FactProof) (preparedProof, error) {
 		return preparedProof{}, e
 	}
 	fact := verified.Fact()
-	if fact.Network != m.cfg.Organization.Network || fact.Rules != m.cfg.Schedule.IDs() {
+	ids := m.cfg.Schedule.IDs()
+	if m.direct != nil {
+		ids = m.direct.Rules()
+	}
+	if fact.Network != m.cfg.Organization.Network || fact.Rules != ids {
 		return preparedProof{}, protocol.ErrRule
 	}
 	if fact.Kind == protocol.FactOutputCreated {
@@ -56,6 +60,12 @@ func (m *Member) prepareProof(input finality.FactProof) (preparedProof, error) {
 	}
 	if fact.Key != receipt.Key() || fact.Revision != receipt.Revision {
 		return preparedProof{}, protocol.ErrRule
+	}
+	if m.direct != nil {
+		if fact.Kind != protocol.FactCredit || receipt.Resource.Kind < protocol.ResourceCAL || receipt.Resource.Kind > protocol.ResourcePolicy {
+			return preparedProof{}, protocol.ErrRule
+		}
+		return preparedProof{fact: fact, receipt: receipt}, nil
 	}
 	switch receipt.Resource.Kind {
 	case protocol.ResourceFUEL, protocol.ResourcePolicy:
@@ -140,11 +150,15 @@ func (m *Member) applyProof(o *state.Overlay, p preparedProof) error {
 		if e != nil {
 			return e
 		}
-		if fact.Key != protocol.Hash(output.ID) || output.Output.Recipient.Network != fact.Network || fact.Revision != 1 {
+		validRevision := fact.Revision == 1 || (m.direct != nil && fact.Revision == 2)
+		if fact.Key != protocol.Hash(output.ID) || output.Output.Recipient.Network != fact.Network || !validRevision {
 			return protocol.ErrRule
 		}
 
 		key := state.Key(state.KeyCreation, output.ID[:])
+		if m.direct != nil {
+			key = rules.DirectCreationKey(output.ID, uint8(fact.Revision-1))
+		}
 		old, found, e := state.Load[state.Creation](o, key)
 		if e != nil {
 			return e
@@ -181,7 +195,11 @@ func (m *Member) applyProof(o *state.Overlay, p preparedProof) error {
 	if !found {
 		return nil
 	}
-	if approval.Tx.Body.Config != m.cfg.Organization.Hash() {
+	config := approval.Tx.Body.Config
+	if approval.Direct != nil {
+		config = approval.Direct.Body.Config
+	}
+	if config != m.cfg.Organization.Hash() {
 		return protocol.ErrAuth
 	}
 	index := -1

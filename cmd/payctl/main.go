@@ -22,6 +22,10 @@ func main() {
 		err = relayWallet(os.Args[2:])
 	case "demo":
 		err = demo(os.Args[2:])
+	case "demo-v3":
+		err = demoDirect(os.Args[2:])
+	case "bench-v3":
+		err = benchDirect(os.Args[2:])
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}

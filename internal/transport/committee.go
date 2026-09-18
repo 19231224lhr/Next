@@ -23,11 +23,12 @@ type CommitteeClient struct {
 }
 
 func NewCommitteeClient(url string) *CommitteeClient {
-	return &CommitteeClient{BaseURL: strings.TrimRight(url, "/"), HTTP: &http.Client{Timeout: 5 * time.Second}}
+	return &CommitteeClient{BaseURL: strings.TrimRight(url, "/"), HTTP: NewHTTPClient(5 * time.Second)}
 }
 func (c *CommitteeClient) Submit(ctx context.Context, raw []byte) error {
+	_, directErr := protocol.DecodeDirectPayment(raw)
 	// A relay already persisted its envelope. Network retries must preserve it.
-	if _, err := protocol.DecodeSubmission(raw); err != nil {
+	if _, err := protocol.DecodeSubmission(raw); err != nil && directErr != nil && !protocol.IsRepairInput(raw) {
 		var network protocol.Hash
 		cert, e := protocol.DecodeCertificate(raw)
 		if e == nil {
@@ -80,6 +81,7 @@ func (c *CommitteeClient) get(ctx context.Context, path string, limit int) ([]by
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 		return nil, fmt.Errorf("committee query HTTP %d", response.StatusCode)
 	}
 	raw, e := io.ReadAll(io.LimitReader(response.Body, int64(limit+1)))

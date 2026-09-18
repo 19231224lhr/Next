@@ -101,6 +101,7 @@ type Debit struct {
 type Approval struct {
 	Fact      protocol.SpendFactID
 	Tx        protocol.SignedTx
+	Direct    *protocol.FastTx `json:",omitempty"`
 	Admission protocol.AdmissionVector
 	Effects   protocol.CertifiedEffects
 	Debits    []Debit
