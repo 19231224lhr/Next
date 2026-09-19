@@ -148,9 +148,9 @@ func TestDirectInboxFullFallsBackToDurableScan(t *testing.T) {
 	}
 	seen := make(chan protocol.SpendFactID, 256)
 	r.Public = relayPublic{submit: func(_ context.Context, raw []byte) error {
-		p, err := protocol.DecodeDirectPayment(raw)
+		p, err := protocol.DecodeDirectSubmission(raw)
 		if err == nil {
-			seen <- p.Certificate.QC.Fact
+			seen <- p.Authorization.Fact
 		}
 		return err
 	}}
@@ -267,7 +267,7 @@ func TestDirectInboxProcessExitBeforePersistAndFullPayloadResubmit(t *testing.T)
 		t.Fatal(err)
 	}
 	startDirectRelay(t, r)
-	want, _ := payments[0].MarshalBinary()
+	want, _ := payments[0].Submission().MarshalBinary()
 	select {
 	case got := <-sent:
 		if !bytes.Equal(got, want) {

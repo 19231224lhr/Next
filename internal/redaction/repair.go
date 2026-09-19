@@ -82,41 +82,41 @@ func digest(b []byte) protocol.Hash { return protocol.Hash(sha256.Sum256(b)) }
 
 // InputTarget validates responsibility and timing before a member computes its
 // local share. No caller supplies an arbitrary RSA representative.
-func InputTarget(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, output protocol.OutputID, now int64) (protocol.RepairInput, protocol.DirectPayment, error) {
+func InputTarget(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, output protocol.OutputID, now int64) (protocol.RepairInput, protocol.DirectSubmission, error) {
 	var command protocol.RepairInput
 	ob, found, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(output))
 	if err != nil {
-		return command, protocol.DirectPayment{}, err
+		return command, protocol.DirectSubmission{}, err
 	}
 	if !found || ob.Status != rules.DirectOpen {
-		return command, protocol.DirectPayment{}, rules.ErrMissing
+		return command, protocol.DirectSubmission{}, rules.ErrMissing
 	}
 	if ob.Deadline == 0 || now < ob.Deadline {
-		return command, protocol.DirectPayment{}, rules.ErrLimited
+		return command, protocol.DirectSubmission{}, rules.ErrLimited
 	}
 	cfg, ok := p.Organizations[ob.Config]
 	if !ok || cfg.Org != ob.Issuer {
-		return command, protocol.DirectPayment{}, protocol.ErrAuth
+		return command, protocol.DirectSubmission{}, protocol.ErrAuth
 	}
 	location, found, err := state.Load[Location](v, LocationKey(ob.Transaction))
 	if err != nil {
-		return command, protocol.DirectPayment{}, err
+		return command, protocol.DirectSubmission{}, err
 	}
 	if !found {
-		return command, protocol.DirectPayment{}, rules.ErrMissing
+		return command, protocol.DirectSubmission{}, rules.ErrMissing
 	}
 	b, revision, err := Canonical(v, bs, location.Height)
 	if err != nil {
-		return command, protocol.DirectPayment{}, err
+		return command, protocol.DirectSubmission{}, err
 	}
 	if int(location.Index) >= len(b.Data.Txs) {
-		return command, protocol.DirectPayment{}, protocol.ErrRule
+		return command, protocol.DirectSubmission{}, protocol.ErrRule
 	}
-	payment, err := protocol.DecodeDirectPayment(b.Data.Txs[location.Index])
+	payment, err := protocol.DecodeDirectSubmission(b.Data.Txs[location.Index])
 	if err != nil {
 		return command, payment, err
 	}
-	if payment.Tx.ID() != ob.Transaction || payment.Certificate.QC.Fact != ob.Consumer || int(ob.Input) >= len(payment.Tx.Funding) || payment.Tx.Body.Inputs[ob.Input].Output != output || payment.Tx.Claims[ob.Input].Output.Amount != ob.Amount {
+	if payment.Tx.ID() != ob.Transaction || payment.Authorization.Fact != ob.Consumer || int(ob.Input) >= len(payment.Tx.Funding) || payment.Tx.Body.Inputs[ob.Input].Output != output || payment.Tx.Claims[ob.Input].Output.Amount != ob.Amount {
 		return command, payment, protocol.ErrAuth
 	}
 	f := payment.Tx.Funding[ob.Input]
@@ -139,8 +139,8 @@ func InputShare(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy,
 }
 
 // ReplaceInput changes only one fixed-width funding slot; the immutable claim,
-// wallet signature, QC, fees and output IDs remain byte-for-byte unchanged.
-func ReplaceInput(p rules.DirectPolicy, c protocol.RepairInput, payment protocol.DirectPayment, shares []chameleon.Contribution) (protocol.RepairInput, error) {
+// wallet signature, organization authorization, fees and output IDs remain byte-for-byte unchanged.
+func ReplaceInput(p rules.DirectPolicy, c protocol.RepairInput, payment protocol.DirectSubmission, shares []chameleon.Contribution) (protocol.RepairInput, error) {
 	i := int(c.Input)
 	if i >= len(payment.Tx.Funding) {
 		return c, protocol.ErrRule
@@ -166,7 +166,7 @@ func nextBody(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c
 	if c.Network != expected.Network || c.Height != expected.Height || c.Transaction != expected.Transaction || c.Input != expected.Input || c.Base != expected.Base || c.Previous != expected.Previous {
 		return nil, nil, protocol.ErrAuth
 	}
-	next, err := protocol.DecodeDirectPayment(c.TransactionBytes)
+	next, err := protocol.DecodeDirectSubmission(c.TransactionBytes)
 	if err != nil {
 		return nil, nil, err
 	}

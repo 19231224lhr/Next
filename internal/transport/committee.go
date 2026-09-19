@@ -26,7 +26,7 @@ func NewCommitteeClient(url string) *CommitteeClient {
 	return &CommitteeClient{BaseURL: strings.TrimRight(url, "/"), HTTP: NewHTTPClient(5 * time.Second)}
 }
 func (c *CommitteeClient) Submit(ctx context.Context, raw []byte) error {
-	_, directErr := protocol.DecodeDirectPayment(raw)
+	_, directErr := protocol.DecodeDirectSubmission(raw)
 	// A relay already persisted its envelope. Network retries must preserve it.
 	if _, err := protocol.DecodeSubmission(raw); err != nil && directErr != nil && !protocol.IsRepairInput(raw) {
 		var network protocol.Hash

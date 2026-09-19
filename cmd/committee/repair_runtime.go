@@ -275,7 +275,7 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 						break
 					}
 					var command protocol.RepairInput
-					var payment protocol.DirectPayment
+					var payment protocol.DirectSubmission
 					err = db.View(func(v state.ReadView) error {
 						var err error
 						command, payment, err = redaction.InputTarget(v, blocks, policy, ob.Output, now)

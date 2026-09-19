@@ -52,7 +52,11 @@ func TestGroupedDirectOutboxDoesNotReviveAfterBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	trust, proof := testkit.Block("grouped-outbox", 1, nil, [][]byte{raw}, []*abci.ExecTxResult{{Data: data}})
+	public, err := payment.Submission().MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	trust, proof := testkit.Block("grouped-outbox", 1, nil, [][]byte{public}, []*abci.ExecTxResult{{Data: data}})
 	verified, err := finality.VerifyBlock(trust, proof)
 	if err != nil {
 		t.Fatal(err)

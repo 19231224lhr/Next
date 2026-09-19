@@ -237,7 +237,7 @@ func demoDirect(args []string) error {
 			case <-ticker.C:
 			}
 		}
-		raw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).MarshalBinary()
+		raw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).Submission().MarshalBinary()
 		if err != nil {
 			return err
 		}

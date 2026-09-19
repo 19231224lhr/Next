@@ -88,7 +88,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	childRaw, err := (protocol.DirectPayment{Tx: child, Certificate: cc, InputCertificates: []protocol.InputCertificate{{Certificate: pc, Index: 0}}}).MarshalBinary()
+	childRaw, err := (protocol.DirectPayment{Tx: child, Certificate: cc, InputCertificates: []protocol.InputCertificate{{Certificate: pc, Index: 0}}}).Submission().MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	appendBlock(2, 1700000002, nil)
 	output := pc.Summary.OutputID(0)
 	var command protocol.RepairInput
-	var payment protocol.DirectPayment
+	var payment protocol.DirectSubmission
 	var inputShares []chameleon.Contribution
 	err = db.View(func(v state.ReadView) error {
 		var err error
@@ -238,7 +238,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	if err = vals.VerifyCommitLight(chain, originalID, 1, blocks.LoadBlockCommit(1)); err != nil {
 		t.Fatal(err)
 	}
-	parentRaw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).MarshalBinary()
+	parentRaw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).Submission().MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +264,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lateRaw, err := (protocol.DirectPayment{Tx: spendLate, Certificate: lc}).MarshalBinary()
+	lateRaw, err := (protocol.DirectPayment{Tx: spendLate, Certificate: lc}).Submission().MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
 	}

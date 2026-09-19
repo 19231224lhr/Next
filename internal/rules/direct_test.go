@@ -103,6 +103,11 @@ func (f directFixture) payment(t *testing.T, input protocol.OutputID, parent *pr
 		t.Fatal(err)
 	}
 	tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.owner)}
+	return f.certify(t, tx, parents)
+}
+
+func (f directFixture) certify(t *testing.T, tx protocol.FastTx, parents []InputCertificate) DirectPayment {
+	t.Helper()
 	vector, err := PrepareDirectVector(tx, f.policy)
 	if err != nil {
 		t.Fatal(err)
@@ -149,6 +154,30 @@ func loadDirect[T any](t *testing.T, db store.Store, key []byte) T {
 		t.Fatal(err)
 	}
 	return result
+}
+
+func TestDirectFinalPaymentDoesNotRegisterNewGuarantees(t *testing.T) {
+	f := newDirectFixture(t)
+	p := f.payment(t, f.genesis, nil, 1)
+	f.settle(t, p, 100)
+	id := p.Certificate.Summary.OutputID(0)
+	for _, key := range [][]byte{
+		state.Key(keyDirectCoverage, p.Certificate.QC.Fact[:]),
+		state.Key(keyDirectPromise, id[:]),
+	} {
+		if err := f.db.View(func(v state.ReadView) error {
+			if _, err := v.Get(key); err != state.ErrNotFound {
+				t.Fatalf("normal final payment created unnecessary guarantee record: %x (%v)", key, err)
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := loadDirect[DirectPaymentState](t, f.db, state.Key(keyDirectPayment, p.Certificate.QC.Fact[:]))
+	if !got.Settled || !got.Fee.Closed {
+		t.Fatal("normal settlement or fee closing missing")
+	}
 }
 
 func TestDirectChildBeforeParentAndImmediateSuccessor(t *testing.T) {

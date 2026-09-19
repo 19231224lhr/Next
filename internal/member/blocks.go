@@ -141,7 +141,7 @@ func (m *Member) ApplyBlock(o *state.Overlay, b finality.VerifiedBlock) error {
 			if err != nil {
 				return err
 			}
-			pay, err := protocol.DecodeDirectPayment(repair.TransactionBytes)
+			pay, err := protocol.DecodeDirectSubmission(repair.TransactionBytes)
 			if err != nil {
 				return err
 			}
@@ -172,12 +172,12 @@ func (m *Member) ApplyBlock(o *state.Overlay, b finality.VerifiedBlock) error {
 			}
 			continue
 		}
-		pay, err := protocol.DecodeDirectPayment(entry.Bytes)
+		pay, err := protocol.DecodeDirectSubmission(entry.Bytes)
 		if err != nil {
 			return err
 		}
 		tx := pay.Tx
-		fact := pay.Certificate.QC.Fact
+		fact := pay.Authorization.Fact
 		if tx.Body.Network != m.cfg.Organization.Network {
 			return protocol.ErrAuth
 		}
@@ -237,7 +237,7 @@ func (m *Member) ApplyBlock(o *state.Overlay, b finality.VerifiedBlock) error {
 			late[i] = true
 		}
 		for i, out := range tx.Body.Outputs {
-			id := pay.Certificate.Summary.OutputID(uint32(i))
+			id := pay.Summary().OutputID(uint32(i))
 			if err = m.resolveLocal(o, id, false); err != nil {
 				return err
 			}

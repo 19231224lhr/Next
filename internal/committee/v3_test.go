@@ -70,7 +70,7 @@ func TestDirectABCIChildBeforeParentReplay(t *testing.T) {
 			t.Fatal(err)
 		}
 		for i, payment := range payments {
-			raw, err := payment.MarshalBinary()
+			raw, err := payment.Submission().MarshalBinary()
 			if err != nil {
 				t.Fatal(err)
 			}

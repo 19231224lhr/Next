@@ -265,10 +265,14 @@ func (r *Relay) runDirectTask(ctx context.Context, task directTask, decode func(
 	}
 	c := payment.Certificate
 	if task.target < 0 {
+		raw, err := payment.Submission().MarshalBinary()
+		if err != nil {
+			return err
+		}
 		requesttrace.Payment("relay_enter", task.fact)
 		requesttrace.Payment("relay_ready", task.fact)
 		requesttrace.Payment("submit_start", task.fact)
-		err := r.Public.Submit(ctx, p.Certificate)
+		err = r.Public.Submit(ctx, raw)
 		requesttrace.Payment("submit_done", task.fact)
 		return err
 	}

@@ -1,5 +1,7 @@
 # UTXO FastPay
 
+Public submissions now use `DirectSubmission` (406): transaction, existing organization spend authorization and immediate input certificates. New output TXCer remains in wallet/INSTALL delivery (405). See [the current amendment](docs/implementation-public-submission-v4.md). Use a fresh genesis for this accounting-rule revision.
+
 Current implementation: direct-liability payments with block-driven wallet and
 member updates (wire/application version 4). Active branch:
 `implementation/block-following-v4`.

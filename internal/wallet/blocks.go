@@ -18,7 +18,7 @@ func (w *Wallet) ApplyBlock(o *state.Overlay, b finality.VerifiedBlock) error {
 		if !result.Applied || protocol.IsRepairInput(entry.Bytes) {
 			continue
 		}
-		pay, err := protocol.DecodeDirectPayment(entry.Bytes)
+		pay, err := protocol.DecodeDirectSubmission(entry.Bytes)
 		if err != nil {
 			return err
 		}
@@ -40,7 +40,7 @@ func (w *Wallet) ApplyBlock(o *state.Overlay, b finality.VerifiedBlock) error {
 			if late[uint32(i)] {
 				instance = 1
 			}
-			id := pay.Certificate.Summary.OutputID(uint32(i))
+			id := pay.Summary().OutputID(uint32(i))
 			key := DirectCoinKey(id, instance)
 			old, found, err := state.Load[DirectCoin](o, key)
 			if err != nil {

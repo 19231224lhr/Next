@@ -71,8 +71,8 @@ func (r *SettlementRecorder) get(raw []byte) *SettlementTiming {
 	var fact protocol.SpendFactID
 	if cert, err := protocol.DecodeCertificate(body); err == nil {
 		fact = cert.QC.Fact
-	} else if payment, err := protocol.DecodeDirectPayment(body); err == nil {
-		fact = payment.Certificate.QC.Fact
+	} else if payment, err := protocol.DecodeDirectSubmission(body); err == nil {
+		fact = payment.Authorization.Fact
 	} else {
 		return nil
 	}

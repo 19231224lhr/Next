@@ -11,9 +11,34 @@ type DirectPayment struct {
 	InputCertificates []InputCertificate
 }
 
-// MarshalBinary keeps every certificate and authorization in the immutable
-// envelope. Only the fixed-width funding references/openings may be revised.
+// DirectSubmission is the public transaction, not a newly issued output TXCer.
+// Authorization reuses the organization's existing votes for this spend. Its
+// signed summary is reconstructed from Tx and Admission, never sent twice.
+type DirectSubmission struct {
+	Tx                FastTx
+	Admission         AdmissionVector
+	Authorization     SpendQC
+	InputCertificates []InputCertificate
+}
+
+func (p DirectPayment) Submission() DirectSubmission {
+	return DirectSubmission{Tx: p.Tx, Admission: p.Certificate.Summary.Admission,
+		Authorization: p.Certificate.QC, InputCertificates: p.InputCertificates}
+}
+
+func (p DirectSubmission) Summary() OutputSummary { return SummaryFor(p.Tx, p.Admission) }
+
+// Only fixed-width funding references/openings may be revised in either format.
 func (p DirectPayment) MarshalBinary() ([]byte, error) {
+	if p.Certificate.Summary.Fact() != p.Submission().Summary().Fact() {
+		return nil, ErrAuth
+	}
+	return p.Submission().marshal(405)
+}
+
+func (p DirectSubmission) MarshalBinary() ([]byte, error) { return p.marshal(406) }
+
+func (p DirectSubmission) marshal(kind uint16) ([]byte, error) {
 	raw, err := p.Tx.MarshalBinary()
 	if err != nil {
 		return nil, err
@@ -26,15 +51,15 @@ func (p DirectPayment) MarshalBinary() ([]byte, error) {
 		return nil, ErrEncoding
 	}
 	e := new(Encoder)
-	e.U16(405)
+	e.U16(kind)
 	e.Bytes(fixed)
-	if p.Certificate.QC.Fact != p.Certificate.Summary.Fact() || len(p.Certificate.QC.Votes) < 3 || len(p.Certificate.QC.Votes) > 4 {
+	if p.Authorization.Fact != p.Summary().Fact() || len(p.Authorization.Votes) < 3 || len(p.Authorization.Votes) > 4 {
 		return nil, ErrAuth
 	}
-	e.Bytes(p.Certificate.Summary.Admission.Encode())
-	e.Fixed(p.Certificate.QC.Fact[:])
-	e.U32(uint32(len(p.Certificate.QC.Votes)))
-	for _, v := range p.Certificate.QC.Votes {
+	e.Bytes(p.Admission.Encode())
+	e.Fixed(p.Authorization.Fact[:])
+	e.U32(uint32(len(p.Authorization.Votes)))
+	for _, v := range p.Authorization.Votes {
 		e.U16(v.Member)
 		e.Fixed(v.Signature[:])
 	}
@@ -50,13 +75,25 @@ func (p DirectPayment) MarshalBinary() ([]byte, error) {
 	return encodeDirectEnvelope(e.Data(), mutable)
 }
 
-func DecodeDirectPayment(raw []byte) (p DirectPayment, err error) {
+func DecodeDirectPayment(raw []byte) (DirectPayment, error) {
+	p, err := decodeDirectSubmission(raw, 405)
+	if err != nil {
+		return DirectPayment{}, err
+	}
+	return DirectPayment{Tx: p.Tx, Certificate: OutputCertificate{Summary: p.Summary(), QC: p.Authorization}, InputCertificates: p.InputCertificates}, nil
+}
+
+func DecodeDirectSubmission(raw []byte) (DirectSubmission, error) {
+	return decodeDirectSubmission(raw, 406)
+}
+
+func decodeDirectSubmission(raw []byte, kind uint16) (p DirectSubmission, err error) {
 	fixed, mutable, err := decodeDirectEnvelope(raw)
 	if err != nil {
 		return p, err
 	}
 	d := NewDecoder(fixed)
-	if d.U16() != 405 {
+	if d.U16() != kind {
 		return p, ErrEncoding
 	}
 	tx, err := encodeDirectEnvelope(d.Bytes(MaxRequestBytes), mutable)
@@ -75,12 +112,12 @@ func DecodeDirectPayment(raw []byte) (p DirectPayment, err error) {
 	if err = v.Done(); err != nil {
 		return p, err
 	}
-	p.Certificate.Summary = SummaryFor(p.Tx, vector)
-	copy(p.Certificate.QC.Fact[:], d.Fixed(32))
-	p.Certificate.QC.Votes = make([]SpendVote, d.Count(4))
-	for i := range p.Certificate.QC.Votes {
-		p.Certificate.QC.Votes[i].Member = d.U16()
-		copy(p.Certificate.QC.Votes[i].Signature[:], d.Fixed(64))
+	p.Admission = vector
+	copy(p.Authorization.Fact[:], d.Fixed(32))
+	p.Authorization.Votes = make([]SpendVote, d.Count(4))
+	for i := range p.Authorization.Votes {
+		p.Authorization.Votes[i].Member = d.U16()
+		copy(p.Authorization.Votes[i].Signature[:], d.Fixed(64))
 	}
 	p.InputCertificates = make([]InputCertificate, d.Count(MaxInputs))
 	for i := range p.InputCertificates {

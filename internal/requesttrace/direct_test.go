@@ -36,7 +36,7 @@ func TestSettlementRecordsV4DirectCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err = (protocol.DirectPayment{Tx: tx, Certificate: cert}).MarshalBinary()
+	raw, err = (protocol.DirectPayment{Tx: tx, Certificate: cert}).Submission().MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
 	}

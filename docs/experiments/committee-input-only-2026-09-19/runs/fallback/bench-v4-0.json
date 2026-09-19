@@ -1,0 +1,4070 @@
+{
+  "Summary": {
+    "block_observed_p50_ms": 2760.3115,
+    "completed_per_second": 2.765013830685588,
+    "concurrency": 8,
+    "count": 16,
+    "elapsed_s": 5.7865895,
+    "failed": 0,
+    "fast_p50_ms": 104.966125,
+    "fast_p95_ms": 137.77125,
+    "finished_unix_ns": 1789828783471085500,
+    "member_applied_p50_ms": 2817.27425,
+    "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.",
+    "started_unix_ns": 1789828777684496000,
+    "timing_origin": "wallet_http_submit_v4",
+    "trace": true,
+    "workload": "closed_loop_final_utxo_cross_org"
+  },
+  "Samples": [
+    {
+      "Index": 0,
+      "SentUnixNS": 1789828777684553000,
+      "CertificateReceivedUnixNS": 1789828777744130000,
+      "FastUnixNS": 1789828777789514000,
+      "BlockObservedUnixNS": 1789828780490134000,
+      "MemberObservedUnixNS": 1789828780509523000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777685367000,
+          "local_ns": 125
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777686131000,
+          "local_ns": 764000
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777687376000,
+          "local_ns": 166
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777687515000,
+          "local_ns": 139416
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777687626000,
+          "local_ns": 167
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777687819000,
+          "local_ns": 500
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777688072000,
+          "local_ns": 446250
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777688113000,
+          "local_ns": 295250
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777697709000,
+          "local_ns": 10333125
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777697718000,
+          "local_ns": 10342041
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777697736000,
+          "local_ns": 10110208
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777697739000,
+          "local_ns": 10112917
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777697825000,
+          "local_ns": 10006959
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777697828000,
+          "local_ns": 10009459
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828777709571000,
+          "local_ns": 21753167
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777709628000,
+          "local_ns": 21809709
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828777715588000,
+          "local_ns": 27961958
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777715640000,
+          "local_ns": 28014042
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828777721536000,
+          "local_ns": 34160250
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777721800000,
+          "local_ns": 34424458
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777739470000,
+          "local_ns": 51844292
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777739489000,
+          "local_ns": 51862708
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828777739489000,
+          "local_ns": 51862875
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777743419000,
+          "local_ns": 56043708
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777743437000,
+          "local_ns": 56061208
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743437000,
+          "local_ns": 56061375
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777743470000,
+          "local_ns": 55652459
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777743484000,
+          "local_ns": 55666167
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743484000,
+          "local_ns": 55666292
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743944000,
+          "local_ns": 58577750
+        }
+      ],
+      "FastMS": 104.961417,
+      "BlockObservedMS": 2805.603625,
+      "MemberAppliedMS": 2824.992458,
+      "Fact": "d1584b1e3f8e5bcc802542fcc38453fb140039ce492fed993957093e2895df90"
+    },
+    {
+      "Index": 1,
+      "SentUnixNS": 1789828777684565000,
+      "CertificateReceivedUnixNS": 1789828777744111000,
+      "FastUnixNS": 1789828777789499000,
+      "BlockObservedUnixNS": 1789828780490126000,
+      "MemberObservedUnixNS": 1789828780509515000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777685349000,
+          "local_ns": 166
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777685715000,
+          "local_ns": 366041
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777686840000,
+          "local_ns": 208
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777686998000,
+          "local_ns": 158625
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777687452000,
+          "local_ns": 611791
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777687453000,
+          "local_ns": 613625
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828777687463000,
+          "local_ns": 622750
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777687630000,
+          "local_ns": 790541
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777687721000,
+          "local_ns": 125
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777687872000,
+          "local_ns": 151167
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777688234000,
+          "local_ns": 83
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777688368000,
+          "local_ns": 134000
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777688370000,
+          "local_ns": 649417
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777688372000,
+          "local_ns": 651375
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777697740000,
+          "local_ns": 9506500
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777697742000,
+          "local_ns": 9508541
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777703391000,
+          "local_ns": 16550958
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777703590000,
+          "local_ns": 16750708
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828777703591000,
+          "local_ns": 16750958
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828777709485000,
+          "local_ns": 21251333
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777709567000,
+          "local_ns": 21333666
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828777715436000,
+          "local_ns": 27715625
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777715526000,
+          "local_ns": 27805709
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777739424000,
+          "local_ns": 51704375
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777739526000,
+          "local_ns": 51805625
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828777739526000,
+          "local_ns": 51806000
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777743476000,
+          "local_ns": 55242750
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777743510000,
+          "local_ns": 55276333
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743510000,
+          "local_ns": 55276416
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828777744015000,
+          "local_ns": 58666458
+        }
+      ],
+      "FastMS": 104.934708,
+      "BlockObservedMS": 2805.583458,
+      "MemberAppliedMS": 2824.972583,
+      "Fact": "7d6780c1be61db8c217a98c6a294da76fb6b898fe0dc69b22b805bca9463e52e"
+    },
+    {
+      "Index": 2,
+      "SentUnixNS": 1789828777684543000,
+      "CertificateReceivedUnixNS": 1789828777744129000,
+      "FastUnixNS": 1789828777789509000,
+      "BlockObservedUnixNS": 1789828780790030000,
+      "MemberObservedUnixNS": 1789828780816363000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777685108000,
+          "local_ns": 250
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777685680000,
+          "local_ns": 572291
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777687368000,
+          "local_ns": 125
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777687967000,
+          "local_ns": 599167
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777688122000,
+          "local_ns": 166
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777688295000,
+          "local_ns": 172500
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777688440000,
+          "local_ns": 417
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777688620000,
+          "local_ns": 180792
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777697899000,
+          "local_ns": 9777083
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777697901000,
+          "local_ns": 9779166
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777697939000,
+          "local_ns": 10571583
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777697942000,
+          "local_ns": 10574125
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777698131000,
+          "local_ns": 9691458
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777698133000,
+          "local_ns": 9693625
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828777709685000,
+          "local_ns": 22317625
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777709732000,
+          "local_ns": 22364792
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828777715642000,
+          "local_ns": 27520083
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777715688000,
+          "local_ns": 27566208
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828777721999000,
+          "local_ns": 33560417
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777722061000,
+          "local_ns": 33622458
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777739428000,
+          "local_ns": 51306541
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777739494000,
+          "local_ns": 51371958
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828777739494000,
+          "local_ns": 51372083
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777743461000,
+          "local_ns": 56093833
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777743475000,
+          "local_ns": 55036000
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777743505000,
+          "local_ns": 56137583
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743505000,
+          "local_ns": 56137833
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777743510000,
+          "local_ns": 55071583
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743510000,
+          "local_ns": 55071708
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743970000,
+          "local_ns": 58863291
+        }
+      ],
+      "FastMS": 104.966125,
+      "BlockObservedMS": 3105.51225,
+      "MemberAppliedMS": 3131.844583,
+      "Fact": "8782ca71bab37a17e2e67ee3426b8d248a44041d23ba3bb08914959ff30a4d60"
+    },
+    {
+      "Index": 3,
+      "SentUnixNS": 1789828777684557000,
+      "CertificateReceivedUnixNS": 1789828777757006000,
+      "FastUnixNS": 1789828777789556000,
+      "BlockObservedUnixNS": 1789828780490140000,
+      "MemberObservedUnixNS": 1789828780509709000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777685109000,
+          "local_ns": 167
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777685956000,
+          "local_ns": 846750
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777688188000,
+          "local_ns": 209
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777688327000,
+          "local_ns": 139459
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777689013000,
+          "local_ns": 167
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777697977000,
+          "local_ns": 8963917
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777698024000,
+          "local_ns": 9836292
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777698027000,
+          "local_ns": 9839292
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777698422000,
+          "local_ns": 9409709
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777698424000,
+          "local_ns": 9411375
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777703586000,
+          "local_ns": 167
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777703844000,
+          "local_ns": 258667
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828777709787000,
+          "local_ns": 21599167
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777709831000,
+          "local_ns": 21643875
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828777715791000,
+          "local_ns": 26778000
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777715836000,
+          "local_ns": 26823375
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777721741000,
+          "local_ns": 18155458
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777721743000,
+          "local_ns": 18157417
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828777733716000,
+          "local_ns": 30131292
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777733765000,
+          "local_ns": 30180042
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777739426000,
+          "local_ns": 50413709
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777739474000,
+          "local_ns": 50461584
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828777739474000,
+          "local_ns": 50461875
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777743450000,
+          "local_ns": 55262584
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777743496000,
+          "local_ns": 55309250
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743497000,
+          "local_ns": 55309667
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777756507000,
+          "local_ns": 52921917
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777756556000,
+          "local_ns": 52971000
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828777756557000,
+          "local_ns": 52971625
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828777756922000,
+          "local_ns": 71813209
+        }
+      ],
+      "FastMS": 105.000209,
+      "BlockObservedMS": 2805.605584,
+      "MemberAppliedMS": 2825.175167,
+      "Fact": "d81c798e8e223d5f0d474990a065c4db57a1611c7516a5d69d0c1f839f3ea1d1"
+    },
+    {
+      "Index": 4,
+      "SentUnixNS": 1789828777684538000,
+      "CertificateReceivedUnixNS": 1789828777765672000,
+      "FastUnixNS": 1789828777830419000,
+      "BlockObservedUnixNS": 1789828780480483000,
+      "MemberObservedUnixNS": 1789828780481381000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777685388000,
+          "local_ns": 125
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777687368000,
+          "local_ns": 1979875
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777688727000,
+          "local_ns": 125
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777688952000,
+          "local_ns": 224791
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777697794000,
+          "local_ns": 125
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777697923000,
+          "local_ns": 129541
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777698014000,
+          "local_ns": 9286916
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777698022000,
+          "local_ns": 9294583
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777698360000,
+          "local_ns": 566125
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777698362000,
+          "local_ns": 568416
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777703672000,
+          "local_ns": 83
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777703929000,
+          "local_ns": 256917
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828777709736000,
+          "local_ns": 21008583
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777709783000,
+          "local_ns": 21056250
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828777715744000,
+          "local_ns": 17950208
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777715788000,
+          "local_ns": 17994375
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777721745000,
+          "local_ns": 18072417
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777721755000,
+          "local_ns": 18082917
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828777733770000,
+          "local_ns": 30097792
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777733816000,
+          "local_ns": 30143958
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777739506000,
+          "local_ns": 41712291
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777739535000,
+          "local_ns": 41741708
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828777739535000,
+          "local_ns": 41741916
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777743421000,
+          "local_ns": 54693958
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777743436000,
+          "local_ns": 54708916
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743436000,
+          "local_ns": 54709291
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777756455000,
+          "local_ns": 52783375
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777756470000,
+          "local_ns": 52798500
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828777756470000,
+          "local_ns": 52798667
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828777756872000,
+          "local_ns": 71484166
+        }
+      ],
+      "FastMS": 145.883084,
+      "BlockObservedMS": 2795.967709,
+      "MemberAppliedMS": 2796.865375,
+      "Fact": "29ace8e130462d82d1611381aaf2968d1ed1286824c0550ac16284d5ef2a1f9c"
+    },
+    {
+      "Index": 5,
+      "SentUnixNS": 1789828777684815000,
+      "CertificateReceivedUnixNS": 1789828777743978000,
+      "FastUnixNS": 1789828777759491000,
+      "BlockObservedUnixNS": 1789828780485079000,
+      "MemberObservedUnixNS": 1789828780491938000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777685363000,
+          "local_ns": 125
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777685826000,
+          "local_ns": 462708
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777687302000,
+          "local_ns": 250
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777687484000,
+          "local_ns": 166
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777687533000,
+          "local_ns": 208
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777687623000,
+          "local_ns": 138458
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777687673000,
+          "local_ns": 140666
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777687709000,
+          "local_ns": 407333
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777688122000,
+          "local_ns": 277417
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777688935000,
+          "local_ns": 1090625
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777697927000,
+          "local_ns": 10394791
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777697935000,
+          "local_ns": 10402250
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777697973000,
+          "local_ns": 10671375
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777697975000,
+          "local_ns": 10673500
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777698132000,
+          "local_ns": 10287375
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777698134000,
+          "local_ns": 10289542
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777703648000,
+          "local_ns": 16163625
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777703650000,
+          "local_ns": 16165583
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828777703661000,
+          "local_ns": 16177333
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777703897000,
+          "local_ns": 16412500
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828777709833000,
+          "local_ns": 21989084
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777710010000,
+          "local_ns": 22165917
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828777715692000,
+          "local_ns": 28159083
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777715737000,
+          "local_ns": 28205083
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828777721808000,
+          "local_ns": 34507125
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777721995000,
+          "local_ns": 34693833
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777733456000,
+          "local_ns": 45972375
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777733473000,
+          "local_ns": 45988875
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828777733473000,
+          "local_ns": 45989125
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777739459000,
+          "local_ns": 51926416
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777739472000,
+          "local_ns": 51940166
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828777739473000,
+          "local_ns": 51940291
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777743414000,
+          "local_ns": 55569959
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777743424000,
+          "local_ns": 56122833
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777743431000,
+          "local_ns": 55586625
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743431000,
+          "local_ns": 55586750
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777743439000,
+          "local_ns": 56138041
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743439000,
+          "local_ns": 56138250
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743858000,
+          "local_ns": 58495458
+        }
+      ],
+      "FastMS": 74.676125,
+      "BlockObservedMS": 2800.285959,
+      "MemberAppliedMS": 2807.14575,
+      "Fact": "66dc48a992c794203dada055155600ad964378886ad643d4fc9098f38c991f04"
+    },
+    {
+      "Index": 6,
+      "SentUnixNS": 1789828777684533000,
+      "CertificateReceivedUnixNS": 1789828777756931000,
+      "FastUnixNS": 1789828777789531000,
+      "BlockObservedUnixNS": 1789828780214532000,
+      "MemberObservedUnixNS": 1789828780215589000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777685431000,
+          "local_ns": 250
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777685842000,
+          "local_ns": 412041
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777686877000,
+          "local_ns": 84
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777687043000,
+          "local_ns": 165625
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777687522000,
+          "local_ns": 125
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777687559000,
+          "local_ns": 333
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777687660000,
+          "local_ns": 138000
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777687782000,
+          "local_ns": 223833
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777687883000,
+          "local_ns": 1006000
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777687886000,
+          "local_ns": 1008917
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828777687913000,
+          "local_ns": 1036084
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777688183000,
+          "local_ns": 1306500
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777697646000,
+          "local_ns": 10087416
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777697648000,
+          "local_ns": 10089833
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777703657000,
+          "local_ns": 16135250
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777703659000,
+          "local_ns": 16137417
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777709489000,
+          "local_ns": 22612375
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777709509000,
+          "local_ns": 22632292
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828777709509000,
+          "local_ns": 22632417
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828777715530000,
+          "local_ns": 27972250
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777715585000,
+          "local_ns": 28026458
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828777733458000,
+          "local_ns": 45936042
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777733548000,
+          "local_ns": 46026042
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777739466000,
+          "local_ns": 51908166
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777739482000,
+          "local_ns": 51924500
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828777739483000,
+          "local_ns": 51924666
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777756462000,
+          "local_ns": 68940334
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777756477000,
+          "local_ns": 68955417
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828777756477000,
+          "local_ns": 68955625
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828777756846000,
+          "local_ns": 71415750
+        }
+      ],
+      "FastMS": 104.998292,
+      "BlockObservedMS": 2530.019,
+      "MemberAppliedMS": 2531.075834,
+      "Fact": "76c7951cc1051defb5b3aca7575c5079540b9a64552b218ada215b306638cb43"
+    },
+    {
+      "Index": 7,
+      "SentUnixNS": 1789828777684805000,
+      "CertificateReceivedUnixNS": 1789828777743979000,
+      "FastUnixNS": 1789828777789519000,
+      "BlockObservedUnixNS": 1789828780490096000,
+      "MemberObservedUnixNS": 1789828780491780000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777685307000,
+          "local_ns": 125
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777685764000,
+          "local_ns": 457250
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777686761000,
+          "local_ns": 250
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777686871000,
+          "local_ns": 458
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777686956000,
+          "local_ns": 195500
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777687174000,
+          "local_ns": 303375
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777687489000,
+          "local_ns": 729209
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777687493000,
+          "local_ns": 732250
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828777687572000,
+          "local_ns": 811584
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777687637000,
+          "local_ns": 766166
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777687639000,
+          "local_ns": 768083
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828777687645000,
+          "local_ns": 773666
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777687799000,
+          "local_ns": 928041
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777688345000,
+          "local_ns": 1584959
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828777688518000,
+          "local_ns": 209
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828777688669000,
+          "local_ns": 150334
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828777697867000,
+          "local_ns": 9348834
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828777697870000,
+          "local_ns": 9351459
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828777709632000,
+          "local_ns": 21113792
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828777709681000,
+          "local_ns": 21162542
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777715452000,
+          "local_ns": 28691792
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777715473000,
+          "local_ns": 28712750
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828777715473000,
+          "local_ns": 28713000
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777721542000,
+          "local_ns": 34670875
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777721610000,
+          "local_ns": 34738833
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828777721610000,
+          "local_ns": 34739416
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828777743417000,
+          "local_ns": 54899000
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828777743434000,
+          "local_ns": 54916042
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743434000,
+          "local_ns": 54916334
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828777743880000,
+          "local_ns": 58573708
+        }
+      ],
+      "FastMS": 104.71475,
+      "BlockObservedMS": 2805.313291,
+      "MemberAppliedMS": 2806.997541,
+      "Fact": "600827c2fc8b554d99feddcec50ea641f1687be90e2e0b42a8587896bda52e6b"
+    },
+    {
+      "Index": 8,
+      "SentUnixNS": 1789828780215591000,
+      "CertificateReceivedUnixNS": 1789828780254663000,
+      "FastUnixNS": 1789828780282351000,
+      "BlockObservedUnixNS": 1789828782807867000,
+      "MemberObservedUnixNS": 1789828782833965000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780215635000,
+          "local_ns": 292
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780230490000,
+          "local_ns": 14855834
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780230842000,
+          "local_ns": 208
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780230851000,
+          "local_ns": 166
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780230865000,
+          "local_ns": 250
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780230901000,
+          "local_ns": 167
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780230987000,
+          "local_ns": 135583
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780230988000,
+          "local_ns": 145958
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780231000000,
+          "local_ns": 135250
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780231039000,
+          "local_ns": 138167
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780231434000,
+          "local_ns": 591792
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780231436000,
+          "local_ns": 594083
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780231436000,
+          "local_ns": 584375
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780231438000,
+          "local_ns": 586791
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828780231442000,
+          "local_ns": 599917
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780231443000,
+          "local_ns": 578917
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828780231444000,
+          "local_ns": 592916
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780231489000,
+          "local_ns": 588250
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780231492000,
+          "local_ns": 590958
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780231496000,
+          "local_ns": 631667
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828780231497000,
+          "local_ns": 596375
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828780231508000,
+          "local_ns": 644000
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780231511000,
+          "local_ns": 659875
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780231512000,
+          "local_ns": 670167
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780231572000,
+          "local_ns": 670917
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780231724000,
+          "local_ns": 859834
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780250354000,
+          "local_ns": 19512500
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780250372000,
+          "local_ns": 19530083
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828780250372000,
+          "local_ns": 19530250
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780250374000,
+          "local_ns": 19523166
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780250496000,
+          "local_ns": 19645291
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828780250497000,
+          "local_ns": 19645416
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780254346000,
+          "local_ns": 23445375
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780254349000,
+          "local_ns": 23485167
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780254367000,
+          "local_ns": 23466000
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828780254367000,
+          "local_ns": 23466125
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780254371000,
+          "local_ns": 23506417
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828780254371000,
+          "local_ns": 23506584
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828780254580000,
+          "local_ns": 38946125
+        }
+      ],
+      "FastMS": 66.760958,
+      "BlockObservedMS": 2592.297083,
+      "MemberAppliedMS": 2618.395083,
+      "Fact": "a97926ac578c85ae585eeab8c86409f7c5dc3532e5ca1fb003805524ba2b3389"
+    },
+    {
+      "Index": 9,
+      "SentUnixNS": 1789828780481383000,
+      "CertificateReceivedUnixNS": 1789828780509810000,
+      "FastUnixNS": 1789828780544506000,
+      "BlockObservedUnixNS": 1789828783245387000,
+      "MemberObservedUnixNS": 1789828783320220000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780481432000,
+          "local_ns": 334
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780481574000,
+          "local_ns": 142209
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780481852000,
+          "local_ns": 208
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780481863000,
+          "local_ns": 166
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780481868000,
+          "local_ns": 208
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780481894000,
+          "local_ns": 125
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780481986000,
+          "local_ns": 134167
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780481997000,
+          "local_ns": 134458
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780482002000,
+          "local_ns": 133750
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780482026000,
+          "local_ns": 131875
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780482433000,
+          "local_ns": 580875
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780482435000,
+          "local_ns": 582875
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780482439000,
+          "local_ns": 576708
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828780482440000,
+          "local_ns": 588417
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780482441000,
+          "local_ns": 578416
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780482445000,
+          "local_ns": 576792
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780482447000,
+          "local_ns": 579167
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828780482447000,
+          "local_ns": 584708
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828780482454000,
+          "local_ns": 585833
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780482468000,
+          "local_ns": 574667
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780482470000,
+          "local_ns": 576500
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828780482477000,
+          "local_ns": 582959
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780482505000,
+          "local_ns": 642666
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780482509000,
+          "local_ns": 657750
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780482514000,
+          "local_ns": 645708
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780482536000,
+          "local_ns": 641875
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780499321000,
+          "local_ns": 17453125
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780499415000,
+          "local_ns": 17546917
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828780499415000,
+          "local_ns": 17547083
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780509321000,
+          "local_ns": 27427500
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780509337000,
+          "local_ns": 27443084
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828780509337000,
+          "local_ns": 27443292
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780509431000,
+          "local_ns": 27579625
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780509436000,
+          "local_ns": 27573375
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780509452000,
+          "local_ns": 27589791
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828780509452000,
+          "local_ns": 27589916
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780509503000,
+          "local_ns": 27651333
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828780509503000,
+          "local_ns": 27651833
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828780509709000,
+          "local_ns": 28278125
+        }
+      ],
+      "FastMS": 63.123875,
+      "BlockObservedMS": 2764.026791,
+      "MemberAppliedMS": 2838.859916,
+      "Fact": "6b014a095548ead333b5449eccf5135321ae7f0d28fe71327ec924e8459f3424"
+    },
+    {
+      "Index": 10,
+      "SentUnixNS": 1789828780491782000,
+      "CertificateReceivedUnixNS": 1789828780544509000,
+      "FastUnixNS": 1789828780597449000,
+      "BlockObservedUnixNS": 1789828783247735000,
+      "MemberObservedUnixNS": 1789828783322985000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780491847000,
+          "local_ns": 125
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780491991000,
+          "local_ns": 143916
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780492422000,
+          "local_ns": 83
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780492508000,
+          "local_ns": 292
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780492566000,
+          "local_ns": 144375
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780492659000,
+          "local_ns": 151709
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780493016000,
+          "local_ns": 594125
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780493019000,
+          "local_ns": 596667
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780499411000,
+          "local_ns": 6903042
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780499413000,
+          "local_ns": 6905584
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828780499418000,
+          "local_ns": 6910709
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780499552000,
+          "local_ns": 7044625
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828780509315000,
+          "local_ns": 16892875
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780509383000,
+          "local_ns": 16961250
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780509427000,
+          "local_ns": 250
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780509631000,
+          "local_ns": 204500
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780510395000,
+          "local_ns": 968417
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780510398000,
+          "local_ns": 971375
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828780510404000,
+          "local_ns": 977292
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780510466000,
+          "local_ns": 1039500
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780524319000,
+          "local_ns": 31811875
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780524334000,
+          "local_ns": 31827000
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828780524335000,
+          "local_ns": 31827209
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780530320000,
+          "local_ns": 37898667
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780530323000,
+          "local_ns": 20896167
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780530335000,
+          "local_ns": 37913125
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828780530335000,
+          "local_ns": 37913292
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780530480000,
+          "local_ns": 21053167
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828780530480000,
+          "local_ns": 21053334
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828780530809000,
+          "local_ns": 38962750
+        }
+      ],
+      "FastMS": 105.667833,
+      "BlockObservedMS": 2755.9755,
+      "MemberAppliedMS": 2831.226375,
+      "Fact": "a29cc77b8599ff0b03c62ba7d8dfa11b2458b5430fb4f64b1fb7330eafd42aad"
+    },
+    {
+      "Index": 11,
+      "SentUnixNS": 1789828780491940000,
+      "CertificateReceivedUnixNS": 1789828780554719000,
+      "FastUnixNS": 1789828780626306000,
+      "BlockObservedUnixNS": 1789828783252229000,
+      "MemberObservedUnixNS": 1789828783326903000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780491981000,
+          "local_ns": 125
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780492118000,
+          "local_ns": 137250
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780492540000,
+          "local_ns": 166
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780492609000,
+          "local_ns": 83
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780492626000,
+          "local_ns": 167
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780492679000,
+          "local_ns": 138916
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780492765000,
+          "local_ns": 156083
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780492770000,
+          "local_ns": 144084
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780493120000,
+          "local_ns": 580458
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780493123000,
+          "local_ns": 583458
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780493270000,
+          "local_ns": 660833
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780493272000,
+          "local_ns": 662667
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780499475000,
+          "local_ns": 6849584
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780499486000,
+          "local_ns": 6860709
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828780509387000,
+          "local_ns": 16847291
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780509438000,
+          "local_ns": 16898708
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828780509527000,
+          "local_ns": 16917542
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780509925000,
+          "local_ns": 17315417
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828780524313000,
+          "local_ns": 31688125
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780524381000,
+          "local_ns": 31755375
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780530340000,
+          "local_ns": 37800041
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780530355000,
+          "local_ns": 37815291
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828780530355000,
+          "local_ns": 37815500
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780544422000,
+          "local_ns": 51813250
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780544438000,
+          "local_ns": 51829417
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828780544438000,
+          "local_ns": 51829625
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780554386000,
+          "local_ns": 61761125
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780554403000,
+          "local_ns": 61777500
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828780554403000,
+          "local_ns": 61777667
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828780554625000,
+          "local_ns": 62644583
+        }
+      ],
+      "FastMS": 134.367083,
+      "BlockObservedMS": 2760.3115,
+      "MemberAppliedMS": 2834.985667,
+      "Fact": "f8b7ff760a8196607c76280ed640ecbd4059241e7947e62e14fa4afc36d273ad"
+    },
+    {
+      "Index": 12,
+      "SentUnixNS": 1789828780509521000,
+      "CertificateReceivedUnixNS": 1789828780569912000,
+      "FastUnixNS": 1789828780626310000,
+      "BlockObservedUnixNS": 1789828783252243000,
+      "MemberObservedUnixNS": 1789828783326957000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780509626000,
+          "local_ns": 125
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780509767000,
+          "local_ns": 140917
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780510090000,
+          "local_ns": 459
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780510096000,
+          "local_ns": 333
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780510170000,
+          "local_ns": 83
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780510259000,
+          "local_ns": 163292
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780510282000,
+          "local_ns": 193042
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780510300000,
+          "local_ns": 130208
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780510703000,
+          "local_ns": 607333
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780510705000,
+          "local_ns": 609208
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780510742000,
+          "local_ns": 571916
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780510744000,
+          "local_ns": 574125
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780510830000,
+          "local_ns": 740334
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780510835000,
+          "local_ns": 745500
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828780524383000,
+          "local_ns": 14288000
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780524434000,
+          "local_ns": 14338833
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828780530322000,
+          "local_ns": 20232500
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780530441000,
+          "local_ns": 20351584
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828780530584000,
+          "local_ns": 20414291
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780530658000,
+          "local_ns": 20488541
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780554379000,
+          "local_ns": 44283667
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780554395000,
+          "local_ns": 44299625
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828780554395000,
+          "local_ns": 44299792
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780558341000,
+          "local_ns": 48252459
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780558357000,
+          "local_ns": 48267792
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828780558357000,
+          "local_ns": 48267917
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780565438000,
+          "local_ns": 55268916
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780565454000,
+          "local_ns": 55284958
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828780565454000,
+          "local_ns": 55285125
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828780569725000,
+          "local_ns": 60099917
+        }
+      ],
+      "FastMS": 116.789916,
+      "BlockObservedMS": 2742.743583,
+      "MemberAppliedMS": 2817.458708,
+      "Fact": "1bf007791a12cb7cf9a2ded830b7627aded52337b5cd36f8cf6ad474b830a830"
+    },
+    {
+      "Index": 13,
+      "SentUnixNS": 1789828780509543000,
+      "CertificateReceivedUnixNS": 1789828780597465000,
+      "FastUnixNS": 1789828780647313000,
+      "BlockObservedUnixNS": 1789828783247755000,
+      "MemberObservedUnixNS": 1789828783322978000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780509683000,
+          "local_ns": 208
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780509828000,
+          "local_ns": 145250
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780510192000,
+          "local_ns": 167
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780510329000,
+          "local_ns": 136750
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780510476000,
+          "local_ns": 125
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780510614000,
+          "local_ns": 137875
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780510681000,
+          "local_ns": 416
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780510777000,
+          "local_ns": 584875
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780510779000,
+          "local_ns": 586500
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780510938000,
+          "local_ns": 256708
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780511055000,
+          "local_ns": 579041
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780511057000,
+          "local_ns": 581166
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780511425000,
+          "local_ns": 744250
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780511428000,
+          "local_ns": 746791
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828780524503000,
+          "local_ns": 14027416
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780524584000,
+          "local_ns": 14108291
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828780530446000,
+          "local_ns": 19764708
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780530500000,
+          "local_ns": 19819375
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828780530662000,
+          "local_ns": 20470083
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780530722000,
+          "local_ns": 20529583
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780554384000,
+          "local_ns": 43907791
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780554398000,
+          "local_ns": 43922666
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828780554399000,
+          "local_ns": 43922875
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780558367000,
+          "local_ns": 47685916
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780558387000,
+          "local_ns": 47706750
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828780558388000,
+          "local_ns": 47707000
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780565456000,
+          "local_ns": 55263875
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780565474000,
+          "local_ns": 55282000
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828780565474000,
+          "local_ns": 55282167
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828780569888000,
+          "local_ns": 60205833
+        }
+      ],
+      "FastMS": 137.77125,
+      "BlockObservedMS": 2738.2345,
+      "MemberAppliedMS": 2813.457458,
+      "Fact": "056560703e327b228610aaa9132714b84276f34a8b24e4f4b2d2fb78a56b00ca"
+    },
+    {
+      "Index": 14,
+      "SentUnixNS": 1789828780509711000,
+      "CertificateReceivedUnixNS": 1789828780569950000,
+      "FastUnixNS": 1789828780626353000,
+      "BlockObservedUnixNS": 1789828783252213000,
+      "MemberObservedUnixNS": 1789828783326963000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780509793000,
+          "local_ns": 125
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780509928000,
+          "local_ns": 136083
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780510601000,
+          "local_ns": 125
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780510670000,
+          "local_ns": 83
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780510734000,
+          "local_ns": 132750
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780510763000,
+          "local_ns": 292
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780510812000,
+          "local_ns": 141500
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780510956000,
+          "local_ns": 193542
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780511175000,
+          "local_ns": 573792
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780511177000,
+          "local_ns": 575792
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780511255000,
+          "local_ns": 585250
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780511258000,
+          "local_ns": 587416
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780511472000,
+          "local_ns": 709167
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780520483000,
+          "local_ns": 9720209
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828780524590000,
+          "local_ns": 13989250
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780524887000,
+          "local_ns": 14286084
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828780530504000,
+          "local_ns": 19742084
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780530561000,
+          "local_ns": 19798167
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_started",
+          "unix_ns": 1789828780530725000,
+          "local_ns": 20054750
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780530781000,
+          "local_ns": 20111041
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780554397000,
+          "local_ns": 43797000
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780554413000,
+          "local_ns": 43812542
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828780554413000,
+          "local_ns": 43812750
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780558376000,
+          "local_ns": 47614042
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780558391000,
+          "local_ns": 47629000
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828780558391000,
+          "local_ns": 47629167
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780565461000,
+          "local_ns": 54791750
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780565477000,
+          "local_ns": 54807500
+        },
+        {
+          "node": "http://127.0.0.1:28003",
+          "stage": "response_ready",
+          "unix_ns": 1789828780565477000,
+          "local_ns": 54807750
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828780569834000,
+          "local_ns": 60041583
+        }
+      ],
+      "FastMS": 116.642417,
+      "BlockObservedMS": 2742.524583,
+      "MemberAppliedMS": 2817.27425,
+      "Fact": "6c2deeb5275d2507f47babe1e25f28e6108b9749d563ab0faab8400fb4627880"
+    },
+    {
+      "Index": 15,
+      "SentUnixNS": 1789828780816366000,
+      "CertificateReceivedUnixNS": 1789828780847615000,
+      "FastUnixNS": 1789828780868300000,
+      "BlockObservedUnixNS": 1789828783444922000,
+      "MemberObservedUnixNS": 1789828783471037000,
+      "Foreground": [
+        {
+          "node": "gateway",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780816427000,
+          "local_ns": 250
+        },
+        {
+          "node": "gateway",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780816567000,
+          "local_ns": 141042
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780816835000,
+          "local_ns": 209
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780816845000,
+          "local_ns": 291
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "http_handler_enter",
+          "unix_ns": 1789828780816861000,
+          "local_ns": 125
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780816964000,
+          "local_ns": 129250
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780816992000,
+          "local_ns": 130583
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "request_decoded",
+          "unix_ns": 1789828780816995000,
+          "local_ns": 150333
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780817407000,
+          "local_ns": 571709
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780817409000,
+          "local_ns": 573584
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_started",
+          "unix_ns": 1789828780817414000,
+          "local_ns": 579209
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780817437000,
+          "local_ns": 575875
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780817439000,
+          "local_ns": 577625
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_started",
+          "unix_ns": 1789828780817445000,
+          "local_ns": 584125
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "validation_complete",
+          "unix_ns": 1789828780817447000,
+          "local_ns": 602416
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_requested",
+          "unix_ns": 1789828780817449000,
+          "local_ns": 604416
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_started",
+          "unix_ns": 1789828780817455000,
+          "local_ns": 609541
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780817482000,
+          "local_ns": 646667
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780817511000,
+          "local_ns": 649542
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "update_evaluated",
+          "unix_ns": 1789828780817525000,
+          "local_ns": 680041
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780836298000,
+          "local_ns": 19462792
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780836305000,
+          "local_ns": 19443542
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780836315000,
+          "local_ns": 19480167
+        },
+        {
+          "node": "http://127.0.0.1:28001",
+          "stage": "response_ready",
+          "unix_ns": 1789828780836315000,
+          "local_ns": 19480334
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780836402000,
+          "local_ns": 19540833
+        },
+        {
+          "node": "http://127.0.0.1:28002",
+          "stage": "response_ready",
+          "unix_ns": 1789828780836402000,
+          "local_ns": 19541083
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "commit_returned",
+          "unix_ns": 1789828780847287000,
+          "local_ns": 30442125
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "vote_signed",
+          "unix_ns": 1789828780847303000,
+          "local_ns": 30458125
+        },
+        {
+          "node": "http://127.0.0.1:28000",
+          "stage": "response_ready",
+          "unix_ns": 1789828780847303000,
+          "local_ns": 30458291
+        },
+        {
+          "node": "gateway",
+          "stage": "response_ready",
+          "unix_ns": 1789828780847519000,
+          "local_ns": 31092667
+        }
+      ],
+      "FastMS": 51.935292,
+      "BlockObservedMS": 2628.578042,
+      "MemberAppliedMS": 2654.692542,
+      "Fact": "931e0ffd01446b541c3ebd6821f3b96756a90772068411f3ee8d0a6ed21fb235"
+    }
+  ],
+  "Timeline": [
+    {
+      "UnixNS": 1789828777684534000,
+      "Stage": "follow_wait_start",
+      "Fields": {
+        "height": "1"
+      }
+    },
+    {
+      "UnixNS": 1789828779984954000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "2101",
+        "height": "1",
+        "path": "/commit?height=2",
+        "start_ns": "1789828779984739000"
+      }
+    },
+    {
+      "UnixNS": 1789828779985125000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "1272",
+        "height": "1",
+        "path": "/block?height=1",
+        "start_ns": "1789828779984956000"
+      }
+    },
+    {
+      "UnixNS": 1789828779985208000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "176",
+        "height": "1",
+        "path": "/block_results?height=1",
+        "start_ns": "1789828779985127000"
+      }
+    },
+    {
+      "UnixNS": 1789828779985209000,
+      "Stage": "follow_verify_start",
+      "Fields": {
+        "height": "1"
+      }
+    },
+    {
+      "UnixNS": 1789828779985327000,
+      "Stage": "follow_verify_done",
+      "Fields": {
+        "height": "1"
+      }
+    },
+    {
+      "UnixNS": 1789828779985327000,
+      "Stage": "follow_update_requested",
+      "Fields": {
+        "height": "1"
+      }
+    },
+    {
+      "UnixNS": 1789828779985333000,
+      "Stage": "follow_update_started",
+      "Fields": {
+        "height": "1"
+      }
+    },
+    {
+      "UnixNS": 1789828779985340000,
+      "Stage": "follow_apply_start",
+      "Fields": {
+        "height": "1"
+      }
+    },
+    {
+      "UnixNS": 1789828779985341000,
+      "Stage": "follow_apply_done",
+      "Fields": {
+        "height": "1"
+      }
+    },
+    {
+      "UnixNS": 1789828780015394000,
+      "Stage": "follow_committed",
+      "Fields": {
+        "height": "1"
+      }
+    },
+    {
+      "UnixNS": 1789828780015399000,
+      "Stage": "follow_wait_start",
+      "Fields": {
+        "height": "2"
+      }
+    },
+    {
+      "UnixNS": 1789828780185671000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "2101",
+        "height": "2",
+        "path": "/commit?height=3",
+        "start_ns": "1789828780185489000"
+      }
+    },
+    {
+      "UnixNS": 1789828780185974000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "5612",
+        "height": "2",
+        "path": "/block?height=2",
+        "start_ns": "1789828780185672000"
+      }
+    },
+    {
+      "UnixNS": 1789828780186191000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "288",
+        "height": "2",
+        "path": "/block_results?height=2",
+        "start_ns": "1789828780185977000"
+      }
+    },
+    {
+      "UnixNS": 1789828780186192000,
+      "Stage": "follow_verify_start",
+      "Fields": {
+        "height": "2"
+      }
+    },
+    {
+      "UnixNS": 1789828780186393000,
+      "Stage": "follow_verify_done",
+      "Fields": {
+        "height": "2"
+      }
+    },
+    {
+      "UnixNS": 1789828780186394000,
+      "Stage": "follow_update_requested",
+      "Fields": {
+        "height": "2"
+      }
+    },
+    {
+      "UnixNS": 1789828780186401000,
+      "Stage": "follow_update_started",
+      "Fields": {
+        "height": "2"
+      }
+    },
+    {
+      "UnixNS": 1789828780186403000,
+      "Stage": "follow_apply_start",
+      "Fields": {
+        "height": "2"
+      }
+    },
+    {
+      "UnixNS": 1789828780186584000,
+      "Stage": "follow_apply_done",
+      "Fields": {
+        "height": "2"
+      }
+    },
+    {
+      "UnixNS": 1789828780214414000,
+      "Stage": "follow_committed",
+      "Fields": {
+        "height": "2"
+      }
+    },
+    {
+      "UnixNS": 1789828780214419000,
+      "Stage": "follow_wait_start",
+      "Fields": {
+        "height": "3"
+      }
+    },
+    {
+      "UnixNS": 1789828780435170000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "2101",
+        "height": "3",
+        "path": "/commit?height=4",
+        "start_ns": "1789828780435008000"
+      }
+    },
+    {
+      "UnixNS": 1789828780435669000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "21488",
+        "height": "3",
+        "path": "/block?height=3",
+        "start_ns": "1789828780435172000"
+      }
+    },
+    {
+      "UnixNS": 1789828780436054000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "863",
+        "height": "3",
+        "path": "/block_results?height=3",
+        "start_ns": "1789828780435679000"
+      }
+    },
+    {
+      "UnixNS": 1789828780436056000,
+      "Stage": "follow_verify_start",
+      "Fields": {
+        "height": "3"
+      }
+    },
+    {
+      "UnixNS": 1789828780436153000,
+      "Stage": "follow_verify_done",
+      "Fields": {
+        "height": "3"
+      }
+    },
+    {
+      "UnixNS": 1789828780436153000,
+      "Stage": "follow_update_requested",
+      "Fields": {
+        "height": "3"
+      }
+    },
+    {
+      "UnixNS": 1789828780436159000,
+      "Stage": "follow_update_started",
+      "Fields": {
+        "height": "3"
+      }
+    },
+    {
+      "UnixNS": 1789828780436164000,
+      "Stage": "follow_apply_start",
+      "Fields": {
+        "height": "3"
+      }
+    },
+    {
+      "UnixNS": 1789828780437036000,
+      "Stage": "follow_apply_done",
+      "Fields": {
+        "height": "3"
+      }
+    },
+    {
+      "UnixNS": 1789828780480342000,
+      "Stage": "follow_committed",
+      "Fields": {
+        "height": "3"
+      }
+    },
+    {
+      "UnixNS": 1789828780480354000,
+      "Stage": "follow_wait_start",
+      "Fields": {
+        "height": "4"
+      }
+    },
+    {
+      "UnixNS": 1789828780764627000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "2101",
+        "height": "4",
+        "path": "/commit?height=5",
+        "start_ns": "1789828780759705000"
+      }
+    },
+    {
+      "UnixNS": 1789828780764999000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "5613",
+        "height": "4",
+        "path": "/block?height=4",
+        "start_ns": "1789828780764630000"
+      }
+    },
+    {
+      "UnixNS": 1789828780765258000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "288",
+        "height": "4",
+        "path": "/block_results?height=4",
+        "start_ns": "1789828780765001000"
+      }
+    },
+    {
+      "UnixNS": 1789828780765263000,
+      "Stage": "follow_verify_start",
+      "Fields": {
+        "height": "4"
+      }
+    },
+    {
+      "UnixNS": 1789828780765398000,
+      "Stage": "follow_verify_done",
+      "Fields": {
+        "height": "4"
+      }
+    },
+    {
+      "UnixNS": 1789828780765399000,
+      "Stage": "follow_update_requested",
+      "Fields": {
+        "height": "4"
+      }
+    },
+    {
+      "UnixNS": 1789828780765406000,
+      "Stage": "follow_update_started",
+      "Fields": {
+        "height": "4"
+      }
+    },
+    {
+      "UnixNS": 1789828780765409000,
+      "Stage": "follow_apply_start",
+      "Fields": {
+        "height": "4"
+      }
+    },
+    {
+      "UnixNS": 1789828780765590000,
+      "Stage": "follow_apply_done",
+      "Fields": {
+        "height": "4"
+      }
+    },
+    {
+      "UnixNS": 1789828780787430000,
+      "Stage": "follow_committed",
+      "Fields": {
+        "height": "4"
+      }
+    },
+    {
+      "UnixNS": 1789828780787437000,
+      "Stage": "follow_wait_start",
+      "Fields": {
+        "height": "5"
+      }
+    },
+    {
+      "UnixNS": 1789828782559958000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "2101",
+        "height": "5",
+        "path": "/commit?height=6",
+        "start_ns": "1789828782559722000"
+      }
+    },
+    {
+      "UnixNS": 1789828782560172000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "2306",
+        "height": "5",
+        "path": "/block?height=5",
+        "start_ns": "1789828782559959000"
+      }
+    },
+    {
+      "UnixNS": 1789828782560252000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "176",
+        "height": "5",
+        "path": "/block_results?height=5",
+        "start_ns": "1789828782560174000"
+      }
+    },
+    {
+      "UnixNS": 1789828782560253000,
+      "Stage": "follow_verify_start",
+      "Fields": {
+        "height": "5"
+      }
+    },
+    {
+      "UnixNS": 1789828782560354000,
+      "Stage": "follow_verify_done",
+      "Fields": {
+        "height": "5"
+      }
+    },
+    {
+      "UnixNS": 1789828782560354000,
+      "Stage": "follow_update_requested",
+      "Fields": {
+        "height": "5"
+      }
+    },
+    {
+      "UnixNS": 1789828782560360000,
+      "Stage": "follow_update_started",
+      "Fields": {
+        "height": "5"
+      }
+    },
+    {
+      "UnixNS": 1789828782560367000,
+      "Stage": "follow_apply_start",
+      "Fields": {
+        "height": "5"
+      }
+    },
+    {
+      "UnixNS": 1789828782560368000,
+      "Stage": "follow_apply_done",
+      "Fields": {
+        "height": "5"
+      }
+    },
+    {
+      "UnixNS": 1789828782591333000,
+      "Stage": "follow_committed",
+      "Fields": {
+        "height": "5"
+      }
+    },
+    {
+      "UnixNS": 1789828782591339000,
+      "Stage": "follow_wait_start",
+      "Fields": {
+        "height": "6"
+      }
+    },
+    {
+      "UnixNS": 1789828782791792000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "2098",
+        "height": "6",
+        "path": "/commit?height=7",
+        "start_ns": "1789828782784557000"
+      }
+    },
+    {
+      "UnixNS": 1789828782792279000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "5613",
+        "height": "6",
+        "path": "/block?height=6",
+        "start_ns": "1789828782791795000"
+      }
+    },
+    {
+      "UnixNS": 1789828782792548000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "288",
+        "height": "6",
+        "path": "/block_results?height=6",
+        "start_ns": "1789828782792281000"
+      }
+    },
+    {
+      "UnixNS": 1789828782792550000,
+      "Stage": "follow_verify_start",
+      "Fields": {
+        "height": "6"
+      }
+    },
+    {
+      "UnixNS": 1789828782792649000,
+      "Stage": "follow_verify_done",
+      "Fields": {
+        "height": "6"
+      }
+    },
+    {
+      "UnixNS": 1789828782792649000,
+      "Stage": "follow_update_requested",
+      "Fields": {
+        "height": "6"
+      }
+    },
+    {
+      "UnixNS": 1789828782792658000,
+      "Stage": "follow_update_started",
+      "Fields": {
+        "height": "6"
+      }
+    },
+    {
+      "UnixNS": 1789828782792669000,
+      "Stage": "follow_apply_start",
+      "Fields": {
+        "height": "6"
+      }
+    },
+    {
+      "UnixNS": 1789828782792870000,
+      "Stage": "follow_apply_done",
+      "Fields": {
+        "height": "6"
+      }
+    },
+    {
+      "UnixNS": 1789828782828453000,
+      "Stage": "follow_committed",
+      "Fields": {
+        "height": "6"
+      }
+    },
+    {
+      "UnixNS": 1789828782828476000,
+      "Stage": "follow_wait_start",
+      "Fields": {
+        "height": "7"
+      }
+    },
+    {
+      "UnixNS": 1789828783017531000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "2099",
+        "height": "7",
+        "path": "/commit?height=8",
+        "start_ns": "1789828783009568000"
+      }
+    },
+    {
+      "UnixNS": 1789828783017841000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "2439",
+        "height": "7",
+        "path": "/block?height=7",
+        "start_ns": "1789828783017533000"
+      }
+    },
+    {
+      "UnixNS": 1789828783018003000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "176",
+        "height": "7",
+        "path": "/block_results?height=7",
+        "start_ns": "1789828783017844000"
+      }
+    },
+    {
+      "UnixNS": 1789828783018004000,
+      "Stage": "follow_verify_start",
+      "Fields": {
+        "height": "7"
+      }
+    },
+    {
+      "UnixNS": 1789828783018102000,
+      "Stage": "follow_verify_done",
+      "Fields": {
+        "height": "7"
+      }
+    },
+    {
+      "UnixNS": 1789828783018109000,
+      "Stage": "follow_update_requested",
+      "Fields": {
+        "height": "7"
+      }
+    },
+    {
+      "UnixNS": 1789828783018118000,
+      "Stage": "follow_update_started",
+      "Fields": {
+        "height": "7"
+      }
+    },
+    {
+      "UnixNS": 1789828783018121000,
+      "Stage": "follow_apply_start",
+      "Fields": {
+        "height": "7"
+      }
+    },
+    {
+      "UnixNS": 1789828783018121000,
+      "Stage": "follow_apply_done",
+      "Fields": {
+        "height": "7"
+      }
+    },
+    {
+      "UnixNS": 1789828783052410000,
+      "Stage": "follow_committed",
+      "Fields": {
+        "height": "7"
+      }
+    },
+    {
+      "UnixNS": 1789828783052417000,
+      "Stage": "follow_wait_start",
+      "Fields": {
+        "height": "8"
+      }
+    },
+    {
+      "UnixNS": 1789828783212661000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "2101",
+        "height": "8",
+        "path": "/commit?height=9",
+        "start_ns": "1789828783211309000"
+      }
+    },
+    {
+      "UnixNS": 1789828783213323000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "21483",
+        "height": "8",
+        "path": "/block?height=8",
+        "start_ns": "1789828783212663000"
+      }
+    },
+    {
+      "UnixNS": 1789828783220996000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "863",
+        "height": "8",
+        "path": "/block_results?height=8",
+        "start_ns": "1789828783213325000"
+      }
+    },
+    {
+      "UnixNS": 1789828783220997000,
+      "Stage": "follow_verify_start",
+      "Fields": {
+        "height": "8"
+      }
+    },
+    {
+      "UnixNS": 1789828783221104000,
+      "Stage": "follow_verify_done",
+      "Fields": {
+        "height": "8"
+      }
+    },
+    {
+      "UnixNS": 1789828783221105000,
+      "Stage": "follow_update_requested",
+      "Fields": {
+        "height": "8"
+      }
+    },
+    {
+      "UnixNS": 1789828783221110000,
+      "Stage": "follow_update_started",
+      "Fields": {
+        "height": "8"
+      }
+    },
+    {
+      "UnixNS": 1789828783221112000,
+      "Stage": "follow_apply_start",
+      "Fields": {
+        "height": "8"
+      }
+    },
+    {
+      "UnixNS": 1789828783221989000,
+      "Stage": "follow_apply_done",
+      "Fields": {
+        "height": "8"
+      }
+    },
+    {
+      "UnixNS": 1789828783252416000,
+      "Stage": "follow_committed",
+      "Fields": {
+        "height": "8"
+      }
+    },
+    {
+      "UnixNS": 1789828783252424000,
+      "Stage": "follow_wait_start",
+      "Fields": {
+        "height": "9"
+      }
+    },
+    {
+      "UnixNS": 1789828783414600000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "2101",
+        "height": "9",
+        "path": "/commit?height=10",
+        "start_ns": "1789828783410216000"
+      }
+    },
+    {
+      "UnixNS": 1789828783414906000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "5480",
+        "height": "9",
+        "path": "/block?height=9",
+        "start_ns": "1789828783414602000"
+      }
+    },
+    {
+      "UnixNS": 1789828783415080000,
+      "Stage": "follow_fetch",
+      "Fields": {
+        "bytes": "288",
+        "height": "9",
+        "path": "/block_results?height=9",
+        "start_ns": "1789828783414908000"
+      }
+    },
+    {
+      "UnixNS": 1789828783415081000,
+      "Stage": "follow_verify_start",
+      "Fields": {
+        "height": "9"
+      }
+    },
+    {
+      "UnixNS": 1789828783415180000,
+      "Stage": "follow_verify_done",
+      "Fields": {
+        "height": "9"
+      }
+    },
+    {
+      "UnixNS": 1789828783415180000,
+      "Stage": "follow_update_requested",
+      "Fields": {
+        "height": "9"
+      }
+    },
+    {
+      "UnixNS": 1789828783415186000,
+      "Stage": "follow_update_started",
+      "Fields": {
+        "height": "9"
+      }
+    },
+    {
+      "UnixNS": 1789828783415188000,
+      "Stage": "follow_apply_start",
+      "Fields": {
+        "height": "9"
+      }
+    },
+    {
+      "UnixNS": 1789828783415377000,
+      "Stage": "follow_apply_done",
+      "Fields": {
+        "height": "9"
+      }
+    },
+    {
+      "UnixNS": 1789828783436558000,
+      "Stage": "follow_committed",
+      "Fields": {
+        "height": "9"
+      }
+    },
+    {
+      "UnixNS": 1789828783436601000,
+      "Stage": "follow_wait_start",
+      "Fields": {
+        "height": "10"
+      }
+    }
+  ]
+}

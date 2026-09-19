@@ -20,11 +20,11 @@ func (r *Relay) ObserveBlock(config protocol.Hash) blockfollow.Apply {
 			if !result.Applied {
 				continue
 			}
-			p, err := protocol.DecodeDirectPayment(t.Bytes)
+			p, err := protocol.DecodeDirectSubmission(t.Bytes)
 			if err != nil {
 				continue
 			}
-			fact := p.Certificate.QC.Fact
+			fact := p.Authorization.Fact
 			// Also covers block arrival before background outbox persistence.
 			if p.Tx.Body.Config == config {
 				r.forgetInstall(fact)

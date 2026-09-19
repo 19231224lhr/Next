@@ -21,8 +21,12 @@ import (
 )
 
 func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
-	for _, repair := range []bool{false, true} {
-		t.Run(map[bool]string{false: "source_arrives", true: "repair_then_late"}[repair], func(t *testing.T) {
+	for _, scenario := range []struct {
+		name          string
+		repair, split bool
+	}{{"source_arrives", false, false}, {"repair_then_late", true, false}, {"partial_repair_then_late", true, true}} {
+		t.Run(scenario.name, func(t *testing.T) {
+			repair := scenario.repair
 			f := testkit.NewFixture("follow", "org", 1)
 			f.EnableDirect()
 			raw, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
@@ -61,12 +65,24 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if scenario.split {
+				body := parent.Body
+				body.Outputs = []protocol.Output{body.Outputs[0], body.Outputs[0]}
+				body.Outputs[0].Amount, body.Outputs[1].Amount = 40, 60
+				body.Intent = body.IntentID()
+				parent, err = protocol.NewFastTx(body, parent.Claims, policy.Key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				parent.Auth = []protocol.OwnerAuth{protocol.SignOwner(parent.ID(), f.Owner)}
+			}
 			pc, err := f.DirectCertificate(parent, policy)
 			if err != nil {
 				t.Fatal(err)
 			}
 			body := parent.Body
 			body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(0), Evidence: protocol.Hash(pc.QC.Fact)}}
+			body.Outputs = []protocol.Output{parent.Body.Outputs[0]}
 			body.Nonce[0] = 42
 			body.Intent = body.IntentID()
 			child, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: parent.Body.Outputs[0]}}, policy.Key)
@@ -122,7 +138,7 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				raw, err := p.MarshalBinary()
+				raw, err := p.Submission().MarshalBinary()
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -146,7 +162,7 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				raw, _ := cp.MarshalBinary()
+				raw, _ := cp.Submission().MarshalBinary()
 				command := protocol.RepairInput{Network: f.Org.Network, Output: pc.Summary.OutputID(0), Height: 1, TransactionBytes: raw, Parts: []chameleon.Opening{{}}}
 				raw, err = command.MarshalBinary()
 				if err != nil {
@@ -165,10 +181,28 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 			}
 			expected := uint64(0)
 			if repair {
-				expected = 100
+				expected = parent.Body.Outputs[0].Amount
 			}
 			if cal.Reserved != expected {
 				t.Fatalf("CAL residual=%d expected=%d", cal.Reserved, expected)
+			}
+			// Public settlement preceded any INSTALL; late replication must not
+			// reopen the outbox or change the already applied budget.
+			if err = m.InstallDirect(pp); err != nil {
+				t.Fatal(err)
+			}
+			after, err := m.Quota(f.Genesis.Grants[0].Key, 0)
+			if err != nil || after.Reserved != expected {
+				t.Fatal("late INSTALL changed quota", after, err)
+			}
+			if err = db.View(func(v state.ReadView) error {
+				_, found, err := state.Load[state.Outbox](v, state.Key(state.KeyOutbox, pc.QC.Fact[:]))
+				if found {
+					t.Fatal("late INSTALL reopened outbox")
+				}
+				return err
+			}); err != nil {
+				t.Fatal(err)
 			}
 			instance := uint8(0)
 			if repair {

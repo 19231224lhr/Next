@@ -152,15 +152,19 @@ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Out
 		}
 	}
 	requesttrace.Payment("relay_ready", pending.Fact)
-	return r.submitDirect(ctx, key, pending)
+	return r.submitDirect(ctx, key, pending, payment)
 }
 
-func (r *Relay) submitDirect(ctx context.Context, key []byte, pending state.Outbox) error {
+func (r *Relay) submitDirect(ctx context.Context, key []byte, pending state.Outbox, payment protocol.DirectPayment) error {
 	now := time.Now().UnixNano()
 	if now >= pending.NextSubmitUnixNS {
+		raw, err := payment.Submission().MarshalBinary()
+		if err != nil {
+			return err
+		}
 		// No random outer envelope: retries preserve the redaction-aware identity.
 		requesttrace.Payment("submit_start", pending.Fact)
-		_ = r.Public.Submit(ctx, pending.Certificate)
+		_ = r.Public.Submit(ctx, raw)
 		requesttrace.Payment("submit_done", pending.Fact)
 		pending.NextSubmitUnixNS = now + int64(2*time.Second)
 	}

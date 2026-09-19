@@ -17,14 +17,14 @@ func (e *Engine) verifyV3(raw []byte) (rules.VerifiedDirectPayment, error) {
 	if e.direct == nil {
 		return rules.VerifiedDirectPayment{}, protocol.ErrRule
 	}
-	p, err := protocol.DecodeDirectPayment(raw)
+	p, err := protocol.DecodeDirectSubmission(raw)
 	if err != nil {
 		return rules.VerifiedDirectPayment{}, err
 	}
 	if p.Tx.Body.Network != e.cfg.Network {
 		return rules.VerifiedDirectPayment{}, protocol.ErrAuth
 	}
-	return rules.VerifyDirectPayment(p, *e.direct)
+	return rules.VerifyDirectSubmission(p, *e.direct)
 }
 
 func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.Transition, error) {
@@ -51,7 +51,7 @@ func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.
 	if err != nil || len(tr.Changes) == 0 {
 		return tr, err
 	}
-	p, err := protocol.DecodeDirectPayment(raw)
+	p, err := protocol.DecodeDirectSubmission(raw)
 	if err != nil {
 		return state.Transition{}, err
 	}

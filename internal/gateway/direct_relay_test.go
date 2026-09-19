@@ -66,6 +66,28 @@ type relayPublic struct {
 	submit func(context.Context, []byte) error
 }
 
+func TestDirectRelayDoesNotSubmitNewOutputCertificate(t *testing.T) {
+	c, r, payments := directRelayFixture(t, 1)
+	sent := make(chan []byte, 8)
+	r.Public = relayPublic{submit: func(_ context.Context, raw []byte) error {
+		sent <- bytes.Clone(raw)
+		return nil
+	}}
+	startDirectRelay(t, r)
+	select {
+	case raw := <-sent:
+		if _, err := protocol.DecodeDirectPayment(raw); err == nil {
+			t.Fatal("committee received the internal payment with its new output certificate")
+		}
+		p, err := protocol.DecodeDirectSubmission(raw)
+		if err != nil || p.Tx.ID() != payments[0].Tx.ID() || protocol.VerifyQC(p.Authorization, c.org) != nil {
+			t.Fatal("public transaction lost its organization authorization", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("submission stalled")
+	}
+}
+
 func (p relayPublic) Submit(ctx context.Context, raw []byte) error { return p.submit(ctx, raw) }
 
 type relayInstaller struct {
@@ -304,9 +326,9 @@ func TestDirectRelayWakeAfterPersistenceAndLostHints(t *testing.T) {
 	}
 	seen := make(chan protocol.SpendFactID, 8)
 	r.Public = relayPublic{submit: func(_ context.Context, raw []byte) error {
-		p, err := protocol.DecodeDirectPayment(raw)
+		p, err := protocol.DecodeDirectSubmission(raw)
 		if err == nil {
-			seen <- p.Certificate.QC.Fact
+			seen <- p.Authorization.Fact
 		}
 		return err
 	}}

@@ -23,14 +23,14 @@ func (p DirectPolicy) Rules() protocol.RuleIDs {
 	e.Fixed(r.Accounting[:])
 	e.U64(uint64(p.TimeoutSeconds))
 	e.U64(p.RepairCost)
-	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V4_BLOCK_FOLLOWING", e.Data())
+	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V4_INPUT_GUARANTEES", e.Data())
 	return r
 }
 
 type InputCertificate = protocol.InputCertificate
 type DirectPayment = protocol.DirectPayment
 type VerifiedDirectPayment struct {
-	payment DirectPayment
+	payment protocol.DirectSubmission
 	parents map[protocol.OutputID]InputCertificate
 }
 
@@ -206,6 +206,13 @@ func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.Admission
 }
 
 func VerifyDirectPayment(payment DirectPayment, p DirectPolicy) (VerifiedDirectPayment, error) {
+	if payment.Certificate.Summary.Fact() != payment.Submission().Summary().Fact() {
+		return VerifiedDirectPayment{}, protocol.ErrAuth
+	}
+	return VerifyDirectSubmission(payment.Submission(), p)
+}
+
+func VerifyDirectSubmission(payment protocol.DirectSubmission, p DirectPolicy) (VerifiedDirectPayment, error) {
 	// Freeze canonical objects once at the verification boundary.
 	raw, err := payment.Tx.MarshalBinary()
 	if err != nil {
@@ -223,16 +230,15 @@ func VerifyDirectPayment(payment DirectPayment, p DirectPolicy) (VerifiedDirectP
 		}
 		return protocol.DecodeOutputCertificate(b)
 	}
-	payment.Certificate, err = freeze(payment.Certificate)
-	if err != nil {
-		return VerifiedDirectPayment{}, err
-	}
+	payment.Admission = append(protocol.AdmissionVector(nil), payment.Admission...)
+	payment.Authorization.Votes = append([]protocol.SpendVote(nil), payment.Authorization.Votes...)
 	vector, err := PrepareDirectVector(tx, p)
 	if err != nil {
 		return VerifiedDirectPayment{}, err
 	}
 	cfg, ok := p.Organizations[tx.Body.Config]
-	if !ok || payment.Certificate.Verify(cfg) != nil || payment.Certificate.Summary.Fact() != protocol.SummaryFor(tx, vector).Fact() {
+	summary := payment.Summary()
+	if !ok || summary.Validate() != nil || summary.Network != cfg.Network || summary.Issuer != cfg.Org || summary.Epoch != cfg.Epoch || summary.Config != cfg.Hash() || payment.Authorization.Fact != summary.Fact() || summary.Fact() != protocol.SummaryFor(tx, vector).Fact() || protocol.VerifyQC(payment.Authorization, cfg) != nil {
 		return VerifiedDirectPayment{}, protocol.ErrAuth
 	}
 	if len(payment.InputCertificates) > protocol.MaxInputs {
@@ -509,8 +515,8 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 	pay := verified.payment
 	tx := pay.Tx
 	t := tx.Body
-	c := pay.Certificate
-	fact := c.QC.Fact
+	summary := pay.Summary()
+	fact := pay.Authorization.Fact
 	if fact == (protocol.SpendFactID{}) || t.Rules != policy.Rules() || now <= 0 || policy.TimeoutSeconds <= 0 || now > math.MaxInt64-policy.TimeoutSeconds {
 		return state.Transition{}, protocol.ErrRule
 	}
@@ -528,18 +534,18 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 	} else if found && prior != tx.ID() {
 		return state.Transition{}, ErrConflict
 	}
-	if err = e.register(c); err != nil {
-		return state.Transition{}, err
-	}
-	p := directPayment{Summary: c.Summary, FeeAccount: t.Fee.Account}
+	p := directPayment{Summary: summary, FeeAccount: t.Fee.Account}
 	e.resultData.Applied = true
-	for i, a := range c.Summary.Admission {
-		if a.Key.Kind == protocol.ResourceCAL {
-			continue
-		}
-		g, err := e.grant(c.Summary, i)
+	for i, a := range summary.Admission {
+		g, err := e.grant(summary, i)
 		if err != nil {
 			return state.Transition{}, err
+		}
+		if a.Key.Kind == protocol.ResourceCAL {
+			if a.Cap > g.Amount {
+				return state.Transition{}, ErrLimited
+			}
+			continue // New final outputs need no temporary coverage registration.
 		}
 		if a.Key.Kind == protocol.ResourcePolicy && g.Subject != t.Subject {
 			return state.Transition{}, protocol.ErrAuth
@@ -638,7 +644,7 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 		return state.Transition{}, err
 	}
 	for i, out := range t.Outputs {
-		id := c.Summary.OutputID(uint32(i))
+		id := summary.OutputID(uint32(i))
 		ob, exists, err := state.Load[DirectObligation](e.o, DirectObligationKey(id))
 		if err != nil {
 			return state.Transition{}, err
@@ -656,8 +662,14 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 				}
 			}
 		}
-		if err = e.completeOutput(id, false); err != nil {
+		// A child may already have registered this promise before its source
+		// arrived. Resolve that record; do not create one just to close it.
+		if _, found, err := state.Load[directPromise](e.o, state.Key(keyDirectPromise, id[:])); err != nil {
 			return state.Transition{}, err
+		} else if found {
+			if err = e.completeOutput(id, false); err != nil {
+				return state.Transition{}, err
+			}
 		}
 		if instance == 1 {
 			e.resultData.LateOutputs = append(e.resultData.LateOutputs, uint32(i))
