@@ -66,7 +66,7 @@ func Open(path string, id Identity) (*Bolt, error) {
 		db.Close()
 		return nil, e
 	}
-	return &Bolt{db: db, trace: id.Role == "gateway" && requesttrace.Consensus != nil}, nil
+	return &Bolt{db: db, trace: (id.Role == "gateway" || id.Role == "committee") && requesttrace.Consensus != nil}, nil
 }
 func (b *Bolt) View(fn func(state.ReadView) error) error {
 	return b.db.View(func(tx *bolt.Tx) error { return fn(boltView{tx.Bucket(dataBucket)}) })

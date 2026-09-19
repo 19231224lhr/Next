@@ -1,4 +1,21 @@
-# Current wire4 increments (2026-09-19)
+# Committee verification reuse (2026-09-19)
+
+Direct public submissions now reuse successful immutable verification results by
+the hash of their complete wire bytes within one fixed-policy Engine. Ledger
+checks still run on every execution. Sync, organization authorization, owner
+signatures, input guarantees and Comet rules are unchanged. Trace-only committee
+storage breakdowns were added separately after the cache comparison.
+
+Thirteen fresh-genesis rounds (1,300 payments) passed state, balance, fee and
+outbox audits. Four untraced rounds per mode reduced mean 100-payment closed-loop
+time from 2.406 to 2.241 seconds (6.8%). Foreground pooled P95 increased from
+252.557 to 274.281 ms; its cause remains unresolved. Tagged full tests, focused
+race tests, vet, build and warm-cache historical-repair tests passed.
+
+See [implementation, stage comparisons and persistence findings](experiments/committee-verification-cache-2026-09-19/README.md).
+These are bounded experiments, not a sustainable throughput claim.
+
+# Earlier wire4 increments (2026-09-19)
 
 Wallets and members follow verified public blocks. The gateway now wakes after
 durable outbox persistence and runs public submission and member INSTALL in

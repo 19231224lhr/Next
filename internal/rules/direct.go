@@ -34,6 +34,9 @@ type VerifiedDirectPayment struct {
 	parents map[protocol.OutputID]InputCertificate
 }
 
+// TxID exposes identity without exposing the cached, immutable payment material.
+func (v VerifiedDirectPayment) TxID() protocol.TxID { return v.payment.Tx.ID() }
+
 const (
 	keyDirectCoverage   uint8 = 100
 	keyDirectPromise    uint8 = 101

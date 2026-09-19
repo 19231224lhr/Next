@@ -12,6 +12,7 @@ import (
 	cmtstore "github.com/cometbft/cometbft/store"
 	"github.com/cometbft/cometbft/types"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 	"utxo/crypto/chameleon"
@@ -49,7 +50,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	}
 	defer disk.Close()
 	blocks := cmtstore.NewBlockStore(disk)
-	newApp := func() (appstore.Store, *apppkg.App) {
+	newApp := func() (appstore.Store, *apppkg.App, *apppkg.Engine) {
 		db := appstore.NewMemory()
 		engine, err := apppkg.NewEngine(cfg, db)
 		if err != nil {
@@ -62,9 +63,9 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return db, app
+		return db, app, engine
 	}
-	db, app := newApp()
+	db, app, warmEngine := newApp()
 	defer db.Close()
 	ctx := context.Background()
 	parent, err := f.FastTransaction(0, 1, policy)
@@ -238,6 +239,35 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	if err = vals.VerifyCommitLight(chain, originalID, 1, blocks.LoadBlockCommit(1)); err != nil {
 		t.Fatal(err)
 	}
+	t.Run("warm-cache-after-authorized-repair", func(t *testing.T) {
+		// The original child was cached before its funding was legally repaired.
+		// Compare with a cache-disabled engine over the exact same current ledger.
+		t.Setenv("UTXO_EXPERIMENT_DISABLE_DIRECT_CACHE", "1")
+		coldEngine, err := apppkg.NewEngine(cfg, db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := coldEngine.EnableRepair(blocks); err != nil {
+			t.Fatal(err)
+		}
+		for _, raw := range [][]byte{childRaw, revised.Data.Txs[0], repairRaw} {
+			err := db.View(func(v state.ReadView) error {
+				ctx := apppkg.BlockContext{Height: 4, Time: time.Unix(1700000034, 0)}
+				warm, warmErr := warmEngine.ExecuteAt(v, raw, ctx)
+				cold, coldErr := coldEngine.ExecuteAt(v, raw, ctx)
+				if (warmErr == nil) != (coldErr == nil) || !reflect.DeepEqual(warm, cold) {
+					t.Fatalf("repair interleaving differs: warm=%v cold=%v", warmErr, coldErr)
+				}
+				if len(warm.Changes) != 0 {
+					t.Fatal("resubmission after repair changed ledger")
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
 	parentRaw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).Submission().MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
@@ -271,7 +301,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	appendBlock(5, 1700000035, lateRaw)
 	// Start the application from genesis with an already-redacted block store.
 	// Every historical state hash and the single debit must reproduce exactly.
-	replayDB, replay := newApp()
+	replayDB, replay, _ := newApp()
 	defer replayDB.Close()
 	for i := int64(1); i <= 5; i++ {
 		original, err := blocks.LoadOriginalBlock(i)

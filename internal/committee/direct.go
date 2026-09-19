@@ -1,6 +1,8 @@
 package committee
 
 import (
+	"time"
+	"utxo/internal/requesttrace"
 	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/protocol"
@@ -17,6 +19,24 @@ func (e *Engine) verifyV3(raw []byte) (rules.VerifiedDirectPayment, error) {
 	if e.direct == nil {
 		return rules.VerifiedDirectPayment{}, protocol.ErrRule
 	}
+	// TxID deliberately survives funding repair and excludes OwnerAuth. Cache
+	// only the exact public bytes, within this Engine's fixed policy snapshot.
+	trace := requesttrace.Consensus
+	var started time.Time
+	if trace != nil {
+		started = time.Now()
+	}
+	key := protocol.Digest("VERIFIED_DIRECT_SUBMISSION_BYTES", raw)
+	verified, hit := e.directCache.get(key)
+	if trace != nil {
+		defer func() {
+			hits, misses, evictions, oversized, entries, bytes := e.directCache.stats()
+			trace.Mark("direct_verify", "key", key.String(), "cached", hit, "duration_ns", time.Since(started).Nanoseconds(), "hits", hits, "misses", misses, "evictions", evictions, "oversized", oversized, "entries", entries, "bytes", bytes)
+		}()
+	}
+	if hit {
+		return verified, nil
+	}
 	p, err := protocol.DecodeDirectSubmission(raw)
 	if err != nil {
 		return rules.VerifiedDirectPayment{}, err
@@ -24,7 +44,11 @@ func (e *Engine) verifyV3(raw []byte) (rules.VerifiedDirectPayment, error) {
 	if p.Tx.Body.Network != e.cfg.Network {
 		return rules.VerifiedDirectPayment{}, protocol.ErrAuth
 	}
-	return rules.VerifyDirectSubmission(p, *e.direct)
+	verified, err = rules.VerifyDirectSubmission(p, *e.direct)
+	if err == nil {
+		e.directCache.put(key, verified, len(raw))
+	}
+	return verified, err
 }
 
 func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.Transition, error) {
@@ -51,13 +75,9 @@ func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.
 	if err != nil || len(tr.Changes) == 0 {
 		return tr, err
 	}
-	p, err := protocol.DecodeDirectSubmission(raw)
-	if err != nil {
-		return state.Transition{}, err
-	}
 	o := state.NewOverlay(v)
 	o.Apply(tr.Changes)
-	if err = state.Put(o, PaymentLocationKey(p.Tx.ID()), PaymentLocation{Height: b.Height, Index: b.Index}); err != nil {
+	if err = state.Put(o, PaymentLocationKey(verified.TxID()), PaymentLocation{Height: b.Height, Index: b.Index}); err != nil {
 		return state.Transition{}, err
 	}
 	tr.Changes = o.Changes()

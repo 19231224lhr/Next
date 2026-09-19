@@ -1,0 +1,800 @@
+{
+  "benchmark": {
+    "block_observed_p50_ms": 1243.89675,
+    "completed_per_second": 45.29212942248629,
+    "concurrency": 64,
+    "count": 100,
+    "elapsed_s": 2.207889125,
+    "failed": 0,
+    "fast_p50_ms": 167.576375,
+    "fast_p95_ms": 233.510208,
+    "finished_unix_ns": 1789832354470873125,
+    "member_applied_p50_ms": 1301.150416,
+    "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.",
+    "started_unix_ns": 1789832352262984000,
+    "timing_origin": "wallet_http_submit_v4",
+    "trace": true,
+    "workload": "closed_loop_final_utxo_cross_org"
+  },
+  "audit": "passed",
+  "stages": {
+    "send_offset_ms": {
+      "n": 100,
+      "p50": 1.1495,
+      "p95": 1324.531,
+      "min": 0.056,
+      "max": 1324.553,
+      "mean": 469.0865
+    },
+    "certificate_ready_to_submit_ms": {
+      "n": 100,
+      "p50": 35.934,
+      "p95": 60.096,
+      "min": 0.479,
+      "max": 67.682,
+      "mean": 34.83166
+    },
+    "fast_ms": {
+      "n": 100,
+      "p50": 167.688,
+      "p95": 233.508,
+      "min": 61.953,
+      "max": 233.808,
+      "mean": 163.01816
+    },
+    "wallet_to_gateway_ms": {
+      "n": 100,
+      "p50": 2.065,
+      "p95": 9.084,
+      "min": 0.053,
+      "max": 11.22,
+      "mean": 3.45754
+    },
+    "gateway_collect_ms": {
+      "n": 100,
+      "p50": 97.4815,
+      "p95": 106.991,
+      "min": 30.26,
+      "max": 112.456,
+      "mean": 91.66568
+    },
+    "response_transfer_ms": {
+      "n": 100,
+      "p50": 0.493,
+      "p95": 14.775,
+      "min": 0.046,
+      "max": 17.02,
+      "mean": 4.16415
+    },
+    "wallet_receive_verify_save_ms": {
+      "n": 100,
+      "p50": 56.8505,
+      "p95": 111.834,
+      "min": 22.065,
+      "max": 121.591,
+      "mean": 63.73079
+    },
+    "response_to_persist_start_ms": {
+      "n": 100,
+      "p50": 0.1585,
+      "p95": 13.371,
+      "min": 0.114,
+      "max": 23.865,
+      "mean": 2.59678
+    },
+    "gateway_persist_ms": {
+      "n": 100,
+      "p50": 162.885,
+      "p95": 166.956,
+      "min": 25.133,
+      "max": 176.535,
+      "mean": 120.73409
+    },
+    "persist_to_callback_ms": {
+      "n": 100,
+      "p50": 29.3375,
+      "p95": 39.392,
+      "min": 0.188,
+      "max": 44.821,
+      "mean": 27.95722
+    },
+    "persist_callback_to_durable_ms": {
+      "n": 100,
+      "p50": 133.666,
+      "p95": 134.007,
+      "min": 23.715,
+      "max": 134.034,
+      "mean": 92.69427999999999
+    },
+    "gateway_queue_legacy_ms": {
+      "n": 100,
+      "p50": -112.30449999999999,
+      "p95": -9.271,
+      "min": -166.957,
+      "max": -3.053,
+      "mean": -88.50025
+    },
+    "durable_to_scheduled_ms": {
+      "n": 100,
+      "p50": -112.5645,
+      "p95": -9.641,
+      "min": -167.862,
+      "max": -3.207,
+      "mean": -90.23989
+    },
+    "durable_to_submit_ms": {
+      "n": 100,
+      "p50": -112.245,
+      "p95": -9.039,
+      "min": -166.921,
+      "max": -2.826,
+      "mean": -88.41662
+    },
+    "submit_roundtrip_ms": {
+      "n": 100,
+      "p50": 2.3555,
+      "p95": 11.191,
+      "min": 0.93,
+      "max": 93.019,
+      "mean": 3.93872
+    },
+    "delivery_ms": {
+      "n": 100,
+      "p50": 0.045,
+      "p95": 0.215,
+      "min": 0.025,
+      "max": 0.956,
+      "mean": 0.07529
+    },
+    "admission_ms": {
+      "n": 100,
+      "p50": 2.1345,
+      "p95": 2.438,
+      "min": 0.734,
+      "max": 92.802,
+      "mean": 2.81624
+    },
+    "accepted_to_prepare_enter_ms": {
+      "n": 100,
+      "p50": 268.4625,
+      "p95": 319.21,
+      "min": 11.089,
+      "max": 336.561,
+      "mean": 231.40945
+    },
+    "prepare_ms": {
+      "n": 100,
+      "p50": 0.211,
+      "p95": 0.211,
+      "min": 0.007,
+      "max": 0.211,
+      "mean": 0.17993
+    },
+    "prepare_done_to_finalize_ms": {
+      "n": 100,
+      "p50": 345.658,
+      "p95": 345.658,
+      "min": 248.827,
+      "max": 345.658,
+      "mean": 328.38118000000003
+    },
+    "prior_transactions_ms": {
+      "n": 100,
+      "p50": 1.5845,
+      "p95": 4.149,
+      "min": 0.008,
+      "max": 4.449,
+      "mean": 1.79564
+    },
+    "final_check_ms": {
+      "n": 100,
+      "p50": 0.003,
+      "p95": 0.007,
+      "min": 0.003,
+      "max": 0.011,
+      "mean": 0.00381
+    },
+    "execute_ms": {
+      "n": 100,
+      "p50": 0.052,
+      "p95": 0.107,
+      "min": 0.044,
+      "max": 0.374,
+      "mean": 0.06114
+    },
+    "remaining_block_ms": {
+      "n": 100,
+      "p50": 1.7595,
+      "p95": 4.224,
+      "min": 0.026,
+      "max": 4.585,
+      "mean": 1.94373
+    },
+    "finalize_to_commit_start_ms": {
+      "n": 100,
+      "p50": 15.448,
+      "p95": 29.761,
+      "min": 15.448,
+      "max": 60.57,
+      "mean": 21.21355
+    },
+    "commit_ms": {
+      "n": 100,
+      "p50": 131.785,
+      "p95": 131.785,
+      "min": 16.09,
+      "max": 131.785,
+      "mean": 93.48434
+    },
+    "send_to_submit_ms": {
+      "n": 100,
+      "p50": 135.1455,
+      "p95": 163.203,
+      "min": 30.797,
+      "max": 167.299,
+      "mean": 129.95488
+    },
+    "send_to_commit_ms": {
+      "n": 100,
+      "p50": 925.771,
+      "p95": 926.758,
+      "min": 407.841,
+      "max": 926.868,
+      "mean": 811.46148
+    },
+    "fast_to_commit_ms": {
+      "n": 100,
+      "p50": 692.99,
+      "p95": 757.998,
+      "min": 307.112,
+      "max": 805.007,
+      "mean": 648.44332
+    },
+    "committee_received_to_commit_ms": {
+      "n": 100,
+      "p50": 767.7275,
+      "p95": 796.664,
+      "min": 328.587,
+      "max": 820.823,
+      "mean": 681.28994
+    },
+    "next_header_wait_fetch_ms": {
+      "n": 100,
+      "p50": 254.539,
+      "p95": 254.539,
+      "min": 217.714,
+      "max": 331.111,
+      "mean": 242.42298
+    },
+    "block_results_fetch_ms": {
+      "n": 100,
+      "p50": 19.538,
+      "p95": 19.538,
+      "min": 0.578,
+      "max": 19.538,
+      "mean": 12.927620000000001
+    },
+    "wallet_block_verify_ms": {
+      "n": 100,
+      "p50": 0.221,
+      "p95": 0.221,
+      "min": 0.122,
+      "max": 0.221,
+      "mean": 0.20617
+    },
+    "wallet_update_queue_ms": {
+      "n": 100,
+      "p50": 0.015,
+      "p95": 0.015,
+      "min": 0.006,
+      "max": 0.015,
+      "mean": 0.01243
+    },
+    "wallet_block_apply_ms": {
+      "n": 100,
+      "p50": 9.222,
+      "p95": 9.222,
+      "min": 0.179,
+      "max": 9.222,
+      "mean": 7.90583
+    },
+    "wallet_update_flush_ms": {
+      "n": 100,
+      "p50": 45.547,
+      "p95": 45.547,
+      "min": 19.899,
+      "max": 45.547,
+      "mean": 38.030319999999996
+    },
+    "wallet_observe_lag_ms": {
+      "n": 100,
+      "p50": 0.043,
+      "p95": 12.265,
+      "min": -11.864,
+      "max": 16.023,
+      "mean": -0.93472
+    },
+    "member_apply_from_commit_ms": {
+      "n": 100,
+      "p50": 374.031,
+      "p95": 374.031,
+      "min": 263.012,
+      "max": 383.986,
+      "mean": 334.51346
+    },
+    "member_observe_lag_ms": {
+      "n": 100,
+      "p50": 17.61,
+      "p95": 24.802,
+      "min": -7.478,
+      "max": 26.346,
+      "mean": 14.07095
+    },
+    "commit_to_wallet_observed_ms": {
+      "n": 100,
+      "p50": 317.27049999999997,
+      "p95": 332.328,
+      "min": 245.561,
+      "max": 367.936,
+      "mean": 300.57334
+    },
+    "block_observed_ms": {
+      "n": 100,
+      "p50": 1243.903,
+      "p95": 1259.083,
+      "min": 775.777,
+      "max": 1269.488,
+      "mean": 1112.03482
+    },
+    "members_observed_ms": {
+      "n": 100,
+      "p50": 1311.9345,
+      "p95": 1325.192,
+      "min": 803.762,
+      "max": 1326.289,
+      "mean": 1160.04589
+    }
+  },
+  "submit_before_store_return_marker": 100,
+  "submit_before_persist_callback": 31,
+  "member_vote_stages": {
+    "validation_ms": {
+      "n": 307,
+      "p50": 2.609875,
+      "p95": 24.178334,
+      "min": 0.4335,
+      "max": 40.640917,
+      "mean": 7.745868335504886
+    },
+    "storage_queue_ms": {
+      "n": 307,
+      "p50": 19.759125,
+      "p95": 30.958042,
+      "min": 0.006291,
+      "max": 37.77725,
+      "mean": 18.590971237785016
+    },
+    "storage_callback_ms": {
+      "n": 307,
+      "p50": 0.049625,
+      "p95": 0.29075,
+      "min": 0.039083,
+      "max": 5.1245,
+      "mean": 0.13450160912052117
+    },
+    "storage_return_ms": {
+      "n": 307,
+      "p50": 29.665375,
+      "p95": 47.833375,
+      "min": 14.969625,
+      "max": 48.832541,
+      "mean": 31.636643719869706
+    },
+    "vote_sign_ms": {
+      "n": 307,
+      "p50": 0.014625,
+      "p95": 0.35575,
+      "min": 0.013125,
+      "max": 24.35525,
+      "mean": 0.17560698697068405
+    }
+  },
+  "install_stages": {
+    "validation_ms": {
+      "n": 251,
+      "p50": 0.629,
+      "p95": 0.979,
+      "min": 0.54,
+      "max": 13.621,
+      "mean": 0.9830478087649402
+    },
+    "store_ms": {
+      "n": 251,
+      "p50": 26.801,
+      "p95": 50.8,
+      "min": 0.053,
+      "max": 103.926,
+      "mean": 30.288509960159363
+    }
+  },
+  "calls": {
+    "committee0": {
+      "store_update": 8,
+      "configuration": 1,
+      "comet_operation": 85,
+      "received tock": 9,
+      "entering new round": 8,
+      "entering propose step": 7,
+      "prepare_enter": 2,
+      "prepare_done": 2,
+      "signed proposal": 2,
+      "received complete proposal block": 7,
+      "entering prevote step": 7,
+      "process_enter": 7,
+      "process_done": 7,
+      "signed and pushed vote": 14,
+      "entering precommit step": 7,
+      "entering commit step": 7,
+      "finalizing commit of block": 7,
+      "finalize_enter": 7,
+      "finalize_locked": 7,
+      "finalize_done": 7,
+      "commit_start": 7,
+      "commit_lock": 7,
+      "commit_update_start": 7,
+      "commit_update_callback": 7,
+      "commit_update_return": 7,
+      "commit_done": 7,
+      "direct_verify": 500
+    },
+    "committee1": {
+      "store_update": 8,
+      "configuration": 1,
+      "comet_operation": 87,
+      "received tock": 8,
+      "entering new round": 7,
+      "entering propose step": 7,
+      "received complete proposal block": 7,
+      "entering prevote step": 7,
+      "process_enter": 7,
+      "process_done": 7,
+      "signed and pushed vote": 14,
+      "entering precommit step": 7,
+      "entering commit step": 7,
+      "finalizing commit of block": 7,
+      "finalize_enter": 7,
+      "finalize_locked": 7,
+      "finalize_done": 7,
+      "commit_start": 7,
+      "commit_lock": 7,
+      "commit_update_start": 7,
+      "commit_update_callback": 7,
+      "commit_update_return": 7,
+      "commit_done": 7,
+      "direct_verify": 562,
+      "prepare_enter": 2,
+      "prepare_done": 2,
+      "signed proposal": 2
+    },
+    "committee2": {
+      "store_update": 8,
+      "configuration": 1,
+      "comet_operation": 86,
+      "received tock": 8,
+      "entering new round": 7,
+      "entering propose step": 7,
+      "received complete proposal block": 7,
+      "entering prevote step": 7,
+      "process_enter": 7,
+      "process_done": 7,
+      "signed and pushed vote": 14,
+      "entering precommit step": 7,
+      "entering commit step": 7,
+      "finalizing commit of block": 7,
+      "finalize_enter": 7,
+      "finalize_locked": 7,
+      "finalize_done": 7,
+      "commit_start": 7,
+      "commit_lock": 7,
+      "commit_update_start": 7,
+      "commit_update_callback": 7,
+      "commit_update_return": 7,
+      "commit_done": 7,
+      "direct_verify": 535,
+      "prepare_enter": 2,
+      "prepare_done": 2,
+      "signed proposal": 2
+    },
+    "committee3": {
+      "store_update": 8,
+      "configuration": 1,
+      "comet_operation": 78,
+      "received tock": 9,
+      "entering new round": 8,
+      "entering propose step": 7,
+      "received complete proposal block": 7,
+      "entering prevote step": 7,
+      "process_enter": 7,
+      "process_done": 7,
+      "signed and pushed vote": 14,
+      "entering precommit step": 7,
+      "entering commit step": 7,
+      "finalizing commit of block": 7,
+      "finalize_enter": 7,
+      "finalize_locked": 7,
+      "finalize_done": 7,
+      "commit_start": 7,
+      "commit_lock": 7,
+      "commit_update_start": 7,
+      "commit_update_callback": 7,
+      "commit_update_return": 7,
+      "commit_done": 7,
+      "direct_verify": 499,
+      "prepare_enter": 1,
+      "prepare_done": 1,
+      "signed proposal": 1
+    },
+    "gateway0": {
+      "follow_wait_start": 7,
+      "certificate_ready": 100,
+      "outbox_persist_start": 100,
+      "relay_action_scheduled": 351,
+      "persist_update_requested": 100,
+      "persist_callback": 100,
+      "relay_install_start": 251,
+      "relay_enter": 100,
+      "relay_ready": 100,
+      "submit_start": 100,
+      "submit_done": 100,
+      "store_update": 15,
+      "outbox_persist_done": 100,
+      "relay_install_done": 251,
+      "follow_fetch": 18,
+      "follow_verify_start": 6,
+      "follow_verify_done": 6,
+      "follow_update_requested": 6,
+      "follow_update_started": 6,
+      "follow_apply_start": 6,
+      "follow_apply_done": 6,
+      "follow_committed": 6
+    },
+    "gateway1": {
+      "follow_wait_start": 7,
+      "follow_fetch": 18,
+      "follow_verify_start": 6,
+      "follow_verify_done": 6,
+      "follow_update_requested": 6,
+      "follow_update_started": 6,
+      "follow_apply_start": 6,
+      "follow_apply_done": 6,
+      "store_update": 6,
+      "follow_committed": 6
+    },
+    "org0-member0": {
+      "follow_wait_start": 7,
+      "install_enter": 72,
+      "install_store_start": 72,
+      "install_store_done": 72,
+      "follow_fetch": 18,
+      "follow_verify_start": 6,
+      "follow_verify_done": 6,
+      "follow_update_requested": 6,
+      "follow_update_started": 6,
+      "follow_apply_start": 6,
+      "follow_apply_done": 6,
+      "follow_committed": 6
+    },
+    "org0-member1": {
+      "follow_wait_start": 7,
+      "install_enter": 61,
+      "install_store_start": 61,
+      "install_store_done": 61,
+      "follow_fetch": 18,
+      "follow_verify_start": 6,
+      "follow_verify_done": 6,
+      "follow_update_requested": 6,
+      "follow_update_started": 6,
+      "follow_apply_start": 6,
+      "follow_apply_done": 6,
+      "follow_committed": 6
+    },
+    "org0-member2": {
+      "follow_wait_start": 7,
+      "install_enter": 60,
+      "install_store_start": 60,
+      "install_store_done": 60,
+      "follow_fetch": 18,
+      "follow_verify_start": 6,
+      "follow_verify_done": 6,
+      "follow_update_requested": 6,
+      "follow_update_started": 6,
+      "follow_apply_start": 6,
+      "follow_apply_done": 6,
+      "follow_committed": 6
+    },
+    "org0-member3": {
+      "follow_wait_start": 7,
+      "install_enter": 58,
+      "install_store_start": 58,
+      "install_store_done": 58,
+      "follow_fetch": 18,
+      "follow_verify_start": 6,
+      "follow_verify_done": 6,
+      "follow_update_requested": 6,
+      "follow_update_started": 6,
+      "follow_apply_start": 6,
+      "follow_apply_done": 6,
+      "follow_committed": 6
+    },
+    "org1-member0": {
+      "follow_wait_start": 7,
+      "follow_fetch": 18,
+      "follow_verify_start": 6,
+      "follow_verify_done": 6,
+      "follow_update_requested": 6,
+      "follow_update_started": 6,
+      "follow_apply_start": 6,
+      "follow_apply_done": 6,
+      "follow_committed": 6
+    },
+    "org1-member1": {
+      "follow_wait_start": 7,
+      "follow_fetch": 18,
+      "follow_verify_start": 6,
+      "follow_verify_done": 6,
+      "follow_update_requested": 6,
+      "follow_update_started": 6,
+      "follow_apply_start": 6,
+      "follow_apply_done": 6,
+      "follow_committed": 6
+    },
+    "org1-member2": {
+      "follow_wait_start": 7,
+      "follow_fetch": 18,
+      "follow_verify_start": 6,
+      "follow_verify_done": 6,
+      "follow_update_requested": 6,
+      "follow_update_started": 6,
+      "follow_apply_start": 6,
+      "follow_apply_done": 6,
+      "follow_committed": 6
+    },
+    "org1-member3": {
+      "follow_wait_start": 7,
+      "follow_fetch": 18,
+      "follow_verify_start": 6,
+      "follow_verify_done": 6,
+      "follow_update_requested": 6,
+      "follow_update_started": 6,
+      "follow_apply_start": 6,
+      "follow_apply_done": 6,
+      "follow_committed": 6
+    },
+    "wallet": {
+      "follow_wait_start": 7,
+      "follow_fetch": 18,
+      "follow_verify_start": 6,
+      "follow_verify_done": 6,
+      "follow_update_requested": 6,
+      "follow_update_started": 6,
+      "follow_apply_start": 6,
+      "follow_apply_done": 6,
+      "follow_committed": 6
+    }
+  },
+  "gateway_storage": {
+    "physical_updates": 15,
+    "changed": 15,
+    "write_sync_total_ms": 520.380915
+  },
+  "last_commit_from_first_send_ms": 1932.874,
+  "last_fast_from_first_send_ms": 1478.87,
+  "peak_saved_not_submitted": 0,
+  "peak_received_not_committed": 64,
+  "cohorts": [
+    {
+      "send_order": "1-20",
+      "send_offset_ms": 0.20450000000000002,
+      "fast_ms": 168.8745,
+      "durable_to_submit_ms": -122.29650000000001,
+      "accepted_to_prepare_enter_ms": 277.14,
+      "send_to_commit_ms": 926.7194999999999,
+      "block_observed_ms": 1256.2785,
+      "members_observed_ms": 1324.281
+    },
+    {
+      "send_order": "21-40",
+      "send_offset_ms": 0.9984999999999999,
+      "fast_ms": 168.028,
+      "durable_to_submit_ms": -129.6855,
+      "accepted_to_prepare_enter_ms": 286.57,
+      "send_to_commit_ms": 925.9255,
+      "block_observed_ms": 1255.481,
+      "members_observed_ms": 1323.405
+    },
+    {
+      "send_order": "41-60",
+      "send_offset_ms": 1.1495,
+      "fast_ms": 167.8775,
+      "durable_to_submit_ms": -121.219,
+      "accepted_to_prepare_enter_ms": 276.0955,
+      "send_to_commit_ms": 925.7745,
+      "block_observed_ms": 1255.367,
+      "members_observed_ms": 1323.4245
+    },
+    {
+      "send_order": "61-80",
+      "send_offset_ms": 1301.3465,
+      "fast_ms": 125.648,
+      "durable_to_submit_ms": -49.586,
+      "accepted_to_prepare_enter_ms": 172.0435,
+      "send_to_commit_ms": 631.5835,
+      "block_observed_ms": 877.2295,
+      "members_observed_ms": 901.8595
+    },
+    {
+      "send_order": "81-100",
+      "send_offset_ms": 1324.4995,
+      "fast_ms": 132.4695,
+      "durable_to_submit_ms": -22.89,
+      "accepted_to_prepare_enter_ms": 126.01050000000001,
+      "send_to_commit_ms": 608.4304999999999,
+      "block_observed_ms": 858.2455,
+      "members_observed_ms": 872.2365
+    }
+  ],
+  "blocks": [
+    {
+      "height": 2,
+      "payments": 1,
+      "proposer": "committee2",
+      "prepare_ms": 0.038,
+      "prepare_to_finalize_ms": 254.317,
+      "process_ms": 0.007,
+      "finalize_ms": 0.182,
+      "final_check_sum_ms": 0.008,
+      "execute_sum_ms": 0.138,
+      "commit_ms": 16.09,
+      "commit_offset_ms": 408.057
+    },
+    {
+      "height": 3,
+      "payments": 63,
+      "proposer": "committee1",
+      "prepare_ms": 0.211,
+      "prepare_to_finalize_ms": 345.658,
+      "process_ms": 0.206,
+      "finalize_ms": 4.71,
+      "final_check_sum_ms": 0.24,
+      "execute_sum_ms": 3.874,
+      "commit_ms": 131.785,
+      "commit_offset_ms": 926.924
+    },
+    {
+      "height": 5,
+      "payments": 1,
+      "proposer": "committee0",
+      "prepare_ms": 0.007,
+      "prepare_to_finalize_ms": 248.827,
+      "process_ms": 0.007,
+      "finalize_ms": 0.246,
+      "final_check_sum_ms": 0.01,
+      "execute_sum_ms": 0.161,
+      "commit_ms": 24.024,
+      "commit_offset_ms": 1597.979
+    },
+    {
+      "height": 6,
+      "payments": 35,
+      "proposer": "committee2",
+      "prepare_ms": 0.133,
+      "prepare_to_finalize_ms": 301.672,
+      "process_ms": 0.128,
+      "finalize_ms": 2.386,
+      "final_check_sum_ms": 0.123,
+      "execute_sum_ms": 1.941,
+      "commit_ms": 28.739,
+      "commit_offset_ms": 1932.93
+    }
+  ]
+}

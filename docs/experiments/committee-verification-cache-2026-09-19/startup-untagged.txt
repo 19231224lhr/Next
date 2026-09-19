@@ -1,0 +1,12 @@
+START cache-plain-a1
+Created finite two-organization laboratory: /Users/richz/lab/man/utxo-fastpay-v12/.run/group-cache-plain-a1
+Traceback (most recent call last):
+  File "/Users/richz/lab/man/utxo-fastpay-v12/docs/experiments/stages100-2026-09-19/run_experiment.py", line 62, in <module>
+    if proc.poll() is not None: raise RuntimeError('lab exited')
+RuntimeError: lab exited
+Traceback (most recent call last):
+  File "/Users/richz/lab/man/utxo-fastpay-v12/docs/experiments/committee-verification-cache-2026-09-19/run_sequence.py", line 59, in <module>
+    subprocess.run(['python3',str(runner),label,binaries,trace],cwd=root,env=runenv,check=True)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['python3', '/Users/richz/lab/man/utxo-fastpay-v12/docs/experiments/stages100-2026-09-19/run_experiment.py', 'cache-plain-a1', 'cache-new-bin', 'plain']' returned non-zero exit status 1.

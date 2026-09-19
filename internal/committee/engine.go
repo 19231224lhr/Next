@@ -3,6 +3,7 @@ package committee
 import (
 	"encoding/binary"
 	"encoding/json"
+	"os"
 	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/internal/store"
@@ -23,7 +24,8 @@ type EngineConfig struct {
 	Direct        *rules.DirectSettings `json:",omitempty"`
 }
 type Engine struct {
-	cache         certificateCache
+	cache         verificationCache[rules.VerifiedCertificate]
+	directCache   verificationCache[rules.VerifiedDirectPayment]
 	cfg           EngineConfig
 	db            store.Store
 	orgs          map[protocol.Hash]protocol.OrgConfig
@@ -46,6 +48,7 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 		return nil, e
 	}
 	engine := &Engine{cfg: c, db: db, orgs: make(map[protocol.Hash]protocol.OrgConfig), genesis: protocol.Digest("PUBLIC_GENESIS_V2", b)}
+	engine.directCache.disabled = os.Getenv("UTXO_EXPERIMENT_DISABLE_DIRECT_CACHE") == "1"
 	if c.Direct != nil {
 		p, err := c.Direct.Policy(c.Schedule, c.Organizations)
 		if err != nil {
