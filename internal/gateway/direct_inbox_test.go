@@ -3,13 +3,18 @@ package gateway
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
 	"utxo/internal/state"
 	"utxo/internal/store"
+	"utxo/internal/testkit"
 	"utxo/protocol"
 )
 
@@ -184,5 +189,91 @@ func TestDirectInboxOwnsBytesAndRejectsAfterClose(t *testing.T) {
 	q.close()
 	if q.Offer(p) || len(q.snapshot()) != 0 {
 		t.Fatal("closed inbox accepted or retained payload")
+	}
+}
+
+func TestDirectInboxProcessExitBeforePersistAndFullPayloadResubmit(t *testing.T) {
+	type carrier struct {
+		Organization protocol.OrgConfig
+		Payment      protocol.DirectPayment
+	}
+	identity := store.Identity{Network: "test", Role: "gateway", Node: "crash", Schema: 4}
+	if dir := os.Getenv("UTXO_TEST_EARLY_EXIT"); dir != "" {
+		raw, err := os.ReadFile(filepath.Join(dir, "carrier.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var held carrier
+		if err = json.Unmarshal(raw, &held); err != nil {
+			t.Fatal(err)
+		}
+		db, err := store.Open(filepath.Join(dir, "gateway.db"), identity)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hold := &holdDirectWrites{Store: db, entered: make(chan struct{}), release: make(chan struct{})}
+		var clients [4]MemberClient
+		for i := range clients {
+			clients[i] = relayInstaller{install: func(ctx context.Context, _ protocol.DirectPayment) error { <-ctx.Done(); return ctx.Err() }}
+		}
+		c, err := New(held.Organization, clients, hold)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := &Relay{DB: hold, Direct: true, Early: NewDirectInbox(), Organizations: map[protocol.Hash]protocol.OrgConfig{held.Organization.Hash(): held.Organization}, Members: map[protocol.Hash][4]MemberClient{held.Organization.Org: clients}}
+		r.Trust, _ = testkit.Block("direct-relay", 1, nil, nil, nil)
+		r.Public = relayPublic{submit: func(context.Context, []byte) error { os.Exit(23); return nil }}
+		if !r.Early.Offer(held.Payment) {
+			t.Fatal("offer")
+		}
+		go func() { _ = c.PersistDirect(held.Payment) }()
+		<-hold.entered
+		_ = r.Run(context.Background())
+		t.Fatal("did not exit on early submission")
+	}
+	c, r, payments := directRelayFixture(t, 1)
+	dir := t.TempDir()
+	raw, err := json.Marshal(carrier{c.org, payments[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A holder has the complete original payment. This is not an assertion that
+	// the receive-only wallet can reconstruct it from an output and TXCer.
+	if err = os.WriteFile(filepath.Join(dir, "carrier.json"), raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	child := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestDirectInboxProcessExitBeforePersistAndFullPayloadResubmit$")
+	child.Env = append(os.Environ(), "UTXO_TEST_EARLY_EXIT="+dir)
+	output, err := child.CombinedOutput()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 23 {
+		t.Fatalf("child: %v %s", err, output)
+	}
+	db, err := store.Open(filepath.Join(dir, "gateway.db"), identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	entries, err := store.Scan(db, state.Key(state.KeyOutbox), nil, 1)
+	if err != nil || len(entries) != 0 {
+		t.Fatal("volatile offer was mistaken for durable outbox", err)
+	}
+	c.db, r.DB = db, db
+	sent := make(chan []byte, 8)
+	r.Public = relayPublic{submit: func(_ context.Context, b []byte) error { sent <- bytes.Clone(b); return nil }}
+	if err = c.PersistDirect(payments[0]); err != nil {
+		t.Fatal(err)
+	}
+	startDirectRelay(t, r)
+	want, _ := payments[0].MarshalBinary()
+	select {
+	case got := <-sent:
+		if !bytes.Equal(got, want) {
+			t.Fatal("resubmit changed payment")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("resubmission stalled")
 	}
 }
