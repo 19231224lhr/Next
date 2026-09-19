@@ -126,9 +126,11 @@ func (a *App) InitChain(_ context.Context, r *abci.RequestInitChain) (*abci.Resp
 	return &abci.ResponseInitChain{AppHash: bytes.Clone(a.response.AppHash)}, nil
 }
 func (a *App) CheckTx(_ context.Context, r *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
+	requesttrace.Settlement.Command(r.Tx, "mempool_enter", 0)
 	if e := a.check(r.Tx); e != nil {
 		return &abci.ResponseCheckTx{Code: 1, Log: e.Error()}, nil
 	}
+	requesttrace.Settlement.Command(r.Tx, "mempool_checked", 0)
 	return &abci.ResponseCheckTx{}, nil
 }
 func (a *App) PrepareProposal(_ context.Context, r *abci.RequestPrepareProposal) (*abci.ResponsePrepareProposal, error) {
@@ -345,7 +347,15 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 	return cloneResponse(response), nil
 }
 func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit, error) {
+	var entered time.Time
+	var lockWait time.Duration
+	if requesttrace.Consensus != nil {
+		entered = time.Now()
+	}
 	a.mu.Lock()
+	if !entered.IsZero() {
+		lockWait = time.Since(entered)
+	}
 	defer a.mu.Unlock()
 	if a.halted != nil {
 		return nil, a.halted
@@ -355,6 +365,9 @@ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit
 	}
 	requesttrace.Settlement.Block(a.pending.Height, "commit_start")
 	requesttrace.Consensus.Mark("commit_start", "height", a.pending.Height)
+	if !entered.IsZero() {
+		requesttrace.Consensus.Mark("commit_lock", "height", a.pending.Height, "wait_ns", lockWait.Nanoseconds())
+	}
 	raw, e := json.Marshal(a.pending)
 	if e != nil {
 		return nil, e
@@ -372,7 +385,18 @@ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit
 		location, _ := json.Marshal(factLocation{Height: a.pending.Height, Index: i})
 		cs = append(cs, state.Change{Key: proofKey(f.ID()), Value: location})
 	}
-	e = a.db.Update(func(state.ReadView) ([]state.Change, error) { return cs, nil })
+	if requesttrace.Consensus != nil {
+		bytes := 0
+		for _, c := range cs {
+			bytes += len(c.Key) + len(c.Value)
+		}
+		requesttrace.Consensus.Mark("commit_update_start", "height", a.pending.Height, "changes", len(cs), "bytes", bytes)
+	}
+	e = a.db.Update(func(state.ReadView) ([]state.Change, error) {
+		requesttrace.Consensus.Mark("commit_update_callback", "height", a.pending.Height)
+		return cs, nil
+	})
+	requesttrace.Consensus.Mark("commit_update_return", "height", a.pending.Height)
 	if e != nil {
 		a.halted = e
 		return nil, e

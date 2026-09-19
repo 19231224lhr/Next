@@ -115,6 +115,7 @@ func run() error {
 	}
 	requesttrace.Consensus.Mark("configuration", "flush", cc.P2P.FlushThrottleTimeout, "gossip", cc.Consensus.PeerGossipSleepDuration, "commit", cc.Consensus.TimeoutCommit)
 	cc.StateSync.Enable = false
+	requesttrace.EnableCometProfile()
 	var validator *privval.FilePV
 	_, keyErr := os.Stat(cc.PrivValidatorKeyFile())
 	_, stateErr := os.Stat(cc.PrivValidatorStateFile())

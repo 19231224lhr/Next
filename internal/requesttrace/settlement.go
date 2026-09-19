@@ -22,6 +22,8 @@ var Settlement = func() *SettlementRecorder {
 }()
 
 type SettlementTiming struct {
+	MempoolEnterUnixNS    int64
+	MempoolCheckedUnixNS  int64
 	FinalCheckStartUnixNS int64
 	FinalCheckDoneUnixNS  int64
 	PreparedUnixNS        int64
@@ -114,6 +116,14 @@ func (r *SettlementRecorder) Command(raw []byte, stage string, height int64) {
 		return
 	}
 	switch stage {
+	case "mempool_enter":
+		if event.MempoolEnterUnixNS == 0 {
+			event.MempoolEnterUnixNS = now
+		}
+	case "mempool_checked":
+		if event.MempoolCheckedUnixNS == 0 {
+			event.MempoolCheckedUnixNS = now
+		}
 	case "final_check_start":
 		if event.FinalCheckStartUnixNS == 0 {
 			event.FinalCheckStartUnixNS = now

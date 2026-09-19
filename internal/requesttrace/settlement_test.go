@@ -22,6 +22,8 @@ func TestSettlementTimingLinksAttemptsAndCommitWithoutOverwriting(t *testing.T) 
 	received := time.Now().UnixNano()
 	r.Receive(raw, sent, received, "gateway")
 	r.Command(raw, "accepted", 0)
+	r.Command(raw, "mempool_enter", 0)
+	r.Command(raw, "mempool_checked", 0)
 	r.Command(raw, "execute_start", 7)
 	r.Command(raw, "execute_done", 7)
 	r.Block(7, "commit_start")
@@ -31,6 +33,9 @@ func TestSettlementTimingLinksAttemptsAndCommitWithoutOverwriting(t *testing.T) 
 		t.Fatal(events)
 	}
 	e := events[0]
+	if e.MempoolEnterUnixNS < received || e.MempoolCheckedUnixNS < e.MempoolEnterUnixNS {
+		t.Fatal("mempool timing missing")
+	}
 	if e.DeliveredUnixNS != sent || e.ReceivedUnixNS != received || e.Height != 7 || e.ExecuteStartUnixNS < received || e.CommittedUnixNS < e.CommitStartUnixNS {
 		t.Fatalf("bad trace: %+v", e)
 	}

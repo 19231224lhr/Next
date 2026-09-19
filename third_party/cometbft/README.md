@@ -18,3 +18,11 @@ Monetary changes execute at the new repair height, never retrospectively.
 The cryptographic package is supplied by this application's root module. This
 directory is a patch source bundle, not a standalone Comet distribution.
 See [implementation and evidence](../../docs/implementation-v1.2.md).
+
+For local profiling, set both `UTXO_SETTLEMENT_TRACE=1` and
+`UTXO_COMET_PROFILE=1` before starting committee processes. The optional
+`libs/operationtrace` hook records proposal construction, WAL synchronization,
+validator signing-state saves, and BlockStore saves in the existing bounded
+in-memory timeline. It adds no diagnostic disk writes and changes no durability
+or consensus rule. Signature timing includes the nested signing-state save;
+do not add the two measurements together. The hook stays nil in normal runs.

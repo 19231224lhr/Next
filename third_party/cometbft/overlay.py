@@ -19,14 +19,14 @@ if not out.exists():
             os.chmod(pathlib.Path(parent) / name, 0o644)
 
 def patch(name, edits):
-    text = (source / name).read_text()
+    text = (source / name).read_text(encoding="utf-8")
     for before, after in edits:
         if text.count(before) != 1:
             raise RuntimeError(f"pinned source mismatch: {name}: {before[:70]}")
         text = text.replace(before, after, 1)
     target = out / name
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(text)
+    target.write_text(text, encoding="utf-8")
 
 patch("types/tx.go", [
     ("return tmhash.Sum(tx)", "return redactionTxHash(tx)"),
@@ -65,7 +65,36 @@ patch("consensus/reactor.go", [
 patch("node/node.go", [
     (') (*Node, error) {\n\tblockStore, stateDB, err := initDBs(config, dbProvider)\n\tif err != nil {\n\t\treturn nil, err\n\t}', ') (*Node, error) {\n\tblockStore, stateDB, err := initDBs(config, dbProvider)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n if BeforeReplay != nil { if err := BeforeReplay(blockStore); err != nil { return nil, err } }'),
 ])
-for name in ["types/redaction.go", "store/redaction.go", "node/redaction.go"]:
+# Opt-in timings around the pinned implementation's real synchronous calls.
+# The hook is nil in normal runs; no extra log or storage writes are introduced.
+trace_import = ('import (', 'import (\n "github.com/cometbft/cometbft/libs/operationtrace"')
+patch("privval/file.go", [trace_import,
+    ('func (lss *FilePVLastSignState) Save() {',
+     'func (lss *FilePVLastSignState) Save() {\n defer operationtrace.Start("filepv_save", lss.Height)()'),
+])
+patch("consensus/state.go", [trace_import,
+    ('block, err = cs.createProposalBlock(context.TODO())',
+     'endBuild := operationtrace.Start("proposal_build", height)\n block, err = cs.createProposalBlock(context.TODO())\n endBuild()'),
+    ('blockParts, err = block.MakePartSet(types.BlockPartSizeBytes)',
+     'endParts := operationtrace.Start("proposal_parts", height)\n blockParts, err = block.MakePartSet(types.BlockPartSizeBytes)\n endParts()'),
+    ('if err := cs.wal.FlushAndSync(); err != nil {\n\t\tcs.Logger.Error("failed flushing WAL to disk")\n\t}',
+     'endFlush := operationtrace.Start("proposal_wal_flush", height)\n if err := cs.wal.FlushAndSync(); err != nil {\n cs.Logger.Error("failed flushing WAL to disk")\n }\n endFlush()'),
+    ('if err := cs.privValidator.SignProposal(cs.state.ChainID, p); err == nil {',
+     'endSign := operationtrace.Start("proposal_sign", height)\n signErr := cs.privValidator.SignProposal(cs.state.ChainID,p)\n endSign()\n if err := signErr; err == nil {'),
+    ('if err := cs.wal.FlushAndSync(); err != nil {\n\t\treturn nil, err\n\t}',
+     'endFlush := operationtrace.Start("vote_wal_flush", cs.Height)\n flushErr := cs.wal.FlushAndSync()\n endFlush()\n if flushErr != nil { return nil, flushErr }'),
+    ('recoverable, err := types.SignAndCheckVote(vote, cs.privValidator, cs.state.ChainID, extEnabled && (msgType == cmtproto.PrecommitType))',
+     'endSign := operationtrace.Start("vote_sign", cs.Height)\n recoverable, err := types.SignAndCheckVote(vote, cs.privValidator, cs.state.ChainID, extEnabled && (msgType == cmtproto.PrecommitType))\n endSign()'),
+    ('err := cs.wal.WriteSync(mi) // NOTE: fsync',
+     'endInternal := operationtrace.Start("internal_message_wal", rs.Height)\n err := cs.wal.WriteSync(mi) // NOTE: fsync\n endInternal()'),
+    ('// Save to blockStore.\n', '// Save to blockStore.\n endStore := operationtrace.Start("blockstore_save", height)\n'),
+    ('\n\tfail.Fail() // XXX\n\n\t// Write EndHeightMessage', '\n endStore()\n\tfail.Fail() // XXX\n\n\t// Write EndHeightMessage'),
+    ('endMsg := EndHeightMessage{height}', 'endEndHeight := operationtrace.Start("endheight_wal", height)\n endMsg := EndHeightMessage{height}'),
+    ('\n\tfail.Fail() // XXX\n\n\t// Create a copy of the state', '\n endEndHeight()\n\tfail.Fail() // XXX\n\n\t// Create a copy of the state'),
+])
+
+for name in ["types/redaction.go", "store/redaction.go", "node/redaction.go", "libs/operationtrace/trace.go"]:
+    (out / name).parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(root / "third_party/cometbft" / name, out / name)
 subprocess.check_call(["go", "mod", "edit", "-replace",
                       "github.com/cometbft/cometbft=./.scratch/comet-src"], cwd=root)
