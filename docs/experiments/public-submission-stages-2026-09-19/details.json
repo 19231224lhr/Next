@@ -1,0 +1,1101 @@
+{
+  "origin": "wallet HTTP send; all processes on one Mac",
+  "send_window_s": 1.434138,
+  "last_send_to_last_commit_s": 0.844653,
+  "last_send_to_last_member_observation_s": 1.184787,
+  "extra_stages": {
+    "ready_to_scheduled_ms": {
+      "n": 100,
+      "p50": 6.538,
+      "p95": 59.867,
+      "min": 0.144,
+      "max": 74.492,
+      "mean": 14.8802
+    },
+    "scheduled_to_submit_ms": {
+      "n": 100,
+      "p50": 0.3365,
+      "p95": 6.915,
+      "min": 0.302,
+      "max": 8.029,
+      "mean": 1.17292
+    },
+    "submit_to_receive_ms": {
+      "n": 100,
+      "p50": 0.159,
+      "p95": 0.295,
+      "min": 0.134,
+      "max": 0.559,
+      "mean": 0.17953
+    },
+    "entry_receive_to_proposer_checked_ms": {
+      "n": 100,
+      "p50": 12.667,
+      "p95": 25.114,
+      "min": 0.706,
+      "max": 158.309,
+      "mean": 11.19631
+    },
+    "proposer_checked_to_prepare_ms": {
+      "n": 100,
+      "p50": 294.33299999999997,
+      "p95": 351.253,
+      "min": 0.078,
+      "max": 391.459,
+      "mean": 287.56207
+    },
+    "proposal_wait_overlap_previous_commit_ms": {
+      "n": 100,
+      "p50": 279.556,
+      "p95": 361.493,
+      "min": 0,
+      "max": 401.53,
+      "mean": 281.08756999999997
+    }
+  },
+  "consensus_block_stats": {
+    "prepare_to_signed_proposal_ms": {
+      "n": 4,
+      "p50": 28.444499999999998,
+      "p95": 36.357,
+      "min": 14.498,
+      "max": 43.03,
+      "mean": 28.60425
+    },
+    "proposal_delivery_ms": {
+      "n": 4,
+      "p50": 34.1165,
+      "p95": 37.802,
+      "min": 17.685,
+      "max": 70.983,
+      "mean": 39.22525
+    },
+    "received_to_process_ms": {
+      "n": 4,
+      "p50": 0.109,
+      "p95": 0.118,
+      "min": 0.084,
+      "max": 0.307,
+      "mean": 0.15225
+    },
+    "process_proposal_ms": {
+      "n": 4,
+      "p50": 11.364,
+      "p95": 22.003,
+      "min": 0.667,
+      "max": 39.375,
+      "mean": 15.6925
+    },
+    "process_to_signed_prevote_ms": {
+      "n": 4,
+      "p50": 43.340999999999994,
+      "p95": 51.422,
+      "min": 10.083,
+      "max": 74.726,
+      "mean": 42.872749999999996
+    },
+    "signed_prevote_to_precommit_ms": {
+      "n": 4,
+      "p50": 38.9925,
+      "p95": 50.05,
+      "min": 18.022,
+      "max": 110.877,
+      "mean": 51.721
+    },
+    "precommit_to_signed_precommit_ms": {
+      "n": 4,
+      "p50": 67.598,
+      "p95": 75.007,
+      "min": 36.089,
+      "max": 76.098,
+      "mean": 61.84575
+    },
+    "signed_precommit_to_commit_step_ms": {
+      "n": 4,
+      "p50": 44.0635,
+      "p95": 45.306,
+      "min": 22.642,
+      "max": 51.947,
+      "mean": 40.679
+    },
+    "commit_step_to_finalize_ms": {
+      "n": 4,
+      "p50": 50.1935,
+      "p95": 51.46,
+      "min": 40.094,
+      "max": 97.724,
+      "mean": 59.55125
+    }
+  },
+  "consensus_blocks": [
+    {
+      "height": 2,
+      "payments": 1,
+      "prepare_to_signed_proposal_ms": 14.498,
+      "proposal_delivery_ms": 17.685,
+      "received_to_process_ms": 0.118,
+      "process_proposal_ms": 0.725,
+      "process_to_signed_prevote_ms": 51.422,
+      "signed_prevote_to_precommit_ms": 50.05,
+      "precommit_to_signed_precommit_ms": 76.098,
+      "signed_precommit_to_commit_step_ms": 42.821,
+      "commit_step_to_finalize_ms": 97.724
+    },
+    {
+      "height": 3,
+      "payments": 63,
+      "prepare_to_signed_proposal_ms": 36.357,
+      "proposal_delivery_ms": 70.983,
+      "received_to_process_ms": 0.307,
+      "process_proposal_ms": 39.375,
+      "process_to_signed_prevote_ms": 35.26,
+      "signed_prevote_to_precommit_ms": 27.935,
+      "precommit_to_signed_precommit_ms": 36.089,
+      "signed_precommit_to_commit_step_ms": 22.642,
+      "commit_step_to_finalize_ms": 40.094
+    },
+    {
+      "height": 5,
+      "payments": 1,
+      "prepare_to_signed_proposal_ms": 20.532,
+      "proposal_delivery_ms": 30.431,
+      "received_to_process_ms": 0.084,
+      "process_proposal_ms": 0.667,
+      "process_to_signed_prevote_ms": 74.726,
+      "signed_prevote_to_precommit_ms": 18.022,
+      "precommit_to_signed_precommit_ms": 75.007,
+      "signed_precommit_to_commit_step_ms": 51.947,
+      "commit_step_to_finalize_ms": 48.927
+    },
+    {
+      "height": 6,
+      "payments": 35,
+      "prepare_to_signed_proposal_ms": 43.03,
+      "proposal_delivery_ms": 37.802,
+      "received_to_process_ms": 0.1,
+      "process_proposal_ms": 22.003,
+      "process_to_signed_prevote_ms": 10.083,
+      "signed_prevote_to_precommit_ms": 110.877,
+      "precommit_to_signed_precommit_ms": 60.189,
+      "signed_precommit_to_commit_step_ms": 45.306,
+      "commit_step_to_finalize_ms": 51.46
+    }
+  ],
+  "transactions": [
+    {
+      "fact": "4a49d413c037579ffd67caea415cc3886bcf3ba51e52314ecb9d3d69e21d4ceb",
+      "ready_to_scheduled_ms": 60.084,
+      "scheduled_to_submit_ms": 0.491,
+      "submit_to_receive_ms": 0.159,
+      "entry_receive_to_proposer_checked_ms": 7.526,
+      "proposer_checked_to_prepare_ms": 272.726,
+      "proposal_wait_overlap_previous_commit_ms": 277.797
+    },
+    {
+      "fact": "d2a05c982530e59548218c0c9216959e3afacbde85433d6226a5f98f17e42746",
+      "ready_to_scheduled_ms": 0.757,
+      "scheduled_to_submit_ms": 0.529,
+      "submit_to_receive_ms": 0.333,
+      "entry_receive_to_proposer_checked_ms": 0.888,
+      "proposer_checked_to_prepare_ms": 0.078,
+      "proposal_wait_overlap_previous_commit_ms": 0
+    },
+    {
+      "fact": "657afdcbf85175e5a10a11b8bf836158b401cb0bdfa0ebcd8c8a0d9302d92b75",
+      "ready_to_scheduled_ms": 4.778,
+      "scheduled_to_submit_ms": 0.853,
+      "submit_to_receive_ms": 0.243,
+      "entry_receive_to_proposer_checked_ms": 14.497,
+      "proposer_checked_to_prepare_ms": 312.508,
+      "proposal_wait_overlap_previous_commit_ms": 325.35
+    },
+    {
+      "fact": "69242ac0671890f4a5f68c320e92aa6eb9bcc5c0ccefbc83890d9a13a09cc0ba",
+      "ready_to_scheduled_ms": 30.262,
+      "scheduled_to_submit_ms": 0.348,
+      "submit_to_receive_ms": 0.173,
+      "entry_receive_to_proposer_checked_ms": 25.114,
+      "proposer_checked_to_prepare_ms": 293.089,
+      "proposal_wait_overlap_previous_commit_ms": 316.518
+    },
+    {
+      "fact": "49b9f2f473433ae9902324662fcab380d6bf19e6bdc4272356088da801cb4b00",
+      "ready_to_scheduled_ms": 44.627,
+      "scheduled_to_submit_ms": 0.446,
+      "submit_to_receive_ms": 0.186,
+      "entry_receive_to_proposer_checked_ms": 11.633,
+      "proposer_checked_to_prepare_ms": 275.887,
+      "proposal_wait_overlap_previous_commit_ms": 286.733
+    },
+    {
+      "fact": "d1769685b3848952d821360f7485a2314ed0f01e4b1020806a2ca812f60935b2",
+      "ready_to_scheduled_ms": 0.3,
+      "scheduled_to_submit_ms": 0.335,
+      "submit_to_receive_ms": 0.161,
+      "entry_receive_to_proposer_checked_ms": 11.732,
+      "proposer_checked_to_prepare_ms": 351.253,
+      "proposal_wait_overlap_previous_commit_ms": 362.174
+    },
+    {
+      "fact": "899bd8da8f52f39136b8cd77216a502303a81ec690697aec09018c18abe50e49",
+      "ready_to_scheduled_ms": 8.652,
+      "scheduled_to_submit_ms": 0.327,
+      "submit_to_receive_ms": 0.153,
+      "entry_receive_to_proposer_checked_ms": 15.519,
+      "proposer_checked_to_prepare_ms": 307.835,
+      "proposal_wait_overlap_previous_commit_ms": 321.204
+    },
+    {
+      "fact": "13086fd71bc29e42d542900ee90267c3983c82e69704b7192291a60fef994fcd",
+      "ready_to_scheduled_ms": 0.19,
+      "scheduled_to_submit_ms": 0.352,
+      "submit_to_receive_ms": 0.174,
+      "entry_receive_to_proposer_checked_ms": 10.879,
+      "proposer_checked_to_prepare_ms": 391.459,
+      "proposal_wait_overlap_previous_commit_ms": 401.53
+    },
+    {
+      "fact": "94d6302dc1eb85f46fba0ff881d897ae6560f096bfe0aa859bf731c67aefcd0d",
+      "ready_to_scheduled_ms": 7.305,
+      "scheduled_to_submit_ms": 0.348,
+      "submit_to_receive_ms": 0.266,
+      "entry_receive_to_proposer_checked_ms": 14.222,
+      "proposer_checked_to_prepare_ms": 319.556,
+      "proposal_wait_overlap_previous_commit_ms": 331.673
+    },
+    {
+      "fact": "d32db02ad42bf3aab605170064061e1cb8a33c9b90c41eb94efca54b43433241",
+      "ready_to_scheduled_ms": 0.148,
+      "scheduled_to_submit_ms": 0.367,
+      "submit_to_receive_ms": 0.372,
+      "entry_receive_to_proposer_checked_ms": 3.245,
+      "proposer_checked_to_prepare_ms": 365.605,
+      "proposal_wait_overlap_previous_commit_ms": 367.572
+    },
+    {
+      "fact": "d60a809fe11dc0b183d537b7ca36a98f97ced21372ff2432188951c686f2da98",
+      "ready_to_scheduled_ms": 9.29,
+      "scheduled_to_submit_ms": 0.431,
+      "submit_to_receive_ms": 0.181,
+      "entry_receive_to_proposer_checked_ms": 14.224,
+      "proposer_checked_to_prepare_ms": 325.693,
+      "proposal_wait_overlap_previous_commit_ms": 337.039
+    },
+    {
+      "fact": "b7804544261f5ee8f16a4d4e693c8b194b6edcd02e2d31be5c7b667c0092115a",
+      "ready_to_scheduled_ms": 14.967,
+      "scheduled_to_submit_ms": 0.331,
+      "submit_to_receive_ms": 0.146,
+      "entry_receive_to_proposer_checked_ms": 25.707,
+      "proposer_checked_to_prepare_ms": 292.324,
+      "proposal_wait_overlap_previous_commit_ms": 315.868
+    },
+    {
+      "fact": "03413b2e5607b60d08ce407839aa484233bd24eb752008f64b6189859e8320a9",
+      "ready_to_scheduled_ms": 56.066,
+      "scheduled_to_submit_ms": 0.324,
+      "submit_to_receive_ms": 0.149,
+      "entry_receive_to_proposer_checked_ms": 13.432,
+      "proposer_checked_to_prepare_ms": 261.741,
+      "proposal_wait_overlap_previous_commit_ms": 273.009
+    },
+    {
+      "fact": "1f8424071132617b72f159958979562f9c800b38da5174ffcc9304069a0859d6",
+      "ready_to_scheduled_ms": 5.947,
+      "scheduled_to_submit_ms": 0.325,
+      "submit_to_receive_ms": 0.157,
+      "entry_receive_to_proposer_checked_ms": 25.165,
+      "proposer_checked_to_prepare_ms": 295.507,
+      "proposal_wait_overlap_previous_commit_ms": 318.547
+    },
+    {
+      "fact": "4caa1bc59ae9225a13f114b2651dce353ab5152c98ce2ba2fc4ce55a0cf3da23",
+      "ready_to_scheduled_ms": 0.174,
+      "scheduled_to_submit_ms": 0.387,
+      "submit_to_receive_ms": 0.134,
+      "entry_receive_to_proposer_checked_ms": 13.314,
+      "proposer_checked_to_prepare_ms": 349.643,
+      "proposal_wait_overlap_previous_commit_ms": 360.821
+    },
+    {
+      "fact": "001896a2001bb7bd9c14fca4ced0779d3465faa1b7950bd3556d481f37ee4bb6",
+      "ready_to_scheduled_ms": 74.492,
+      "scheduled_to_submit_ms": 0.321,
+      "submit_to_receive_ms": 0.148,
+      "entry_receive_to_proposer_checked_ms": 13.426,
+      "proposer_checked_to_prepare_ms": 261.064,
+      "proposal_wait_overlap_previous_commit_ms": 272.365
+    },
+    {
+      "fact": "52db9fc8a8e43096b958c7189b6e8db6e4b4919e05b1a3df9c8fe95c9d0bb356",
+      "ready_to_scheduled_ms": 0.31,
+      "scheduled_to_submit_ms": 7.903,
+      "submit_to_receive_ms": 0.177,
+      "entry_receive_to_proposer_checked_ms": 13.249,
+      "proposer_checked_to_prepare_ms": 328.059,
+      "proposal_wait_overlap_previous_commit_ms": 339.052
+    },
+    {
+      "fact": "da4217fb6f1bd458b9b55aa5e7646b313b5c2b9c79f0934ff07ae7db48ff7d6f",
+      "ready_to_scheduled_ms": 0.846,
+      "scheduled_to_submit_ms": 0.335,
+      "submit_to_receive_ms": 0.17,
+      "entry_receive_to_proposer_checked_ms": 14.271,
+      "proposer_checked_to_prepare_ms": 324.931,
+      "proposal_wait_overlap_previous_commit_ms": 336.467
+    },
+    {
+      "fact": "d0cb1dd22cf7710affc57d697221e2382c7568cfaf7fbbb7b1b012eb0ca89248",
+      "ready_to_scheduled_ms": 5.489,
+      "scheduled_to_submit_ms": 0.316,
+      "submit_to_receive_ms": 0.167,
+      "entry_receive_to_proposer_checked_ms": 14.123,
+      "proposer_checked_to_prepare_ms": 321.122,
+      "proposal_wait_overlap_previous_commit_ms": 332.623
+    },
+    {
+      "fact": "e9ca6fafdcea02378c7f80f0ffe9cd64eb2bbcb751a5dfa6cd2c580466be1970",
+      "ready_to_scheduled_ms": 2.848,
+      "scheduled_to_submit_ms": 0.324,
+      "submit_to_receive_ms": 0.159,
+      "entry_receive_to_proposer_checked_ms": 14.64,
+      "proposer_checked_to_prepare_ms": 315.619,
+      "proposal_wait_overlap_previous_commit_ms": 328.15
+    },
+    {
+      "fact": "601280b13e54127b4742c58429be83d5c1cdce77317bb21267cc0608fb731f43",
+      "ready_to_scheduled_ms": 60.764,
+      "scheduled_to_submit_ms": 0.315,
+      "submit_to_receive_ms": 0.159,
+      "entry_receive_to_proposer_checked_ms": 13.697,
+      "proposer_checked_to_prepare_ms": 258.12,
+      "proposal_wait_overlap_previous_commit_ms": 269.695
+    },
+    {
+      "fact": "7378e4616b0b3ea92683fc7647df1c7bae01ab522f7d6c5df9008407394fca7a",
+      "ready_to_scheduled_ms": 14.114,
+      "scheduled_to_submit_ms": 0.636,
+      "submit_to_receive_ms": 0.156,
+      "entry_receive_to_proposer_checked_ms": 14.58,
+      "proposer_checked_to_prepare_ms": 311.74,
+      "proposal_wait_overlap_previous_commit_ms": 324.616
+    },
+    {
+      "fact": "72b1b4f6d4a88837e672584269c5b9d0c87b5544933f5f90b1492b3c5b6565e5",
+      "ready_to_scheduled_ms": 59.867,
+      "scheduled_to_submit_ms": 0.321,
+      "submit_to_receive_ms": 0.146,
+      "entry_receive_to_proposer_checked_ms": 13.633,
+      "proposer_checked_to_prepare_ms": 258.871,
+      "proposal_wait_overlap_previous_commit_ms": 270.369
+    },
+    {
+      "fact": "564f0c2a006babead36bf4d6e57ac24af984d1999af07a6c3cd2b6c712d2f297",
+      "ready_to_scheduled_ms": 0.145,
+      "scheduled_to_submit_ms": 0.322,
+      "submit_to_receive_ms": 0.161,
+      "entry_receive_to_proposer_checked_ms": 2.7,
+      "proposer_checked_to_prepare_ms": 366.38,
+      "proposal_wait_overlap_previous_commit_ms": 368.247
+    },
+    {
+      "fact": "8e762b7bcc35ae2ea3450fbb4462c9dd3c8644f42a0d9c5fbd47933b5be2a23e",
+      "ready_to_scheduled_ms": 12.25,
+      "scheduled_to_submit_ms": 0.323,
+      "submit_to_receive_ms": 0.164,
+      "entry_receive_to_proposer_checked_ms": 25.292,
+      "proposer_checked_to_prepare_ms": 294.728,
+      "proposal_wait_overlap_previous_commit_ms": 317.851
+    },
+    {
+      "fact": "b89be9cf66fa6337f59b411df65c4113a78de5153051c75fcb1a951f1ca1cc03",
+      "ready_to_scheduled_ms": 14.124,
+      "scheduled_to_submit_ms": 0.334,
+      "submit_to_receive_ms": 0.559,
+      "entry_receive_to_proposer_checked_ms": 24.802,
+      "proposer_checked_to_prepare_ms": 293.938,
+      "proposal_wait_overlap_previous_commit_ms": 317.187
+    },
+    {
+      "fact": "7f3698dcc02d1fa05400c8392a0d0cb8fd92b707e5f40516fc9343ef159b2379",
+      "ready_to_scheduled_ms": 51.147,
+      "scheduled_to_submit_ms": 0.319,
+      "submit_to_receive_ms": 0.154,
+      "entry_receive_to_proposer_checked_ms": 13.394,
+      "proposer_checked_to_prepare_ms": 262.422,
+      "proposal_wait_overlap_previous_commit_ms": 273.698
+    },
+    {
+      "fact": "45182089b44737da4a0368968e0bfa87634328b18b31bd60989ee37c8891d1d3",
+      "ready_to_scheduled_ms": 24.915,
+      "scheduled_to_submit_ms": 0.346,
+      "submit_to_receive_ms": 0.295,
+      "entry_receive_to_proposer_checked_ms": 15.278,
+      "proposer_checked_to_prepare_ms": 308.599,
+      "proposal_wait_overlap_previous_commit_ms": 321.881
+    },
+    {
+      "fact": "a03e420ab3fcbfbafe03d7c48e7560e57a141c92d7893da6759139104047b49f",
+      "ready_to_scheduled_ms": 0.444,
+      "scheduled_to_submit_ms": 7.814,
+      "submit_to_receive_ms": 0.244,
+      "entry_receive_to_proposer_checked_ms": 12.462,
+      "proposer_checked_to_prepare_ms": 328.869,
+      "proposal_wait_overlap_previous_commit_ms": 339.782
+    },
+    {
+      "fact": "6597af8ad48d885371f92a4d11b8ea5740b8c54d9b5406aa972ed649f8b34314",
+      "ready_to_scheduled_ms": 11.89,
+      "scheduled_to_submit_ms": 0.32,
+      "submit_to_receive_ms": 0.157,
+      "entry_receive_to_proposer_checked_ms": 14.858,
+      "proposer_checked_to_prepare_ms": 314.09,
+      "proposal_wait_overlap_previous_commit_ms": 326.751
+    },
+    {
+      "fact": "79e5f8d68af45ccb16589ab014fcf77aafd93336c1344c033bba8f486a4e2a32",
+      "ready_to_scheduled_ms": 10.477,
+      "scheduled_to_submit_ms": 0.327,
+      "submit_to_receive_ms": 0.168,
+      "entry_receive_to_proposer_checked_ms": 12.042,
+      "proposer_checked_to_prepare_ms": 326.464,
+      "proposal_wait_overlap_previous_commit_ms": 337.612
+    },
+    {
+      "fact": "7d3bf481b3d24e64e95b1647c2b64397dba9875969a4d38fd32c482f38af6488",
+      "ready_to_scheduled_ms": 56.604,
+      "scheduled_to_submit_ms": 0.324,
+      "submit_to_receive_ms": 0.15,
+      "entry_receive_to_proposer_checked_ms": 13.421,
+      "proposer_checked_to_prepare_ms": 263.094,
+      "proposal_wait_overlap_previous_commit_ms": 274.356
+    },
+    {
+      "fact": "8e928fa28bea627e927317b75ba2401446a13dad0bb35ba1088071eac83ee986",
+      "ready_to_scheduled_ms": 15.769,
+      "scheduled_to_submit_ms": 0.331,
+      "submit_to_receive_ms": 0.152,
+      "entry_receive_to_proposer_checked_ms": 25.764,
+      "proposer_checked_to_prepare_ms": 291.553,
+      "proposal_wait_overlap_previous_commit_ms": 315.229
+    },
+    {
+      "fact": "5e7fb5948db95d74ce08b89a7bd95e38484e46fdbd0640a2097f3dd696148429",
+      "ready_to_scheduled_ms": 39.78,
+      "scheduled_to_submit_ms": 6.879,
+      "submit_to_receive_ms": 0.25,
+      "entry_receive_to_proposer_checked_ms": 6.299,
+      "proposer_checked_to_prepare_ms": 274.346,
+      "proposal_wait_overlap_previous_commit_ms": 279.227
+    },
+    {
+      "fact": "f5ddbfad5d258d31df1236548014d864c607357d8c67ab1052cbbc70dc03a974",
+      "ready_to_scheduled_ms": 53.133,
+      "scheduled_to_submit_ms": 0.499,
+      "submit_to_receive_ms": 0.165,
+      "entry_receive_to_proposer_checked_ms": 7.151,
+      "proposer_checked_to_prepare_ms": 271.956,
+      "proposal_wait_overlap_previous_commit_ms": 277.033
+    },
+    {
+      "fact": "bbc0ced909f47e2202601b10eb37cf6316e24274f29bf80dad1ab632154e5519",
+      "ready_to_scheduled_ms": 11.189,
+      "scheduled_to_submit_ms": 0.319,
+      "submit_to_receive_ms": 0.222,
+      "entry_receive_to_proposer_checked_ms": 13.616,
+      "proposer_checked_to_prepare_ms": 324.158,
+      "proposal_wait_overlap_previous_commit_ms": 335.786
+    },
+    {
+      "fact": "d0d4d9ab14017e5ff80f9e3148c0fc722f6fb4f8430376697e6eb39cc7b843fe",
+      "ready_to_scheduled_ms": 11.041,
+      "scheduled_to_submit_ms": 0.33,
+      "submit_to_receive_ms": 0.15,
+      "entry_receive_to_proposer_checked_ms": 24.963,
+      "proposer_checked_to_prepare_ms": 297.062,
+      "proposal_wait_overlap_previous_commit_ms": 319.888
+    },
+    {
+      "fact": "a42f6ae08758dfb73861958993a82114286b6d9cbe8fd2c441c8d4c13f0318e6",
+      "ready_to_scheduled_ms": 2.177,
+      "scheduled_to_submit_ms": 0.342,
+      "submit_to_receive_ms": 0.18,
+      "entry_receive_to_proposer_checked_ms": 15.385,
+      "proposer_checked_to_prepare_ms": 309.39,
+      "proposal_wait_overlap_previous_commit_ms": 322.554
+    },
+    {
+      "fact": "160796ccdba792019d803afb818cd01e67a07ef2cc332b4635fa6912156c9dc6",
+      "ready_to_scheduled_ms": 11.808,
+      "scheduled_to_submit_ms": 0.342,
+      "submit_to_receive_ms": 0.154,
+      "entry_receive_to_proposer_checked_ms": 25.062,
+      "proposer_checked_to_prepare_ms": 296.276,
+      "proposal_wait_overlap_previous_commit_ms": 319.218
+    },
+    {
+      "fact": "812afb24bce2dba18f725305797fe556d2c15a96f008b1222b399a5b9a6f5a1a",
+      "ready_to_scheduled_ms": 4.859,
+      "scheduled_to_submit_ms": 0.325,
+      "submit_to_receive_ms": 0.155,
+      "entry_receive_to_proposer_checked_ms": 15.005,
+      "proposer_checked_to_prepare_ms": 313.296,
+      "proposal_wait_overlap_previous_commit_ms": 326.02
+    },
+    {
+      "fact": "0ce019d9feddb512fb5300feeae16dc4629496f61e7458bdfff67082ca44a68a",
+      "ready_to_scheduled_ms": 6.596,
+      "scheduled_to_submit_ms": 0.316,
+      "submit_to_receive_ms": 0.155,
+      "entry_receive_to_proposer_checked_ms": 14.228,
+      "proposer_checked_to_prepare_ms": 320.358,
+      "proposal_wait_overlap_previous_commit_ms": 332.313
+    },
+    {
+      "fact": "b8d8e3b1910b6a3713536841c67056b8151d1cdaed9e8769643afb9ca10bd6f9",
+      "ready_to_scheduled_ms": 45.979,
+      "scheduled_to_submit_ms": 6.915,
+      "submit_to_receive_ms": 0.173,
+      "entry_receive_to_proposer_checked_ms": 7.028,
+      "proposer_checked_to_prepare_ms": 273.508,
+      "proposal_wait_overlap_previous_commit_ms": 278.505
+    },
+    {
+      "fact": "ff4bedcabd50ef53e7a988a4037f2e1ecd45ac9330a3c0513e8ff1f3917e0fee",
+      "ready_to_scheduled_ms": 4.188,
+      "scheduled_to_submit_ms": 0.315,
+      "submit_to_receive_ms": 0.147,
+      "entry_receive_to_proposer_checked_ms": 13.664,
+      "proposer_checked_to_prepare_ms": 323.395,
+      "proposal_wait_overlap_previous_commit_ms": 335.1
+    },
+    {
+      "fact": "0bdefbde6a11b99f05bb07a572e96e1aea754c8f08ad01f37dd2d4e2a75188d3",
+      "ready_to_scheduled_ms": 9.234,
+      "scheduled_to_submit_ms": 0.517,
+      "submit_to_receive_ms": 0.152,
+      "entry_receive_to_proposer_checked_ms": 14.078,
+      "proposer_checked_to_prepare_ms": 317.156,
+      "proposal_wait_overlap_previous_commit_ms": 329.471
+    },
+    {
+      "fact": "8e4db79c8695ed9f1b380f1196153a8be33fc45c7d451954c8ca90d378b04c86",
+      "ready_to_scheduled_ms": 60.28,
+      "scheduled_to_submit_ms": 0.318,
+      "submit_to_receive_ms": 0.149,
+      "entry_receive_to_proposer_checked_ms": 13.816,
+      "proposer_checked_to_prepare_ms": 257.37,
+      "proposal_wait_overlap_previous_commit_ms": 269.047
+    },
+    {
+      "fact": "aa8ef6e6782a1c1b179d49ce2b4b5754edece9bc9ec66338f3c7c07cab663073",
+      "ready_to_scheduled_ms": 55.11,
+      "scheduled_to_submit_ms": 0.332,
+      "submit_to_receive_ms": 0.182,
+      "entry_receive_to_proposer_checked_ms": 13.318,
+      "proposer_checked_to_prepare_ms": 264.627,
+      "proposal_wait_overlap_previous_commit_ms": 275.686
+    },
+    {
+      "fact": "deeae36a95643d432441dccd27565709affa0798f2d8002f7f4d48e8c57a8bd5",
+      "ready_to_scheduled_ms": 53.463,
+      "scheduled_to_submit_ms": 0.322,
+      "submit_to_receive_ms": 0.165,
+      "entry_receive_to_proposer_checked_ms": 13.245,
+      "proposer_checked_to_prepare_ms": 265.397,
+      "proposal_wait_overlap_previous_commit_ms": 276.366
+    },
+    {
+      "fact": "c38ac91a3194085600b16bfecdd1ae9324ced1933ccccd09e611fd38aa9a5c79",
+      "ready_to_scheduled_ms": 59.577,
+      "scheduled_to_submit_ms": 0.324,
+      "submit_to_receive_ms": 0.15,
+      "entry_receive_to_proposer_checked_ms": 13.516,
+      "proposer_checked_to_prepare_ms": 259.626,
+      "proposal_wait_overlap_previous_commit_ms": 271.046
+    },
+    {
+      "fact": "987aeb6187b75f076ea1737f7565684be1557f51ec93ee1029531d53b8aeb495",
+      "ready_to_scheduled_ms": 8.876,
+      "scheduled_to_submit_ms": 0.417,
+      "submit_to_receive_ms": 0.146,
+      "entry_receive_to_proposer_checked_ms": 13.355,
+      "proposer_checked_to_prepare_ms": 317.944,
+      "proposal_wait_overlap_previous_commit_ms": 330.126
+    },
+    {
+      "fact": "99de808ce05cae96e45e466a361b7fc2c0e2dac82c43be7fea942acbce02972e",
+      "ready_to_scheduled_ms": 9.46,
+      "scheduled_to_submit_ms": 0.332,
+      "submit_to_receive_ms": 0.147,
+      "entry_receive_to_proposer_checked_ms": 14.683,
+      "proposer_checked_to_prepare_ms": 316.385,
+      "proposal_wait_overlap_previous_commit_ms": 328.816
+    },
+    {
+      "fact": "361e40f4c7935b4d53cf95bfc5996696680ca6d43532d87bf6e6a6eedd123218",
+      "ready_to_scheduled_ms": 0.866,
+      "scheduled_to_submit_ms": 0.349,
+      "submit_to_receive_ms": 0.151,
+      "entry_receive_to_proposer_checked_ms": 15.171,
+      "proposer_checked_to_prepare_ms": 310.981,
+      "proposal_wait_overlap_previous_commit_ms": 323.938
+    },
+    {
+      "fact": "20cffee48898478bd7db2ddc3a7154ad488f6a6c27f856239b1db0ddb082af36",
+      "ready_to_scheduled_ms": 2.924,
+      "scheduled_to_submit_ms": 0.316,
+      "submit_to_receive_ms": 0.144,
+      "entry_receive_to_proposer_checked_ms": 14.771,
+      "proposer_checked_to_prepare_ms": 314.859,
+      "proposal_wait_overlap_previous_commit_ms": 327.412
+    },
+    {
+      "fact": "f049537e707adeed1b523fa5f6e02061b4508c4b9ac342675afa134bbdd6bfc5",
+      "ready_to_scheduled_ms": 18.08,
+      "scheduled_to_submit_ms": 0.327,
+      "submit_to_receive_ms": 0.149,
+      "entry_receive_to_proposer_checked_ms": 15.538,
+      "proposer_checked_to_prepare_ms": 307.164,
+      "proposal_wait_overlap_previous_commit_ms": 320.54
+    },
+    {
+      "fact": "7571faeacd70e72429e556947253a7b8933bc2038455eef84f1b9594d5064dd6",
+      "ready_to_scheduled_ms": 0.333,
+      "scheduled_to_submit_ms": 0.341,
+      "submit_to_receive_ms": 0.161,
+      "entry_receive_to_proposer_checked_ms": 12.509,
+      "proposer_checked_to_prepare_ms": 350.477,
+      "proposal_wait_overlap_previous_commit_ms": 361.493
+    },
+    {
+      "fact": "4446da07d016e8bd05614951cd1aa16c693f1b097a7fd25625155f282fbb2a84",
+      "ready_to_scheduled_ms": 0.493,
+      "scheduled_to_submit_ms": 7.821,
+      "submit_to_receive_ms": 0.182,
+      "entry_receive_to_proposer_checked_ms": 11.742,
+      "proposer_checked_to_prepare_ms": 329.648,
+      "proposal_wait_overlap_previous_commit_ms": 340.581
+    },
+    {
+      "fact": "cc17da9aeb8b22a0e1fe03592f6633f190ac218231faf74099ff9de4b4923c65",
+      "ready_to_scheduled_ms": 5.389,
+      "scheduled_to_submit_ms": 0.322,
+      "submit_to_receive_ms": 0.155,
+      "entry_receive_to_proposer_checked_ms": 14.047,
+      "proposer_checked_to_prepare_ms": 321.883,
+      "proposal_wait_overlap_previous_commit_ms": 333.441
+    },
+    {
+      "fact": "d9b16a964f4faed701bcd80e2969af2d71ed13d43155552e367c8023c893e509",
+      "ready_to_scheduled_ms": 4.441,
+      "scheduled_to_submit_ms": 0.314,
+      "submit_to_receive_ms": 0.154,
+      "entry_receive_to_proposer_checked_ms": 13.764,
+      "proposer_checked_to_prepare_ms": 322.642,
+      "proposal_wait_overlap_previous_commit_ms": 334.44
+    },
+    {
+      "fact": "73b030dc90872e45caf15340ad900132d55db973497b74698b62051b3535799b",
+      "ready_to_scheduled_ms": 52.53,
+      "scheduled_to_submit_ms": 0.339,
+      "submit_to_receive_ms": 0.148,
+      "entry_receive_to_proposer_checked_ms": 13.447,
+      "proposer_checked_to_prepare_ms": 260.381,
+      "proposal_wait_overlap_previous_commit_ms": 271.69
+    },
+    {
+      "fact": "7cb34e6ef33b01036ffe7342e48672f3f03f7a9c9adb7d42b57a8f5c299d714a",
+      "ready_to_scheduled_ms": 7.792,
+      "scheduled_to_submit_ms": 0.359,
+      "submit_to_receive_ms": 0.438,
+      "entry_receive_to_proposer_checked_ms": 13.643,
+      "proposer_checked_to_prepare_ms": 327.261,
+      "proposal_wait_overlap_previous_commit_ms": 338.373
+    },
+    {
+      "fact": "ac20aa9399f5ffc3a92b2b2954ec217cd67dc128936415681effb90301320dfc",
+      "ready_to_scheduled_ms": 56.349,
+      "scheduled_to_submit_ms": 0.325,
+      "submit_to_receive_ms": 0.147,
+      "entry_receive_to_proposer_checked_ms": 13.874,
+      "proposer_checked_to_prepare_ms": 256.622,
+      "proposal_wait_overlap_previous_commit_ms": 268.397
+    },
+    {
+      "fact": "4d87380d3570094736b08df41f7ad7ef4e11ae2c8ddaa36fd6d4b241671c7af2",
+      "ready_to_scheduled_ms": 44.523,
+      "scheduled_to_submit_ms": 6.761,
+      "submit_to_receive_ms": 0.173,
+      "entry_receive_to_proposer_checked_ms": 5.617,
+      "proposer_checked_to_prepare_ms": 275.122,
+      "proposal_wait_overlap_previous_commit_ms": 279.885
+    },
+    {
+      "fact": "c945e003de99c2ed2bdd84b5ae1a7eb780cc696c2eb7ebf2e4edf967ec62a1b2",
+      "ready_to_scheduled_ms": 8.104,
+      "scheduled_to_submit_ms": 0.962,
+      "submit_to_receive_ms": 0.168,
+      "entry_receive_to_proposer_checked_ms": 12.825,
+      "proposer_checked_to_prepare_ms": 318.766,
+      "proposal_wait_overlap_previous_commit_ms": 330.791
+    },
+    {
+      "fact": "73d194912e8605f644df71fd39eb8ec8806a7684620e3d09154c136fcbfe0abf",
+      "ready_to_scheduled_ms": 62.876,
+      "scheduled_to_submit_ms": 0.342,
+      "submit_to_receive_ms": 0.161,
+      "entry_receive_to_proposer_checked_ms": 13.334,
+      "proposer_checked_to_prepare_ms": 263.836,
+      "proposal_wait_overlap_previous_commit_ms": 275.034
+    },
+    {
+      "fact": "75459a466d6cbeb2558b5f31d1b5352c0e5096e37c9b49f8e6e0f8e7b3faa02d",
+      "ready_to_scheduled_ms": 5.797,
+      "scheduled_to_submit_ms": 0.32,
+      "submit_to_receive_ms": 0.147,
+      "entry_receive_to_proposer_checked_ms": 15.311,
+      "proposer_checked_to_prepare_ms": 310.205,
+      "proposal_wait_overlap_previous_commit_ms": 323.215
+    },
+    {
+      "fact": "1f67cc070b6e62e2f64b66775b956f42e50e503de2088e1279b918ccbad81182",
+      "ready_to_scheduled_ms": 0.145,
+      "scheduled_to_submit_ms": 0.341,
+      "submit_to_receive_ms": 0.159,
+      "entry_receive_to_proposer_checked_ms": 158.309,
+      "proposer_checked_to_prepare_ms": 309.886,
+      "proposal_wait_overlap_previous_commit_ms": 397.52
+    },
+    {
+      "fact": "531b93343a8a994ddb6714a15e3c0f9c3eb9a0ab476adcea0b1a1e08abb085a9",
+      "ready_to_scheduled_ms": 0.271,
+      "scheduled_to_submit_ms": 0.984,
+      "submit_to_receive_ms": 0.157,
+      "entry_receive_to_proposer_checked_ms": 0.798,
+      "proposer_checked_to_prepare_ms": 385.576,
+      "proposal_wait_overlap_previous_commit_ms": 342.281
+    },
+    {
+      "fact": "e71373f3da32323b8f671de5d75ebff34399bb8ac0ae015fe7675fd9a2313f20",
+      "ready_to_scheduled_ms": 0.182,
+      "scheduled_to_submit_ms": 0.302,
+      "submit_to_receive_ms": 0.136,
+      "entry_receive_to_proposer_checked_ms": 0.788,
+      "proposer_checked_to_prepare_ms": 362.553,
+      "proposal_wait_overlap_previous_commit_ms": 319.256
+    },
+    {
+      "fact": "27d13312442fb3880e80aeb77e8fcbe4aea1d9979a7147e0e9a5f87fb0a47db2",
+      "ready_to_scheduled_ms": 0.287,
+      "scheduled_to_submit_ms": 1.087,
+      "submit_to_receive_ms": 0.154,
+      "entry_receive_to_proposer_checked_ms": 1.692,
+      "proposer_checked_to_prepare_ms": 300.19,
+      "proposal_wait_overlap_previous_commit_ms": 256.898
+    },
+    {
+      "fact": "500a305aead29aa3eb18a864b28c97e601e8acf251bafb346059edd501ee32b0",
+      "ready_to_scheduled_ms": 0.144,
+      "scheduled_to_submit_ms": 0.339,
+      "submit_to_receive_ms": 0.191,
+      "entry_receive_to_proposer_checked_ms": 0.794,
+      "proposer_checked_to_prepare_ms": 325.147,
+      "proposal_wait_overlap_previous_commit_ms": 281.851
+    },
+    {
+      "fact": "88763e5c0bdbb13437df7df8644a280095f4c6ae138a4df41c43172b269be88e",
+      "ready_to_scheduled_ms": 0.153,
+      "scheduled_to_submit_ms": 5.707,
+      "submit_to_receive_ms": 0.261,
+      "entry_receive_to_proposer_checked_ms": 0.832,
+      "proposer_checked_to_prepare_ms": 280.85,
+      "proposal_wait_overlap_previous_commit_ms": 237.556
+    },
+    {
+      "fact": "e6296374a37573483525d7894a9d989c606c8488288749d422ce0afcbc49afde",
+      "ready_to_scheduled_ms": 0.815,
+      "scheduled_to_submit_ms": 0.317,
+      "submit_to_receive_ms": 0.158,
+      "entry_receive_to_proposer_checked_ms": 2.136,
+      "proposer_checked_to_prepare_ms": 299.502,
+      "proposal_wait_overlap_previous_commit_ms": 256.208
+    },
+    {
+      "fact": "8db5090bb2205b80d01f1361d4c4ea88948ff5cd921a5d765953f2f0b1134cfa",
+      "ready_to_scheduled_ms": 1.998,
+      "scheduled_to_submit_ms": 0.324,
+      "submit_to_receive_ms": 0.158,
+      "entry_receive_to_proposer_checked_ms": 2.081,
+      "proposer_checked_to_prepare_ms": 298.854,
+      "proposal_wait_overlap_previous_commit_ms": 255.558
+    },
+    {
+      "fact": "fc2d6f05ad03d078a88758e049c2753fcb9012d4d0726391c335ba8e61f9642c",
+      "ready_to_scheduled_ms": 0.296,
+      "scheduled_to_submit_ms": 0.326,
+      "submit_to_receive_ms": 0.163,
+      "entry_receive_to_proposer_checked_ms": 1.142,
+      "proposer_checked_to_prepare_ms": 301.489,
+      "proposal_wait_overlap_previous_commit_ms": 258.195
+    },
+    {
+      "fact": "3c55badc3fee11e722745512ba002c6e985074c513071c768434ba1a5bb894f6",
+      "ready_to_scheduled_ms": 0.328,
+      "scheduled_to_submit_ms": 0.354,
+      "submit_to_receive_ms": 0.174,
+      "entry_receive_to_proposer_checked_ms": 1.775,
+      "proposer_checked_to_prepare_ms": 300.818,
+      "proposal_wait_overlap_previous_commit_ms": 257.498
+    },
+    {
+      "fact": "f545573ef18c30265aaec47cd836d158bc506b7f5f9004a3d439a56ad6b76648",
+      "ready_to_scheduled_ms": 0.237,
+      "scheduled_to_submit_ms": 0.327,
+      "submit_to_receive_ms": 0.201,
+      "entry_receive_to_proposer_checked_ms": 0.777,
+      "proposer_checked_to_prepare_ms": 302.184,
+      "proposal_wait_overlap_previous_commit_ms": 258.888
+    },
+    {
+      "fact": "9cb5e0e9cea8f26ee605bee3b95c009780c66f5e7375b25d76c99e3684d428e8",
+      "ready_to_scheduled_ms": 10.952,
+      "scheduled_to_submit_ms": 0.32,
+      "submit_to_receive_ms": 0.157,
+      "entry_receive_to_proposer_checked_ms": 2.138,
+      "proposer_checked_to_prepare_ms": 242.002,
+      "proposal_wait_overlap_previous_commit_ms": 198.674
+    },
+    {
+      "fact": "d638fa638792cae120fea15168dae79e691d51d71e5159fe78bcad4ba83441c4",
+      "ready_to_scheduled_ms": 12.528,
+      "scheduled_to_submit_ms": 0.313,
+      "submit_to_receive_ms": 0.141,
+      "entry_receive_to_proposer_checked_ms": 2.009,
+      "proposer_checked_to_prepare_ms": 240.665,
+      "proposal_wait_overlap_previous_commit_ms": 197.344
+    },
+    {
+      "fact": "952549ab762b3fb64b623c390640f3b0c2d1fe7b24162813bd78484ddaffbc82",
+      "ready_to_scheduled_ms": 9.692,
+      "scheduled_to_submit_ms": 0.33,
+      "submit_to_receive_ms": 0.153,
+      "entry_receive_to_proposer_checked_ms": 2.148,
+      "proposer_checked_to_prepare_ms": 243.357,
+      "proposal_wait_overlap_previous_commit_ms": 200.064
+    },
+    {
+      "fact": "bad07fb9c7fefd4f19cd7ab41f38e5510bac2f5ad2ba9948d53a3112399e8628",
+      "ready_to_scheduled_ms": 0.157,
+      "scheduled_to_submit_ms": 0.369,
+      "submit_to_receive_ms": 0.164,
+      "entry_receive_to_proposer_checked_ms": 0.741,
+      "proposer_checked_to_prepare_ms": 260.393,
+      "proposal_wait_overlap_previous_commit_ms": 217.099
+    },
+    {
+      "fact": "b28d2f208d5c59a04e6f2d60d94a6ead2cda562b8db1ecd5e60906ef1b62b4e7",
+      "ready_to_scheduled_ms": 0.146,
+      "scheduled_to_submit_ms": 0.416,
+      "submit_to_receive_ms": 0.163,
+      "entry_receive_to_proposer_checked_ms": 1.355,
+      "proposer_checked_to_prepare_ms": 259.707,
+      "proposal_wait_overlap_previous_commit_ms": 216.351
+    },
+    {
+      "fact": "fc416a92bafb33643b87b26bece61392a1b9ea356541a28a5b3b949f9e7e1deb",
+      "ready_to_scheduled_ms": 10.224,
+      "scheduled_to_submit_ms": 0.327,
+      "submit_to_receive_ms": 0.153,
+      "entry_receive_to_proposer_checked_ms": 2.157,
+      "proposer_checked_to_prepare_ms": 242.706,
+      "proposal_wait_overlap_previous_commit_ms": 199.412
+    },
+    {
+      "fact": "3435898f5d2fad6346305f6ed0ab353ced0546a656a5e8cb33fe35660e9d23c0",
+      "ready_to_scheduled_ms": 2.075,
+      "scheduled_to_submit_ms": 0.344,
+      "submit_to_receive_ms": 0.165,
+      "entry_receive_to_proposer_checked_ms": 2.109,
+      "proposer_checked_to_prepare_ms": 256.976,
+      "proposal_wait_overlap_previous_commit_ms": 213.684
+    },
+    {
+      "fact": "0fcc61b929a541510367f9201ac947ef959605e4dc59438ec6d7a19253cd6d6a",
+      "ready_to_scheduled_ms": 8.763,
+      "scheduled_to_submit_ms": 0.313,
+      "submit_to_receive_ms": 0.147,
+      "entry_receive_to_proposer_checked_ms": 2.064,
+      "proposer_checked_to_prepare_ms": 237.347,
+      "proposal_wait_overlap_previous_commit_ms": 194.055
+    },
+    {
+      "fact": "617921ad46dad107b40b7424545ad2d2e25d5c8a8aba9642e571104b2cb1854b",
+      "ready_to_scheduled_ms": 5.527,
+      "scheduled_to_submit_ms": 0.33,
+      "submit_to_receive_ms": 0.166,
+      "entry_receive_to_proposer_checked_ms": 2.131,
+      "proposer_checked_to_prepare_ms": 239.969,
+      "proposal_wait_overlap_previous_commit_ms": 196.675
+    },
+    {
+      "fact": "c5cd2bd81034f803df5c7a5e4ea864b074f5fc9b6a9615139870f781e94ea535",
+      "ready_to_scheduled_ms": 1.023,
+      "scheduled_to_submit_ms": 0.529,
+      "submit_to_receive_ms": 0.152,
+      "entry_receive_to_proposer_checked_ms": 2.758,
+      "proposer_checked_to_prepare_ms": 244.051,
+      "proposal_wait_overlap_previous_commit_ms": 200.72
+    },
+    {
+      "fact": "28d2afe147ccc5c5e87e0c120dede3e96c8d861c6fabbfa45af210c995a88db0",
+      "ready_to_scheduled_ms": 7.21,
+      "scheduled_to_submit_ms": 1.252,
+      "submit_to_receive_ms": 0.196,
+      "entry_receive_to_proposer_checked_ms": 0.91,
+      "proposer_checked_to_prepare_ms": 246.115,
+      "proposal_wait_overlap_previous_commit_ms": 202.822
+    },
+    {
+      "fact": "e4e8f8c3a2f0dfb55b2ab7ca65b34637fb0c58ebce080d4e625cb9d8232566ae",
+      "ready_to_scheduled_ms": 0.173,
+      "scheduled_to_submit_ms": 0.338,
+      "submit_to_receive_ms": 0.182,
+      "entry_receive_to_proposer_checked_ms": 2.073,
+      "proposer_checked_to_prepare_ms": 258.951,
+      "proposal_wait_overlap_previous_commit_ms": 215.659
+    },
+    {
+      "fact": "8a7aac0edb4afe53142aca659e01a680f51aba994ef475bd365259418211a630",
+      "ready_to_scheduled_ms": 6.48,
+      "scheduled_to_submit_ms": 0.318,
+      "submit_to_receive_ms": 0.152,
+      "entry_receive_to_proposer_checked_ms": 2.137,
+      "proposer_checked_to_prepare_ms": 239.318,
+      "proposal_wait_overlap_previous_commit_ms": 195.993
+    },
+    {
+      "fact": "948ed7c9a75b360b4ec8e09e01d49515dc9712d465c387adfeae74efd6cc99dc",
+      "ready_to_scheduled_ms": 0.307,
+      "scheduled_to_submit_ms": 5.468,
+      "submit_to_receive_ms": 0.162,
+      "entry_receive_to_proposer_checked_ms": 2.084,
+      "proposer_checked_to_prepare_ms": 263.359,
+      "proposal_wait_overlap_previous_commit_ms": 220.063
+    },
+    {
+      "fact": "d22d2e416a8b1d96895920ddc1a3f2615041f6205670a71ade09de5fc58dbaac",
+      "ready_to_scheduled_ms": 1.366,
+      "scheduled_to_submit_ms": 0.345,
+      "submit_to_receive_ms": 0.17,
+      "entry_receive_to_proposer_checked_ms": 2.141,
+      "proposer_checked_to_prepare_ms": 257.63,
+      "proposal_wait_overlap_previous_commit_ms": 214.333
+    },
+    {
+      "fact": "e88906adf457c81ed3402b88fb1833a7a42dc78ed1807d0d330d99ebf4fa155b",
+      "ready_to_scheduled_ms": 11.68,
+      "scheduled_to_submit_ms": 0.311,
+      "submit_to_receive_ms": 0.364,
+      "entry_receive_to_proposer_checked_ms": 1.988,
+      "proposer_checked_to_prepare_ms": 241.309,
+      "proposal_wait_overlap_previous_commit_ms": 198.014
+    },
+    {
+      "fact": "d7075d3cf1eefe1e6efad1433cb09c99c5124453599ed9b022947306d88e766d",
+      "ready_to_scheduled_ms": 0.856,
+      "scheduled_to_submit_ms": 0.437,
+      "submit_to_receive_ms": 0.156,
+      "entry_receive_to_proposer_checked_ms": 1.408,
+      "proposer_checked_to_prepare_ms": 245.491,
+      "proposal_wait_overlap_previous_commit_ms": 202.095
+    },
+    {
+      "fact": "5de24d1c5c815fcedc009dd893cc2007495357cc2c2906191d204f3b8bae0d40",
+      "ready_to_scheduled_ms": 0.189,
+      "scheduled_to_submit_ms": 5.531,
+      "submit_to_receive_ms": 0.174,
+      "entry_receive_to_proposer_checked_ms": 1.451,
+      "proposer_checked_to_prepare_ms": 264.009,
+      "proposal_wait_overlap_previous_commit_ms": 220.712
+    },
+    {
+      "fact": "e4dee3c863ca5870ce02b6c69c009846d98fa823887fde7bd3af8ad40847ee98",
+      "ready_to_scheduled_ms": 0.273,
+      "scheduled_to_submit_ms": 7.951,
+      "submit_to_receive_ms": 0.166,
+      "entry_receive_to_proposer_checked_ms": 0.706,
+      "proposer_checked_to_prepare_ms": 222.742,
+      "proposal_wait_overlap_previous_commit_ms": 179.451
+    },
+    {
+      "fact": "ae300ca3633af3ef5b2be185ec3c3f8ecb476ea555d7c24544168594aa1187b9",
+      "ready_to_scheduled_ms": 7.373,
+      "scheduled_to_submit_ms": 0.312,
+      "submit_to_receive_ms": 0.148,
+      "entry_receive_to_proposer_checked_ms": 2.143,
+      "proposer_checked_to_prepare_ms": 237.994,
+      "proposal_wait_overlap_previous_commit_ms": 194.697
+    },
+    {
+      "fact": "0c691919f95ef51b79ff559b494a749b7f284a5b3e09738875a9c8c17c5f76ed",
+      "ready_to_scheduled_ms": 0.155,
+      "scheduled_to_submit_ms": 0.499,
+      "submit_to_receive_ms": 0.185,
+      "entry_receive_to_proposer_checked_ms": 2.68,
+      "proposer_checked_to_prepare_ms": 258.3,
+      "proposal_wait_overlap_previous_commit_ms": 215.004
+    },
+    {
+      "fact": "47e000d770808725cdae200a4eb262a2cb3624dd031903524d117907f3647750",
+      "ready_to_scheduled_ms": 0.301,
+      "scheduled_to_submit_ms": 5.55,
+      "submit_to_receive_ms": 0.173,
+      "entry_receive_to_proposer_checked_ms": 0.777,
+      "proposer_checked_to_prepare_ms": 264.692,
+      "proposal_wait_overlap_previous_commit_ms": 221.397
+    },
+    {
+      "fact": "85a0ba86da7650342257508a27ba58815ad69876b47f16e841902aba7b7f5ab0",
+      "ready_to_scheduled_ms": 0.566,
+      "scheduled_to_submit_ms": 0.873,
+      "submit_to_receive_ms": 0.153,
+      "entry_receive_to_proposer_checked_ms": 2.233,
+      "proposer_checked_to_prepare_ms": 244.716,
+      "proposal_wait_overlap_previous_commit_ms": 201.421
+    },
+    {
+      "fact": "2b9b385b4f24984e0dae7684e6806ec67da9e96296c34adce529c2116489d06e",
+      "ready_to_scheduled_ms": 7.64,
+      "scheduled_to_submit_ms": 0.312,
+      "submit_to_receive_ms": 0.147,
+      "entry_receive_to_proposer_checked_ms": 2.134,
+      "proposer_checked_to_prepare_ms": 238.624,
+      "proposal_wait_overlap_previous_commit_ms": 195.332
+    },
+    {
+      "fact": "802f0c346922ccf4fe82e6ba2402d0933676af1b668cb07d43512e4d11139f0b",
+      "ready_to_scheduled_ms": 0.219,
+      "scheduled_to_submit_ms": 8.029,
+      "submit_to_receive_ms": 0.159,
+      "entry_receive_to_proposer_checked_ms": 1.298,
+      "proposer_checked_to_prepare_ms": 222.071,
+      "proposal_wait_overlap_previous_commit_ms": 178.779
+    }
+  ],
+  "rounds": {
+    "committee0": [
+      "0"
+    ],
+    "committee1": [
+      "0"
+    ],
+    "committee2": [
+      "0"
+    ],
+    "committee3": [
+      "0"
+    ]
+  },
+  "audit": "both runs passed"
+}
