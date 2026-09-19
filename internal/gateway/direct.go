@@ -86,7 +86,7 @@ func (c *Collector) PersistDirect(p protocol.DirectPayment) error {
 	fact := p.Certificate.QC.Fact
 	id := p.Tx.ID()
 	requesttrace.Payment("persist_update_requested", fact)
-	return c.db.Update(func(v state.ReadView) ([]state.Change, error) {
+	err = c.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		requesttrace.Payment("persist_callback", fact)
 		o := state.NewOverlay(v)
 		key := state.Key(state.KeyCollected, id[:])
@@ -106,9 +106,17 @@ func (c *Collector) PersistDirect(p protocol.DirectPayment) error {
 		}
 		return o.Changes(), nil
 	})
+	if err == nil && c.NotifyPersisted != nil {
+		c.NotifyPersisted(fact)
+	}
+	return err
 }
 
 func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Outbox) error {
+	// Member fallback waits outside the decoding, verification and write path.
+	if r.MemberRelay && (pending.PublicComplete || time.Now().UnixNano() < pending.NextSubmitUnixNS) {
+		return nil
+	}
 	requesttrace.Payment("relay_enter", pending.Fact)
 	payment, err := protocol.DecodeDirectPayment(pending.Certificate)
 	if err != nil {
@@ -144,6 +152,10 @@ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Out
 		}
 	}
 	requesttrace.Payment("relay_ready", pending.Fact)
+	return r.submitDirect(ctx, key, pending)
+}
+
+func (r *Relay) submitDirect(ctx context.Context, key []byte, pending state.Outbox) error {
 	now := time.Now().UnixNano()
 	if now >= pending.NextSubmitUnixNS {
 		// No random outer envelope: retries preserve the redaction-aware identity.
@@ -153,16 +165,19 @@ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Out
 		pending.NextSubmitUnixNS = now + int64(2*time.Second)
 	}
 	requesttrace.Payment("relay_update_requested", pending.Fact)
-	err = r.DB.Update(func(v state.ReadView) ([]state.Change, error) {
+	err := r.DB.Update(func(v state.ReadView) ([]state.Change, error) {
 		requesttrace.Payment("relay_callback", pending.Fact)
-		if _, err := v.Get(key); errors.Is(err, state.ErrNotFound) {
-			r.forgetInstall(pending.Fact)
-			return nil, nil
-		} else if err != nil {
+		current, found, err := state.Load[state.Outbox](v, key)
+		if err != nil {
 			return nil, err
 		}
+		if !found {
+			r.forgetInstall(pending.Fact)
+			return nil, nil
+		}
+		current.NextSubmitUnixNS = max(current.NextSubmitUnixNS, pending.NextSubmitUnixNS)
 		o := state.NewOverlay(v)
-		if err := state.Put(o, key, pending); err != nil {
+		if err := state.Put(o, key, current); err != nil {
 			return nil, err
 		}
 		return o.Changes(), nil

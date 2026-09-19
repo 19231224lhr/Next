@@ -15,9 +15,11 @@ type MemberClient interface {
 	Install(context.Context, protocol.TXCer) error
 }
 type Collector struct {
-	org     protocol.OrgConfig
-	members [4]MemberClient
-	db      store.Store
+	// NotifyPersisted is a best-effort scheduling hint, never the durable queue.
+	NotifyPersisted func(protocol.SpendFactID)
+	org             protocol.OrgConfig
+	members         [4]MemberClient
+	db              store.Store
 }
 
 func New(org protocol.OrgConfig, members [4]MemberClient, db store.Store) (*Collector, error) {

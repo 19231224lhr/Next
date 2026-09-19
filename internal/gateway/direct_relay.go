@@ -1,0 +1,242 @@
+package gateway
+
+import (
+	"context"
+	"encoding/json"
+	"sync"
+	"time"
+
+	"utxo/internal/requesttrace"
+	"utxo/internal/state"
+	"utxo/internal/store"
+	"utxo/protocol"
+)
+
+type directTask struct {
+	fact   protocol.SpendFactID
+	target int // -1 submits; 0..3 install at one member each.
+}
+
+type directLane struct {
+	cursor            []byte
+	active, limit     int
+	scanning, wrapped bool
+}
+
+// runDirect keeps public submission independent of member replication. Only
+// running actions occupy memory; durable outbox pages remain the ready queue.
+func (r *Relay) runDirect(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	var workers sync.WaitGroup
+	defer func() { cancel(); workers.Wait() }()
+	lanes := [2]directLane{{limit: 4, scanning: true, wrapped: true}, {limit: 4, scanning: true, wrapped: true}}
+	busy := make(map[directTask]bool)
+	done := make(chan directTask, 8)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	again := make(chan struct{})
+	close(again)
+
+	launch := func(p state.Outbox, target int, lane *directLane, decode func() (protocol.DirectPayment, error)) {
+		task := directTask{p.Fact, target}
+		if lane.active == lane.limit || busy[task] || p.PublicComplete {
+			return
+		}
+		if target < 0 {
+			if time.Now().UnixNano() < p.NextSubmitUnixNS {
+				return
+			}
+		} else if !r.reserveDirectInstall(p.Fact, target) {
+			return
+		}
+		busy[task] = true
+		lane.active++
+		markDirectAction("relay_action_scheduled", p.Fact, target)
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			operation, stop := context.WithTimeout(ctx, 5*time.Second)
+			_ = r.runDirectTask(operation, task, decode)
+			stop()
+			// Capacity covers every running action; shutdown cannot lose a worker.
+			done <- task
+		}()
+	}
+	schedule := func(p state.Outbox, index int) {
+		// Share immutable decoded evidence among this payment's INSTALL targets.
+		decode := sync.OnceValues(func() (protocol.DirectPayment, error) { return r.verifyDirectPending(p) })
+		if index == 0 {
+			launch(p, -1, &lanes[0], decode)
+			return
+		}
+		for target, member := range r.Members[p.Origin] {
+			if _, ok := member.(DirectMemberClient); ok {
+				launch(p, target, &lanes[1], decode)
+			}
+		}
+	}
+	refill := func(index int) error {
+		lane := &lanes[index]
+		if !lane.scanning || lane.active == lane.limit {
+			return nil
+		}
+		entries, err := store.Scan(r.DB, state.Key(state.KeyOutbox), lane.cursor, 16)
+		if err != nil {
+			return err
+		}
+		if len(entries) == 0 && lane.cursor != nil && !lane.wrapped {
+			lane.wrapped = true
+			lane.cursor = nil
+			entries, err = store.Scan(r.DB, state.Key(state.KeyOutbox), nil, 16)
+			if err != nil {
+				return err
+			}
+		}
+		for _, entry := range entries {
+			var pending state.Outbox
+			if err := json.Unmarshal(entry.Value, &pending); err != nil {
+				return err
+			}
+			schedule(pending, index)
+			lane.cursor = entry.Key
+		}
+		lane.scanning = len(entries) == 16
+		if !lane.scanning {
+			lane.cursor = nil
+		}
+		return nil
+	}
+	for {
+		if ctx.Err() != nil {
+			return nil
+		}
+		// Alternate bounded pages, so notifications and either lane cannot starve
+		// old durable tasks or monopolize the event loop.
+		for i := range lanes {
+			if err := refill(i); err != nil {
+				return err
+			}
+		}
+		var more <-chan struct{}
+		for _, lane := range lanes {
+			if lane.scanning && lane.active < lane.limit {
+				more = again
+				break
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case task := <-done:
+			delete(busy, task)
+			index := 0
+			if task.target >= 0 {
+				index = 1
+			}
+			lanes[index].active--
+			lanes[index].scanning = true
+			lanes[index].wrapped = false
+		case fact, open := <-r.Wake:
+			if !open {
+				r.Wake = nil
+				continue
+			}
+			p, found, err := r.directPending(fact)
+			if err != nil {
+				return err
+			}
+			if found {
+				for i := range lanes {
+					schedule(p, i)
+				}
+			}
+		case <-ticker.C:
+			for i := range lanes {
+				lanes[i].scanning = true
+				lanes[i].wrapped = false
+			}
+		case <-more:
+		}
+	}
+}
+
+func markDirectAction(stage string, fact protocol.SpendFactID, target int) {
+	if requesttrace.Consensus != nil {
+		requesttrace.Consensus.Mark(stage, "spend", protocol.Hash(fact).String(), "target", target)
+	}
+}
+
+func (r *Relay) reserveDirectInstall(fact protocol.SpendFactID, target int) bool {
+	r.installMu.Lock()
+	defer r.installMu.Unlock()
+	if r.installs == nil {
+		r.installs = make(map[protocol.SpendFactID]installProgress)
+	}
+	p := r.installs[fact]
+	if p.acked&(1<<target) != 0 || time.Now().Before(p.directNext[target]) {
+		return false
+	}
+	p.directNext[target] = time.Now().Add(time.Second)
+	r.installs[fact] = p
+	return true
+}
+
+func (r *Relay) directPending(fact protocol.SpendFactID) (p state.Outbox, found bool, err error) {
+	err = r.DB.View(func(v state.ReadView) error {
+		if _, observed, e := state.Load[bool](v, state.Key(state.KeyObserved, fact[:])); e != nil {
+			return e
+		} else if observed {
+			return nil
+		}
+		var e error
+		p, found, e = state.Load[state.Outbox](v, state.Key(state.KeyOutbox, fact[:]))
+		return e
+	})
+	return
+}
+
+func (r *Relay) runDirectTask(ctx context.Context, task directTask, decode func() (protocol.DirectPayment, error)) error {
+	p, found, err := r.directPending(task.fact)
+	if err != nil {
+		return err
+	}
+	if !found || p.PublicComplete {
+		r.forgetInstall(task.fact)
+		return nil
+	}
+	if task.target < 0 && time.Now().UnixNano() < p.NextSubmitUnixNS {
+		return nil
+	}
+	payment, err := decode()
+	if err != nil {
+		return err
+	}
+	c := payment.Certificate
+	if task.target < 0 {
+		requesttrace.Payment("relay_enter", task.fact)
+		requesttrace.Payment("relay_ready", task.fact)
+		return r.submitDirect(ctx, state.Key(state.KeyOutbox, task.fact[:]), p)
+	}
+	markDirectAction("relay_install_start", task.fact, task.target)
+	if client, ok := r.Members[c.Summary.Issuer][task.target].(DirectMemberClient); ok {
+		err = client.InstallDirect(ctx, payment)
+		if err == nil {
+			r.installAck(task.fact, task.target)
+		}
+	}
+	markDirectAction("relay_install_done", task.fact, task.target)
+	return err
+}
+
+func (r *Relay) verifyDirectPending(p state.Outbox) (protocol.DirectPayment, error) {
+	payment, err := protocol.DecodeDirectPayment(p.Certificate)
+	if err != nil {
+		return payment, err
+	}
+	c := payment.Certificate
+	org, known := r.Organizations[c.Summary.Config]
+	if !known || c.QC.Fact != p.Fact || c.Summary.Tx != payment.Tx.ID() || c.Verify(org) != nil {
+		return payment, protocol.ErrAuth
+	}
+	return payment, nil
+}

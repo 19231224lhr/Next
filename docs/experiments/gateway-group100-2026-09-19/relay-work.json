@@ -1,0 +1,53 @@
+{
+  "source": "group-trace-b/reports/trace100; 100 payments, concurrency 64",
+  "nodes": {
+    "gateway0": {
+      "relay_enter": 161,
+      "relay_update_requested": 161,
+      "submit_start": 100,
+      "submit_done": 100
+    },
+    "org0-member0": {
+      "relay_enter": 272,
+      "relay_update_requested": 272,
+      "submit_start": 100,
+      "submit_done": 100,
+      "install_count": 107,
+      "install_before_store_p50_ms": 0.857,
+      "install_store_p50_ms": 40.597
+    },
+    "org0-member1": {
+      "relay_enter": 201,
+      "relay_update_requested": 201,
+      "submit_start": 100,
+      "submit_done": 100,
+      "install_count": 107,
+      "install_before_store_p50_ms": 0.726,
+      "install_store_p50_ms": 38.19
+    },
+    "org0-member2": {
+      "relay_enter": 267,
+      "relay_update_requested": 267,
+      "submit_start": 100,
+      "submit_done": 100,
+      "install_count": 107,
+      "install_before_store_p50_ms": 0.817,
+      "install_store_p50_ms": 39.512
+    },
+    "org0-member3": {
+      "relay_enter": 239,
+      "relay_update_requested": 239,
+      "submit_start": 98,
+      "submit_done": 98,
+      "install_count": 107,
+      "install_before_store_p50_ms": 0.637,
+      "install_store_p50_ms": 36.558
+    }
+  },
+  "total_submit_calls": 498,
+  "total_relay_passes": 1140,
+  "groups": 44,
+  "group_idle_fraction_actual_tasks": 0.09350645497813637,
+  "group_idle_fraction_four_slots": 0.14567556913202262,
+  "interpretation": "Submit calls are not successful admissions or executions. Update requests are not physical commits. Idle fractions describe observed group slots, not predicted speedup."
+}

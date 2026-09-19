@@ -138,6 +138,16 @@ func run() error {
 	relayCtx, relayCancel := context.WithCancel(ctx)
 	relay := &gateway.Relay{DB: db, Public: transport.NewCommitteeClient(n.CommitteeURLs[0]), Trust: trust, Organizations: make(map[protocol.Hash]protocol.OrgConfig), Members: make(map[protocol.Hash][4]gateway.MemberClient)}
 	relay.Direct = n.Direct != nil
+	if relay.Direct {
+		wake := make(chan protocol.SpendFactID, 256)
+		relay.Wake = wake
+		collector.NotifyPersisted = func(fact protocol.SpendFactID) {
+			select {
+			case wake <- fact:
+			default:
+			}
+		}
+	}
 	for _, organization := range n.Organizations {
 		relay.Organizations[organization.Hash()] = organization
 		var endpoints [4]gateway.MemberClient

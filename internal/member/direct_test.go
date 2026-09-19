@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 	"utxo/internal/member"
 	"utxo/internal/rules"
+	"utxo/internal/state"
 	"utxo/internal/store"
 	"utxo/internal/testkit"
 	"utxo/protocol"
@@ -42,6 +44,8 @@ func TestDirectDurableApprovalAndBackgroundInstall(t *testing.T) {
 	cert := protocol.OutputCertificate{}
 	members := make([]*member.Member, 3)
 	var dbs []store.Store
+	var paths []string
+	var configs []member.Config
 	defer func() {
 		for _, db := range dbs {
 			db.Close()
@@ -86,6 +90,8 @@ func TestDirectDurableApprovalAndBackgroundInstall(t *testing.T) {
 			t.Fatal(err)
 		}
 		members[i] = m
+		paths = append(paths, path)
+		configs = append(configs, cfg)
 		if _, err = m.ApproveDirect(context.Background(), protocol.DirectRequest{Tx: conflict}); err == nil {
 			t.Fatal("restart forgot input lock")
 		}
@@ -107,12 +113,51 @@ func TestDirectDurableApprovalAndBackgroundInstall(t *testing.T) {
 	}
 	child.Auth = []protocol.OwnerAuth{protocol.SignOwner(child.ID(), f.Owner)}
 	req := protocol.DirectRequest{Tx: child, InputCertificates: []protocol.InputCertificate{{Certificate: cert, Index: 0}}}
-	for _, m := range members {
+	for i, m := range members {
 		if _, err = m.ApproveDirect(context.Background(), req); err != nil {
 			t.Fatalf("successor waited for INSTALL: %v", err)
 		}
 		if err = m.InstallDirect(protocol.DirectPayment{Tx: tx, Certificate: cert}); err != nil {
 			t.Fatal(err)
 		}
+		pending := func() state.Outbox {
+			t.Helper()
+			var value state.Outbox
+			err := dbs[i].View(func(v state.ReadView) error {
+				var found bool
+				var err error
+				value, found, err = state.Load[state.Outbox](v, state.Key(state.KeyOutbox, cert.QC.Fact[:]))
+				if !found {
+					t.Error("installed outbox missing")
+				}
+				return err
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return value
+		}
+		first := pending().NextSubmitUnixNS
+		if first <= time.Now().UnixNano() {
+			t.Fatal("member did not defer its first fallback")
+		}
+		if err := dbs[i].Close(); err != nil {
+			t.Fatal(err)
+		}
+		dbs[i], err = store.Open(paths[i], store.Identity{Network: "direct-member", Role: "member", Node: "node", Schema: 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+		restarted, err := member.New(configs[i], dbs[i], f.Genesis)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := restarted.InstallDirect(protocol.DirectPayment{Tx: tx, Certificate: cert}); err != nil {
+			t.Fatal(err)
+		}
+		if pending().NextSubmitUnixNS != first {
+			t.Fatal("restart or repeated INSTALL extended fallback grace period")
+		}
+
 	}
 }

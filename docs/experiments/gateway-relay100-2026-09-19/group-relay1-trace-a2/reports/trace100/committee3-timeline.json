@@ -1,0 +1,1783 @@
+[
+  {
+    "UnixNS": 1789789996899612000,
+    "Stage": "configuration",
+    "Fields": {
+      "commit": "100ms",
+      "flush": "10ms",
+      "gossip": "10ms"
+    }
+  },
+  {
+    "UnixNS": 1789789998178508000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "1",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "-916.608ms"
+    }
+  },
+  {
+    "UnixNS": 1789789998178516000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "1",
+      "module": "consensus",
+      "previous": "1/0/RoundStepNewHeight",
+      "proposer": "21F3E39727B0002E998112DA09CB6CB07E743C73",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789789998178529000,
+    "Stage": "entering propose step",
+    "Fields": {
+      "current": "1/0/RoundStepNewRound",
+      "height": "1",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789789998178538000,
+    "Stage": "prepare_enter",
+    "Fields": {
+      "candidates": "0",
+      "height": "1"
+    }
+  },
+  {
+    "UnixNS": 1789789998178539000,
+    "Stage": "prepare_done",
+    "Fields": {
+      "height": "1",
+      "selected": "0"
+    }
+  },
+  {
+    "UnixNS": 1789789998182888000,
+    "Stage": "signed proposal",
+    "Fields": {
+      "height": "1",
+      "module": "consensus",
+      "proposal": "Proposal{1/0 (DE51E3FC5C29CAB7E66095B8926BF77A4CEF22C292324A85A07B42441BDFE02B:1:C23B9E07D13E, -1) 0A5348B5E5A6 @ 2026-09-19T03:53:18.182438Z}",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789789998193511000,
+    "Stage": "received complete proposal block",
+    "Fields": {
+      "hash": "DE51E3FC5C29CAB7E66095B8926BF77A4CEF22C292324A85A07B42441BDFE02B",
+      "height": "1",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789789998193515000,
+    "Stage": "entering prevote step",
+    "Fields": {
+      "current": "1/0/RoundStepPropose",
+      "height": "1",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789789998193523000,
+    "Stage": "process_enter",
+    "Fields": {
+      "height": "1",
+      "transactions": "0"
+    }
+  },
+  {
+    "UnixNS": 1789789998193524000,
+    "Stage": "process_done",
+    "Fields": {
+      "height": "1"
+    }
+  },
+  {
+    "UnixNS": 1789789998193800000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "1",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 1/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) DE51E3FC5C29 E61738C68C0A 000000000000 @ 2026-09-19T03:53:18.193528Z}"
+    }
+  },
+  {
+    "UnixNS": 1789789998221594000,
+    "Stage": "entering precommit step",
+    "Fields": {
+      "current": "1/0/RoundStepPrevote",
+      "height": "1",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789789998234901000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "1",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 1/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) DE51E3FC5C29 BD92F6EED38C 000000000000 @ 2026-09-19T03:53:18.231392Z}"
+    }
+  },
+  {
+    "UnixNS": 1789789998266102000,
+    "Stage": "entering commit step",
+    "Fields": {
+      "commit_round": "0",
+      "current": "1/0/RoundStepPrecommit",
+      "height": "1",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789789998266125000,
+    "Stage": "finalizing commit of block",
+    "Fields": {
+      "hash": "DE51E3FC5C29CAB7E66095B8926BF77A4CEF22C292324A85A07B42441BDFE02B",
+      "height": "1",
+      "module": "consensus",
+      "num_txs": "0",
+      "root": "959F36ADAD4EF63FDDDE68450AF73171D42EA1210DC8660ED5020A36AFB1AD2B"
+    }
+  },
+  {
+    "UnixNS": 1789789998285484000,
+    "Stage": "finalize_enter",
+    "Fields": {
+      "height": "1"
+    }
+  },
+  {
+    "UnixNS": 1789789998285486000,
+    "Stage": "finalize_locked",
+    "Fields": {
+      "height": "1"
+    }
+  },
+  {
+    "UnixNS": 1789789998285495000,
+    "Stage": "finalize_done",
+    "Fields": {
+      "height": "1"
+    }
+  },
+  {
+    "UnixNS": 1789789998293467000,
+    "Stage": "commit_start",
+    "Fields": {
+      "height": "1"
+    }
+  },
+  {
+    "UnixNS": 1789789998309402000,
+    "Stage": "commit_done",
+    "Fields": {
+      "height": "1"
+    }
+  },
+  {
+    "UnixNS": 1789789998366142000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "2",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "40.676ms"
+    }
+  },
+  {
+    "UnixNS": 1789789998366147000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "2",
+      "module": "consensus",
+      "previous": "2/0/RoundStepNewHeight",
+      "proposer": "3BB308C3FDCC93F54D7B2B42ACC898CCE0F0CD98",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790001366218000,
+    "Stage": "entering propose step",
+    "Fields": {
+      "current": "2/0/RoundStepNewRound",
+      "height": "2",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790001397601000,
+    "Stage": "received complete proposal block",
+    "Fields": {
+      "hash": "9A0E8B3029D539E0D8E92E12DA355D367E3BA7AC5AE72449AB8F949E7F729028",
+      "height": "2",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790001397610000,
+    "Stage": "entering prevote step",
+    "Fields": {
+      "current": "2/0/RoundStepPropose",
+      "height": "2",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790001397703000,
+    "Stage": "process_enter",
+    "Fields": {
+      "height": "2",
+      "transactions": "1"
+    }
+  },
+  {
+    "UnixNS": 1789790001398505000,
+    "Stage": "process_done",
+    "Fields": {
+      "height": "2"
+    }
+  },
+  {
+    "UnixNS": 1789790001430636000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "2",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 2/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 9A0E8B3029D5 5241C4E2E664 000000000000 @ 2026-09-19T03:53:21.414164Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790001479268000,
+    "Stage": "entering precommit step",
+    "Fields": {
+      "current": "2/0/RoundStepPrevote",
+      "height": "2",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790001524462000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "2",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 2/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 9A0E8B3029D5 477215FA2F83 000000000000 @ 2026-09-19T03:53:21.493213Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790001558599000,
+    "Stage": "entering commit step",
+    "Fields": {
+      "commit_round": "0",
+      "current": "2/0/RoundStepPrecommit",
+      "height": "2",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790001558691000,
+    "Stage": "finalizing commit of block",
+    "Fields": {
+      "hash": "9A0E8B3029D539E0D8E92E12DA355D367E3BA7AC5AE72449AB8F949E7F729028",
+      "height": "2",
+      "module": "consensus",
+      "num_txs": "1",
+      "root": "959F36ADAD4EF63FDDDE68450AF73171D42EA1210DC8660ED5020A36AFB1AD2B"
+    }
+  },
+  {
+    "UnixNS": 1789790001611175000,
+    "Stage": "finalize_enter",
+    "Fields": {
+      "height": "2"
+    }
+  },
+  {
+    "UnixNS": 1789790001611176000,
+    "Stage": "finalize_locked",
+    "Fields": {
+      "height": "2"
+    }
+  },
+  {
+    "UnixNS": 1789790001612693000,
+    "Stage": "finalize_done",
+    "Fields": {
+      "height": "2"
+    }
+  },
+  {
+    "UnixNS": 1789790001643242000,
+    "Stage": "commit_start",
+    "Fields": {
+      "height": "2"
+    }
+  },
+  {
+    "UnixNS": 1789790001659187000,
+    "Stage": "commit_done",
+    "Fields": {
+      "height": "2"
+    }
+  },
+  {
+    "UnixNS": 1789790001677217000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "3",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "-18.571ms"
+    }
+  },
+  {
+    "UnixNS": 1789790001677223000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "3",
+      "module": "consensus",
+      "previous": "3/0/RoundStepNewHeight",
+      "proposer": "7D3974F982243DFE53E3BD98E86D1632AC570603",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790001677235000,
+    "Stage": "entering propose step",
+    "Fields": {
+      "current": "3/0/RoundStepNewRound",
+      "height": "3",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790001777269000,
+    "Stage": "received complete proposal block",
+    "Fields": {
+      "hash": "CF511693DB0B7C36E59A8AAF1B9CB48075876436C4AA5EB35A8EAFE1AA470690",
+      "height": "3",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790001777276000,
+    "Stage": "entering prevote step",
+    "Fields": {
+      "current": "3/0/RoundStepPropose",
+      "height": "3",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790001777366000,
+    "Stage": "process_enter",
+    "Fields": {
+      "height": "3",
+      "transactions": "6"
+    }
+  },
+  {
+    "UnixNS": 1789790001781905000,
+    "Stage": "process_done",
+    "Fields": {
+      "height": "3"
+    }
+  },
+  {
+    "UnixNS": 1789790001825522000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "3",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 3/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) CF511693DB0B 89D3C5D5F65E 000000000000 @ 2026-09-19T03:53:21.803203Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790001847164000,
+    "Stage": "entering precommit step",
+    "Fields": {
+      "current": "3/0/RoundStepPrevote",
+      "height": "3",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790001898583000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "3",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 3/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) CF511693DB0B E04D8C7BEBE6 000000000000 @ 2026-09-19T03:53:21.85811Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790001919713000,
+    "Stage": "entering commit step",
+    "Fields": {
+      "commit_round": "0",
+      "current": "3/0/RoundStepPrecommit",
+      "height": "3",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790001919798000,
+    "Stage": "finalizing commit of block",
+    "Fields": {
+      "hash": "CF511693DB0B7C36E59A8AAF1B9CB48075876436C4AA5EB35A8EAFE1AA470690",
+      "height": "3",
+      "module": "consensus",
+      "num_txs": "6",
+      "root": "3801961980C0F1ED5D8E20215890BAE9B8B28BF9C8AD099093EF9E53C05F5613"
+    }
+  },
+  {
+    "UnixNS": 1789790001942232000,
+    "Stage": "finalize_enter",
+    "Fields": {
+      "height": "3"
+    }
+  },
+  {
+    "UnixNS": 1789790001942233000,
+    "Stage": "finalize_locked",
+    "Fields": {
+      "height": "3"
+    }
+  },
+  {
+    "UnixNS": 1789790001950668000,
+    "Stage": "finalize_done",
+    "Fields": {
+      "height": "3"
+    }
+  },
+  {
+    "UnixNS": 1789790001988151000,
+    "Stage": "commit_start",
+    "Fields": {
+      "height": "3"
+    }
+  },
+  {
+    "UnixNS": 1789790002010188000,
+    "Stage": "commit_done",
+    "Fields": {
+      "height": "3"
+    }
+  },
+  {
+    "UnixNS": 1789790002062491000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "4",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "-42.57ms"
+    }
+  },
+  {
+    "UnixNS": 1789790002062495000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "4",
+      "module": "consensus",
+      "previous": "4/0/RoundStepNewHeight",
+      "proposer": "C55B9310A62E9E25301CEC5311F05E944E87667D",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790002062506000,
+    "Stage": "entering propose step",
+    "Fields": {
+      "current": "4/0/RoundStepNewRound",
+      "height": "4",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790002149534000,
+    "Stage": "received complete proposal block",
+    "Fields": {
+      "hash": "05D737C599E8BA1F6A25A06BC0EB3C6B55CD9AF7E8570B3312676E435BC80518",
+      "height": "4",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790002149540000,
+    "Stage": "entering prevote step",
+    "Fields": {
+      "current": "4/0/RoundStepPropose",
+      "height": "4",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790002149619000,
+    "Stage": "process_enter",
+    "Fields": {
+      "height": "4",
+      "transactions": "15"
+    }
+  },
+  {
+    "UnixNS": 1789790002160997000,
+    "Stage": "process_done",
+    "Fields": {
+      "height": "4"
+    }
+  },
+  {
+    "UnixNS": 1789790002213564000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "4",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 4/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 05D737C599E8 902F6288718B 000000000000 @ 2026-09-19T03:53:22.18013Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790002234427000,
+    "Stage": "entering precommit step",
+    "Fields": {
+      "current": "4/0/RoundStepPrevote",
+      "height": "4",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790002265590000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "4",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 4/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 05D737C599E8 DEDA71C6CE0F 000000000000 @ 2026-09-19T03:53:22.249181Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790002298345000,
+    "Stage": "entering commit step",
+    "Fields": {
+      "commit_round": "0",
+      "current": "4/0/RoundStepPrecommit",
+      "height": "4",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790002298437000,
+    "Stage": "finalizing commit of block",
+    "Fields": {
+      "hash": "05D737C599E8BA1F6A25A06BC0EB3C6B55CD9AF7E8570B3312676E435BC80518",
+      "height": "4",
+      "module": "consensus",
+      "num_txs": "15",
+      "root": "73374F763C349CBB43B09E5F1CCAA56CA89C29F7E4DF36C743A9A42053CA9504"
+    }
+  },
+  {
+    "UnixNS": 1789790002352182000,
+    "Stage": "finalize_enter",
+    "Fields": {
+      "height": "4"
+    }
+  },
+  {
+    "UnixNS": 1789790002352182000,
+    "Stage": "finalize_locked",
+    "Fields": {
+      "height": "4"
+    }
+  },
+  {
+    "UnixNS": 1789790002373391000,
+    "Stage": "finalize_done",
+    "Fields": {
+      "height": "4"
+    }
+  },
+  {
+    "UnixNS": 1789790002405157000,
+    "Stage": "commit_start",
+    "Fields": {
+      "height": "4"
+    }
+  },
+  {
+    "UnixNS": 1789790002440147000,
+    "Stage": "commit_done",
+    "Fields": {
+      "height": "4"
+    }
+  },
+  {
+    "UnixNS": 1789790002480246000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "5",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "-81.854ms"
+    }
+  },
+  {
+    "UnixNS": 1789790002480252000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "5",
+      "module": "consensus",
+      "previous": "5/0/RoundStepNewHeight",
+      "proposer": "21F3E39727B0002E998112DA09CB6CB07E743C73",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790002480261000,
+    "Stage": "entering propose step",
+    "Fields": {
+      "current": "5/0/RoundStepNewRound",
+      "height": "5",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790002480920000,
+    "Stage": "prepare_enter",
+    "Fields": {
+      "candidates": "10",
+      "height": "5"
+    }
+  },
+  {
+    "UnixNS": 1789790002487999000,
+    "Stage": "prepare_done",
+    "Fields": {
+      "height": "5",
+      "selected": "10"
+    }
+  },
+  {
+    "UnixNS": 1789790002560502000,
+    "Stage": "signed proposal",
+    "Fields": {
+      "height": "5",
+      "module": "consensus",
+      "proposal": "Proposal{5/0 (6E0CEF681346D5DD40E6D701BC3BBC8F036223DF4D217007CC18795FEC438768:1:5DA46A84266C, -1) 1D8BD489815C @ 2026-09-19T03:53:22.51815Z}",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790002596238000,
+    "Stage": "received complete proposal block",
+    "Fields": {
+      "hash": "6E0CEF681346D5DD40E6D701BC3BBC8F036223DF4D217007CC18795FEC438768",
+      "height": "5",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790002596244000,
+    "Stage": "entering prevote step",
+    "Fields": {
+      "current": "5/0/RoundStepPropose",
+      "height": "5",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790002596328000,
+    "Stage": "process_enter",
+    "Fields": {
+      "height": "5",
+      "transactions": "10"
+    }
+  },
+  {
+    "UnixNS": 1789790002602112000,
+    "Stage": "process_done",
+    "Fields": {
+      "height": "5"
+    }
+  },
+  {
+    "UnixNS": 1789790002644436000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "5",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 5/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 6E0CEF681346 EC3215E5D7DC 000000000000 @ 2026-09-19T03:53:22.606117Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790002717371000,
+    "Stage": "entering precommit step",
+    "Fields": {
+      "current": "5/0/RoundStepPrevote",
+      "height": "5",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790002771264000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "5",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 5/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 6E0CEF681346 56C8C831B6C7 000000000000 @ 2026-09-19T03:53:22.736159Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790002803581000,
+    "Stage": "entering commit step",
+    "Fields": {
+      "commit_round": "0",
+      "current": "5/0/RoundStepPrecommit",
+      "height": "5",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790002803660000,
+    "Stage": "finalizing commit of block",
+    "Fields": {
+      "hash": "6E0CEF681346D5DD40E6D701BC3BBC8F036223DF4D217007CC18795FEC438768",
+      "height": "5",
+      "module": "consensus",
+      "num_txs": "10",
+      "root": "542AC49D0289B75A864649099E93C65D1C4AB70951CF8890D5E06FD8ED56DF49"
+    }
+  },
+  {
+    "UnixNS": 1789790002862189000,
+    "Stage": "finalize_enter",
+    "Fields": {
+      "height": "5"
+    }
+  },
+  {
+    "UnixNS": 1789790002862190000,
+    "Stage": "finalize_locked",
+    "Fields": {
+      "height": "5"
+    }
+  },
+  {
+    "UnixNS": 1789790002876067000,
+    "Stage": "finalize_done",
+    "Fields": {
+      "height": "5"
+    }
+  },
+  {
+    "UnixNS": 1789790002915221000,
+    "Stage": "commit_start",
+    "Fields": {
+      "height": "5"
+    }
+  },
+  {
+    "UnixNS": 1789790002958106000,
+    "Stage": "commit_done",
+    "Fields": {
+      "height": "5"
+    }
+  },
+  {
+    "UnixNS": 1789790003029336000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "6",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "-125.705ms"
+    }
+  },
+  {
+    "UnixNS": 1789790003029342000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "6",
+      "module": "consensus",
+      "previous": "6/0/RoundStepNewHeight",
+      "proposer": "3BB308C3FDCC93F54D7B2B42ACC898CCE0F0CD98",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790003029353000,
+    "Stage": "entering propose step",
+    "Fields": {
+      "current": "6/0/RoundStepNewRound",
+      "height": "6",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790003167415000,
+    "Stage": "received complete proposal block",
+    "Fields": {
+      "hash": "15C5D6172C3CFA01E0A5185B86DBCAB6489EE546D58EC14A0BA393985FC666D0",
+      "height": "6",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790003167431000,
+    "Stage": "entering prevote step",
+    "Fields": {
+      "current": "6/0/RoundStepPropose",
+      "height": "6",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790003167532000,
+    "Stage": "process_enter",
+    "Fields": {
+      "height": "6",
+      "transactions": "23"
+    }
+  },
+  {
+    "UnixNS": 1789790003184163000,
+    "Stage": "process_done",
+    "Fields": {
+      "height": "6"
+    }
+  },
+  {
+    "UnixNS": 1789790003239376000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "6",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 6/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 15C5D6172C3C 932D0C3D14F8 000000000000 @ 2026-09-19T03:53:23.207146Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790003260333000,
+    "Stage": "entering precommit step",
+    "Fields": {
+      "current": "6/0/RoundStepPrevote",
+      "height": "6",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790003316424000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "6",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 6/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 15C5D6172C3C BE445C04B864 000000000000 @ 2026-09-19T03:53:23.283199Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790003341346000,
+    "Stage": "entering commit step",
+    "Fields": {
+      "commit_round": "0",
+      "current": "6/0/RoundStepPrecommit",
+      "height": "6",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790003341468000,
+    "Stage": "finalizing commit of block",
+    "Fields": {
+      "hash": "15C5D6172C3CFA01E0A5185B86DBCAB6489EE546D58EC14A0BA393985FC666D0",
+      "height": "6",
+      "module": "consensus",
+      "num_txs": "23",
+      "root": "44B56E9099C768F53A73B5C00DC99818EBBCA5A2765DC65F671A606C42AA4BB0"
+    }
+  },
+  {
+    "UnixNS": 1789790003409173000,
+    "Stage": "finalize_enter",
+    "Fields": {
+      "height": "6"
+    }
+  },
+  {
+    "UnixNS": 1789790003409174000,
+    "Stage": "finalize_locked",
+    "Fields": {
+      "height": "6"
+    }
+  },
+  {
+    "UnixNS": 1789790003443291000,
+    "Stage": "finalize_done",
+    "Fields": {
+      "height": "6"
+    }
+  },
+  {
+    "UnixNS": 1789790003458706000,
+    "Stage": "commit_start",
+    "Fields": {
+      "height": "6"
+    }
+  },
+  {
+    "UnixNS": 1789790003482213000,
+    "Stage": "commit_done",
+    "Fields": {
+      "height": "6"
+    }
+  },
+  {
+    "UnixNS": 1789790003514359000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "7",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "-72.91ms"
+    }
+  },
+  {
+    "UnixNS": 1789790003514372000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "7",
+      "module": "consensus",
+      "previous": "7/0/RoundStepNewHeight",
+      "proposer": "7D3974F982243DFE53E3BD98E86D1632AC570603",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790003514397000,
+    "Stage": "entering propose step",
+    "Fields": {
+      "current": "7/0/RoundStepNewRound",
+      "height": "7",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790003685211000,
+    "Stage": "received complete proposal block",
+    "Fields": {
+      "hash": "7458071D878FE657DD1F5ABD37F6B2D6F63DA8E25BC2102E11A0B4A413E6F65A",
+      "height": "7",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790003685221000,
+    "Stage": "entering prevote step",
+    "Fields": {
+      "current": "7/0/RoundStepPropose",
+      "height": "7",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790003685316000,
+    "Stage": "process_enter",
+    "Fields": {
+      "height": "7",
+      "transactions": "12"
+    }
+  },
+  {
+    "UnixNS": 1789790003693520000,
+    "Stage": "process_done",
+    "Fields": {
+      "height": "7"
+    }
+  },
+  {
+    "UnixNS": 1789790003769492000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "7",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 7/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 7458071D878F 3BC8C6874666 000000000000 @ 2026-09-19T03:53:23.718145Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790003787335000,
+    "Stage": "entering precommit step",
+    "Fields": {
+      "current": "7/0/RoundStepPrevote",
+      "height": "7",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790003831566000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "7",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 7/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 7458071D878F E97F474A592A 000000000000 @ 2026-09-19T03:53:23.802178Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790003871440000,
+    "Stage": "entering commit step",
+    "Fields": {
+      "commit_round": "0",
+      "current": "7/0/RoundStepPrecommit",
+      "height": "7",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790003871539000,
+    "Stage": "finalizing commit of block",
+    "Fields": {
+      "hash": "7458071D878FE657DD1F5ABD37F6B2D6F63DA8E25BC2102E11A0B4A413E6F65A",
+      "height": "7",
+      "module": "consensus",
+      "num_txs": "12",
+      "root": "4CDA383565C1676CDBAE2491A67575D6E93536A7BE68DC6B48DC8A702A8A7AC1"
+    }
+  },
+  {
+    "UnixNS": 1789790003912170000,
+    "Stage": "finalize_enter",
+    "Fields": {
+      "height": "7"
+    }
+  },
+  {
+    "UnixNS": 1789790003912171000,
+    "Stage": "finalize_locked",
+    "Fields": {
+      "height": "7"
+    }
+  },
+  {
+    "UnixNS": 1789790003929353000,
+    "Stage": "finalize_done",
+    "Fields": {
+      "height": "7"
+    }
+  },
+  {
+    "UnixNS": 1789790003977209000,
+    "Stage": "commit_start",
+    "Fields": {
+      "height": "7"
+    }
+  },
+  {
+    "UnixNS": 1789790004000161000,
+    "Stage": "commit_done",
+    "Fields": {
+      "height": "7"
+    }
+  },
+  {
+    "UnixNS": 1789790004027255000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "8",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "-55.778ms"
+    }
+  },
+  {
+    "UnixNS": 1789790004027261000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "8",
+      "module": "consensus",
+      "previous": "8/0/RoundStepNewHeight",
+      "proposer": "C55B9310A62E9E25301CEC5311F05E944E87667D",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004027274000,
+    "Stage": "entering propose step",
+    "Fields": {
+      "current": "8/0/RoundStepNewRound",
+      "height": "8",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004098539000,
+    "Stage": "received complete proposal block",
+    "Fields": {
+      "hash": "C28854728DEE1C567DB3DD29223090936F1A8735E72C6BC69047DD8BAC56A577",
+      "height": "8",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790004098559000,
+    "Stage": "entering prevote step",
+    "Fields": {
+      "current": "8/0/RoundStepPropose",
+      "height": "8",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004098651000,
+    "Stage": "process_enter",
+    "Fields": {
+      "height": "8",
+      "transactions": "17"
+    }
+  },
+  {
+    "UnixNS": 1789790004111430000,
+    "Stage": "process_done",
+    "Fields": {
+      "height": "8"
+    }
+  },
+  {
+    "UnixNS": 1789790004146565000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "8",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 8/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) C28854728DEE BE85CE7CEC62 000000000000 @ 2026-09-19T03:53:24.12218Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790004167290000,
+    "Stage": "entering precommit step",
+    "Fields": {
+      "current": "8/0/RoundStepPrevote",
+      "height": "8",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004205585000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "8",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 8/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) C28854728DEE E2EBA1EF020C 000000000000 @ 2026-09-19T03:53:24.185188Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790004236565000,
+    "Stage": "entering commit step",
+    "Fields": {
+      "commit_round": "0",
+      "current": "8/0/RoundStepPrecommit",
+      "height": "8",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790004236652000,
+    "Stage": "finalizing commit of block",
+    "Fields": {
+      "hash": "C28854728DEE1C567DB3DD29223090936F1A8735E72C6BC69047DD8BAC56A577",
+      "height": "8",
+      "module": "consensus",
+      "num_txs": "17",
+      "root": "C627B0ADD9BEE8630CDB6B4A29BDC95E27267B31680A1058C6561F77B5BCE081"
+    }
+  },
+  {
+    "UnixNS": 1789790004316243000,
+    "Stage": "finalize_enter",
+    "Fields": {
+      "height": "8"
+    }
+  },
+  {
+    "UnixNS": 1789790004316244000,
+    "Stage": "finalize_locked",
+    "Fields": {
+      "height": "8"
+    }
+  },
+  {
+    "UnixNS": 1789790004342135000,
+    "Stage": "finalize_done",
+    "Fields": {
+      "height": "8"
+    }
+  },
+  {
+    "UnixNS": 1789790004372217000,
+    "Stage": "commit_start",
+    "Fields": {
+      "height": "8"
+    }
+  },
+  {
+    "UnixNS": 1789790004398217000,
+    "Stage": "commit_done",
+    "Fields": {
+      "height": "8"
+    }
+  },
+  {
+    "UnixNS": 1789790004422301000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "9",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "-85.714ms"
+    }
+  },
+  {
+    "UnixNS": 1789790004422306000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "9",
+      "module": "consensus",
+      "previous": "9/0/RoundStepNewHeight",
+      "proposer": "21F3E39727B0002E998112DA09CB6CB07E743C73",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004422314000,
+    "Stage": "entering propose step",
+    "Fields": {
+      "current": "9/0/RoundStepNewRound",
+      "height": "9",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004422342000,
+    "Stage": "prepare_enter",
+    "Fields": {
+      "candidates": "9",
+      "height": "9"
+    }
+  },
+  {
+    "UnixNS": 1789790004429303000,
+    "Stage": "prepare_done",
+    "Fields": {
+      "height": "9",
+      "selected": "9"
+    }
+  },
+  {
+    "UnixNS": 1789790004480439000,
+    "Stage": "signed proposal",
+    "Fields": {
+      "height": "9",
+      "module": "consensus",
+      "proposal": "Proposal{9/0 (DDB4A15759E605084B1AC5729A42F70312526B04F0EF8CF5588066A6FA7B3AF6:1:2B402D49F2CA, -1) 79577819516F @ 2026-09-19T03:53:24.451201Z}",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004503228000,
+    "Stage": "received complete proposal block",
+    "Fields": {
+      "hash": "DDB4A15759E605084B1AC5729A42F70312526B04F0EF8CF5588066A6FA7B3AF6",
+      "height": "9",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790004503234000,
+    "Stage": "entering prevote step",
+    "Fields": {
+      "current": "9/0/RoundStepPropose",
+      "height": "9",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004503327000,
+    "Stage": "process_enter",
+    "Fields": {
+      "height": "9",
+      "transactions": "9"
+    }
+  },
+  {
+    "UnixNS": 1789790004509116000,
+    "Stage": "process_done",
+    "Fields": {
+      "height": "9"
+    }
+  },
+  {
+    "UnixNS": 1789790004510527000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "9",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 9/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) DDB4A15759E6 527179D8CCD6 000000000000 @ 2026-09-19T03:53:24.51012Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790004580502000,
+    "Stage": "entering precommit step",
+    "Fields": {
+      "current": "9/0/RoundStepPrevote",
+      "height": "9",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004614561000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "9",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 9/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) DDB4A15759E6 7963DB4BBDFC 000000000000 @ 2026-09-19T03:53:24.596156Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790004636460000,
+    "Stage": "entering commit step",
+    "Fields": {
+      "commit_round": "0",
+      "current": "9/0/RoundStepPrecommit",
+      "height": "9",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790004636543000,
+    "Stage": "finalizing commit of block",
+    "Fields": {
+      "hash": "DDB4A15759E605084B1AC5729A42F70312526B04F0EF8CF5588066A6FA7B3AF6",
+      "height": "9",
+      "module": "consensus",
+      "num_txs": "9",
+      "root": "342FC48160C1266F8EFA744F5C80E5607469665D7F21514E96EBC965C3ADF7DB"
+    }
+  },
+  {
+    "UnixNS": 1789790004662671000,
+    "Stage": "finalize_enter",
+    "Fields": {
+      "height": "9"
+    }
+  },
+  {
+    "UnixNS": 1789790004662673000,
+    "Stage": "finalize_locked",
+    "Fields": {
+      "height": "9"
+    }
+  },
+  {
+    "UnixNS": 1789790004675885000,
+    "Stage": "finalize_done",
+    "Fields": {
+      "height": "9"
+    }
+  },
+  {
+    "UnixNS": 1789790004718204000,
+    "Stage": "commit_start",
+    "Fields": {
+      "height": "9"
+    }
+  },
+  {
+    "UnixNS": 1789790004733185000,
+    "Stage": "commit_done",
+    "Fields": {
+      "height": "9"
+    }
+  },
+  {
+    "UnixNS": 1789790004755314000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "10",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "-18.769ms"
+    }
+  },
+  {
+    "UnixNS": 1789790004755321000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "10",
+      "module": "consensus",
+      "previous": "10/0/RoundStepNewHeight",
+      "proposer": "3BB308C3FDCC93F54D7B2B42ACC898CCE0F0CD98",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004755326000,
+    "Stage": "entering propose step",
+    "Fields": {
+      "current": "10/0/RoundStepNewRound",
+      "height": "10",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004826763000,
+    "Stage": "received complete proposal block",
+    "Fields": {
+      "hash": "909AC8F83DAF31FE65EB55393AA376214A59092B39B8B9A9FCED4E1362420A79",
+      "height": "10",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790004826772000,
+    "Stage": "entering prevote step",
+    "Fields": {
+      "current": "10/0/RoundStepPropose",
+      "height": "10",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004826865000,
+    "Stage": "process_enter",
+    "Fields": {
+      "height": "10",
+      "transactions": "7"
+    }
+  },
+  {
+    "UnixNS": 1789790004831689000,
+    "Stage": "process_done",
+    "Fields": {
+      "height": "10"
+    }
+  },
+  {
+    "UnixNS": 1789790004835583000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "10",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 10/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 909AC8F83DAF F1BF1A134EFA 000000000000 @ 2026-09-19T03:53:24.835151Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790004842276000,
+    "Stage": "entering precommit step",
+    "Fields": {
+      "current": "10/0/RoundStepPrevote",
+      "height": "10",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004857614000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "10",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 10/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 909AC8F83DAF 340632B96EE4 000000000000 @ 2026-09-19T03:53:24.850119Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790004882296000,
+    "Stage": "entering commit step",
+    "Fields": {
+      "commit_round": "0",
+      "current": "10/0/RoundStepPrecommit",
+      "height": "10",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790004882397000,
+    "Stage": "finalizing commit of block",
+    "Fields": {
+      "hash": "909AC8F83DAF31FE65EB55393AA376214A59092B39B8B9A9FCED4E1362420A79",
+      "height": "10",
+      "module": "consensus",
+      "num_txs": "7",
+      "root": "61339D804283457BC995AA678AFFBE670AA10A0C33558946F990DA290DA4A026"
+    }
+  },
+  {
+    "UnixNS": 1789790004889180000,
+    "Stage": "finalize_enter",
+    "Fields": {
+      "height": "10"
+    }
+  },
+  {
+    "UnixNS": 1789790004889180000,
+    "Stage": "finalize_locked",
+    "Fields": {
+      "height": "10"
+    }
+  },
+  {
+    "UnixNS": 1789790004900054000,
+    "Stage": "finalize_done",
+    "Fields": {
+      "height": "10"
+    }
+  },
+  {
+    "UnixNS": 1789790004933236000,
+    "Stage": "commit_start",
+    "Fields": {
+      "height": "10"
+    }
+  },
+  {
+    "UnixNS": 1789790004956203000,
+    "Stage": "commit_done",
+    "Fields": {
+      "height": "10"
+    }
+  },
+  {
+    "UnixNS": 1789790004982337000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "11",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "15.089ms"
+    }
+  },
+  {
+    "UnixNS": 1789790004982343000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "11",
+      "module": "consensus",
+      "previous": "11/0/RoundStepNewHeight",
+      "proposer": "7D3974F982243DFE53E3BD98E86D1632AC570603",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790004982353000,
+    "Stage": "entering propose step",
+    "Fields": {
+      "current": "11/0/RoundStepNewRound",
+      "height": "11",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790005019450000,
+    "Stage": "received complete proposal block",
+    "Fields": {
+      "hash": "1705D063A666D76796A27F52ED52CDFD69155EC95C16CE9A869CFC9124B3179B",
+      "height": "11",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790005019460000,
+    "Stage": "entering prevote step",
+    "Fields": {
+      "current": "11/0/RoundStepPropose",
+      "height": "11",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790005019572000,
+    "Stage": "process_enter",
+    "Fields": {
+      "height": "11",
+      "transactions": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790005019573000,
+    "Stage": "process_done",
+    "Fields": {
+      "height": "11"
+    }
+  },
+  {
+    "UnixNS": 1789790005027482000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "11",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 11/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 1705D063A666 44EEAE90A2C1 000000000000 @ 2026-09-19T03:53:25.027128Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790005045330000,
+    "Stage": "entering precommit step",
+    "Fields": {
+      "current": "11/0/RoundStepPrevote",
+      "height": "11",
+      "module": "consensus",
+      "round": "0"
+    }
+  },
+  {
+    "UnixNS": 1789790005057474000,
+    "Stage": "signed and pushed vote",
+    "Fields": {
+      "height": "11",
+      "module": "consensus",
+      "round": "0",
+      "vote": "Vote{0:21F3E39727B0 11/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 1705D063A666 EB2553534D23 000000000000 @ 2026-09-19T03:53:25.053147Z}"
+    }
+  },
+  {
+    "UnixNS": 1789790005076265000,
+    "Stage": "entering commit step",
+    "Fields": {
+      "commit_round": "0",
+      "current": "11/0/RoundStepPrecommit",
+      "height": "11",
+      "module": "consensus"
+    }
+  },
+  {
+    "UnixNS": 1789790005076356000,
+    "Stage": "finalizing commit of block",
+    "Fields": {
+      "hash": "1705D063A666D76796A27F52ED52CDFD69155EC95C16CE9A869CFC9124B3179B",
+      "height": "11",
+      "module": "consensus",
+      "num_txs": "0",
+      "root": "1F083EA4465C99321DDAEEDC0FC228BA391699E930A98566226DDD6061C141C8"
+    }
+  },
+  {
+    "UnixNS": 1789790005087186000,
+    "Stage": "finalize_enter",
+    "Fields": {
+      "height": "11"
+    }
+  },
+  {
+    "UnixNS": 1789790005087186000,
+    "Stage": "finalize_locked",
+    "Fields": {
+      "height": "11"
+    }
+  },
+  {
+    "UnixNS": 1789790005087202000,
+    "Stage": "finalize_done",
+    "Fields": {
+      "height": "11"
+    }
+  },
+  {
+    "UnixNS": 1789790005099139000,
+    "Stage": "commit_start",
+    "Fields": {
+      "height": "11"
+    }
+  },
+  {
+    "UnixNS": 1789790005128204000,
+    "Stage": "commit_done",
+    "Fields": {
+      "height": "11"
+    }
+  },
+  {
+    "UnixNS": 1789790005176328000,
+    "Stage": "received tock",
+    "Fields": {
+      "height": "12",
+      "module": "consensus",
+      "round": "0",
+      "step": "RoundStepNewHeight",
+      "timeout": "18.092ms"
+    }
+  },
+  {
+    "UnixNS": 1789790005176334000,
+    "Stage": "entering new round",
+    "Fields": {
+      "height": "12",
+      "module": "consensus",
+      "previous": "12/0/RoundStepNewHeight",
+      "proposer": "C55B9310A62E9E25301CEC5311F05E944E87667D",
+      "round": "0"
+    }
+  }
+]

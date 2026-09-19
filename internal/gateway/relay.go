@@ -22,6 +22,7 @@ type PublicClient interface {
 	Certificate(context.Context, protocol.SpendFactID) (protocol.TXCer, error)
 }
 type Relay struct {
+	Wake          <-chan protocol.SpendFactID
 	Direct        bool
 	MemberRelay   bool
 	DB            store.Store
@@ -37,8 +38,9 @@ type Relay struct {
 	installs  map[protocol.SpendFactID]installProgress
 }
 type installProgress struct {
-	acked uint8
-	next  time.Time
+	acked      uint8
+	next       time.Time
+	directNext [4]time.Time
 }
 
 func (r *Relay) installTargets(id protocol.SpendFactID) uint8 {
@@ -58,7 +60,10 @@ func (r *Relay) installTargets(id protocol.SpendFactID) uint8 {
 func (r *Relay) installAck(id protocol.SpendFactID, index int) {
 	r.installMu.Lock()
 	defer r.installMu.Unlock()
-	p := r.installs[id]
+	p, exists := r.installs[id]
+	if !exists {
+		return
+	}
 	p.acked |= 1 << index
 	r.installs[id] = p
 }
@@ -71,6 +76,9 @@ func (r *Relay) forgetInstall(id protocol.SpendFactID) {
 func (r *Relay) Run(ctx context.Context) error {
 	if r.DB == nil || r.Public == nil || r.Trust.Validate() != nil {
 		return protocol.ErrRule
+	}
+	if r.Direct && !r.MemberRelay {
+		return r.runDirect(ctx)
 	}
 	var cursor []byte
 	ticker := time.NewTicker(100 * time.Millisecond)

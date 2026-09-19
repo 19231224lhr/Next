@@ -2,6 +2,7 @@ package member
 
 import (
 	"context"
+	"time"
 	"utxo/internal/requesttrace"
 	"utxo/internal/rules"
 	"utxo/internal/state"
@@ -210,7 +211,10 @@ func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
 			return nil, err
 		}
 		if !found {
-			pending = state.Outbox{Fact: fact, Origin: payment.Tx.Body.Certifier}
+			// Give the gateway the first attempt. Persist this once, so repeated
+			// INSTALL and restart cannot postpone member fallback indefinitely.
+			pending = state.Outbox{Fact: fact, Origin: payment.Tx.Body.Certifier,
+				NextSubmitUnixNS: time.Now().Add(2*time.Second + time.Duration(m.cfg.Index)*250*time.Millisecond).UnixNano()}
 		}
 		pending.Certificate = raw
 		if err = state.Put(o, outkey, pending); err != nil {

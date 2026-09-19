@@ -1,3 +1,18 @@
+# Current wire4 increments (2026-09-19)
+
+Wallets and members follow verified public blocks. The gateway now wakes after
+durable outbox persistence and runs public submission and member INSTALL in
+independent rolling lanes (4 submissions, 4 target INSTALL RPCs). Members persist
+a first fallback deadline of 2 seconds plus 250 ms per member index; duplicate
+INSTALL and restart preserve it. Only verified public completion ends retries.
+
+See [gateway scheduling results](experiments/gateway-relay100-2026-09-19/README.md)
+and [member fallback implementation and results](experiments/gateway-relay-fallback-2026-09-19/README.md).
+These are bounded batch experiments, not a sustained TPS claim. Retry timing
+remains durable; in-memory retry pacing is still a separate proposed optimization.
+
+The v1.2 and v1.1 entries below are historical checkpoints.
+
 # Direct-liability v1.2 implementation (2026-09-19)
 
 The isolated wire-v3 branch now runs detached TXCer, one-round approval,
