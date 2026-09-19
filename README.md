@@ -128,6 +128,16 @@ use it to locate costs and repeat final latency comparisons with tracing disable
 
 ### Response before gateway persistence
 
+For the current wire4 path, complete payment bytes enter an optional bounded
+memory inbox after the response flush. Public submission and member INSTALL may
+run concurrently with gateway persistence, using the existing four slots per
+action. The inbox holds at most 128 payments / 32 MiB; overflow falls back to
+durable outbox scanning. Gateway retry cooldowns stay in bounded memory (8192
+entries, two seconds after completion); restart may resend the same bytes early.
+Outbox creation and verified completion remain durable. Member first-fallback
+deadlines remain persisted and are not extended by retries or HTTP acceptance.
+See [the isolated comparisons](docs/experiments/parallel-relay-2026-09-19/README.md).
+
 After three verified votes the gateway sends the full Content-Length response
 and flushes it, then persists the certificate and outbox in the same bounded
 handler. The existing 128 handler slots also bound pending persistence; no new
@@ -186,6 +196,9 @@ setting is changed. See [the phase diagnosis](docs/experiments/latency-phase-202
 for measured results, limitations and the separate delivery-retry repair plan.
 
 ### Durable relay retry pacing
+
+The following describes the retained legacy wire3 path. Current wire4 gateway
+pacing is described above and uses no retry-only database update.
 
 Relays keep the delivery envelope and retry timing in the existing outbox. Proof
 polling does not itself resubmit a payment. Retries are spaced by one second;

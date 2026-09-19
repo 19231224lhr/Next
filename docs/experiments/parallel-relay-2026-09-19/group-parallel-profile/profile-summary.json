@@ -1,0 +1,1094 @@
+{
+  "nodes": {
+    "committee0-timeline": {
+      "per_call_ms": {
+        "proposal_build": {
+          "n": 2,
+          "p50": 11.8363335,
+          "max": 22.785333,
+          "sum": 23.672667
+        },
+        "proposal_parts": {
+          "n": 2,
+          "p50": 0.079146,
+          "max": 0.126292,
+          "sum": 0.158292
+        },
+        "proposal_wal_flush": {
+          "n": 2,
+          "p50": 8.9357915,
+          "max": 11.966875,
+          "sum": 17.871583
+        },
+        "filepv_save": {
+          "n": 10,
+          "p50": 15.7717505,
+          "max": 39.295625,
+          "sum": 188.953919
+        },
+        "proposal_sign": {
+          "n": 2,
+          "p50": 12.661458499999998,
+          "max": 19.277917,
+          "sum": 25.322916999999997
+        },
+        "internal_message_wal": {
+          "n": 13,
+          "p50": 12.184625,
+          "max": 19.329083,
+          "sum": 152.108959
+        },
+        "vote_wal_flush": {
+          "n": 8,
+          "p50": 14.284812500000001,
+          "max": 16.734333,
+          "sum": 97.382707
+        },
+        "vote_sign": {
+          "n": 8,
+          "p50": 21.7699795,
+          "max": 39.328792,
+          "sum": 163.89016900000001
+        },
+        "blockstore_save": {
+          "n": 4,
+          "p50": 15.772187500000001,
+          "max": 35.512958,
+          "sum": 79.874167
+        },
+        "endheight_wal": {
+          "n": 4,
+          "p50": 14.4946875,
+          "max": 42.940875,
+          "sum": 84.779375
+        }
+      },
+      "per_business_block_sums_ms": {
+        "2": {
+          "proposal_build": 0.887334,
+          "proposal_parts": 0.032,
+          "proposal_wal_flush": 5.904708,
+          "filepv_save": 55.059126,
+          "proposal_sign": 19.277917,
+          "internal_message_wal": 45.733959,
+          "vote_wal_flush": 21.916749,
+          "vote_sign": 35.853834,
+          "blockstore_save": 17.756625,
+          "endheight_wal": 12.979
+        },
+        "3": {
+          "vote_wal_flush": 24.843083,
+          "filepv_save": 15.290251,
+          "vote_sign": 15.341501000000001,
+          "internal_message_wal": 19.561292,
+          "blockstore_save": 35.512958,
+          "endheight_wal": 16.010375
+        },
+        "5": {
+          "vote_wal_flush": 31.496417,
+          "filepv_save": 39.863125000000004,
+          "vote_sign": 39.926834,
+          "internal_message_wal": 28.861709,
+          "blockstore_save": 13.78775,
+          "endheight_wal": 42.940875
+        },
+        "6": {
+          "proposal_build": 22.785333,
+          "proposal_parts": 0.126292,
+          "proposal_wal_flush": 11.966875,
+          "filepv_save": 78.741417,
+          "proposal_sign": 6.045,
+          "internal_message_wal": 57.951999,
+          "vote_wal_flush": 19.126458,
+          "vote_sign": 72.768,
+          "blockstore_save": 12.816834,
+          "endheight_wal": 12.849125
+        }
+      }
+    },
+    "committee1-timeline": {
+      "per_call_ms": {
+        "vote_wal_flush": {
+          "n": 8,
+          "p50": 16.71675,
+          "max": 21.30575,
+          "sum": 125.405916
+        },
+        "filepv_save": {
+          "n": 9,
+          "p50": 12.656666,
+          "max": 44.242458,
+          "sum": 139.407457
+        },
+        "vote_sign": {
+          "n": 8,
+          "p50": 14.5626665,
+          "max": 44.2625,
+          "sum": 131.298416
+        },
+        "internal_message_wal": {
+          "n": 12,
+          "p50": 13.1187705,
+          "max": 19.671042,
+          "sum": 148.59125
+        },
+        "blockstore_save": {
+          "n": 4,
+          "p50": 17.4554585,
+          "max": 31.500625,
+          "sum": 76.6195
+        },
+        "endheight_wal": {
+          "n": 4,
+          "p50": 14.964542,
+          "max": 19.043167,
+          "sum": 58.966918
+        },
+        "proposal_build": {
+          "n": 1,
+          "p50": 52.270708,
+          "max": 52.270708,
+          "sum": 52.270708
+        },
+        "proposal_parts": {
+          "n": 1,
+          "p50": 0.206625,
+          "max": 0.206625,
+          "sum": 0.206625
+        },
+        "proposal_wal_flush": {
+          "n": 1,
+          "p50": 11.406917,
+          "max": 11.406917,
+          "sum": 11.406917
+        },
+        "proposal_sign": {
+          "n": 1,
+          "p50": 8.350042,
+          "max": 8.350042,
+          "sum": 8.350042
+        }
+      },
+      "per_business_block_sums_ms": {
+        "2": {
+          "vote_wal_flush": 34.584,
+          "filepv_save": 32.878333999999995,
+          "vote_sign": 32.935582999999994,
+          "internal_message_wal": 29.985625,
+          "blockstore_save": 10.207958,
+          "endheight_wal": 15.985709
+        },
+        "3": {
+          "proposal_build": 52.270708,
+          "proposal_parts": 0.206625,
+          "proposal_wal_flush": 11.406917,
+          "filepv_save": 11.769582999999999,
+          "proposal_sign": 8.350042,
+          "internal_message_wal": 54.66004100000001,
+          "vote_wal_flush": 19.524416,
+          "vote_sign": 3.4924999999999997,
+          "blockstore_save": 31.500625,
+          "endheight_wal": 9.994667
+        },
+        "5": {
+          "vote_wal_flush": 33.4335,
+          "filepv_save": 56.899124,
+          "vote_sign": 56.959625,
+          "internal_message_wal": 31.949083,
+          "blockstore_save": 16.787834,
+          "endheight_wal": 19.043167
+        },
+        "6": {
+          "vote_wal_flush": 37.864000000000004,
+          "filepv_save": 37.860416,
+          "vote_sign": 37.910708,
+          "internal_message_wal": 31.996501000000002,
+          "blockstore_save": 18.123083,
+          "endheight_wal": 13.943375
+        }
+      }
+    },
+    "committee2-timeline": {
+      "per_call_ms": {
+        "vote_wal_flush": {
+          "n": 8,
+          "p50": 16.406979,
+          "max": 29.560291,
+          "sum": 140.905999
+        },
+        "filepv_save": {
+          "n": 9,
+          "p50": 22.257875,
+          "max": 46.420875,
+          "sum": 189.082249
+        },
+        "vote_sign": {
+          "n": 8,
+          "p50": 20.832124999999998,
+          "max": 46.441666,
+          "sum": 162.090292
+        },
+        "internal_message_wal": {
+          "n": 10,
+          "p50": 15.771833,
+          "max": 23.14325,
+          "sum": 151.300622
+        },
+        "blockstore_save": {
+          "n": 4,
+          "p50": 16.965917,
+          "max": 32.747875,
+          "sum": 79.610876
+        },
+        "endheight_wal": {
+          "n": 4,
+          "p50": 22.4629585,
+          "max": 39.004375,
+          "sum": 91.856542
+        },
+        "proposal_build": {
+          "n": 1,
+          "p50": 0.717041,
+          "max": 0.717041,
+          "sum": 0.717041
+        },
+        "proposal_parts": {
+          "n": 1,
+          "p50": 0.027583,
+          "max": 0.027583,
+          "sum": 0.027583
+        },
+        "proposal_wal_flush": {
+          "n": 1,
+          "p50": 6.896458,
+          "max": 6.896458,
+          "sum": 6.896458
+        },
+        "proposal_sign": {
+          "n": 1,
+          "p50": 27.323958,
+          "max": 27.323958,
+          "sum": 27.323958
+        }
+      },
+      "per_business_block_sums_ms": {
+        "2": {
+          "vote_wal_flush": 51.79025,
+          "filepv_save": 50.469458,
+          "vote_sign": 50.621542,
+          "internal_message_wal": 36.343958,
+          "blockstore_save": 32.747875,
+          "endheight_wal": 25.90425
+        },
+        "3": {
+          "vote_wal_flush": 23.671708000000002,
+          "filepv_save": 15.448500000000001,
+          "vote_sign": 15.502417000000001,
+          "internal_message_wal": 22.414166,
+          "blockstore_save": 12.931167,
+          "endheight_wal": 7.92625
+        },
+        "5": {
+          "proposal_build": 0.717041,
+          "proposal_parts": 0.027583,
+          "proposal_wal_flush": 6.896458,
+          "filepv_save": 74.44033300000001,
+          "proposal_sign": 27.323958,
+          "internal_message_wal": 66.526499,
+          "vote_wal_flush": 21.1565,
+          "vote_sign": 47.185666,
+          "blockstore_save": 15.8535,
+          "endheight_wal": 19.021667
+        },
+        "6": {
+          "vote_wal_flush": 44.287541,
+          "filepv_save": 48.723957999999996,
+          "vote_sign": 48.780667,
+          "internal_message_wal": 26.015999,
+          "blockstore_save": 18.078334,
+          "endheight_wal": 39.004375
+        }
+      }
+    },
+    "committee3-timeline": {
+      "per_call_ms": {
+        "vote_wal_flush": {
+          "n": 8,
+          "p50": 17.0235625,
+          "max": 22.8045,
+          "sum": 136.67354
+        },
+        "filepv_save": {
+          "n": 8,
+          "p50": 14.3568745,
+          "max": 55.207458,
+          "sum": 150.644166
+        },
+        "vote_sign": {
+          "n": 8,
+          "p50": 14.377958,
+          "max": 55.227166,
+          "sum": 150.913333
+        },
+        "internal_message_wal": {
+          "n": 8,
+          "p50": 14.151125,
+          "max": 24.629667,
+          "sum": 114.634543
+        },
+        "blockstore_save": {
+          "n": 4,
+          "p50": 11.98675,
+          "max": 13.821625,
+          "sum": 46.560874999999996
+        },
+        "endheight_wal": {
+          "n": 4,
+          "p50": 13.906542,
+          "max": 18.117958,
+          "sum": 55.687208
+        }
+      },
+      "per_business_block_sums_ms": {
+        "2": {
+          "vote_wal_flush": 42.4785,
+          "filepv_save": 25.642417000000002,
+          "vote_sign": 25.732416999999998,
+          "internal_message_wal": 36.063584,
+          "blockstore_save": 10.208459,
+          "endheight_wal": 12.948875
+        },
+        "3": {
+          "vote_wal_flush": 26.802083000000003,
+          "filepv_save": 15.476707999999999,
+          "vote_sign": 15.534833,
+          "internal_message_wal": 22.239417000000003,
+          "blockstore_save": 13.765041,
+          "endheight_wal": 14.864209
+        },
+        "5": {
+          "vote_wal_flush": 29.511833,
+          "filepv_save": 63.859417,
+          "vote_sign": 63.925248999999994,
+          "internal_message_wal": 21.987291999999997,
+          "blockstore_save": 13.821625,
+          "endheight_wal": 18.117958
+        },
+        "6": {
+          "vote_wal_flush": 37.881124,
+          "filepv_save": 45.665624,
+          "vote_sign": 45.720833999999996,
+          "internal_message_wal": 34.34425,
+          "blockstore_save": 8.76575,
+          "endheight_wal": 9.756166
+        }
+      }
+    }
+  },
+  "proposal_queue": [
+    {
+      "fact": "8171b41b79010f106826588fae1cc9d810f785df31832fde9cdd2478438e73fd",
+      "height": 2,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 1.221,
+      "proposer_checked_to_prepare_ms": 0.101
+    },
+    {
+      "fact": "e1bed4c57fd3cfedc3e4b0578dea15fd16b07e474117900c361dc5e526108a3e",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 25.084,
+      "proposer_checked_to_prepare_ms": 190.468
+    },
+    {
+      "fact": "b7ef6ce78767d2ace83c723effe2f1e622c51a8790644c708d4516d50ea6eb40",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 12.389,
+      "proposer_checked_to_prepare_ms": 227.752
+    },
+    {
+      "fact": "757b61402639ebd19be66f63b60df0c87d5a69c2196e1e6e1a39f480694278f3",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 12.192,
+      "proposer_checked_to_prepare_ms": 301.438
+    },
+    {
+      "fact": "75fc07de97b87f66d4aa00daa440657ca36f360a26ec9676415620b8fd2ba7a5",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.578,
+      "proposer_checked_to_prepare_ms": 199.408
+    },
+    {
+      "fact": "3e507bca28091f5accfc74e126ade9c300b22fced74319c1f08d772b2f5060e7",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 25.088,
+      "proposer_checked_to_prepare_ms": 189.765
+    },
+    {
+      "fact": "0fbd35b1173eb8bccb34394ea587392c69b82cf3aad1af4e533667843c2039d6",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 16.225,
+      "proposer_checked_to_prepare_ms": 185.478
+    },
+    {
+      "fact": "4c813f092bcca2cfd8cbaa8cba297ddae0bca935df93a8c94e6ba03968413dcb",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 25.178,
+      "proposer_checked_to_prepare_ms": 195.483
+    },
+    {
+      "fact": "cad27cf8522d2695a230447f3340108bab6f326fc0d93b3c5c4a2ba2d4e11790",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 11.644,
+      "proposer_checked_to_prepare_ms": 302.227
+    },
+    {
+      "fact": "382ab82125a4bfda44e55a9c477346ababd4703111873579977034d643dac34e",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.936,
+      "proposer_checked_to_prepare_ms": 191.9
+    },
+    {
+      "fact": "d1471940cd4224f7cf02c8aa513bc44a887feff76663c249349c85584df16baf",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 18.832,
+      "proposer_checked_to_prepare_ms": 179.681
+    },
+    {
+      "fact": "5592e0143013da3185984c004d780e05250665c607f2c87adc63e52462aad660",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.083,
+      "proposer_checked_to_prepare_ms": 203.294
+    },
+    {
+      "fact": "7f4904477fca979e50ca428863cdfbcfacb8f7fb0f2894d8b5f2d72767c2051a",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.989,
+      "proposer_checked_to_prepare_ms": 194.766
+    },
+    {
+      "fact": "05ba48c35057dd715a665c94deedeefffe8e18d2c220d1c00d37e67fcb6f16c8",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 18.523,
+      "proposer_checked_to_prepare_ms": 181.232
+    },
+    {
+      "fact": "3ba3a6b3c0543b4d4676e11139c32cc792ffc3528fd697addbfe251a574413b5",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 13.477,
+      "proposer_checked_to_prepare_ms": 299.861
+    },
+    {
+      "fact": "63603869ae1a9404c1c82be4fe160046121b02ec78be9eaf84e54a8a8258ecea",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.842,
+      "proposer_checked_to_prepare_ms": 192.638
+    },
+    {
+      "fact": "c2f83dba0ce907b46d0aca10cff3b25df8c20dbc577a51df31311f9470a3258d",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.844,
+      "proposer_checked_to_prepare_ms": 193.333
+    },
+    {
+      "fact": "fcc0680d0434af065c1394049dc7687e5562df073bbbfad9d89febbba4865518",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.994,
+      "proposer_checked_to_prepare_ms": 204.068
+    },
+    {
+      "fact": "cbfcc364c9f0783a43432b554f4d017389bb2c537b3ab5461525185f2c5766eb",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.607,
+      "proposer_checked_to_prepare_ms": 206.418
+    },
+    {
+      "fact": "62006ce661ede85e44f0f28bd820c67de5fe3a6816b3fcc87da8a83e410acd35",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 25.041,
+      "proposer_checked_to_prepare_ms": 196.305
+    },
+    {
+      "fact": "6b584678c17cea0f0321f6f81c4b418ebf83e69ccdcb9069bacb5bba6f998313",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 8.435,
+      "proposer_checked_to_prepare_ms": 258.11
+    },
+    {
+      "fact": "ff36aac68e907a430e0a9d63b0982624735df887e5bd4f6efec1bb5b365482e4",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 16.905,
+      "proposer_checked_to_prepare_ms": 184.686
+    },
+    {
+      "fact": "7bea9d32f6c300c2c5b66001d7da2140ac4089e1eb986b4ac88e2dd64256d0be",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.265,
+      "proposer_checked_to_prepare_ms": 212.931
+    },
+    {
+      "fact": "63fb8f6bfa5e7e6295594da28ceaf8d512f69c79b7ccc45f946f9218fc49d3d9",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.344,
+      "proposer_checked_to_prepare_ms": 212.18
+    },
+    {
+      "fact": "1820336d4ed8a832af3838d9a43b5d0e544f18930908cf7387dd4e2de46ad48b",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 18.076,
+      "proposer_checked_to_prepare_ms": 182.006
+    },
+    {
+      "fact": "db0113754ef48eea769060d2ab920f6a1083567b5ce1be406a5e302ea8a655d2",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 18.943,
+      "proposer_checked_to_prepare_ms": 178.891
+    },
+    {
+      "fact": "ec8b8ec8778f88a3a6df958a7d3756a93d632e8722903912de123b17581e9d56",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.408,
+      "proposer_checked_to_prepare_ms": 208.682
+    },
+    {
+      "fact": "7b920be611dc5c351dbc70f0f16d6dc4c861e8732a158f9cf1daaaf5e53dcf72",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 17.767,
+      "proposer_checked_to_prepare_ms": 183.102
+    },
+    {
+      "fact": "d66f0cfe038a73dd9a1af9491a65198bd010bfe72a2bb1e46304f5766d58beff",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 6.95,
+      "proposer_checked_to_prepare_ms": 259.63
+    },
+    {
+      "fact": "c1c60c884f844306b5e3083e2ecb2c5caa6bf93aadc599c2e76d5c0eee212de8",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.355,
+      "proposer_checked_to_prepare_ms": 210.801
+    },
+    {
+      "fact": "fa4bac79ef426cf16bde1caf6ea135315410d7a2020684fe0e9d9d189371258f",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 18.939,
+      "proposer_checked_to_prepare_ms": 178.127
+    },
+    {
+      "fact": "62d3922ee6d975d9a658a3098bdad56c18c7a39e2c3cc50e319986537b33e38d",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.946,
+      "proposer_checked_to_prepare_ms": 197.081
+    },
+    {
+      "fact": "7f90f038887de73f5e9d9b26d2f50008b9f0427a2b7fb03183c3cf07bbb9398a",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.235,
+      "proposer_checked_to_prepare_ms": 202.529
+    },
+    {
+      "fact": "3e847e60b908d86c7a34afbff0c7203b058232401d80893ea9e93d9e40c45677",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 13.077,
+      "proposer_checked_to_prepare_ms": 227.045
+    },
+    {
+      "fact": "11e3bf124fa2517ff3dc4c99b52c991df42f1261743af3de49ed7f84e71cfff7",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 20.572,
+      "proposer_checked_to_prepare_ms": 187.704
+    },
+    {
+      "fact": "1f5e0eb7889881b8af7f7f540e8038fc7d4eca4cda0bd498408951dd8d69ee41",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.4,
+      "proposer_checked_to_prepare_ms": 211.487
+    },
+    {
+      "fact": "efa322fcda6fea070c12f4fe90515def17334423ee6b9a02362959cbc2827063",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.061,
+      "proposer_checked_to_prepare_ms": 214.489
+    },
+    {
+      "fact": "87c1085c36f1faf0c429048aef1efd2a8f73ae16bd38ab7fe60bc1531b9eab45",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 17.635,
+      "proposer_checked_to_prepare_ms": 183.894
+    },
+    {
+      "fact": "ca5c6fda1a143358e5f8920c8bf69ad08ea6799c2f5604558d081f25e941596d",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 20.153,
+      "proposer_checked_to_prepare_ms": 188.383
+    },
+    {
+      "fact": "290f30484477019768cadc2ecafd6679c119b0dfb81708af4325d18c33e26d42",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 21.051,
+      "proposer_checked_to_prepare_ms": 186.298
+    },
+    {
+      "fact": "4edb48fbdad84968d2bd24498ffb545a9644c9413082dac558f793552bb41319",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 21.266,
+      "proposer_checked_to_prepare_ms": 187.003
+    },
+    {
+      "fact": "16566341bfd43280893e497ad8b47f6803c36712805e1b4ee4ee5645fc2d301a",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 22.636,
+      "proposer_checked_to_prepare_ms": 216.044
+    },
+    {
+      "fact": "d8e7e59ca2101d8b4edd106df100849be803f40bcd05e7652b36c81b90eb7f19",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.807,
+      "proposer_checked_to_prepare_ms": 197.85
+    },
+    {
+      "fact": "598fe3f60da5cad304b8222df6033a1eb9a0bfbef4643210842978b8aba2ec15",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.862,
+      "proposer_checked_to_prepare_ms": 204.855
+    },
+    {
+      "fact": "b819bc09a1cd787a4a673ffd4f2d9954a21e5eb29a03a3ac58b1f94197df3bff",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 25.004,
+      "proposer_checked_to_prepare_ms": 191.153
+    },
+    {
+      "fact": "209cf44669407fc63de98eb65f6e43fbe9f14546b44447580a278fa8aace836f",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.059,
+      "proposer_checked_to_prepare_ms": 210.115
+    },
+    {
+      "fact": "5c63260347ae5087349bf9ded8b0aaa03c113c2fef05843c5657615f50b781c5",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 19.094,
+      "proposer_checked_to_prepare_ms": 177.365
+    },
+    {
+      "fact": "ede1ac4af7c408bab8fa26b230a453ef8b572a036e9e329723c3ef283a902e81",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.342,
+      "proposer_checked_to_prepare_ms": 201.751
+    },
+    {
+      "fact": "e9116a1101d49e2e45c4813a3a3df1cda7adf22f16ac0c91d889cb851173a374",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.436,
+      "proposer_checked_to_prepare_ms": 207.906
+    },
+    {
+      "fact": "ff9c5fac54e6d6e8e0ba74c122d797c7ad7dff8e52cb9d404b3588ea342334ab",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.77,
+      "proposer_checked_to_prepare_ms": 205.63
+    },
+    {
+      "fact": "9d2c88545847cee17e45eceb02f81bbac58af08b0245f1fc860db82282c93744",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.675,
+      "proposer_checked_to_prepare_ms": 194.056
+    },
+    {
+      "fact": "7c4239c73f7c411dd9b1f68e566dabac82eaba73c872f90b420a48a9c8b6d54a",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 18.655,
+      "proposer_checked_to_prepare_ms": 180.455
+    },
+    {
+      "fact": "dca6fdeacbf00d5c9f6a2f441a6aeb07fed79580bff9dcc813466e9d30718f0a",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.016,
+      "proposer_checked_to_prepare_ms": 215.264
+    },
+    {
+      "fact": "cdd1e2a806cbdb2b495be2280c3ecb5afa4ee6fbc693e528e75e9c2edaf7fa95",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 19.167,
+      "proposer_checked_to_prepare_ms": 176.586
+    },
+    {
+      "fact": "1530daf5ea1565d9cf82361813695b18789123c6cce7cb1a6b5a532766466d3a",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 13.439,
+      "proposer_checked_to_prepare_ms": 226.312
+    },
+    {
+      "fact": "3ff3e314840e4fa3c18ec1c973990b66e6ec7aafb5d0dff2d610b57a38861fe8",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 11.689,
+      "proposer_checked_to_prepare_ms": 228.569
+    },
+    {
+      "fact": "07a56ec20bbeb32638b8cee15f3eebd997b4596dd4be176ffad2617b2652df70",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 19.495,
+      "proposer_checked_to_prepare_ms": 189.08
+    },
+    {
+      "fact": "7b733d8feb04d451ed1a2c264367af61fb1cc00c6e7b1eb0d0f578e8958c739b",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.71,
+      "proposer_checked_to_prepare_ms": 198.624
+    },
+    {
+      "fact": "416a7bce7d62cd2dc26f142df5fba79989e78afab75e837dfd05de8c7df0318a",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.538,
+      "proposer_checked_to_prepare_ms": 207.18
+    },
+    {
+      "fact": "fe9b9a3cc5dbd7df13eee03635065e481552773ec46ee6aeb83beb44f7d8a0de",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.484,
+      "proposer_checked_to_prepare_ms": 200.178
+    },
+    {
+      "fact": "7dfc847cdc56dd03afcf5b413122a63bf1ba49c84436908dfb63c321969ac998",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 12.772,
+      "proposer_checked_to_prepare_ms": 300.626
+    },
+    {
+      "fact": "d7583be1ffd2bac526ce6378742db8610367f2008d3d0997531d97b4a429650a",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.33,
+      "proposer_checked_to_prepare_ms": 209.431
+    },
+    {
+      "fact": "b9bcff05919b8797593e3f652185fbdfd505d8f375d838e1a680f4947933670d",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 24.304,
+      "proposer_checked_to_prepare_ms": 200.971
+    },
+    {
+      "fact": "ace46c0da2f0544ac9ecd767a999fa0a34dfe206f7e8e5c0cc914ce558fff591",
+      "height": 3,
+      "proposer": "committee1",
+      "entry_receive_to_proposer_checked_ms": 23.199,
+      "proposer_checked_to_prepare_ms": 213.714
+    },
+    {
+      "fact": "350706ba5bb8f3fdac05cacbb8239231ac1bc3d90f86d5c68d1cfc8b270d9828",
+      "height": 5,
+      "proposer": "committee2",
+      "entry_receive_to_proposer_checked_ms": 102.263,
+      "proposer_checked_to_prepare_ms": 277.07
+    },
+    {
+      "fact": "f55549e6089405722fb569ff9a71e601bb2bf38c60e7ac075a9552affe7f038e",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 0.814,
+      "proposer_checked_to_prepare_ms": 269.412
+    },
+    {
+      "fact": "e2eb4a25be88b58af45c8c90f7d396da08d54b4ff2946a6f8fda88146c276e9e",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 1.467,
+      "proposer_checked_to_prepare_ms": 268.708
+    },
+    {
+      "fact": "68e577e7af940aac5b0123f1459d400346bd6df411905e7f1ced7bc957f305a4",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.263,
+      "proposer_checked_to_prepare_ms": 236.521
+    },
+    {
+      "fact": "37e9b778ac4f89c81b4b41fb37585278081c9471b36bc77fe66575ccd729fcbb",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.302,
+      "proposer_checked_to_prepare_ms": 237.204
+    },
+    {
+      "fact": "4fd08c5cf5067b9da95bf758a3caa08d906be0699b363b99ab07547d49598e82",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 0.831,
+      "proposer_checked_to_prepare_ms": 239.998
+    },
+    {
+      "fact": "39df55f6dfbc63b3df9dbf9048b949071fa0002be5b18f1ebf0ca4c6e8957685",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.201,
+      "proposer_checked_to_prepare_ms": 235.217
+    },
+    {
+      "fact": "1c9b62c5567f3251e6a0317cd6ed3478b311814ad8948ca3ebd43d10719b73aa",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.493,
+      "proposer_checked_to_prepare_ms": 237.916
+    },
+    {
+      "fact": "98ea4a93f39d61515236dc58d7b2da6e77b3a92b6e8876ac8af94549d6cc7c2d",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 1.555,
+      "proposer_checked_to_prepare_ms": 239.272
+    },
+    {
+      "fact": "89c6ab6da0971e6629865241d68e4c6ad273f7b96bcac864fd7f6e47aad69d8c",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.149,
+      "proposer_checked_to_prepare_ms": 230.93
+    },
+    {
+      "fact": "7d4420948f757ae630209a29d6906b5963bbf1ea17edec1a35d51c51ba4a0397",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.263,
+      "proposer_checked_to_prepare_ms": 235.873
+    },
+    {
+      "fact": "779c3db5d6a5168d693866172a8e0768a5d35c7d03c46b200c398d9e156a004b",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.397,
+      "proposer_checked_to_prepare_ms": 233.049
+    },
+    {
+      "fact": "47ee8c442d8cff8af9f20ca20edc372b5ac85416078b2a396f92292448ae6cbd",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.219,
+      "proposer_checked_to_prepare_ms": 238.593
+    },
+    {
+      "fact": "88e771f555b9659f57a411cff76d22d5b9401924c31381468c6b084ccbb48a4d",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.319,
+      "proposer_checked_to_prepare_ms": 233.743
+    },
+    {
+      "fact": "56f9489c0452f761c82a564d22585023a9ff8313295716ba0d51b82e5cdc3549",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.495,
+      "proposer_checked_to_prepare_ms": 232.278
+    },
+    {
+      "fact": "a964a70c4411a23cff48b411a6ca41838d0faa5ba650b7a09e3194c2681baf65",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.52,
+      "proposer_checked_to_prepare_ms": 231.599
+    },
+    {
+      "fact": "4ded925cdf4e3764b85ae0e9e4cbc626478e3625a573f0ffa0ff9d51d22c7ccd",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 0.832,
+      "proposer_checked_to_prepare_ms": 246.846
+    },
+    {
+      "fact": "b99d6d9e40f2a79a29e73fde5b2cb5f71422de6929312b901cf350a58f52c168",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.13,
+      "proposer_checked_to_prepare_ms": 234.564
+    },
+    {
+      "fact": "dff3f0311c3a99b476fd5ff951a5ecd3a51a28563ed1b40a961a6a1b128a0ed4",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.831,
+      "proposer_checked_to_prepare_ms": 228.989
+    },
+    {
+      "fact": "3c73405e060f6f9b763d3e0d9881d2cd4d21c757863d856df36d381b130116a2",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.309,
+      "proposer_checked_to_prepare_ms": 219.359
+    },
+    {
+      "fact": "a51021639a402c4bd6b4168c879a057da2bdb07cf50882d5bcf85e436f2fb187",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.344,
+      "proposer_checked_to_prepare_ms": 227.583
+    },
+    {
+      "fact": "d2529c35c437fb0d475ad30a8234936480b0c260dbdf67f278d5998d6ef4b2cd",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.265,
+      "proposer_checked_to_prepare_ms": 215.333
+    },
+    {
+      "fact": "f4d087a5ac883583bc0206c5bafe2fdb51f6e2d51e4f795da032bdb76aa3196f",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.338,
+      "proposer_checked_to_prepare_ms": 230.164
+    },
+    {
+      "fact": "d322a048788c60c64ab211cc9bba1f81116b77b7bd8a6ffc79b0fe913f7af222",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.939,
+      "proposer_checked_to_prepare_ms": 220.044
+    },
+    {
+      "fact": "057e544a6514c217e92a20c5003b95727846ce6849df113a93df5c3f46bb9853",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.161,
+      "proposer_checked_to_prepare_ms": 217.362
+    },
+    {
+      "fact": "3b78362d695f4f8fdd834db21e8e9475d3cb11acc7ca6cd32344719b13a5f0a9",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.074,
+      "proposer_checked_to_prepare_ms": 228.279
+    },
+    {
+      "fact": "3f1cabc98eb96e827f51e9e45752f2e4537eeed21711034f05db04f43d4a336a",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 0.901,
+      "proposer_checked_to_prepare_ms": 222.105
+    },
+    {
+      "fact": "0e8d9e9fd2d464a99bbb97a3f77a687003ad1f5a4f5905f78f7217510574aa2e",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 1.435,
+      "proposer_checked_to_prepare_ms": 221.441
+    },
+    {
+      "fact": "bf4060ce12d53652526c2662f224d18b987a2c60426fef18d0118eed0b3a05e8",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.159,
+      "proposer_checked_to_prepare_ms": 218.7
+    },
+    {
+      "fact": "a7ac6423d13205e933901e7df43199d05969033529065f399e6efcde8e1f7cd9",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.213,
+      "proposer_checked_to_prepare_ms": 214.641
+    },
+    {
+      "fact": "ee934b4e3059e039a7031788b38be92ac07622b05d854ab4e142b83042d8b726",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.149,
+      "proposer_checked_to_prepare_ms": 220.75
+    },
+    {
+      "fact": "7638f29d3e5329543f4197f7eb92b276c210e1b0af9b82e99a6d2835e5577175",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.173,
+      "proposer_checked_to_prepare_ms": 216.02
+    },
+    {
+      "fact": "42b6723a3046e912888c6df9a2456dacf6cc8e5d4abb29f3b5c538f2fb47306f",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.26,
+      "proposer_checked_to_prepare_ms": 218.032
+    },
+    {
+      "fact": "0d5e524abacd7380e925ccd40e09a76a5ee6633247bcffc9b4db31b4cf343ee5",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.209,
+      "proposer_checked_to_prepare_ms": 213.293
+    },
+    {
+      "fact": "c299e5add6e1113eeba43b774a7b2c558b3b67dd9d44d3eac401ef13896da345",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.227,
+      "proposer_checked_to_prepare_ms": 216.699
+    },
+    {
+      "fact": "054044c42a10ed807cc672b94f1e45367de6fcec5a3d7740e75f56fa8114550a",
+      "height": 6,
+      "proposer": "committee0",
+      "entry_receive_to_proposer_checked_ms": 2.304,
+      "proposer_checked_to_prepare_ms": 213.954
+    }
+  ],
+  "proposal_queue_p50_ms": {
+    "entry_receive_to_proposer_checked_ms": 17.9215,
+    "proposer_checked_to_prepare_ms": 213.11200000000002
+  }
+}

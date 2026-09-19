@@ -1,0 +1,44 @@
+{
+  "benchmark": {
+    "block_observed_p50_ms": 1573.45875,
+    "completed_per_second": 38.30572883583333,
+    "concurrency": 128,
+    "count": 800,
+    "dispatch_lag_p50_ms": -0.022,
+    "dispatch_lag_p95_ms": 1.383,
+    "elapsed_s": 20.884604583,
+    "failed": 0,
+    "fast_p50_ms": 111.696958,
+    "fast_p95_ms": 162.842083,
+    "finished_unix_ns": 1789808470006320583,
+    "member_applied_p50_ms": 1628.941667,
+    "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.",
+    "started_unix_ns": 1789808449121716000,
+    "target_send_rate": 40,
+    "timing_origin": "wallet_http_submit_v4",
+    "trace": true,
+    "workload": "paced_final_utxo_cross_org"
+  },
+  "audit": "passed",
+  "unique_commits": 800,
+  "actual_send_rate": 40.000360453811346,
+  "send_to_commit_ms": {
+    "p50": 1061.2685000000001,
+    "p95": 1401.771,
+    "max": 1551.603
+  },
+  "dispatch_lag_ms": {
+    "p50": -0.0215,
+    "p95": 1.383,
+    "max": 23.01
+  },
+  "dispatch_clock": "wall difference; may contain sub-millisecond clock adjustment",
+  "committee_pending_peak": 58,
+  "committee_pending_slope_per_s": -0.021346469622331683,
+  "oldest_committee_peak_ms": 1413.392,
+  "commit_drain_after_last_send_ms": 693.774,
+  "member_drain_after_last_send_ms": 909.408,
+  "peak_process_rss_mib_sum": 1030.015625,
+  "runtime_file_growth_bytes": 183354240,
+  "note": "Finite 20-second target-rate diagnostic run; not a maximum or long-term TPS claim. RSS sums may count shared pages; file growth includes WAL and logs."
+}
