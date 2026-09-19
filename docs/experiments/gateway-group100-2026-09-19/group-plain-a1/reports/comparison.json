@@ -1,0 +1,64 @@
+{
+  "experiment": {
+    "label": "plain-a1",
+    "binaries": "group-a-bin",
+    "trace": false,
+    "count": 100,
+    "concurrency": 64,
+    "flush": "10ms",
+    "gossip": "10ms"
+  },
+  "benchmark": {
+    "block_observed_p50_ms": 2917.267542,
+    "completed_per_second": 17.04853793336984,
+    "concurrency": 64,
+    "count": 100,
+    "elapsed_s": 5.865605625,
+    "failed": 0,
+    "fast_p50_ms": 173.119583,
+    "fast_p95_ms": 199.914458,
+    "finished_unix_ns": 1789787115212903625,
+    "member_applied_p50_ms": 2943.369333,
+    "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.",
+    "started_unix_ns": 1789787109347298000,
+    "timing_origin": "wallet_http_submit_v4",
+    "trace": false,
+    "workload": "closed_loop_final_utxo_cross_org"
+  },
+  "audit": "100 completed at every committee; all outboxes empty; supply audit passed",
+  "fast_ms": {
+    "n": 100,
+    "median": 173.1345,
+    "p95": 199.914,
+    "max": 530.24,
+    "sum": 16820.479
+  },
+  "block_observed_ms": {
+    "n": 100,
+    "median": 2920.2325,
+    "p95": 5080.083,
+    "max": 5379.63,
+    "sum": 314470.033
+  },
+  "member_observed_ms": {
+    "n": 100,
+    "median": 2946.366,
+    "p95": 5092.014,
+    "max": 5388.97,
+    "sum": 317474.369
+  },
+  "send_to_response_ms": {
+    "n": 100,
+    "median": 122.3275,
+    "p95": 139.266,
+    "max": 511.473,
+    "sum": 11993.887
+  },
+  "wallet_verify_save_ms": {
+    "n": 100,
+    "median": 45.6755,
+    "p95": 72.904,
+    "max": 78.972,
+    "sum": 4826.592
+  }
+}

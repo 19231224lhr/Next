@@ -42,8 +42,12 @@ func TestFullHTTPResponseArrivesBeforeGatewayCommit(t *testing.T) {
 		clients[i] = transport.NewMemberClient(srv.URL)
 	}
 	db := &blockedStore{Store: store.NewMemory(), entered: make(chan struct{}), release: make(chan struct{})}
-	defer db.Close()
-	collector, e := gateway.New(f.Org, clients, db)
+	group, e := store.NewGroup(db, 256, 64)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer group.Close()
+	collector, e := gateway.New(f.Org, clients, group)
 	if e != nil {
 		t.Fatal(e)
 	}

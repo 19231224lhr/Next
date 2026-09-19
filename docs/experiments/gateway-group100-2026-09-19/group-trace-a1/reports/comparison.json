@@ -1,0 +1,111 @@
+{
+  "experiment": {
+    "label": "trace-a1",
+    "binaries": "group-a-bin",
+    "trace": true,
+    "count": 100,
+    "concurrency": 64,
+    "flush": "10ms",
+    "gossip": "10ms"
+  },
+  "benchmark": {
+    "block_observed_p50_ms": 3034.897666,
+    "completed_per_second": 16.858858945538707,
+    "concurrency": 64,
+    "count": 100,
+    "elapsed_s": 5.931599542,
+    "failed": 0,
+    "fast_p50_ms": 188.537583,
+    "fast_p95_ms": 226.135583,
+    "finished_unix_ns": 1789786957986350542,
+    "member_applied_p50_ms": 3060.811208,
+    "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.",
+    "started_unix_ns": 1789786952054751000,
+    "timing_origin": "wallet_http_submit_v4",
+    "trace": true,
+    "workload": "closed_loop_final_utxo_cross_org"
+  },
+  "audit": "100 completed at every committee; all outboxes empty; supply audit passed",
+  "fast_ms": {
+    "n": 100,
+    "median": 188.5485,
+    "p95": 226.135,
+    "max": 528.611,
+    "sum": 18297.707
+  },
+  "block_observed_ms": {
+    "n": 100,
+    "median": 3134.7034999999996,
+    "p95": 4813.603,
+    "max": 5225.786,
+    "sum": 312465.999
+  },
+  "member_observed_ms": {
+    "n": 100,
+    "median": 3160.47,
+    "p95": 4863.986,
+    "max": 5249.271,
+    "sum": 316277.301
+  },
+  "send_to_response_ms": {
+    "n": 100,
+    "median": 96.0025,
+    "p95": 121.028,
+    "max": 512.012,
+    "sum": 10268.049
+  },
+  "wallet_verify_save_ms": {
+    "n": 100,
+    "median": 92.914,
+    "p95": 106.307,
+    "max": 106.533,
+    "sum": 8029.658
+  },
+  "save_ms": {
+    "n": 100,
+    "median": 275.5265,
+    "p95": 904.517,
+    "max": 967.21,
+    "sum": 39379.31
+  },
+  "save_to_relay_ms": {
+    "n": 100,
+    "median": 1564.1354999999999,
+    "p95": 3250.059,
+    "max": 4083.04,
+    "sum": 161974.073
+  },
+  "save_wait_ms": {
+    "n": 100,
+    "median": 248.119,
+    "p95": 896.33,
+    "max": 946.057,
+    "sum": 37594.166
+  },
+  "physical_updates": 250,
+  "changed_transactions": 216,
+  "logical_updates": 250,
+  "logical_by_kind": {
+    "persist_callback": 100,
+    "relay_callback": 134,
+    "follow_update_started": 16
+  },
+  "batch_sizes": {
+    "1": 250
+  },
+  "write_sync_ms": 4209.205871,
+  "events": 1972,
+  "committee_records": {
+    "committee0": 100,
+    "committee1": 100,
+    "committee2": 100,
+    "committee3": 100
+  },
+  "committee_commit_ms": {
+    "n": 100,
+    "median": 2902.1385,
+    "p95": 4495.446,
+    "max": 4883.817,
+    "sum": 282352.98099999997
+  }
+}

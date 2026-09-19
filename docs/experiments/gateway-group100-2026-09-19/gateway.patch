@@ -1,0 +1,13 @@
+diff --git a/cmd/gateway/main.go b/cmd/gateway/main.go
+index fd47c1f..beaee64 100644
+--- a/cmd/gateway/main.go
++++ b/cmd/gateway/main.go
+@@ -107 +107 @@ func run() error {
+-	db, e := store.Open(filepath.Join(c.DataDir, "gateway.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: n.Schema()})
++	base, e := store.Open(filepath.Join(c.DataDir, "gateway.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: n.Schema()})
+@@ -110,0 +111,5 @@ func run() error {
++	db, e := store.NewGroup(base, 256, 64)
++	if e != nil {
++		base.Close()
++		return e
++	}

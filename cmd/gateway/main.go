@@ -104,8 +104,13 @@ func run() error {
 	if e != nil {
 		return e
 	}
-	db, e := store.Open(filepath.Join(c.DataDir, "gateway.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: n.Schema()})
+	base, e := store.Open(filepath.Join(c.DataDir, "gateway.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: n.Schema()})
 	if e != nil {
+		return e
+	}
+	db, e := store.NewGroup(base, 256, 64)
+	if e != nil {
+		base.Close()
 		return e
 	}
 	defer db.Close()

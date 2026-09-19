@@ -10,7 +10,7 @@ import (
 )
 
 func TestStorageContracts(t *testing.T) {
-	for _, backend := range []string{"memory", "bbolt"} {
+	for _, backend := range []string{"memory", "bbolt", "group-bbolt"} {
 		t.Run(backend, func(t *testing.T) {
 			var db Store
 			if backend == "memory" {
@@ -21,6 +21,13 @@ func TestStorageContracts(t *testing.T) {
 					t.Fatal(e)
 				}
 				db = b
+				if backend == "group-bbolt" {
+					db, e = NewGroup(b, 256, 64)
+					if e != nil {
+						b.Close()
+						t.Fatal(e)
+					}
+				}
 			}
 			defer db.Close()
 			rollback := errors.New("business rejection")
