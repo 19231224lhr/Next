@@ -54,6 +54,7 @@ func audit(args []string) error {
 	type nodeReport struct {
 		Name                                 string
 		Approvals, Pending, Payments, Closed int
+		PrivateProofRecords                  int `json:",omitempty"`
 		CAL, FUEL, Rewards, Burned           string
 		StateHash, Gap                       string `json:",omitempty"`
 		Revisions                            int    `json:",omitempty"`
@@ -139,6 +140,7 @@ func audit(args []string) error {
 					item.Burned = fmt.Sprint(result.Burned)
 					item.Payments = result.Payments
 					item.Closed = result.Closed
+					item.PrivateProofRecords = result.PrivateProofRecords
 					item.StateHash = result.StateHash
 					if directState != "" && directState != result.StateHash {
 						return fmt.Errorf("committee application states differ")

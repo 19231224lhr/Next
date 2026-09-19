@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 	cfg "utxo/cmd/internal/config"
-	"utxo/finality"
-	"utxo/internal/rules"
+	"utxo/internal/blockfollow"
+	"utxo/internal/member"
 	"utxo/internal/store"
 	"utxo/internal/transport"
 	"utxo/internal/wallet"
@@ -24,7 +24,7 @@ import (
 // This is a bounded closed-loop experiment, not a maximum-throughput claim.
 // Each worker has one outstanding payment and observes its own receipts.
 func benchDirect(args []string) error {
-	flags := flag.NewFlagSet("bench-v3", flag.ContinueOnError)
+	flags := flag.NewFlagSet("bench-v4", flag.ContinueOnError)
 	dir := flags.String("dir", "", "v3 laboratory")
 	start := flags.Int("start", 100, "unused genesis input index")
 	count := flags.Int("count", 128, "transactions")
@@ -75,7 +75,7 @@ func benchDirect(args []string) error {
 	if *start+*count > len(inputs) {
 		return protocol.ErrRule
 	}
-	db, err := store.Open(filepath.Join(*dir, fmt.Sprintf("bench-v3-%d.db", *start)), store.Identity{Network: n.ChainID, Role: "bench", Node: fmt.Sprint(*start), Schema: 3})
+	db, err := store.Open(filepath.Join(*dir, fmt.Sprintf("bench-v4-%d.db", *start)), store.Identity{Network: n.ChainID, Role: "bench", Node: fmt.Sprint(*start), Schema: 4})
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func benchDirect(args []string) error {
 	encoded := make([][]byte, *count)
 	for i := range requests {
 		origin := n.Genesis.Outputs[inputs[*start+i]]
-		body := protocol.TxBody{Wire: 3, Version: 3, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: publicOwner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: policy.Rules(), Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: origin.Output.Amount, Recipient: target}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
+		body := protocol.TxBody{Wire: 4, Version: 4, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: publicOwner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: policy.Rules(), Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: origin.Output.Amount, Recipient: target}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
 		for _, g := range n.Genesis.Grants {
 			if g.Organization == org.Hash() {
 				body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
@@ -124,16 +124,17 @@ func benchDirect(args []string) error {
 		}
 	}
 	type sample struct {
-		Index                                     int
-		FastMS, ProofObservedMS, CreditObservedMS float64
-		Fact                                      string
-		Error                                     string `json:",omitempty"`
+		Index                                    int
+		FastMS, BlockObservedMS, MemberAppliedMS float64
+		Fact                                     string
+		Error                                    string `json:",omitempty"`
 	}
 	samples := make([]sample, *count)
 	httpClient := transport.NewHTTPClient(10 * time.Second)
 	public := transport.NewCommitteeClient(n.CommitteeURLs[0])
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
+	defer blockfollow.Start(ctx, cancel, group, public, trust, receiver.ApplyBlock)()
 	jobs := make(chan int, *count)
 	for i := 0; i < *count; i++ {
 		jobs <- i
@@ -179,36 +180,43 @@ func benchDirect(args []string) error {
 					defer ticker.Stop()
 					created := false
 					for {
+
 						if !created {
-							proof, err := public.Receipt(ctx, protocol.FactOutputCreated, protocol.Hash(cert.Summary.OutputID(0)))
-							if err == nil {
-								if err = receiver.FinalizeDirect(trust, proof); err != nil {
-									return err
-								}
-								created = true
-								samples[i].ProofObservedMS = float64(time.Since(sent)) / float64(time.Millisecond)
-							}
-						}
-						proofs, err := public.DirectReceipts(ctx, cert.QC.Fact)
-						complete := false
-						if err == nil {
-							var facts []protocol.FinalFact
-							for _, proof := range proofs {
-								verified, err := finality.Verify(trust, proof)
-								if err != nil {
-									return err
-								}
-								facts = append(facts, verified.Fact())
-							}
-							complete, err = rules.CheckDirectCredits(cert.Summary, facts)
+							ok, err := receiver.DirectFinal(cert.Summary.OutputID(0), 0)
 							if err != nil {
 								return err
 							}
+							if ok {
+								created = true
+								samples[i].BlockObservedMS = float64(time.Since(sent)) / float64(time.Millisecond)
+							}
 						}
-						if created && complete {
-							samples[i].CreditObservedMS = float64(time.Since(sent)) / float64(time.Millisecond)
-							return nil
+						if created {
+							complete := true
+							for _, url := range n.Members[org.Org] {
+								r, err := http.NewRequestWithContext(ctx, "GET", url+"/v4/progress/"+protocol.Hash(cert.QC.Fact).String(), nil)
+								if err != nil {
+									return err
+								}
+								response, err := httpClient.Do(r)
+								if err != nil {
+									complete = false
+									break
+								}
+								var status member.DirectStatus
+								err = json.NewDecoder(response.Body).Decode(&status)
+								response.Body.Close()
+								if err != nil || response.StatusCode != 200 || !status.Observed || status.Signed && !status.Closed {
+									complete = false
+									break
+								}
+							}
+							if complete {
+								samples[i].MemberAppliedMS = float64(time.Since(sent)) / float64(time.Millisecond)
+								return nil
+							}
 						}
+
 						select {
 						case <-ctx.Done():
 							return ctx.Err()
@@ -234,8 +242,8 @@ func benchDirect(args []string) error {
 			continue
 		}
 		fast = append(fast, s.FastMS)
-		proof = append(proof, s.ProofObservedMS)
-		credit = append(credit, s.CreditObservedMS)
+		proof = append(proof, s.BlockObservedMS)
+		credit = append(credit, s.MemberAppliedMS)
 	}
 	quantile := func(xs []float64, q float64) float64 {
 		if len(xs) == 0 {
@@ -244,12 +252,12 @@ func benchDirect(args []string) error {
 		sort.Float64s(xs)
 		return xs[int(float64(len(xs)-1)*q)]
 	}
-	summary := map[string]any{"timing_origin": "wallet_http_submit_v3", "workload": "closed_loop_final_utxo_cross_org", "count": *count, "concurrency": *concurrency, "failed": failed, "elapsed_s": elapsed.Seconds(), "completed_per_second": float64(*count-failed) / elapsed.Seconds(), "fast_p50_ms": quantile(fast, .5), "fast_p95_ms": quantile(fast, .95), "proof_observed_p50_ms": quantile(proof, .5), "credit_observed_p50_ms": quantile(credit, .5), "note": "Proof/credit figures include polling and client verification; member application drain is checked separately by stopped audit."}
+	summary := map[string]any{"timing_origin": "wallet_http_submit_v4", "workload": "closed_loop_final_utxo_cross_org", "count": *count, "concurrency": *concurrency, "failed": failed, "elapsed_s": elapsed.Seconds(), "completed_per_second": float64(*count-failed) / elapsed.Seconds(), "fast_p50_ms": quantile(fast, .5), "fast_p95_ms": quantile(fast, .95), "block_observed_p50_ms": quantile(proof, .5), "member_applied_p50_ms": quantile(credit, .5), "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested."}
 	report := struct {
 		Summary map[string]any
 		Samples []sample
 	}{summary, samples}
-	path := filepath.Join(*dir, "reports", fmt.Sprintf("bench-v3-%d.json", *start))
+	path := filepath.Join(*dir, "reports", fmt.Sprintf("bench-v4-%d.json", *start))
 	if err = cfg.Write(path, report); err != nil {
 		return err
 	}

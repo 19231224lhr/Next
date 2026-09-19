@@ -48,7 +48,7 @@ func directPaymentHandler(c *gateway.Collector) http.HandlerFunc {
 		w.Header().Set("Content-Length", strconv.Itoa(len(raw)))
 		_, _ = w.Write(raw)
 		_ = http.NewResponseController(w).Flush()
-		if err = c.PersistDirect(protocol.DirectPayment{Tx: req.Tx, Certificate: cert, Parents: req.Parents}); err != nil {
+		if err = c.PersistDirect(protocol.DirectPayment{Tx: req.Tx, Certificate: cert, InputCertificates: req.InputCertificates}); err != nil {
 			slog.Error("background v3 certificate persistence failed", "error", err)
 		}
 	}

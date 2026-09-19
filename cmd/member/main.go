@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 	cfg "utxo/cmd/internal/config"
+	"utxo/internal/blockfollow"
 	"utxo/internal/gateway"
 	"utxo/internal/member"
 	"utxo/internal/store"
@@ -82,13 +83,16 @@ func run() error {
 	relay.ApplyReceipts = m.ApplyReceipts
 	if n.Direct != nil {
 		relay.Direct = true
-		relay.ApplyDirectReceipts = m.ApplyDirectReceipts
+		relay.MemberRelay = true
 	}
 	relay.Install = func(c protocol.TXCer) error {
 		if c.Tx.Body.Certifier == org.Org {
 			return m.Install(c)
 		}
 		return nil
+	}
+	if n.Direct != nil {
+		defer blockfollow.Start(ctx, stop, group, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, m.ApplyBlock)()
 	}
 	relayDone := make(chan error, 1)
 	go func() { relayDone <- relay.Run(relayCtx) }()

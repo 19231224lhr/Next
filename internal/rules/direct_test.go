@@ -88,13 +88,13 @@ func newDirectFixture(t *testing.T) directFixture {
 func (f directFixture) payment(t *testing.T, input protocol.OutputID, parent *protocol.OutputCertificate, nonce byte) DirectPayment {
 	t.Helper()
 	in := protocol.Input{Kind: protocol.FinalInput, Output: input, Evidence: protocol.Digest("genesis-fact")}
-	var parents []DirectParent
+	var parents []InputCertificate
 	if parent != nil {
 		in.Kind = protocol.CertificateInput
 		in.Evidence = protocol.Hash(parent.QC.Fact)
-		parents = []DirectParent{{Certificate: *parent, Index: 0}}
+		parents = []InputCertificate{{Certificate: *parent, Index: 0}}
 	}
-	body := protocol.TxBody{Wire: 3, Version: 3, Network: f.org.Network, Kind: protocol.FastTransfer, Subject: f.output.Recipient.Owner, Certifier: f.org.Org, Config: f.org.Hash(), Epoch: 1, Rules: f.policy.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{f.output}, Admission: f.grants,
+	body := protocol.TxBody{Wire: 4, Version: 4, Network: f.org.Network, Kind: protocol.FastTransfer, Subject: f.output.Recipient.Owner, Certifier: f.org.Org, Config: f.org.Hash(), Epoch: 1, Rules: f.policy.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{f.output}, Admission: f.grants,
 		Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: f.org.Org, Policy: protocol.Digest("policy"), Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
 	body.Nonce[0] = nonce
 	body.Intent = body.IntentID()
@@ -112,7 +112,7 @@ func (f directFixture) payment(t *testing.T, input protocol.OutputID, parent *pr
 	for i := 0; i < 3; i++ {
 		c.QC.Votes = append(c.QC.Votes, protocol.SignSpend(c.QC.Fact, uint16(i), f.members[i]))
 	}
-	return DirectPayment{Tx: tx, Certificate: c, Parents: parents}
+	return DirectPayment{Tx: tx, Certificate: c, InputCertificates: parents}
 }
 
 func (f directFixture) settle(t *testing.T, p DirectPayment, now int64) state.Transition {
@@ -172,7 +172,7 @@ func TestDirectChildBeforeParentAndImmediateSuccessor(t *testing.T) {
 	if ob.Status != DirectFulfilled {
 		t.Fatal("parent did not discharge direct responsibility")
 	}
-	if got := loadDirect[protocol.CreditReceipt](t, f.db, DirectCALCreditKey(parent.Certificate.QC.Fact)); got.Discharged != 100 || got.Paid != 0 {
+	if got := loadDirect[directCoverage](t, f.db, state.Key(keyDirectCoverage, parent.Certificate.QC.Fact[:])).Credit; got.Discharged != 100 || got.Paid != 0 {
 		t.Fatalf("bad credit: %+v", got)
 	}
 	if len(f.settle(t, child, 103).Changes) != 0 {
@@ -208,7 +208,7 @@ func TestDirectRepairThenLateParent(t *testing.T) {
 	if got := loadDirect[state.Creation](t, f.db, DirectCreationKey(pid, 1)); !got.Final {
 		t.Fatal("late output not available")
 	}
-	if got := loadDirect[protocol.CreditReceipt](t, f.db, DirectCALCreditKey(parent.Certificate.QC.Fact)); got.Paid != 100 || got.Discharged != 0 {
+	if got := loadDirect[directCoverage](t, f.db, state.Key(keyDirectCoverage, parent.Certificate.QC.Fact[:])).Credit; got.Paid != 100 || got.Discharged != 0 {
 		t.Fatalf("paid principal returned as credit: %+v", got)
 	}
 	conflict := f.payment(t, pid, &parent.Certificate, 4)

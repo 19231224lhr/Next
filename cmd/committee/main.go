@@ -157,7 +157,7 @@ func run() error {
 	client := local.New(consensus)
 	mux := http.NewServeMux()
 	if network.Direct != nil {
-		mux.HandleFunc("GET /v3/receipts/{spend}", directReceiptsHandler(app, engine, client))
+		blockRoutes(mux, client)
 	}
 	mux.HandleFunc("POST /v1/commands", func(w http.ResponseWriter, r *http.Request) {
 		var received int64
@@ -195,83 +195,85 @@ func run() error {
 		w.WriteHeader(http.StatusAccepted)
 		_ = json.NewEncoder(w).Encode(map[string]string{"command": fmt.Sprintf("%X", result.Hash), "status": "SUBMITTED"})
 	})
-	mux.HandleFunc("GET /v1/receipts/{kind}/{key}", func(w http.ResponseWriter, r *http.Request) {
-		kind, e := strconv.ParseUint(r.PathValue("kind"), 10, 16)
-		if e != nil {
-			http.Error(w, "INVALID_KIND", 400)
-			return
-		}
-		var key protocol.Hash
-		if e = key.UnmarshalText([]byte(r.PathValue("key"))); e != nil {
-			http.Error(w, "INVALID_KEY", 400)
-			return
-		}
-		fact, e := app.LatestFact(protocol.FactKind(kind), key)
-		if e != nil {
-			http.Error(w, "DEFERRED", 404)
-			return
-		}
-		height, e := app.FactHeight(fact.ID())
-		if e != nil {
-			http.Error(w, "PROOF_PENDING", 503)
-			return
-		}
-		height++
-		commit, e := client.Commit(r.Context(), &height)
-		if e != nil {
-			http.Error(w, "PROOF_PENDING", 503)
-			return
-		}
-		proof, e := app.Proof(fact.ID(), commit.SignedHeader)
-		if e != nil {
-			http.Error(w, "PROOF_PENDING", 503)
-			return
-		}
-		raw, e := proof.MarshalBinary()
-		if e != nil {
-			http.Error(w, "PROOF_UNAVAILABLE", 500)
-			return
-		}
-		w.Header().Set("Content-Type", transport.MediaType)
-		_, _ = w.Write(raw)
-	})
-	mux.HandleFunc("GET /v1/outcomes/{spend}", func(w http.ResponseWriter, r *http.Request) {
-		var id protocol.Hash
-		if e := id.UnmarshalText([]byte(r.PathValue("spend"))); e != nil {
-			http.Error(w, "INVALID_ID", 400)
-			return
-		}
-		p, e := engine.Payment(protocol.SpendFactID(id))
-		if e != nil {
-			http.Error(w, "DEFERRED", 404)
-			return
-		}
-		phase := "REGISTERED"
-		if p.Settled {
-			phase = "SETTLED"
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(struct {
-			PublicPhase string
-			FeeClosed   bool
-			Paid        string
-			ProofStatus string
-		}{phase, p.Fee.Closed, strconv.FormatUint(p.Fee.Rewards+p.Fee.Burned, 10), "PENDING_CLIENT_VERIFICATION"})
-	})
-	mux.HandleFunc("GET /v1/txcers/{spend}", func(w http.ResponseWriter, r *http.Request) {
-		var id protocol.Hash
-		if e := id.UnmarshalText([]byte(r.PathValue("spend"))); e != nil {
-			http.Error(w, "INVALID_ID", 400)
-			return
-		}
-		p, e := engine.Payment(protocol.SpendFactID(id))
-		if e != nil {
-			http.Error(w, "DEFERRED", 404)
-			return
-		}
-		w.Header().Set("Content-Type", transport.MediaType)
-		_, _ = w.Write(p.Certificate)
-	})
+	if network.Direct == nil {
+		mux.HandleFunc("GET /v1/receipts/{kind}/{key}", func(w http.ResponseWriter, r *http.Request) {
+			kind, e := strconv.ParseUint(r.PathValue("kind"), 10, 16)
+			if e != nil {
+				http.Error(w, "INVALID_KIND", 400)
+				return
+			}
+			var key protocol.Hash
+			if e = key.UnmarshalText([]byte(r.PathValue("key"))); e != nil {
+				http.Error(w, "INVALID_KEY", 400)
+				return
+			}
+			fact, e := app.LatestFact(protocol.FactKind(kind), key)
+			if e != nil {
+				http.Error(w, "DEFERRED", 404)
+				return
+			}
+			height, e := app.FactHeight(fact.ID())
+			if e != nil {
+				http.Error(w, "PROOF_PENDING", 503)
+				return
+			}
+			height++
+			commit, e := client.Commit(r.Context(), &height)
+			if e != nil {
+				http.Error(w, "PROOF_PENDING", 503)
+				return
+			}
+			proof, e := app.Proof(fact.ID(), commit.SignedHeader)
+			if e != nil {
+				http.Error(w, "PROOF_PENDING", 503)
+				return
+			}
+			raw, e := proof.MarshalBinary()
+			if e != nil {
+				http.Error(w, "PROOF_UNAVAILABLE", 500)
+				return
+			}
+			w.Header().Set("Content-Type", transport.MediaType)
+			_, _ = w.Write(raw)
+		})
+		mux.HandleFunc("GET /v1/outcomes/{spend}", func(w http.ResponseWriter, r *http.Request) {
+			var id protocol.Hash
+			if e := id.UnmarshalText([]byte(r.PathValue("spend"))); e != nil {
+				http.Error(w, "INVALID_ID", 400)
+				return
+			}
+			p, e := engine.Payment(protocol.SpendFactID(id))
+			if e != nil {
+				http.Error(w, "DEFERRED", 404)
+				return
+			}
+			phase := "REGISTERED"
+			if p.Settled {
+				phase = "SETTLED"
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(struct {
+				PublicPhase string
+				FeeClosed   bool
+				Paid        string
+				ProofStatus string
+			}{phase, p.Fee.Closed, strconv.FormatUint(p.Fee.Rewards+p.Fee.Burned, 10), "PENDING_CLIENT_VERIFICATION"})
+		})
+		mux.HandleFunc("GET /v1/txcers/{spend}", func(w http.ResponseWriter, r *http.Request) {
+			var id protocol.Hash
+			if e := id.UnmarshalText([]byte(r.PathValue("spend"))); e != nil {
+				http.Error(w, "INVALID_ID", 400)
+				return
+			}
+			p, e := engine.Payment(protocol.SpendFactID(id))
+			if e != nil {
+				http.Error(w, "DEFERRED", 404)
+				return
+			}
+			w.Header().Set("Content-Type", transport.MediaType)
+			_, _ = w.Write(p.Certificate)
+		})
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		info, _ := app.Info(r.Context(), &abci.RequestInfo{})
 		_ = json.NewEncoder(w).Encode(map[string]string{"height": strconv.FormatInt(info.LastBlockHeight, 10)})

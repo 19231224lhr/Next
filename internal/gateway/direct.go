@@ -5,8 +5,6 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"time"
-	"utxo/finality"
-	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/protocol"
 )
@@ -14,9 +12,6 @@ import (
 type DirectMemberClient interface {
 	ApproveDirect(context.Context, protocol.DirectRequest) (protocol.DirectApproval, error)
 	InstallDirect(context.Context, protocol.DirectPayment) error
-}
-type DirectCreditClient interface {
-	DirectReceipts(context.Context, protocol.SpendFactID) ([]finality.FactProof, error)
 }
 
 func (c *Collector) CollectDirect(ctx context.Context, request protocol.DirectRequest) (protocol.OutputCertificate, error) {
@@ -98,6 +93,11 @@ func (c *Collector) PersistDirect(p protocol.DirectPayment) error {
 			return nil, err
 		}
 		o.Set(key, raw)
+		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
+			return nil, err
+		} else if found {
+			return o.Changes(), nil
+		}
 		if err := state.Put(o, state.Key(state.KeyOutbox, fact[:]), state.Outbox{Fact: fact, Certificate: raw, Origin: p.Tx.Body.Certifier}); err != nil {
 			return nil, err
 		}
@@ -118,7 +118,7 @@ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Out
 	if pending.PublicComplete {
 		return nil
 	}
-	if r.ApplyDirectReceipts == nil {
+	if !r.MemberRelay {
 		targets := r.installTargets(pending.Fact)
 		done := make(chan struct{}, 4)
 		for i, m := range r.Members[c.Summary.Issuer] {
@@ -144,38 +144,12 @@ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Out
 		_ = r.Public.Submit(ctx, pending.Certificate)
 		pending.NextSubmitUnixNS = now + int64(2*time.Second)
 	}
-	public, ok := r.Public.(DirectCreditClient)
-	if !ok {
-		return protocol.ErrUnsupported
-	}
-	proofs, queryErr := public.DirectReceipts(ctx, c.QC.Fact)
-	if queryErr != nil {
-		proofs = nil
-	}
-	facts := make([]protocol.FinalFact, 0, len(proofs))
-	for _, proof := range proofs {
-		verified, err := finality.Verify(r.Trust, proof)
-		if err != nil {
-			return err
-		}
-		facts = append(facts, verified.Fact())
-	}
-	complete, err := rules.CheckDirectCredits(c.Summary, facts)
-	if err != nil {
-		return err
-	}
-	if r.ApplyDirectReceipts != nil {
-		if err = r.ApplyDirectReceipts(proofs); err != nil {
-			return err
-		}
-	}
-	if complete {
-		pending.PublicComplete = true
-		r.forgetInstall(pending.Fact)
-	}
 	return r.DB.Update(func(v state.ReadView) ([]state.Change, error) {
-		if complete {
-			return []state.Change{{Key: key, Delete: true}}, nil
+		if _, err := v.Get(key); errors.Is(err, state.ErrNotFound) {
+			r.forgetInstall(pending.Fact)
+			return nil, nil
+		} else if err != nil {
+			return nil, err
 		}
 		o := state.NewOverlay(v)
 		if err := state.Put(o, key, pending); err != nil {

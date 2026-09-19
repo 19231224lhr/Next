@@ -16,7 +16,7 @@ import (
 var redactionKey *chameleon.Public
 var redactionChain string
 var redactionConfig sync.Mutex
-var txMagic = []byte{'U', 'T', 'X', 'O', '3', 'C', 'H', 0}
+var txMagic = []byte{'U', 'T', 'X', 'O', '4', 'C', 'H', 0}
 var partMagic = []byte{'P', 'A', 'R', 'T', '3', 'C', 'H', 0}
 var ErrRedaction = errors.New("invalid wire-v3 redaction")
 
@@ -51,7 +51,8 @@ func EncodeRedactableTx(fixed, mutable []byte) Tx {
 
 func redactionTxHash(tx Tx) []byte {
 	data := []byte(tx)
-	if redactionKey != nil && len(tx) >= 16 && bytes.Equal(tx[:8], txMagic) {
+	// Wire identity is self-describing; readers need no repair-key setup.
+	if len(tx) >= 16 && bytes.Equal(tx[:8], txMagic) {
 		n, m := uint64(binary.BigEndian.Uint32(tx[8:12])), uint64(binary.BigEndian.Uint32(tx[12:16]))
 		if n+m+16 == uint64(len(tx)) {
 			data = tx[:16+n]

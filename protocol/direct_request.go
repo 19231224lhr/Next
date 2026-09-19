@@ -1,8 +1,8 @@
 package protocol
 
 type DirectRequest struct {
-	Tx      FastTx
-	Parents []DirectParent
+	Tx                FastTx
+	InputCertificates []InputCertificate
 }
 type DirectApproval struct {
 	Summary OutputSummary
@@ -14,14 +14,14 @@ func (r DirectRequest) MarshalBinary() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(r.Parents) > MaxInputs {
+	if len(r.InputCertificates) > MaxInputs {
 		return nil, ErrEncoding
 	}
 	e := new(Encoder)
 	e.U16(306)
 	e.Bytes(tx)
-	e.U32(uint32(len(r.Parents)))
-	for _, p := range r.Parents {
+	e.U32(uint32(len(r.InputCertificates)))
+	for _, p := range r.InputCertificates {
 		b, err := p.Certificate.MarshalBinary()
 		if err != nil {
 			return nil, err
@@ -46,13 +46,13 @@ func DecodeDirectRequest(raw []byte) (r DirectRequest, err error) {
 	if err != nil {
 		return r, err
 	}
-	r.Parents = make([]DirectParent, d.Count(MaxInputs))
-	for i := range r.Parents {
-		r.Parents[i].Certificate, err = DecodeOutputCertificate(d.Bytes(MaxCertificateBytes))
+	r.InputCertificates = make([]InputCertificate, d.Count(MaxInputs))
+	for i := range r.InputCertificates {
+		r.InputCertificates[i].Certificate, err = DecodeOutputCertificate(d.Bytes(MaxCertificateBytes))
 		if err != nil {
 			return r, err
 		}
-		r.Parents[i].Index = d.U32()
+		r.InputCertificates[i].Index = d.U32()
 	}
 	return r, d.Done()
 }

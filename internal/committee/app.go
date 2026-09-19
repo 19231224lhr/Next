@@ -114,8 +114,8 @@ func (a *App) Info(context.Context, *abci.RequestInfo) (*abci.ResponseInfo, erro
 	defer a.mu.Unlock()
 	version, name := uint64(2), "utxo-v2"
 	if a.executeAt != nil {
-		version = 3
-		name = "utxo-v3"
+		version = 4
+		name = "utxo-v4"
 	}
 	return &abci.ResponseInfo{Version: name, AppVersion: version, LastBlockHeight: a.committed.Height, LastBlockAppHash: bytes.Clone(a.response.AppHash)}, nil
 }
@@ -205,6 +205,9 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 			}
 			candidate := state.NewOverlay(overlay)
 			candidate.Apply(transition.Changes)
+			if a.executeAt != nil && len(transition.Facts) != 0 {
+				return protocol.ErrRule
+			}
 			for _, f := range transition.Facts {
 				if f.Network != protocol.Digest("NETWORK", []byte(a.chain)) {
 					return finality.ErrProof
@@ -267,6 +270,7 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 			if err = apply(transition); err != nil {
 				return err
 			}
+			response.TxResults[i].Data = bytes.Clone(transition.Data)
 		}
 		if a.maintenance != nil {
 			transition, err := a.maintenance(overlay)
@@ -314,12 +318,18 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 			enc.Optional(c.Delete)
 			enc.Bytes(c.Value)
 		}
-		commitment = finality.Commitment{Network: protocol.Digest("NETWORK", []byte(a.chain)), Height: r.Height, Previous: bytes.Clone(a.response.AppHash), WriteSet: protocol.Digest("WRITE_SET", enc.Data()), FactRoot: merkle.HashFromByteSlices(leaves)}
-		root, e := commitment.Hash()
-		if e != nil {
-			return nil, e
+		if a.executeAt != nil {
+			network := protocol.Digest("NETWORK", []byte(a.chain))
+			root := protocol.Digest("APP_V4", network[:], a.response.AppHash, enc.Data())
+			response.AppHash = bytes.Clone(root[:])
+		} else {
+			commitment = finality.Commitment{Network: protocol.Digest("NETWORK", []byte(a.chain)), Height: r.Height, Previous: bytes.Clone(a.response.AppHash), WriteSet: protocol.Digest("WRITE_SET", enc.Data()), FactRoot: merkle.HashFromByteSlices(leaves)}
+			root, e := commitment.Hash()
+			if e != nil {
+				return nil, e
+			}
+			response.AppHash = bytes.Clone(root[:])
 		}
-		response.AppHash = bytes.Clone(root[:])
 	}
 
 	raw, e := response.Marshal()
@@ -346,7 +356,10 @@ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit
 		return nil, e
 	}
 	cs := append([]state.Change(nil), a.pendingChanges...)
-	cs = append(cs, state.Change{Key: metaKey, Value: raw}, state.Change{Key: blockKey(a.pending.Height), Value: raw})
+	cs = append(cs, state.Change{Key: metaKey, Value: raw})
+	if a.executeAt == nil {
+		cs = append(cs, state.Change{Key: blockKey(a.pending.Height), Value: raw})
+	}
 	for i, rawFact := range a.pending.Leaves {
 		f, e := protocol.DecodeFact(rawFact)
 		if e != nil {

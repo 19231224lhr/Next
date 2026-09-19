@@ -1,10 +1,7 @@
 package rules
 
 import (
-	"bytes"
-	"encoding/json"
 	"math"
-	"sort"
 
 	"utxo/crypto/chameleon"
 	"utxo/internal/state"
@@ -26,15 +23,15 @@ func (p DirectPolicy) Rules() protocol.RuleIDs {
 	e.Fixed(r.Accounting[:])
 	e.U64(uint64(p.TimeoutSeconds))
 	e.U64(p.RepairCost)
-	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V3_COMMIT_ANCHOR", e.Data())
+	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V4_BLOCK_FOLLOWING", e.Data())
 	return r
 }
 
-type DirectParent = protocol.DirectParent
+type InputCertificate = protocol.InputCertificate
 type DirectPayment = protocol.DirectPayment
 type VerifiedDirectPayment struct {
 	payment DirectPayment
-	parents map[protocol.OutputID]DirectParent
+	parents map[protocol.OutputID]InputCertificate
 }
 
 const (
@@ -42,7 +39,6 @@ const (
 	keyDirectPromise    uint8 = 101
 	keyDirectObligation uint8 = 102
 	keyDirectPayment    uint8 = 103
-	keyDirectCALCredit  uint8 = 104
 	keyDirectRepair     uint8 = 105
 	keyDirectGap        uint8 = 106
 )
@@ -58,10 +54,9 @@ func DirectCreationKey(id protocol.OutputID, instance uint8) []byte {
 func DirectSpendKey(id protocol.OutputID, instance uint8) []byte {
 	return state.Key(state.KeySpend, id[:], []byte{instance})
 }
-func DirectObligationKey(id protocol.OutputID) []byte   { return state.Key(keyDirectObligation, id[:]) }
-func DirectCALCreditKey(id protocol.SpendFactID) []byte { return state.Key(keyDirectCALCredit, id[:]) }
-func DirectRepairKey(id protocol.OutputID) []byte       { return state.Key(keyDirectRepair, id[:]) }
-func DirectGapKey() []byte                              { return state.Key(keyDirectGap) }
+func DirectObligationKey(id protocol.OutputID) []byte { return state.Key(keyDirectObligation, id[:]) }
+func DirectRepairKey(id protocol.OutputID) []byte     { return state.Key(keyDirectRepair, id[:]) }
+func DirectGapKey() []byte                            { return state.Key(keyDirectGap) }
 
 func DirectDueKey(deadline int64, id protocol.OutputID) []byte {
 	e := new(protocol.Encoder)
@@ -90,9 +85,11 @@ type directPromise struct {
 	Index       uint32
 	Status      uint8
 }
+type CoverageBalance struct{ Original, Paid, Discharged, Remaining, Revision uint64 }
+
 type directCoverage struct {
 	Summary protocol.OutputSummary
-	Credit  protocol.CreditReceipt
+	Credit  CoverageBalance
 }
 type directPayment struct {
 	Summary    protocol.OutputSummary
@@ -238,12 +235,12 @@ func VerifyDirectPayment(payment DirectPayment, p DirectPolicy) (VerifiedDirectP
 	if !ok || payment.Certificate.Verify(cfg) != nil || payment.Certificate.Summary.Fact() != protocol.SummaryFor(tx, vector).Fact() {
 		return VerifiedDirectPayment{}, protocol.ErrAuth
 	}
-	if len(payment.Parents) > protocol.MaxInputs {
+	if len(payment.InputCertificates) > protocol.MaxInputs {
 		return VerifiedDirectPayment{}, protocol.ErrRule
 	}
-	parents := make(map[protocol.OutputID]DirectParent, len(payment.Parents))
-	frozen := make([]DirectParent, 0, len(payment.Parents))
-	for _, parent := range payment.Parents {
+	parents := make(map[protocol.OutputID]InputCertificate, len(payment.InputCertificates))
+	frozen := make([]InputCertificate, 0, len(payment.InputCertificates))
+	for _, parent := range payment.InputCertificates {
 		parent.Certificate, err = freeze(parent.Certificate)
 		if err != nil {
 			return VerifiedDirectPayment{}, err
@@ -260,7 +257,7 @@ func VerifyDirectPayment(payment DirectPayment, p DirectPolicy) (VerifiedDirectP
 		parents[id] = parent
 		frozen = append(frozen, parent)
 	}
-	payment.Parents = frozen
+	payment.InputCertificates = frozen
 	for i, in := range tx.Body.Inputs {
 		if in.Kind != protocol.CertificateInput {
 			continue
@@ -274,30 +271,18 @@ func VerifyDirectPayment(payment DirectPayment, p DirectPolicy) (VerifiedDirectP
 }
 
 type directEval struct {
-	o       *state.Overlay
-	policy  DirectPolicy
-	network protocol.Hash
-	facts   map[string]protocol.FinalFact
+	o          *state.Overlay
+	policy     DirectPolicy
+	network    protocol.Hash
+	resultData protocol.ExecutionResult
 }
 
 func newDirectEval(v state.ReadView, p DirectPolicy, network protocol.Hash) *directEval {
-	return &directEval{o: state.NewOverlay(v), policy: p, network: network, facts: map[string]protocol.FinalFact{}}
-}
-func (e *directEval) emit(kind protocol.FactKind, key protocol.Hash, revision uint64, payload []byte) protocol.FinalFact {
-	f := protocol.FinalFact{Kind: kind, Key: key, Revision: revision, Network: e.network, Rules: e.policy.Rules(), Payload: payload}
-	k := new(protocol.Encoder)
-	k.U16(uint16(kind))
-	k.Fixed(key[:])
-	e.facts[string(k.Data())] = f
-	return f
+	return &directEval{o: state.NewOverlay(v), policy: p, network: network}
 }
 func (e *directEval) result() state.Transition {
-	facts := make([]protocol.FinalFact, 0, len(e.facts))
-	for _, f := range e.facts {
-		facts = append(facts, f)
-	}
-	sort.Slice(facts, func(i, j int) bool { return bytes.Compare(facts[i].SortKey(), facts[j].SortKey()) < 0 })
-	return state.Transition{Changes: e.o.Changes(), Facts: facts}
+	raw, _ := e.resultData.MarshalBinary()
+	return state.Transition{Changes: e.o.Changes(), Data: raw}
 }
 
 func (e *directEval) grant(s protocol.OutputSummary, index int) (state.Grant, error) {
@@ -320,7 +305,7 @@ func (e *directEval) register(c protocol.OutputCertificate) error {
 	} else if found {
 		return nil
 	}
-	var receipt protocol.CreditReceipt
+	var receipt CoverageBalance
 	for i, a := range s.Admission {
 		if a.Key.Kind == protocol.ResourceCAL {
 			g, err := e.grant(s, i)
@@ -330,7 +315,7 @@ func (e *directEval) register(c protocol.OutputCertificate) error {
 			if err = updateUsage(e.o, a.Key, a.Cap, 0, g.Amount, true); err != nil {
 				return err
 			}
-			receipt = protocol.CreditReceipt{Spend: fact, Resource: a.Key, Original: a.Cap, Remaining: a.Cap}
+			receipt = CoverageBalance{Original: a.Cap, Remaining: a.Cap}
 		}
 	}
 	if receipt.Original == 0 {
@@ -411,14 +396,7 @@ func (e *directEval) completeOutput(id protocol.OutputID, paid bool) error {
 	if err = state.Put(e.o, coverageKey, coverage); err != nil {
 		return err
 	}
-	if err = state.Put(e.o, DirectCALCreditKey(promise.Certificate), *r); err != nil {
-		return err
-	}
-	b, err := r.MarshalBinary()
-	if err != nil {
-		return err
-	}
-	e.emit(protocol.FactCredit, r.Key(), r.Revision, b)
+
 	return nil
 }
 
@@ -471,18 +449,8 @@ func (e *directEval) closeFee(p *directPayment) error {
 		if err = updateUsage(e.o, a.Key, a.Cap, spent, g.Amount, false); err != nil {
 			return err
 		}
-		r := protocol.CreditReceipt{Spend: p.Summary.Fact(), Resource: a.Key, Original: a.Cap, Paid: spent, Discharged: a.Cap - spent, Revision: 1}
-		b, err := r.MarshalBinary()
-		if err != nil {
-			return err
-		}
-		e.emit(protocol.FactCredit, r.Key(), 1, b)
 	}
-	b, err := json.Marshal(p.Fee)
-	if err != nil {
-		return err
-	}
-	e.emit(protocol.FactFeeClosed, protocol.Hash(p.Summary.Fact()), 1, b)
+
 	return nil
 }
 
@@ -564,6 +532,7 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 		return state.Transition{}, err
 	}
 	p := directPayment{Summary: c.Summary, FeeAccount: t.Fee.Account}
+	e.resultData.Applied = true
 	for i, a := range c.Summary.Admission {
 		if a.Key.Kind == protocol.ResourceCAL {
 			continue
@@ -639,6 +608,7 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 				return state.Transition{}, err
 			}
 			p.Pending++
+			e.resultData.MissingInputs = append(e.resultData.MissingInputs, uint32(i))
 		}
 		incoming, err = protocol.Add(incoming, claim.Output.Amount)
 		if err != nil {
@@ -689,14 +659,14 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 		if err = e.completeOutput(id, false); err != nil {
 			return state.Transition{}, err
 		}
-		payload, err := (protocol.SettledOutput{Spend: fact, ID: id, Transaction: tx.ID(), Index: uint32(i), Output: out}).MarshalBinary()
-		if err != nil {
+		if instance == 1 {
+			e.resultData.LateOutputs = append(e.resultData.LateOutputs, uint32(i))
+		}
+		created := protocol.CreationIdentity(t.Network, tx.ID(), uint32(i), instance)
+		if err = state.Put(e.o, DirectCreationKey(id, instance), state.Creation{Output: out, Fact: created, Source: protocol.Hash(fact), Final: true}); err != nil {
 			return state.Transition{}, err
 		}
-		f := e.emit(protocol.FactOutputCreated, protocol.Hash(id), uint64(instance)+1, payload)
-		if err = state.Put(e.o, DirectCreationKey(id, instance), state.Creation{Output: out, Fact: f.ID(), Source: protocol.Hash(fact), Final: true}); err != nil {
-			return state.Transition{}, err
-		}
+
 	}
 	if err = state.Put(e.o, state.Key(state.KeyIntent, t.Intent[:]), tx.ID()); err != nil {
 		return state.Transition{}, err
@@ -726,6 +696,7 @@ func EvaluateDirectCompensation(v state.ReadView, id protocol.OutputID, policy D
 		return state.Transition{}, protocol.ErrAuth
 	}
 	e := newDirectEval(v, policy, cfg.Network)
+	e.resultData.Applied = true
 	if err = changeAmount(e.o, AccountKey(ob.Issuer, protocol.AssetCAL), ob.Amount, true); err != nil {
 		return state.Transition{}, err
 	}

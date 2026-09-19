@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 	cfg "utxo/cmd/internal/config"
+	"utxo/internal/blockfollow"
 	"utxo/internal/gateway"
 	"utxo/internal/rules"
 	"utxo/internal/store"
@@ -73,7 +74,7 @@ func demoDirect(args []string) error {
 	}
 	origin := outputs[selected]
 	build := func(org protocol.OrgConfig, input protocol.Input, claim protocol.Output, to protocol.ReceiveDescriptor, nonce byte) (protocol.FastTx, error) {
-		body := protocol.TxBody{Wire: 3, Version: 3, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: claim.Recipient.Owner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: p.Rules(), Inputs: []protocol.Input{input}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: claim.Amount, Recipient: to}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
+		body := protocol.TxBody{Wire: 4, Version: 4, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: claim.Recipient.Owner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: p.Rules(), Inputs: []protocol.Input{input}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: claim.Amount, Recipient: to}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
 		for _, g := range n.Genesis.Grants {
 			if g.Organization == org.Hash() {
 				body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
@@ -96,12 +97,12 @@ func demoDirect(args []string) error {
 		tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), key)}
 		return tx, nil
 	}
-	db0, err := store.Open(filepath.Join(*dir, fmt.Sprintf("wallet-v3-%d-a.db", *index)), store.Identity{Network: n.ChainID, Role: "wallet", Node: "a", Schema: 3})
+	db0, err := store.Open(filepath.Join(*dir, fmt.Sprintf("wallet-v4-%d-a.db", *index)), store.Identity{Network: n.ChainID, Role: "wallet", Node: "a", Schema: 4})
 	if err != nil {
 		return err
 	}
 	defer db0.Close()
-	db1, err := store.Open(filepath.Join(*dir, fmt.Sprintf("wallet-v3-%d-b.db", *index)), store.Identity{Network: n.ChainID, Role: "wallet", Node: "b", Schema: 3})
+	db1, err := store.Open(filepath.Join(*dir, fmt.Sprintf("wallet-v4-%d-b.db", *index)), store.Identity{Network: n.ChainID, Role: "wallet", Node: "b", Schema: 4})
 	if err != nil {
 		return err
 	}
@@ -117,6 +118,8 @@ func demoDirect(args []string) error {
 	httpClient := transport.NewHTTPClient(10 * time.Second)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
+	defer blockfollow.Start(ctx, cancel, db0, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w0.ApplyBlock)()
+	defer blockfollow.Start(ctx, cancel, db1, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w1.ApplyBlock)()
 	var sent time.Time
 	send := func(org int, req protocol.DirectRequest) (protocol.OutputCertificate, error) {
 		raw, err := req.MarshalBinary()
@@ -180,7 +183,7 @@ func demoDirect(args []string) error {
 	if err != nil {
 		return err
 	}
-	childReq := protocol.DirectRequest{Tx: child, Parents: []protocol.DirectParent{{Certificate: pc, Index: 0}}}
+	childReq := protocol.DirectRequest{Tx: child, InputCertificates: []protocol.InputCertificate{{Certificate: pc, Index: 0}}}
 	if err = w1.SaveDirectRequest(childReq); err != nil {
 		return err
 	}
@@ -198,21 +201,22 @@ func demoDirect(args []string) error {
 	ticker := time.NewTicker(25 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		proof, err := public.Receipt(ctx, protocol.FactOutputCreated, protocol.Hash(cc.Summary.OutputID(0)))
-		if err == nil {
-			if err = w0.FinalizeDirect(trust, proof); err != nil {
-				return err
-			}
+		ok, err := w0.DirectFinal(cc.Summary.OutputID(0), 0)
+		if err != nil {
+			return err
+		}
+		if ok {
 			finalElapsed = time.Since(sent)
 			break
 		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
 		}
 	}
-	report := map[string]any{"timing_origin": "wallet_http_submit_v3", "parent_fast_ms": float64(parentFast) / float64(time.Millisecond), "child_fast_ms": float64(childFast) / float64(time.Millisecond), "child_public_proof_ms": float64(finalElapsed) / float64(time.Millisecond), "parent_output": protocol.Hash(pc.Summary.OutputID(0)).String(), "child_output": protocol.Hash(cc.Summary.OutputID(0)).String(), "parent_withheld": *withhold}
+	report := map[string]any{"timing_origin": "wallet_http_submit_v4", "parent_fast_ms": float64(parentFast) / float64(time.Millisecond), "child_fast_ms": float64(childFast) / float64(time.Millisecond), "child_block_observed_ms": float64(finalElapsed) / float64(time.Millisecond), "parent_output": protocol.Hash(pc.Summary.OutputID(0)).String(), "child_output": protocol.Hash(cc.Summary.OutputID(0)).String(), "parent_withheld": *withhold}
 	fmt.Println("Child finalized; waiting for compensation only when the parent is deliberately withheld.")
 	if *withhold {
 		url := n.CommitteeURLs[0] + "/v3/obligations/" + protocol.Hash(pc.Summary.OutputID(0)).String()
@@ -241,14 +245,15 @@ func demoDirect(args []string) error {
 			return err
 		}
 		for {
-			proof, err := public.Receipt(ctx, protocol.FactOutputCreated, protocol.Hash(pc.Summary.OutputID(0)))
-			if err == nil && proof.Fact.Revision == 2 {
-				if err = w1.FinalizeDirect(trust, proof); err != nil {
-					return err
-				}
+			ok, err := w1.DirectFinal(pc.Summary.OutputID(0), 1)
+			if err != nil {
+				return err
+			}
+			if ok {
 				report["late_parent_instance"] = 1
 				break
 			}
+
 			select {
 			case <-ctx.Done():
 				return ctx.Err()

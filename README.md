@@ -1,30 +1,25 @@
 # UTXO FastPay
 
-Research implementation of protocol v1.2 (wire/protocol version 3), with the
-v1.1 implementation retained as a separate-network baseline.
-Active Mac checkout: `/Users/richz/lab/man/utxo-fastpay-v12`.
+Current implementation: direct-liability payments with block-driven wallet and
+member updates (wire/application version 4). Active branch:
+`implementation/block-following-v4`.
 
-## Direct-liability implementation
+**Start with [current architecture, build instructions and measurements](docs/implementation-block-following-v4.md).**
 
-The v3 path implements detached TXCer, immediate child settlement with a missing
-certified parent, direct CAL coverage, automatic compensation, actual historical
-Comet block/part revision, original-history replay and late-output instances.
-One-round wallet delivery and background INSTALL remain in place.
+Normal settlement emits no per-payment output or member credit proofs. A shared
+block follower verifies committed execution results once per height and applies
+local changes atomically. Existing durable three-vote fast delivery, background
+INSTALL, direct issuer liability and real historical input repair remain.
 
-**Start with [v1.2 build instructions and measured results](docs/implementation-v1.2.md).**
-Before any build, run `python3 third_party/cometbft/overlay.py` with Go on PATH;
-the root module replaces Comet with its generated `.scratch/comet-src` fork.
-Build v3 commands with `-tags=comet_v3` and initialize a fresh `init-lab -v3`.
-Do not reuse a v2 genesis or database. A clean-source bootstrap has been tested.
+Run `python3 third_party/cometbft/overlay.py` before building. Keep the existing
+`-tags=comet_v3` fork build switch, but use `payctl init-lab -v4`, `bench-v4` and
+`demo-v4` with a fresh genesis. Do not reuse wire-v3 databases.
 
-The 14-process laboratory passed payment, compensation, real history revision,
-replay and stopped-state accounting checks. Short closed-loop runs completed
-about 13 payments/s; **high throughput and long-term bounded storage have not
-been demonstrated**. The report distinguishes implemented features from pending
-retail migration, latest-revision light-client proofs and sustained tests.
+The prior wire-v3 baseline is commit `039374d`; its historical measurements are
+in [v1.2 implementation notes](docs/implementation-v1.2.md). Current short tests
+do not establish sustained high TPS or bounded long-term storage.
 
-The sections below describe the **v1.1 baseline**; their old root/custody rules
-and commands are not the v3 runtime path.
+The sections below document the **v1.1 baseline**, not the current runtime path.
 
 ## Current implementation
 

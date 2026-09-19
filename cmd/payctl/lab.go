@@ -32,7 +32,7 @@ func initialize(args []string) error {
 	dir := flags.String("dir", "", "new laboratory directory")
 	base := flags.Int("port", 18000, "base loopback port")
 	outputs := flags.Int("outputs", 1024, "finite initial CAL outputs per owner")
-	direct := flags.Bool("v3", false, "new direct-liability genesis with a 3-of-4 repair key")
+	direct := flags.Bool("v4", false, "new direct-liability genesis with a 3-of-4 repair key")
 	if e := flags.Parse(args); e != nil {
 		return e
 	}

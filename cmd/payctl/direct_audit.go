@@ -14,6 +14,7 @@ import (
 type directLedgerAudit struct {
 	CAL, FUEL, Gap, Rewards, Burned uint64
 	Payments, Closed                int
+	PrivateProofRecords             int
 	StateHash                       string
 }
 
@@ -57,6 +58,8 @@ func auditDirectLedger(v state.ReadView, n cfg.Network) (result directLedgerAudi
 			}
 			kind := d.U8()
 			switch kind {
+			case 70, 71, 104:
+				result.PrivateProofRecords++
 			case state.KeyCreation:
 				var id protocol.OutputID
 				copy(id[:], d.Bytes(32))
@@ -98,6 +101,9 @@ func auditDirectLedger(v state.ReadView, n cfg.Network) (result directLedgerAudi
 		}
 	}
 	result.StateHash = hex.EncodeToString(hash.Sum(nil))
+	if result.PrivateProofRecords != 0 {
+		return result, fmt.Errorf("private proof records remain: %d", result.PrivateProofRecords)
+	}
 	payments, err := records[rules.DirectPaymentState](v, 103)
 	if err != nil {
 		return result, err

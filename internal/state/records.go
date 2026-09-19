@@ -118,6 +118,7 @@ type Outbox struct {
 }
 
 type Transition struct {
+	Data    []byte
 	Changes []Change
 	Facts   []protocol.FinalFact
 }

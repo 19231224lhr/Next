@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 	cfg "utxo/cmd/internal/config"
+	"utxo/internal/blockfollow"
 	"utxo/internal/gateway"
 	"utxo/internal/requesttrace"
 	"utxo/internal/store"
@@ -140,6 +141,9 @@ func run() error {
 		relay.Members[organization.Org] = endpoints
 	}
 
+	if n.Direct != nil {
+		defer blockfollow.Start(ctx, stop, db, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, relay.ObserveBlock(org.Hash()))()
+	}
 	relayDone := make(chan error, 1)
 	go func() { relayDone <- relay.Run(relayCtx) }()
 	defer func() {

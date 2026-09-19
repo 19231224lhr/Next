@@ -106,7 +106,7 @@ func TestDirectDurableApprovalAndBackgroundInstall(t *testing.T) {
 		t.Fatal(err)
 	}
 	child.Auth = []protocol.OwnerAuth{protocol.SignOwner(child.ID(), f.Owner)}
-	req := protocol.DirectRequest{Tx: child, Parents: []protocol.DirectParent{{Certificate: cert, Index: 0}}}
+	req := protocol.DirectRequest{Tx: child, InputCertificates: []protocol.InputCertificate{{Certificate: cert, Index: 0}}}
 	for _, m := range members {
 		if _, err = m.ApproveDirect(context.Background(), req); err != nil {
 			t.Fatalf("successor waited for INSTALL: %v", err)

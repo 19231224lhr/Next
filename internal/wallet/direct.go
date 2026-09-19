@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"errors"
-	"utxo/finality"
 	"utxo/internal/state"
 	"utxo/protocol"
 )
@@ -72,6 +71,16 @@ func (w *Wallet) ReceiveDirect(output protocol.Output, c protocol.OutputCertific
 	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
 		key := DirectCoinKey(c.Summary.OutputID(index), 0)
+		late, exists, err := state.Load[DirectCoin](v, DirectCoinKey(c.Summary.OutputID(index), 1))
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			if late.Output != output {
+				return nil, protocol.ErrAuth
+			}
+			return nil, nil
+		}
 		old, found, err := state.Load[DirectCoin](v, key)
 		if err != nil {
 			return nil, err
@@ -83,40 +92,6 @@ func (w *Wallet) ReceiveDirect(output protocol.Output, c protocol.OutputCertific
 			return nil, nil
 		}
 		if err = state.Put(o, key, DirectCoin{Output: output, Certificate: &c, Index: index}); err != nil {
-			return nil, err
-		}
-		return o.Changes(), nil
-	})
-}
-
-func (w *Wallet) FinalizeDirect(trust finality.Trust, proof finality.FactProof) error {
-	verified, err := finality.Verify(trust, proof)
-	if err != nil {
-		return err
-	}
-	fact := verified.Fact()
-	if fact.Network != w.network || fact.Kind != protocol.FactOutputCreated || fact.Revision < 1 || fact.Revision > 2 {
-		return protocol.ErrAuth
-	}
-	output, err := protocol.DecodeSettledOutput(fact.Payload)
-	if err != nil {
-		return err
-	}
-	if fact.Key != protocol.Hash(output.ID) || output.Output.Recipient.Owner != w.owner {
-		return protocol.ErrAuth
-	}
-	instance := uint8(fact.Revision - 1)
-	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
-		o := state.NewOverlay(v)
-		key := DirectCoinKey(output.ID, instance)
-		old, found, err := state.Load[DirectCoin](v, key)
-		if err != nil {
-			return nil, err
-		}
-		if found && old.Output != output.Output {
-			return nil, protocol.ErrAuth
-		}
-		if err = state.Put(o, key, DirectCoin{Output: output.Output, Instance: instance, Index: output.Index, Final: fact.ID()}); err != nil {
 			return nil, err
 		}
 		return o.Changes(), nil

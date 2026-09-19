@@ -68,6 +68,21 @@ func MemberHandler(m *member.Member, foreground, background int) http.Handler {
 		}
 	}
 	addDirectHandlers(mux, m, fg, bg, wrap)
+	mux.HandleFunc("GET /v4/progress/{spend}", wrap(bg, func(w http.ResponseWriter, r *http.Request) {
+		var id protocol.Hash
+		if err := id.UnmarshalText([]byte(r.PathValue("spend"))); err != nil {
+			fail(w, err)
+			return
+		}
+		status, err := m.DirectStatus(protocol.SpendFactID(id))
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(status)
+	}))
+
 	mux.HandleFunc("POST /v1/transactions", wrap(fg, func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if r.Header.Get(requesttrace.HeaderName) == "1" {

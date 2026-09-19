@@ -56,7 +56,7 @@ func TestDirectABCIChildBeforeParentReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	payments := []protocol.DirectPayment{{Tx: child, Certificate: cc, Parents: []protocol.DirectParent{{Certificate: pc, Index: 0}}}, {Tx: parent, Certificate: pc}}
+	payments := []protocol.DirectPayment{{Tx: child, Certificate: cc, InputCertificates: []protocol.InputCertificate{{Certificate: pc, Index: 0}}}, {Tx: parent, Certificate: pc}}
 	var reference [][]byte
 	for replica := 0; replica < 2; replica++ {
 		db := store.NewMemory()

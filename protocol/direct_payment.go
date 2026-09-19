@@ -1,14 +1,14 @@
 package protocol
 
-// DirectParent carries only the immediate input certificate, never its history.
-type DirectParent struct {
+// InputCertificate carries only the immediate input certificate, never its history.
+type InputCertificate struct {
 	Certificate OutputCertificate
 	Index       uint32
 }
 type DirectPayment struct {
-	Tx          FastTx
-	Certificate OutputCertificate
-	Parents     []DirectParent
+	Tx                FastTx
+	Certificate       OutputCertificate
+	InputCertificates []InputCertificate
 }
 
 // MarshalBinary keeps every certificate and authorization in the immutable
@@ -22,19 +22,24 @@ func (p DirectPayment) MarshalBinary() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(p.Parents) > MaxInputs {
+	if len(p.InputCertificates) > MaxInputs {
 		return nil, ErrEncoding
 	}
 	e := new(Encoder)
-	e.U16(305)
+	e.U16(405)
 	e.Bytes(fixed)
-	c, err := p.Certificate.MarshalBinary()
-	if err != nil {
-		return nil, err
+	if p.Certificate.QC.Fact != p.Certificate.Summary.Fact() || len(p.Certificate.QC.Votes) < 3 || len(p.Certificate.QC.Votes) > 4 {
+		return nil, ErrAuth
 	}
-	e.Bytes(c)
-	e.U32(uint32(len(p.Parents)))
-	for _, parent := range p.Parents {
+	e.Bytes(p.Certificate.Summary.Admission.Encode())
+	e.Fixed(p.Certificate.QC.Fact[:])
+	e.U32(uint32(len(p.Certificate.QC.Votes)))
+	for _, v := range p.Certificate.QC.Votes {
+		e.U16(v.Member)
+		e.Fixed(v.Signature[:])
+	}
+	e.U32(uint32(len(p.InputCertificates)))
+	for _, parent := range p.InputCertificates {
 		c, err := parent.Certificate.MarshalBinary()
 		if err != nil {
 			return nil, err
@@ -51,7 +56,7 @@ func DecodeDirectPayment(raw []byte) (p DirectPayment, err error) {
 		return p, err
 	}
 	d := NewDecoder(fixed)
-	if d.U16() != 305 {
+	if d.U16() != 405 {
 		return p, ErrEncoding
 	}
 	tx, err := encodeDirectEnvelope(d.Bytes(MaxRequestBytes), mutable)
@@ -62,17 +67,28 @@ func DecodeDirectPayment(raw []byte) (p DirectPayment, err error) {
 	if err != nil {
 		return p, err
 	}
-	p.Certificate, err = DecodeOutputCertificate(d.Bytes(MaxCertificateBytes))
-	if err != nil {
+	v := NewDecoder(d.Bytes(4096))
+	vector := make(AdmissionVector, v.Count(MaxAdmission))
+	for i := range vector {
+		vector[i] = Allocation{Key: decodeResource(v), Cap: v.U64()}
+	}
+	if err = v.Done(); err != nil {
 		return p, err
 	}
-	p.Parents = make([]DirectParent, d.Count(MaxInputs))
-	for i := range p.Parents {
-		p.Parents[i].Certificate, err = DecodeOutputCertificate(d.Bytes(MaxCertificateBytes))
+	p.Certificate.Summary = SummaryFor(p.Tx, vector)
+	copy(p.Certificate.QC.Fact[:], d.Fixed(32))
+	p.Certificate.QC.Votes = make([]SpendVote, d.Count(4))
+	for i := range p.Certificate.QC.Votes {
+		p.Certificate.QC.Votes[i].Member = d.U16()
+		copy(p.Certificate.QC.Votes[i].Signature[:], d.Fixed(64))
+	}
+	p.InputCertificates = make([]InputCertificate, d.Count(MaxInputs))
+	for i := range p.InputCertificates {
+		p.InputCertificates[i].Certificate, err = DecodeOutputCertificate(d.Bytes(MaxCertificateBytes))
 		if err != nil {
 			return p, err
 		}
-		p.Parents[i].Index = d.U32()
+		p.InputCertificates[i].Index = d.U32()
 	}
 	return p, d.Done()
 }

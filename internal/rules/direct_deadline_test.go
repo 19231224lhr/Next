@@ -3,7 +3,6 @@ package rules
 import (
 	"testing"
 	"utxo/internal/state"
-	"utxo/protocol"
 )
 
 func TestDirectIdleBlockCannotExpireNewPayment(t *testing.T) {
@@ -55,7 +54,7 @@ func TestDirectIdleBlockCannotExpireNewPayment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := loadDirect[protocol.CreditReceipt](t, f.db, DirectCALCreditKey(parent.Certificate.QC.Fact))
+	r := loadDirect[directCoverage](t, f.db, state.Key(keyDirectCoverage, parent.Certificate.QC.Fact[:])).Credit
 	if r.Paid != 100 {
 		t.Fatal("deadline did not trigger payment")
 	}

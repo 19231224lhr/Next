@@ -2,35 +2,11 @@ package member
 
 import (
 	"context"
-	"utxo/finality"
 	"utxo/internal/requesttrace"
 	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/protocol"
 )
-
-func (m *Member) ApplyDirectReceipts(proofs []finality.FactProof) error {
-	if m.direct == nil || len(proofs) > protocol.MaxAdmission {
-		return protocol.ErrRule
-	}
-	prepared := make([]preparedProof, len(proofs))
-	for i, p := range proofs {
-		var err error
-		prepared[i], err = m.prepareProof(p)
-		if err != nil {
-			return err
-		}
-	}
-	return m.db.Update(func(v state.ReadView) ([]state.Change, error) {
-		o := state.NewOverlay(v)
-		for _, p := range prepared {
-			if err := m.applyProof(o, p); err != nil {
-				return nil, err
-			}
-		}
-		return o.Changes(), nil
-	})
-}
 
 // ApproveDirect retains the one-round contract: input locks and all five
 // resource debits reach durable storage before the vote is returned.
@@ -58,8 +34,8 @@ func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest) 
 	}
 	summary := protocol.SummaryFor(tx, vector)
 	fact := summary.Fact()
-	parents := map[protocol.OutputID]protocol.DirectParent{}
-	for _, parent := range req.Parents {
+	parents := map[protocol.OutputID]protocol.InputCertificate{}
+	for _, parent := range req.InputCertificates {
 		c := parent.Certificate
 		org, ok := m.peers[c.Summary.Config]
 		if !ok || c.Verify(org) != nil || c.Summary.Rules != m.direct.Rules() || int(parent.Index) >= len(c.Summary.Outputs) {

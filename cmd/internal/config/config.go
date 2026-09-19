@@ -57,7 +57,7 @@ func (n Network) Engine() committee.EngineConfig {
 
 func (n Network) Schema() uint64 {
 	if n.Direct != nil {
-		return 3
+		return 4
 	}
 	return 2
 }

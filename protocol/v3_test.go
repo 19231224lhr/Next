@@ -81,7 +81,7 @@ func TestV3TransactionStableIdentity(t *testing.T) {
 	_, owner, _ := ed25519.GenerateKey(rand.Reader)
 	net, org := Digest("v3-network"), Digest("v3-org")
 	desc := NewDescriptor(net, Route{Kind: OrgRoute, Org: org}, owner)
-	base := TxBody{Wire: 3, Version: 3, Network: net, Kind: FastTransfer, Certifier: org, Config: Digest("config"), Epoch: 1,
+	base := TxBody{Wire: 4, Version: 4, Network: net, Kind: FastTransfer, Certifier: org, Config: Digest("config"), Epoch: 1,
 		Rules:   RuleIDs{Fee: Digest("fee"), Work: Digest("work"), Accounting: Digest("account")},
 		Inputs:  []Input{{Kind: CertificateInput, Output: OutputID(Digest("input")), Evidence: Digest("evidence")}},
 		Outputs: []Output{{Asset: AssetCAL, Amount: 100, Recipient: desc}},

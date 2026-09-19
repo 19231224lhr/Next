@@ -88,7 +88,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	childRaw, err := (protocol.DirectPayment{Tx: child, Certificate: cc, Parents: []protocol.DirectParent{{Certificate: pc, Index: 0}}}).MarshalBinary()
+	childRaw, err := (protocol.DirectPayment{Tx: child, Certificate: cc, InputCertificates: []protocol.InputCertificate{{Certificate: pc, Index: 0}}}).MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,8 +288,8 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 			if balance != 999999900 {
 				t.Fatalf("wrong reserve debit %d", balance)
 			}
-			credit, _, err := state.Load[protocol.CreditReceipt](v, rules.DirectCALCreditKey(pc.QC.Fact))
-			if credit.Paid != 100 || credit.Discharged != 0 {
+			credit, _, err := state.Load[struct{ Credit rules.CoverageBalance }](v, state.Key(100, pc.QC.Fact[:]))
+			if credit.Credit.Paid != 100 || credit.Credit.Discharged != 0 {
 				t.Fatal("late parent returned spent budget")
 			}
 			return err

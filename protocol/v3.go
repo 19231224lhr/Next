@@ -6,9 +6,9 @@ import (
 	"utxo/crypto/chameleon"
 )
 
-const DirectVersion uint64 = 3
+const DirectVersion uint64 = 4
 
-var directMagic = []byte{'U', 'T', 'X', 'O', '3', 'C', 'H', 0}
+var directMagic = []byte{'U', 'T', 'X', 'O', '4', 'C', 'H', 0}
 
 // InputClaim is immutable. Instance 1 is created only by a finalized late parent
 // after compensation; an old certificate never authorizes that instance.
@@ -84,7 +84,7 @@ func (f Funding) ReferenceBytes() []byte {
 
 func NewFastTx(body TxBody, claims []InputClaim, key *chameleon.Public) (FastTx, error) {
 	t := FastTx{Body: body, Claims: claims}
-	if err := body.validateVersion(3, 3); err != nil {
+	if err := body.validateVersion(4, 4); err != nil {
 		return t, err
 	}
 	if len(claims) != len(body.Inputs) || key == nil {
@@ -106,7 +106,7 @@ func NewFastTx(body TxBody, claims []InputClaim, key *chameleon.Public) (FastTx,
 }
 
 func (t FastTx) VerifyAuth() error {
-	if err := t.Body.validateVersion(3, 3); err != nil {
+	if err := t.Body.validateVersion(4, 4); err != nil {
 		return err
 	}
 	if len(t.Claims) != len(t.Body.Inputs) || len(t.Funding) != len(t.Claims) || len(t.Commitments) != len(t.Claims) || len(t.Auth) == 0 || len(t.Auth) > MaxInputs {
@@ -208,7 +208,7 @@ func DecodeFastTx(b []byte) (t FastTx, err error) {
 	}
 	d := NewDecoder(fixed)
 	core := NewDecoder(d.Bytes(MaxTxBytes))
-	t.Body, err = decodeTxVersion(core.Bytes(MaxTxBytes), 3, 3)
+	t.Body, err = decodeTxVersion(core.Bytes(MaxTxBytes), 4, 4)
 	if err != nil {
 		return t, err
 	}
@@ -266,7 +266,7 @@ type OutputCertificate struct {
 
 func (s OutputSummary) encode() []byte {
 	e := new(Encoder)
-	e.U64(3)
+	e.U64(4)
 	e.Fixed(s.Network[:])
 	e.Fixed(s.Tx[:])
 	e.Fixed(s.Issuer[:])
@@ -361,7 +361,7 @@ func (c OutputCertificate) MarshalBinary() ([]byte, error) {
 		return nil, ErrAuth
 	}
 	e := new(Encoder)
-	e.U16(304)
+	e.U16(404)
 	e.Bytes(c.Summary.encode())
 	e.Fixed(c.QC.Fact[:])
 	e.U32(uint32(len(c.QC.Votes)))
@@ -376,11 +376,11 @@ func DecodeOutputCertificate(b []byte) (c OutputCertificate, err error) {
 		return c, ErrEncoding
 	}
 	d := NewDecoder(b)
-	if d.U16() != 304 {
+	if d.U16() != 404 {
 		return c, ErrEncoding
 	}
 	s := NewDecoder(d.Bytes(MaxCertificateBytes))
-	if s.U64() != 3 {
+	if s.U64() != 4 {
 		return c, ErrEncoding
 	}
 	copy(c.Summary.Network[:], s.Fixed(32))

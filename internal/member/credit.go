@@ -16,6 +16,9 @@ type preparedProof struct {
 
 // Snapshot once: the persisted custody bytes and authenticated fact must agree.
 func (m *Member) prepareProof(input finality.FactProof) (preparedProof, error) {
+	if m.direct != nil {
+		return preparedProof{}, protocol.ErrUnsupported
+	}
 	raw, e := input.MarshalBinary()
 	if e != nil {
 		return preparedProof{}, e
