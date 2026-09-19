@@ -30,11 +30,12 @@ func benchDirect(args []string) error {
 	start := flags.Int("start", 100, "unused genesis input index")
 	count := flags.Int("count", 128, "transactions")
 	concurrency := flags.Int("concurrency", 16, "outstanding payments")
+	rate := flags.Float64("rate", 0, "target sends per second (0: closed loop); backpressure is reported as dispatch lag")
 	trace := flags.Bool("trace", false, "include opt-in per-payment and block timing")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if *start < 0 || *count < 1 || *count > 10000 || *concurrency < 1 || *concurrency > 256 {
+	if *start < 0 || *count < 1 || *count > 10000 || *concurrency < 1 || *concurrency > 256 || !(*rate >= 0) || *rate > 100000 {
 		return protocol.ErrRule
 	}
 	var lab cfg.Lab
@@ -126,6 +127,8 @@ func benchDirect(args []string) error {
 		}
 	}
 	type sample struct {
+		DispatchLagMS                                                                                float64 `json:",omitempty"`
+		ScheduledUnixNS                                                                              int64   `json:",omitempty"`
 		Index                                                                                        int
 		SentUnixNS, CertificateReceivedUnixNS, FastUnixNS, BlockObservedUnixNS, MemberObservedUnixNS int64
 		Foreground                                                                                   []requesttrace.Event `json:",omitempty"`
@@ -134,24 +137,30 @@ func benchDirect(args []string) error {
 		Error                                                                                        string `json:",omitempty"`
 	}
 	samples := make([]sample, *count)
+	for i := range samples {
+		samples[i].Index = *start + i
+		samples[i].Error = "not dispatched"
+	}
 	httpClient := transport.NewHTTPClient(10 * time.Second)
 	public := transport.NewCommitteeClient(n.CommitteeURLs[0])
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	defer blockfollow.Start(ctx, cancel, group, public, trust, receiver.ApplyBlock)()
-	jobs := make(chan int, *count)
-	for i := 0; i < *count; i++ {
-		jobs <- i
-	}
-	close(jobs)
 	var wg sync.WaitGroup
 	began := time.Now()
+	jobs := directBenchJobs(ctx, *count, *rate, began)
 	for worker := 0; worker < *concurrency; worker++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for i := range jobs {
 				samples[i].Index = *start + i
+				samples[i].Error = ""
+				var scheduled time.Time
+				if *rate > 0 {
+					scheduled = began.Add(time.Duration(float64(i) / (*rate) * float64(time.Second)))
+					samples[i].ScheduledUnixNS = scheduled.UnixNano()
+				}
 				run := func() error {
 					req, err := http.NewRequestWithContext(ctx, "POST", lab.Gateways[0]+"/v3/transactions", bytes.NewReader(encoded[i]))
 					if err != nil {
@@ -163,6 +172,9 @@ func benchDirect(args []string) error {
 					}
 					sent := time.Now()
 					samples[i].SentUnixNS = sent.UnixNano()
+					if !scheduled.IsZero() {
+						samples[i].DispatchLagMS = float64(sent.Sub(scheduled)) / float64(time.Millisecond)
+					}
 					resp, err := httpClient.Do(req)
 					if err != nil {
 						return err
@@ -271,6 +283,17 @@ func benchDirect(args []string) error {
 	}
 	summary := map[string]any{"timing_origin": "wallet_http_submit_v4", "workload": "closed_loop_final_utxo_cross_org", "count": *count, "concurrency": *concurrency, "failed": failed, "elapsed_s": elapsed.Seconds(), "completed_per_second": float64(*count-failed) / elapsed.Seconds(), "fast_p50_ms": quantile(fast, .5), "fast_p95_ms": quantile(fast, .95), "block_observed_p50_ms": quantile(proof, .5), "member_applied_p50_ms": quantile(credit, .5), "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested."}
 	summary["trace"] = *trace
+	if *rate > 0 {
+		summary["workload"] = "paced_final_utxo_cross_org"
+		summary["target_send_rate"] = *rate
+		lag := make([]float64, 0, len(samples))
+		for _, s := range samples {
+			if s.SentUnixNS > 0 {
+				lag = append(lag, s.DispatchLagMS)
+			}
+		}
+		summary["dispatch_lag_p50_ms"], summary["dispatch_lag_p95_ms"] = quantile(lag, .5), quantile(lag, .95)
+	}
 	summary["started_unix_ns"] = began.UnixNano()
 	summary["finished_unix_ns"] = began.Add(elapsed).UnixNano()
 	var timeline []requesttrace.ConsensusEvent

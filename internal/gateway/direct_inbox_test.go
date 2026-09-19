@@ -164,3 +164,25 @@ func TestDirectInboxFullFallsBackToDurableScan(t *testing.T) {
 		}
 	}
 }
+
+func TestDirectInboxOwnsBytesAndRejectsAfterClose(t *testing.T) {
+	_, _, payments := directRelayFixture(t, 1)
+	p := payments[0]
+	want, err := p.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := NewDirectInbox()
+	if !q.Offer(p) {
+		t.Fatal("offer")
+	}
+	p.Tx.Body.Outputs[0].Amount++
+	got, ok := q.get(p.Certificate.QC.Fact)
+	if !ok || !bytes.Equal(got.Certificate, want) {
+		t.Fatal("caller mutation changed queued bytes")
+	}
+	q.close()
+	if q.Offer(p) || len(q.snapshot()) != 0 {
+		t.Fatal("closed inbox accepted or retained payload")
+	}
+}
