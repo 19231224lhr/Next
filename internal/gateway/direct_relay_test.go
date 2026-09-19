@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,6 +18,48 @@ import (
 	"utxo/internal/testkit"
 	"utxo/protocol"
 )
+
+type countRelayWrites struct {
+	store.Store
+	writes atomic.Int64
+}
+
+func (s *countRelayWrites) Update(fn func(state.ReadView) ([]state.Change, error)) error {
+	s.writes.Add(1)
+	return s.Store.Update(fn)
+}
+
+func TestGatewayRelayRetriesWithoutWritingPacingState(t *testing.T) {
+	_, r, _ := directRelayFixture(t, 1)
+	db := &countRelayWrites{Store: r.DB}
+	r.DB = db
+	type attempt struct {
+		raw []byte
+		at  time.Time
+	}
+	sent := make(chan attempt, 16)
+	r.Public = relayPublic{submit: func(_ context.Context, raw []byte) error {
+		sent <- attempt{bytes.Clone(raw), time.Now()}
+		return nil // HTTP acceptance without a committed block must still retry.
+	}}
+	startDirectRelay(t, r)
+	var first attempt
+	for i := 0; i < 2; i++ {
+		select {
+		case a := <-sent:
+			if i == 0 {
+				first = a
+			} else if !bytes.Equal(a.raw, first.raw) || a.at.Sub(first.at) < 2*time.Second {
+				t.Fatal("retry changed bytes or bypassed cooldown")
+			}
+		case <-time.After(4 * time.Second):
+			t.Fatal("uncommitted payment stopped retrying")
+		}
+	}
+	if n := db.writes.Load(); n != 0 {
+		t.Fatalf("gateway made %d retry-only updates", n)
+	}
+}
 
 type relayPublic struct {
 	PublicClient

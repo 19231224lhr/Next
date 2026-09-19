@@ -31,6 +31,10 @@ func (r *Relay) runDirect(ctx context.Context) error {
 	defer func() { cancel(); workers.Wait() }()
 	lanes := [2]directLane{{limit: 4, scanning: true, wrapped: true}, {limit: 4, scanning: true, wrapped: true}}
 	busy := make(map[directTask]bool)
+	// Only pacing lives here. Durable outbox and verified block following still
+	// own recovery and completion. Restart may resend the identical command early.
+	nextSubmit := make(map[protocol.SpendFactID]time.Time)
+	const maxCooling = 8192
 	done := make(chan directTask, 8)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -46,6 +50,14 @@ func (r *Relay) runDirect(ctx context.Context) error {
 			if time.Now().UnixNano() < p.NextSubmitUnixNS {
 				return
 			}
+			if due, ok := nextSubmit[p.Fact]; ok {
+				if time.Now().Before(due) {
+					return
+				}
+			} else if len(nextSubmit) == maxCooling {
+				return // Retain the durable task; never evict an unexpired cooldown.
+			}
+			nextSubmit[p.Fact] = time.Time{} // Reserved; busy prevents overlap.
 		} else if !r.reserveDirectInstall(p.Fact, target) {
 			return
 		}
@@ -132,6 +144,8 @@ func (r *Relay) runDirect(ctx context.Context) error {
 			index := 0
 			if task.target >= 0 {
 				index = 1
+			} else {
+				nextSubmit[task.fact] = time.Now().Add(2 * time.Second)
 			}
 			lanes[index].active--
 			lanes[index].scanning = true
@@ -151,6 +165,11 @@ func (r *Relay) runDirect(ctx context.Context) error {
 				}
 			}
 		case <-ticker.C:
+			for fact, due := range nextSubmit {
+				if !busy[directTask{fact, -1}] && !time.Now().Before(due) {
+					delete(nextSubmit, fact)
+				}
+			}
 			for i := range lanes {
 				lanes[i].scanning = true
 				lanes[i].wrapped = false
@@ -215,7 +234,10 @@ func (r *Relay) runDirectTask(ctx context.Context, task directTask, decode func(
 	if task.target < 0 {
 		requesttrace.Payment("relay_enter", task.fact)
 		requesttrace.Payment("relay_ready", task.fact)
-		return r.submitDirect(ctx, state.Key(state.KeyOutbox, task.fact[:]), p)
+		requesttrace.Payment("submit_start", task.fact)
+		err := r.Public.Submit(ctx, p.Certificate)
+		requesttrace.Payment("submit_done", task.fact)
+		return err
 	}
 	markDirectAction("relay_install_start", task.fact, task.target)
 	if client, ok := r.Members[c.Summary.Issuer][task.target].(DirectMemberClient); ok {
