@@ -1,0 +1,21 @@
+START db-base-1
+Created finite two-organization laboratory: /Users/richz/lab/man/utxo-fastpay-v12/.run/group-db-base-1
+db-base-1 {"block_observed_p50_ms": 1155.3455, "completed_per_second": 42.59474251568237, "concurrency": 64, "count": 100, "elapsed_s": 2.347707583, "failed": 0, "fast_p50_ms": 185.162917, "fast_p95_ms": 229.914209, "finished_unix_ns": 1789836284689135583, "member_applied_p50_ms": 1258.10225, "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.", "started_unix_ns": 1789836282341428000, "timing_origin": "wallet_http_submit_v4", "trace": false, "workload": "closed_loop_final_utxo_cross_org"}
+START db-index-1
+Created finite two-organization laboratory: /Users/richz/lab/man/utxo-fastpay-v12/.run/group-db-index-1
+db-index-1 {"block_observed_p50_ms": 1120.085, "completed_per_second": 47.37976850718905, "concurrency": 64, "count": 100, "elapsed_s": 2.1106055, "failed": 0, "fast_p50_ms": 285.670709, "fast_p95_ms": 370.613875, "finished_unix_ns": 1789836358911129500, "member_applied_p50_ms": 1192.184708, "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.", "started_unix_ns": 1789836356800524000, "timing_origin": "wallet_http_submit_v4", "trace": false, "workload": "closed_loop_final_utxo_cross_org"}
+START db-prepare-1
+Traceback (most recent call last):
+  File "/Users/richz/lab/man/utxo-fastpay-v12/docs/experiments/stages100-2026-09-19/run_experiment.py", line 21, in <module>
+    run(ctl, 'init-lab', '-v4', '-dir', str(labdir), '-port', '28000', '-outputs', '128')
+  File "/Users/richz/lab/man/utxo-fastpay-v12/docs/experiments/stages100-2026-09-19/run_experiment.py", line 19, in run
+    return subprocess.run(args, env=env, check=True, **kwargs)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '('/Users/richz/lab/man/utxo-fastpay-v12/.run/db-prepare-bin/payctl', 'init-lab', '-v4', '-dir', '/Users/richz/lab/man/utxo-fastpay-v12/.run/group-db-prepare-1', '-port', '28000', '-outputs', '128')' died with <Signals.SIGINT: 2>.
+Traceback (most recent call last):
+  File "/Users/richz/lab/man/utxo-fastpay-v12/docs/experiments/database-optimization-2026-09-20/run_sequence.py", line 52, in <module>
+    subprocess.run(['python3',str(runner),label,'db-'+stage+'-bin',trace],cwd=root,env=env,check=True)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['python3', '/Users/richz/lab/man/utxo-fastpay-v12/docs/experiments/stages100-2026-09-19/run_experiment.py', 'db-prepare-1', 'db-prepare-bin', 'plain']' returned non-zero exit status 1.

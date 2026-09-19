@@ -19,7 +19,11 @@ type Cursor struct {
 	Height int64
 	Hash   []byte
 }
-type Apply func(*state.Overlay, finality.VerifiedBlock) error
+type Apply func(*state.Overlay) error
+
+// Prepare owns decoded block material; only its returned state changes run under
+// the writer. The callback must read current state from the supplied overlay.
+type Prepare func(finality.VerifiedBlock) (Apply, error)
 type Source interface {
 	Block(context.Context, int64) (finality.BlockData, error)
 }
@@ -28,9 +32,15 @@ func Height(db store.Store) (height int64, err error) {
 	err = db.View(func(v state.ReadView) error { c, _, e := state.Load[Cursor](v, cursorKey); height = c.Height; return e })
 	return
 }
-func Commit(db store.Store, b finality.VerifiedBlock, apply Apply) error {
+func Commit(db store.Store, b finality.VerifiedBlock, prepare Prepare) error {
+	requesttrace.Consensus.Mark("follow_prepare_start", "height", b.Height())
+	apply, err := prepare(b)
+	if err != nil {
+		return err
+	}
+	requesttrace.Consensus.Mark("follow_prepare_done", "height", b.Height())
 	requesttrace.Consensus.Mark("follow_update_requested", "height", b.Height())
-	err := db.Update(func(v state.ReadView) ([]state.Change, error) {
+	err = db.Update(func(v state.ReadView) ([]state.Change, error) {
 		requesttrace.Consensus.Mark("follow_update_started", "height", b.Height())
 		c, _, err := state.Load[Cursor](v, cursorKey)
 		if err != nil {
@@ -44,7 +54,7 @@ func Commit(db store.Store, b finality.VerifiedBlock, apply Apply) error {
 		}
 		o := state.NewOverlay(v)
 		requesttrace.Consensus.Mark("follow_apply_start", "height", b.Height())
-		if err = apply(o, b); err != nil {
+		if err = apply(o); err != nil {
 			return nil, err
 		}
 		requesttrace.Consensus.Mark("follow_apply_done", "height", b.Height())
@@ -58,7 +68,7 @@ func Commit(db store.Store, b finality.VerifiedBlock, apply Apply) error {
 	}
 	return err
 }
-func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, apply Apply) error {
+func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, prepare Prepare) error {
 	if t.Validate() != nil {
 		return finality.ErrProof
 	}
@@ -83,7 +93,7 @@ func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, apply 
 				return err
 			}
 			requesttrace.Consensus.Mark("follow_verify_done", "height", height+1)
-			if err = Commit(db, b, apply); err != nil {
+			if err = Commit(db, b, prepare); err != nil {
 				return err
 			}
 			continue
@@ -98,11 +108,11 @@ func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, apply 
 
 // Start joins the follower before its database is closed. An apply error cancels
 // the service context instead of silently leaving quota permanently occupied.
-func Start(ctx context.Context, cancel context.CancelFunc, db store.Store, s Source, t finality.Trust, apply Apply) func() {
+func Start(ctx context.Context, cancel context.CancelFunc, db store.Store, s Source, t finality.Trust, prepare Prepare) func() {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		if err := Run(ctx, db, s, t, apply); err != nil {
+		if err := Run(ctx, db, s, t, prepare); err != nil {
 			slog.Error("block follower stopped", "error", err)
 			cancel()
 		}

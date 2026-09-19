@@ -1,3 +1,20 @@
+# Database work reduction (2026-09-20)
+
+Comet search indexing is disabled; followers prepare static material outside the
+writer; direct approvals retain immutable evidence with cumulative credits in
+LocalProgress; bbolt starts with a 16 MiB mapping. Sync, validation and atomic
+credit/cursor updates remain. Direct member stores now require schema 5; other
+stores and wire format remain 4. No automatic old-member-store migration.
+
+9,500 comparison payments passed state, fee and outbox audits. In three fresh
+100/64 rounds per variant, final mean closed-loop time was 2.089 s versus 2.267 s
+baseline; pooled fast P95 was 173.953 versus 245.900 ms. Payer-member writer
+computation for 100 payments fell from 22.045 to 6.220 ms in diagnostic rounds.
+Growing-database follow-ups showed no stable end-to-end mapping benefit, and
+intermediate patches were not uniformly faster. Real compensation, historical
+revision, late arrival, repaired-history restart, full tagged race/vet and builds
+passed. See [complete evidence and limits](experiments/database-optimization-2026-09-20/README.md).
+
 # Committee verification reuse (2026-09-19)
 
 Direct public submissions now reuse successful immutable verification results by

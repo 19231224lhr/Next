@@ -20,7 +20,9 @@ func TestCursorAndApplicationCommitTogether(t *testing.T) {
 	}
 	key := state.Key(121)
 	fail := errors.New("injected write failure")
-	if err = blockfollow.Commit(db, b, func(o *state.Overlay, _ finality.VerifiedBlock) error { o.Set(key, []byte{1}); return fail }); !errors.Is(err, fail) {
+	if err = blockfollow.Commit(db, b, func(finality.VerifiedBlock) (blockfollow.Apply, error) {
+		return func(o *state.Overlay) error { o.Set(key, []byte{1}); return fail }, nil
+	}); !errors.Is(err, fail) {
 		t.Fatal(err)
 	}
 	height, err := blockfollow.Height(db)
@@ -32,7 +34,9 @@ func TestCursorAndApplicationCommitTogether(t *testing.T) {
 		t.Fatal("failed application leaked state")
 	}
 	calls := 0
-	apply := func(o *state.Overlay, _ finality.VerifiedBlock) error { calls++; o.Set(key, []byte{2}); return nil }
+	apply := func(finality.VerifiedBlock) (blockfollow.Apply, error) {
+		return func(o *state.Overlay) error { calls++; o.Set(key, []byte{2}); return nil }, nil
+	}
 	for i := 0; i < 2; i++ {
 		if err = blockfollow.Commit(db, b, apply); err != nil {
 			t.Fatal(err)

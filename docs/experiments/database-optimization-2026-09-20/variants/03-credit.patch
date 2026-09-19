@@ -1,0 +1,822 @@
+diff --git a/cmd/committee/main.go b/cmd/committee/main.go
+index e014dae..3af2f65 100644
+--- a/cmd/committee/main.go
++++ b/cmd/committee/main.go
+@@ -89,6 +89,8 @@ func run() error {
+ 	cmtcfg.EnsureRoot(cc.RootDir)
+ 	cc.Moniker = fmt.Sprintf("committee-%d", c.Index)
+ 	cc.RPC.ListenAddress = ""
++	// Clients follow blocks by height; transaction/event search is unused.
++	cc.TxIndex.Indexer = "null"
+ 	cc.P2P.ListenAddress = c.P2PListen
+ 	cc.P2P.PersistentPeers = c.Peers
+ 	cc.P2P.AllowDuplicateIP = true
+diff --git a/cmd/member/main.go b/cmd/member/main.go
+index f48ba1a..9d992ef 100644
+--- a/cmd/member/main.go
++++ b/cmd/member/main.go
+@@ -50,7 +50,11 @@ func run() error {
+ 	if e != nil {
+ 		return e
+ 	}
+-	db, e := store.Open(filepath.Join(c.DataDir, "member.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "member", Node: fmt.Sprintf("%s/%d", org.Org, c.Index), Schema: n.Schema()})
++	schema := n.Schema()
++	if n.Direct != nil {
++		schema = member.DirectStoreSchema
++	}
++	db, e := store.Open(filepath.Join(c.DataDir, "member.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "member", Node: fmt.Sprintf("%s/%d", org.Org, c.Index), Schema: schema})
+ 	if e != nil {
+ 		return e
+ 	}
+@@ -92,7 +96,7 @@ func run() error {
+ 		return nil
+ 	}
+ 	if n.Direct != nil {
+-		defer blockfollow.Start(ctx, stop, group, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, m.ApplyBlock)()
++		defer blockfollow.Start(ctx, stop, group, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, m.PrepareBlock)()
+ 	}
+ 	relayDone := make(chan error, 1)
+ 	go func() { relayDone <- relay.Run(relayCtx) }()
+diff --git a/cmd/payctl/audit.go b/cmd/payctl/audit.go
+index 45031f2..3a353e0 100644
+--- a/cmd/payctl/audit.go
++++ b/cmd/payctl/audit.go
+@@ -6,6 +6,7 @@ import (
+ 	"fmt"
+ 	"path/filepath"
+ 	cfg "utxo/cmd/internal/config"
++	"utxo/internal/member"
+ 	"utxo/internal/rules"
+ 	"utxo/internal/state"
+ 	"utxo/internal/store"
+@@ -81,8 +82,12 @@ func audit(args []string) error {
+ 				item.Approvals = len(approvals)
+ 				expected := make(map[protocol.ResourceKey]uint64)
+ 				for _, a := range approvals {
+-					for _, d := range a.Debits {
+-						residual, e := protocol.Sub(d.Cap, d.Applied)
++					applied, e := member.AppliedDebits(v, a)
++					if e != nil {
++						return e
++					}
++					for i, d := range a.Debits {
++						residual, e := protocol.Sub(d.Cap, applied[i])
+ 						if e != nil {
+ 							return e
+ 						}
+diff --git a/cmd/payctl/direct.go b/cmd/payctl/direct.go
+index de3e555..b18c81a 100644
+--- a/cmd/payctl/direct.go
++++ b/cmd/payctl/direct.go
+@@ -118,8 +118,8 @@ func demoDirect(args []string) error {
+ 	httpClient := transport.NewHTTPClient(10 * time.Second)
+ 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+ 	defer cancel()
+-	defer blockfollow.Start(ctx, cancel, db0, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w0.ApplyBlock)()
+-	defer blockfollow.Start(ctx, cancel, db1, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w1.ApplyBlock)()
++	defer blockfollow.Start(ctx, cancel, db0, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w0.PrepareBlock)()
++	defer blockfollow.Start(ctx, cancel, db1, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w1.PrepareBlock)()
+ 	var sent time.Time
+ 	send := func(org int, req protocol.DirectRequest) (protocol.OutputCertificate, error) {
+ 		raw, err := req.MarshalBinary()
+diff --git a/cmd/payctl/direct_bench.go b/cmd/payctl/direct_bench.go
+index 10b5b38..3408b37 100644
+--- a/cmd/payctl/direct_bench.go
++++ b/cmd/payctl/direct_bench.go
+@@ -145,7 +145,7 @@ func benchDirect(args []string) error {
+ 	public := transport.NewCommitteeClient(n.CommitteeURLs[0])
+ 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+ 	defer cancel()
+-	defer blockfollow.Start(ctx, cancel, group, public, trust, receiver.ApplyBlock)()
++	defer blockfollow.Start(ctx, cancel, group, public, trust, receiver.PrepareBlock)()
+ 	var wg sync.WaitGroup
+ 	began := time.Now()
+ 	jobs := directBenchJobs(ctx, *count, *rate, began)
+diff --git a/internal/blockfollow/follow.go b/internal/blockfollow/follow.go
+index f0c6b92..2905abc 100644
+--- a/internal/blockfollow/follow.go
++++ b/internal/blockfollow/follow.go
+@@ -19,7 +19,11 @@ type Cursor struct {
+ 	Height int64
+ 	Hash   []byte
+ }
+-type Apply func(*state.Overlay, finality.VerifiedBlock) error
++type Apply func(*state.Overlay) error
++
++// Prepare owns decoded block material; only its returned state changes run under
++// the writer. The callback must read current state from the supplied overlay.
++type Prepare func(finality.VerifiedBlock) (Apply, error)
+ type Source interface {
+ 	Block(context.Context, int64) (finality.BlockData, error)
+ }
+@@ -28,9 +32,15 @@ func Height(db store.Store) (height int64, err error) {
+ 	err = db.View(func(v state.ReadView) error { c, _, e := state.Load[Cursor](v, cursorKey); height = c.Height; return e })
+ 	return
+ }
+-func Commit(db store.Store, b finality.VerifiedBlock, apply Apply) error {
++func Commit(db store.Store, b finality.VerifiedBlock, prepare Prepare) error {
++	requesttrace.Consensus.Mark("follow_prepare_start", "height", b.Height())
++	apply, err := prepare(b)
++	if err != nil {
++		return err
++	}
++	requesttrace.Consensus.Mark("follow_prepare_done", "height", b.Height())
+ 	requesttrace.Consensus.Mark("follow_update_requested", "height", b.Height())
+-	err := db.Update(func(v state.ReadView) ([]state.Change, error) {
++	err = db.Update(func(v state.ReadView) ([]state.Change, error) {
+ 		requesttrace.Consensus.Mark("follow_update_started", "height", b.Height())
+ 		c, _, err := state.Load[Cursor](v, cursorKey)
+ 		if err != nil {
+@@ -44,7 +54,7 @@ func Commit(db store.Store, b finality.VerifiedBlock, apply Apply) error {
+ 		}
+ 		o := state.NewOverlay(v)
+ 		requesttrace.Consensus.Mark("follow_apply_start", "height", b.Height())
+-		if err = apply(o, b); err != nil {
++		if err = apply(o); err != nil {
+ 			return nil, err
+ 		}
+ 		requesttrace.Consensus.Mark("follow_apply_done", "height", b.Height())
+@@ -58,7 +68,7 @@ func Commit(db store.Store, b finality.VerifiedBlock, apply Apply) error {
+ 	}
+ 	return err
+ }
+-func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, apply Apply) error {
++func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, prepare Prepare) error {
+ 	if t.Validate() != nil {
+ 		return finality.ErrProof
+ 	}
+@@ -83,7 +93,7 @@ func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, apply
+ 				return err
+ 			}
+ 			requesttrace.Consensus.Mark("follow_verify_done", "height", height+1)
+-			if err = Commit(db, b, apply); err != nil {
++			if err = Commit(db, b, prepare); err != nil {
+ 				return err
+ 			}
+ 			continue
+@@ -98,11 +108,11 @@ func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, apply
+ 
+ // Start joins the follower before its database is closed. An apply error cancels
+ // the service context instead of silently leaving quota permanently occupied.
+-func Start(ctx context.Context, cancel context.CancelFunc, db store.Store, s Source, t finality.Trust, apply Apply) func() {
++func Start(ctx context.Context, cancel context.CancelFunc, db store.Store, s Source, t finality.Trust, prepare Prepare) func() {
+ 	done := make(chan struct{})
+ 	go func() {
+ 		defer close(done)
+-		if err := Run(ctx, db, s, t, apply); err != nil {
++		if err := Run(ctx, db, s, t, prepare); err != nil {
+ 			slog.Error("block follower stopped", "error", err)
+ 			cancel()
+ 		}
+diff --git a/internal/blockfollow/follow_test.go b/internal/blockfollow/follow_test.go
+index 2577d2a..fcfa876 100644
+--- a/internal/blockfollow/follow_test.go
++++ b/internal/blockfollow/follow_test.go
+@@ -20,7 +20,9 @@ func TestCursorAndApplicationCommitTogether(t *testing.T) {
+ 	}
+ 	key := state.Key(121)
+ 	fail := errors.New("injected write failure")
+-	if err = blockfollow.Commit(db, b, func(o *state.Overlay, _ finality.VerifiedBlock) error { o.Set(key, []byte{1}); return fail }); !errors.Is(err, fail) {
++	if err = blockfollow.Commit(db, b, func(finality.VerifiedBlock) (blockfollow.Apply, error) {
++		return func(o *state.Overlay) error { o.Set(key, []byte{1}); return fail }, nil
++	}); !errors.Is(err, fail) {
+ 		t.Fatal(err)
+ 	}
+ 	height, err := blockfollow.Height(db)
+@@ -32,7 +34,9 @@ func TestCursorAndApplicationCommitTogether(t *testing.T) {
+ 		t.Fatal("failed application leaked state")
+ 	}
+ 	calls := 0
+-	apply := func(o *state.Overlay, _ finality.VerifiedBlock) error { calls++; o.Set(key, []byte{2}); return nil }
++	apply := func(finality.VerifiedBlock) (blockfollow.Apply, error) {
++		return func(o *state.Overlay) error { calls++; o.Set(key, []byte{2}); return nil }, nil
++	}
+ 	for i := 0; i < 2; i++ {
+ 		if err = blockfollow.Commit(db, b, apply); err != nil {
+ 			t.Fatal(err)
+diff --git a/internal/gateway/blocks.go b/internal/gateway/blocks.go
+index 9585bec..64180e9 100644
+--- a/internal/gateway/blocks.go
++++ b/internal/gateway/blocks.go
+@@ -7,15 +7,16 @@ import (
+ 	"utxo/protocol"
+ )
+ 
+-func (r *Relay) ObserveBlock(config protocol.Hash) blockfollow.Apply {
+-	return func(o *state.Overlay, b finality.VerifiedBlock) error {
++func (r *Relay) ObserveBlock(config protocol.Hash) blockfollow.Prepare {
++	return func(b finality.VerifiedBlock) (blockfollow.Apply, error) {
++		var facts []protocol.SpendFactID
+ 		for _, t := range b.Transactions() {
+ 			if t.Code != 0 || len(t.Data) == 0 {
+ 				continue
+ 			}
+ 			result, err := protocol.DecodeExecution(t.Data)
+ 			if err != nil {
+-				return err
++				return nil, err
+ 			}
+ 			if !result.Applied {
+ 				continue
+@@ -24,16 +25,20 @@ func (r *Relay) ObserveBlock(config protocol.Hash) blockfollow.Apply {
+ 			if err != nil {
+ 				continue
+ 			}
+-			fact := p.Authorization.Fact
+-			// Also covers block arrival before background outbox persistence.
+ 			if p.Tx.Body.Config == config {
++				facts = append(facts, p.Authorization.Fact)
++			}
++		}
++		return func(o *state.Overlay) error {
++			for _, fact := range facts {
++				// Also covers block arrival before background outbox persistence.
+ 				r.forgetInstall(fact)
+-				if err = state.Put(o, state.Key(state.KeyObserved, fact[:]), true); err != nil {
++				if err := state.Put(o, state.Key(state.KeyObserved, fact[:]), true); err != nil {
+ 					return err
+ 				}
+ 				o.Apply([]state.Change{{Key: state.Key(state.KeyOutbox, fact[:]), Delete: true}})
+ 			}
+-		}
+-		return nil
++			return nil
++		}, nil
+ 	}
+ }
+diff --git a/internal/member/blocks.go b/internal/member/blocks.go
+index da2abfd..8f174b5 100644
+--- a/internal/member/blocks.go
++++ b/internal/member/blocks.go
+@@ -2,6 +2,7 @@ package member
+ 
+ import (
+ 	"utxo/finality"
++	"utxo/internal/blockfollow"
+ 	"utxo/internal/rules"
+ 	"utxo/internal/state"
+ 	"utxo/protocol"
+@@ -14,12 +15,56 @@ type LocalProgress struct {
+ 	Paid    uint64
+ 	Fee     rules.Escrow
+ 	Height  int64
++	// Positional entries bind to the immutable Approval.Debits (resource,
++	// grant version, worker and cap). Only this record changes during settlement.
++	Applied []uint64 `json:",omitempty"`
++}
++
++// DirectStoreSchema prevents old member binaries from ignoring split credits.
++const DirectStoreSchema uint64 = 5
++
++func localApplied(a state.Approval, p LocalProgress) ([]uint64, error) {
++	values := p.Applied
++	if values == nil {
++		values = make([]uint64, len(a.Debits))
++		for i, d := range a.Debits {
++			values[i] = d.Applied
++		}
++	}
++	if len(values) != len(a.Debits) {
++		return nil, rules.ErrAccounting
++	}
++	for i, d := range a.Debits {
++		if values[i] < d.Applied || values[i] > d.Cap {
++			return nil, rules.ErrAccounting
++		}
++	}
++	return values, nil
++}
++
++// AppliedDebits is the shared read path for status and offline accounting.
++// Old approvals retain their recorded cumulative amount; it is never reset.
++func AppliedDebits(v state.ReadView, a state.Approval) ([]uint64, error) {
++	var p LocalProgress
++	if a.Direct != nil {
++		var err error
++		p, _, err = state.Load[LocalProgress](v, ProgressKey(a.Fact))
++		if err != nil {
++			return nil, err
++		}
++	}
++	return localApplied(a, p)
+ }
+ 
+ func ProgressKey(f protocol.SpendFactID) []byte { return state.Key(122, f[:]) }
+ func waitingKey(id protocol.OutputID) []byte    { return state.Key(123, id[:]) }
+ 
+ func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgress) error {
++	var err error
++	p.Applied, err = localApplied(*a, *p)
++	if err != nil {
++		return err
++	}
+ 	if p.Settled && p.Pending == 0 && !p.Fee.Closed {
+ 		next, err := p.Fee.Complete(rules.FeeClose)
+ 		if err != nil {
+@@ -50,10 +95,10 @@ func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgre
+ 				}
+ 			}
+ 		}
+-		if target < d.Applied || target > d.Cap {
++		if target < p.Applied[i] || target > d.Cap {
+ 			return rules.ErrAccounting
+ 		}
+-		delta := target - d.Applied
++		delta := target - p.Applied[i]
+ 		if delta == 0 {
+ 			continue
+ 		}
+@@ -73,14 +118,11 @@ func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgre
+ 		if err != nil {
+ 			return err
+ 		}
+-		d.Applied = target
++		p.Applied[i] = target
+ 		if err = state.Put(o, key, slice); err != nil {
+ 			return err
+ 		}
+ 	}
+-	if err := state.Put(o, state.Key(state.KeyApproval, a.Fact[:]), *a); err != nil {
+-		return err
+-	}
+ 	return state.Put(o, ProgressKey(a.Fact), *p)
+ }
+ func (m *Member) resolveLocal(o *state.Overlay, id protocol.OutputID, paid bool) error {
+@@ -120,18 +162,19 @@ func (m *Member) resolveLocal(o *state.Overlay, id protocol.OutputID, paid bool)
+ 	return nil
+ }
+ 
+-// ApplyBlock is called inside the same durable transaction as the height cursor.
+-func (m *Member) ApplyBlock(o *state.Overlay, b finality.VerifiedBlock) error {
++// PrepareBlock decodes and authenticates owned block bytes before entering the writer.
++func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, error) {
+ 	if m.direct == nil {
+-		return protocol.ErrUnsupported
++		return nil, protocol.ErrUnsupported
+ 	}
++	var updates []blockfollow.Apply
+ 	for _, entry := range b.Transactions() {
+ 		if entry.Code != 0 || len(entry.Data) == 0 {
+ 			continue
+ 		}
+ 		result, err := protocol.DecodeExecution(entry.Data)
+ 		if err != nil {
+-			return err
++			return nil, err
+ 		}
+ 		if !result.Applied {
+ 			continue
+@@ -139,120 +182,137 @@ func (m *Member) ApplyBlock(o *state.Overlay, b finality.VerifiedBlock) error {
+ 		if protocol.IsRepairInput(entry.Bytes) {
+ 			repair, err := protocol.DecodeRepairInput(entry.Bytes)
+ 			if err != nil {
+-				return err
++				return nil, err
+ 			}
+ 			pay, err := protocol.DecodeDirectSubmission(repair.TransactionBytes)
+ 			if err != nil {
+-				return err
++				return nil, err
+ 			}
+ 			if int(repair.Input) >= len(pay.Tx.Body.Inputs) {
+-				return protocol.ErrRule
++				return nil, protocol.ErrRule
+ 			}
+-			in := pay.Tx.Body.Inputs[repair.Input]
+-			fact := protocol.SpendFactID(in.Evidence)
+-			a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
++			updates = append(updates, func(o *state.Overlay) error { return m.applyRepair(o, repair, pay) })
++		} else {
++			pay, err := protocol.DecodeDirectSubmission(entry.Bytes)
+ 			if err != nil {
+-				return err
++				return nil, err
+ 			}
+-			if found {
+-				p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+-				if err != nil {
+-					return err
+-				}
+-				p.Paid, err = protocol.Add(p.Paid, pay.Tx.Claims[repair.Input].Output.Amount)
+-				if err != nil {
+-					return err
+-				}
+-				if err = m.finishLocal(o, &a, &p); err != nil {
+-					return err
+-				}
+-			}
+-			if err = m.resolveLocal(o, repair.Output, true); err != nil {
++			updates = append(updates, func(o *state.Overlay) error { return m.applyPayment(o, pay, result, b.Height()) })
++		}
++	}
++	return func(o *state.Overlay) error {
++		for _, apply := range updates {
++			if err := apply(o); err != nil {
+ 				return err
+ 			}
+-			continue
+ 		}
+-		pay, err := protocol.DecodeDirectSubmission(entry.Bytes)
++		return nil
++	}, nil
++}
++
++func (m *Member) applyRepair(o *state.Overlay, repair protocol.RepairInput, pay protocol.DirectSubmission) error {
++	in := pay.Tx.Body.Inputs[repair.Input]
++	fact := protocol.SpendFactID(in.Evidence)
++	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
++	if err != nil {
++		return err
++	}
++	if found {
++		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
++		if err != nil {
++			return err
++		}
++		p.Paid, err = protocol.Add(p.Paid, pay.Tx.Claims[repair.Input].Output.Amount)
+ 		if err != nil {
+ 			return err
+ 		}
+-		tx := pay.Tx
+-		fact := pay.Authorization.Fact
+-		if tx.Body.Network != m.cfg.Organization.Network {
+-			return protocol.ErrAuth
++		if err = m.finishLocal(o, &a, &p); err != nil {
++			return err
+ 		}
+-		a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
++	}
++	if err = m.resolveLocal(o, repair.Output, true); err != nil {
++		return err
++	}
++	return nil
++}
++
++func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, result protocol.ExecutionResult, height int64) error {
++	tx := pay.Tx
++	fact := pay.Authorization.Fact
++	if tx.Body.Network != m.cfg.Organization.Network {
++		return protocol.ErrAuth
++	}
++	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
++	if err != nil {
++		return err
++	}
++	if found {
++		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+ 		if err != nil {
+ 			return err
+ 		}
+-		if found {
+-			p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+-			if err != nil {
+-				return err
+-			}
+-			if p.Settled {
+-				return rules.ErrConflict
+-			}
+-			p.Settled = true
+-			p.Height = b.Height()
+-			p.Pending = uint32(len(result.MissingInputs))
+-			p.Fee, err = rules.NewEscrow(tx.Body.Fee.Maximum, m.direct.Base.Fee)
++		if p.Settled {
++			return rules.ErrConflict
++		}
++		p.Settled = true
++		p.Height = height
++		p.Pending = uint32(len(result.MissingInputs))
++		p.Fee, err = rules.NewEscrow(tx.Body.Fee.Maximum, m.direct.Base.Fee)
++		if err != nil {
++			return err
++		}
++		for _, stage := range []rules.FeeAction{rules.FeeRegister, rules.FeeSettle} {
++			p.Fee, err = p.Fee.Complete(stage)
+ 			if err != nil {
+ 				return err
+ 			}
+-			for _, stage := range []rules.FeeAction{rules.FeeRegister, rules.FeeSettle} {
+-				p.Fee, err = p.Fee.Complete(stage)
+-				if err != nil {
+-					return err
+-				}
+-			}
+-			for _, i := range result.MissingInputs {
+-				if int(i) >= len(tx.Body.Inputs) {
+-					return protocol.ErrRule
+-				}
+-				if err = state.Put(o, waitingKey(tx.Body.Inputs[i].Output), fact); err != nil {
+-					return err
+-				}
++		}
++		for _, i := range result.MissingInputs {
++			if int(i) >= len(tx.Body.Inputs) {
++				return protocol.ErrRule
+ 			}
+-			if err = m.finishLocal(o, &a, &p); err != nil {
++			if err = state.Put(o, waitingKey(tx.Body.Inputs[i].Output), fact); err != nil {
+ 				return err
+ 			}
+ 		}
+-		if tx.Body.Config == m.cfg.Organization.Hash() {
+-			if err = state.Put(o, state.Key(state.KeyObserved, fact[:]), true); err != nil {
+-				return err
+-			}
+-			o.Apply([]state.Change{{Key: state.Key(state.KeyOutbox, fact[:]), Delete: true}})
+-			for i, in := range tx.Body.Inputs {
+-				if err = state.Put(o, rules.DirectSpendKey(in.Output, tx.Claims[i].Instance), state.Spend{Consumed: fact}); err != nil {
+-					return err
+-				}
+-			}
++		if err = m.finishLocal(o, &a, &p); err != nil {
++			return err
+ 		}
+-		late := make(map[uint32]bool, len(result.LateOutputs))
+-		for _, i := range result.LateOutputs {
+-			if int(i) >= len(tx.Body.Outputs) {
+-				return protocol.ErrRule
+-			}
+-			late[i] = true
++	}
++	if tx.Body.Config == m.cfg.Organization.Hash() {
++		if err = state.Put(o, state.Key(state.KeyObserved, fact[:]), true); err != nil {
++			return err
+ 		}
+-		for i, out := range tx.Body.Outputs {
+-			id := pay.Summary().OutputID(uint32(i))
+-			if err = m.resolveLocal(o, id, false); err != nil {
+-				return err
+-			}
+-			if out.Recipient.Route.Org != m.cfg.Organization.Org {
+-				continue
+-			}
+-			instance := uint8(0)
+-			if late[uint32(i)] {
+-				instance = 1
+-			}
+-			creation := state.Creation{Output: out, Fact: protocol.CreationIdentity(tx.Body.Network, tx.ID(), uint32(i), instance), Source: protocol.Hash(fact), Final: true}
+-			if err = state.Put(o, rules.DirectCreationKey(id, instance), creation); err != nil {
++		o.Apply([]state.Change{{Key: state.Key(state.KeyOutbox, fact[:]), Delete: true}})
++		for i, in := range tx.Body.Inputs {
++			if err = state.Put(o, rules.DirectSpendKey(in.Output, tx.Claims[i].Instance), state.Spend{Consumed: fact}); err != nil {
+ 				return err
+ 			}
+ 		}
+ 	}
++	late := make(map[uint32]bool, len(result.LateOutputs))
++	for _, i := range result.LateOutputs {
++		if int(i) >= len(tx.Body.Outputs) {
++			return protocol.ErrRule
++		}
++		late[i] = true
++	}
++	for i, out := range tx.Body.Outputs {
++		id := pay.Summary().OutputID(uint32(i))
++		if err = m.resolveLocal(o, id, false); err != nil {
++			return err
++		}
++		if out.Recipient.Route.Org != m.cfg.Organization.Org {
++			continue
++		}
++		instance := uint8(0)
++		if late[uint32(i)] {
++			instance = 1
++		}
++		creation := state.Creation{Output: out, Fact: protocol.CreationIdentity(tx.Body.Network, tx.ID(), uint32(i), instance), Source: protocol.Hash(fact), Final: true}
++		if err = state.Put(o, rules.DirectCreationKey(id, instance), creation); err != nil {
++			return err
++		}
++	}
+ 	return nil
+ }
+diff --git a/internal/member/blocks_test.go b/internal/member/blocks_test.go
+index a69ac20..15a8cb4 100644
+--- a/internal/member/blocks_test.go
++++ b/internal/member/blocks_test.go
+@@ -1,6 +1,7 @@
+ package member_test
+ 
+ import (
++	"bytes"
+ 	"context"
+ 	"crypto/x509"
+ 	"encoding/pem"
+@@ -20,6 +21,50 @@ import (
+ 	"utxo/protocol"
+ )
+ 
++type countedBlockStore struct {
++	store.Store
++	updates int
++}
++
++func (s *countedBlockStore) Update(fn func(state.ReadView) ([]state.Change, error)) error {
++	s.updates++
++	return s.Store.Update(fn)
++}
++
++func TestInvalidPaymentRejectedBeforeMemberWrite(t *testing.T) {
++	f := testkit.NewFixture("prepare", "org", 1)
++	f.EnableDirect()
++	raw, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
++	if err != nil {
++		t.Fatal(err)
++	}
++	pemblock, _ := pem.Decode(raw)
++	key, err := x509.ParsePKCS1PrivateKey(pemblock.Bytes)
++	if err != nil {
++		t.Fatal(err)
++	}
++	settings := rules.DirectSettings{Modulus: key.N.Bytes(), TimeoutSeconds: 30, RepairCost: 5}
++	db := &countedBlockStore{Store: store.NewMemory()}
++	defer db.Close()
++	m, err := member.New(member.Config{Organization: f.Org, Index: 0, Key: f.Keys[0], Peers: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Workers: 1, Direct: &settings}, db, f.Genesis)
++	if err != nil {
++		t.Fatal(err)
++	}
++	result, _ := (protocol.ExecutionResult{Applied: true}).MarshalBinary()
++	trust, data := testkit.Block("prepare", 1, nil, [][]byte{{0xff}}, []*abci.ExecTxResult{{Data: result}})
++	b, err := finality.VerifyBlock(trust, data)
++	if err != nil {
++		t.Fatal(err)
++	}
++	db.updates = 0
++	if err := blockfollow.Commit(db, b, m.PrepareBlock); err == nil {
++		t.Fatal("invalid payment accepted")
++	}
++	if db.updates != 0 {
++		t.Fatalf("static decoding entered %d write transactions", db.updates)
++	}
++}
++
+ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
+ 	for _, scenario := range []struct {
+ 		name          string
+@@ -96,10 +141,18 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
+ 			}
+ 			pp := protocol.DirectPayment{Tx: parent, Certificate: pc}
+ 			cp := protocol.DirectPayment{Tx: child, Certificate: cc, InputCertificates: []protocol.InputCertificate{{Certificate: pc}}}
++			approved := make(map[protocol.SpendFactID][]byte)
+ 			for _, p := range []protocol.DirectPayment{pp, cp} {
+ 				if _, err = m.ApproveDirect(context.Background(), protocol.DirectRequest{Tx: p.Tx, InputCertificates: p.InputCertificates}); err != nil {
+ 					t.Fatal(err)
+ 				}
++				if err = db.View(func(v state.ReadView) error {
++					var err error
++					approved[p.Certificate.QC.Fact], err = v.Get(state.Key(state.KeyApproval, p.Certificate.QC.Fact[:]))
++					return err
++				}); err != nil {
++					t.Fatal(err)
++				}
+ 			}
+ 			var previous []byte
+ 			height := int64(0)
+@@ -111,14 +164,14 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
+ 				if err != nil {
+ 					t.Fatal(err)
+ 				}
+-				if err = blockfollow.Commit(db, b, m.ApplyBlock); err != nil {
++				if err = blockfollow.Commit(db, b, m.PrepareBlock); err != nil {
+ 					t.Fatal(err)
+ 				}
+-				if err = blockfollow.Commit(wdb, b, w.ApplyBlock); err != nil {
++				if err = blockfollow.Commit(wdb, b, w.PrepareBlock); err != nil {
+ 					t.Fatal(err)
+ 				}
+ 				// Same block is harmless; cursor and quota share the durable transaction.
+-				if err = blockfollow.Commit(db, b, m.ApplyBlock); err != nil {
++				if err = blockfollow.Commit(db, b, m.PrepareBlock); err != nil {
+ 					t.Fatal(err)
+ 				}
+ 				previous = b.Hash()
+@@ -216,6 +269,15 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
+ 				t.Fatal(err)
+ 			}
+ 			err = db.View(func(v state.ReadView) error {
++				for fact, original := range approved {
++					current, err := v.Get(state.Key(state.KeyApproval, fact[:]))
++					if err != nil {
++						return err
++					}
++					if !bytes.Equal(original, current) {
++						t.Fatal("settlement rewrote immutable approval")
++					}
++				}
+ 				a, _, err := state.Load[state.Approval](v, state.Key(state.KeyApproval, cc.QC.Fact[:]))
+ 				if err != nil {
+ 					return err
+@@ -224,8 +286,12 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
+ 				if err != nil {
+ 					return err
+ 				}
+-				for _, d := range a.Debits {
+-					if d.Key.Kind == protocol.ResourceFUEL && d.Cap-d.Applied != p.Fee.Rewards+p.Fee.Burned {
++				applied, err := member.AppliedDebits(v, a)
++				if err != nil {
++					return err
++				}
++				for i, d := range a.Debits {
++					if d.Key.Kind == protocol.ResourceFUEL && d.Cap-applied[i] != p.Fee.Rewards+p.Fee.Burned {
+ 						t.Fatal("real fees were recycled")
+ 					}
+ 				}
+diff --git a/internal/member/outcome.go b/internal/member/outcome.go
+index 9e71022..ab33a03 100644
+--- a/internal/member/outcome.go
++++ b/internal/member/outcome.go
+@@ -17,8 +17,12 @@ func (m *Member) Outcome(id protocol.SpendFactID) (out Outcome, err error) {
+ 			return e
+ 		}
+ 		out.Approved = found
+-		for _, d := range approval.Debits {
+-			residual, e := protocol.Sub(d.Cap, d.Applied)
++		applied, e := AppliedDebits(v, approval)
++		if e != nil {
++			return e
++		}
++		for i, d := range approval.Debits {
++			residual, e := protocol.Sub(d.Cap, applied[i])
+ 			if e != nil {
+ 				return e
+ 			}
+diff --git a/internal/wallet/blocks.go b/internal/wallet/blocks.go
+index 2f8a07c..8f42e2b 100644
+--- a/internal/wallet/blocks.go
++++ b/internal/wallet/blocks.go
+@@ -2,33 +2,39 @@ package wallet
+ 
+ import (
+ 	"utxo/finality"
++	"utxo/internal/blockfollow"
+ 	"utxo/internal/state"
+ 	"utxo/protocol"
+ )
+ 
+-func (w *Wallet) ApplyBlock(o *state.Overlay, b finality.VerifiedBlock) error {
++func (w *Wallet) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, error) {
++	type received struct {
++		key  []byte
++		coin DirectCoin
++	}
++	var coins []received
+ 	for _, entry := range b.Transactions() {
+ 		if entry.Code != 0 || len(entry.Data) == 0 {
+ 			continue
+ 		}
+ 		result, err := protocol.DecodeExecution(entry.Data)
+ 		if err != nil {
+-			return err
++			return nil, err
+ 		}
+ 		if !result.Applied || protocol.IsRepairInput(entry.Bytes) {
+ 			continue
+ 		}
+ 		pay, err := protocol.DecodeDirectSubmission(entry.Bytes)
+ 		if err != nil {
+-			return err
++			return nil, err
+ 		}
+ 		if pay.Tx.Body.Network != w.network {
+-			return protocol.ErrAuth
++			return nil, protocol.ErrAuth
+ 		}
+ 		late := map[uint32]bool{}
+ 		for _, i := range result.LateOutputs {
+ 			if int(i) >= len(pay.Tx.Body.Outputs) {
+-				return protocol.ErrRule
++				return nil, protocol.ErrRule
+ 			}
+ 			late[i] = true
+ 		}
+@@ -41,21 +47,25 @@ func (w *Wallet) ApplyBlock(o *state.Overlay, b finality.VerifiedBlock) error {
+ 				instance = 1
+ 			}
+ 			id := pay.Summary().OutputID(uint32(i))
+-			key := DirectCoinKey(id, instance)
+-			old, found, err := state.Load[DirectCoin](o, key)
++			coin := DirectCoin{Output: out, Instance: instance, Index: uint32(i), Final: protocol.CreationIdentity(w.network, pay.Tx.ID(), uint32(i), instance)}
++			coins = append(coins, received{DirectCoinKey(id, instance), coin})
++		}
++	}
++	return func(o *state.Overlay) error {
++		for _, c := range coins {
++			old, found, err := state.Load[DirectCoin](o, c.key)
+ 			if err != nil {
+ 				return err
+ 			}
+-			if found && old.Output != out {
++			if found && old.Output != c.coin.Output {
+ 				return protocol.ErrAuth
+ 			}
+-			coin := DirectCoin{Output: out, Instance: instance, Index: uint32(i), Final: protocol.CreationIdentity(w.network, pay.Tx.ID(), uint32(i), instance)}
+-			if err = state.Put(o, key, coin); err != nil {
++			if err = state.Put(o, c.key, c.coin); err != nil {
+ 				return err
+ 			}
+ 		}
+-	}
+-	return nil
++		return nil
++	}, nil
+ }
+ func (w *Wallet) DirectFinal(id protocol.OutputID, instance uint8) (bool, error) {
+ 	var final bool

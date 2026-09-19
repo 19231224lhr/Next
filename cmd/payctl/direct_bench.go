@@ -145,7 +145,7 @@ func benchDirect(args []string) error {
 	public := transport.NewCommitteeClient(n.CommitteeURLs[0])
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	defer blockfollow.Start(ctx, cancel, group, public, trust, receiver.ApplyBlock)()
+	defer blockfollow.Start(ctx, cancel, group, public, trust, receiver.PrepareBlock)()
 	var wg sync.WaitGroup
 	began := time.Now()
 	jobs := directBenchJobs(ctx, *count, *rate, began)

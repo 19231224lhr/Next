@@ -1,5 +1,7 @@
 # Selected laboratory observations
 
+- [Database optimization and controlled comparisons](database-optimization-2026-09-20/README.md): four changes, 9,500 performance-test payments, real repair/restart validation, intermediate regressions and separate fresh/grown-database results.
+
 These are single-host diagnostic samples from the Mac Studio prototype, not
 production or sustained-throughput claims. Raw reports retain phase timestamps,
 delivery-attempt identities and limitations. No laboratory keys or databases are

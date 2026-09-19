@@ -1,0 +1,13 @@
+diff --git a/internal/store/bolt.go b/internal/store/bolt.go
+index f942013..edd9cbf 100644
+--- a/internal/store/bolt.go
++++ b/internal/store/bolt.go
+@@ -40,7 +40,7 @@ func Open(path string, id Identity) (*Bolt, error) {
+ 	if e := os.MkdirAll(filepath.Dir(path), 0700); e != nil {
+ 		return nil, e
+ 	}
+-	db, e := bolt.Open(path, 0600, &bolt.Options{Timeout: time.Second})
++	db, e := bolt.Open(path, 0600, &bolt.Options{Timeout: time.Second, InitialMmapSize: 16 << 20})
+ 	if e != nil {
+ 		return nil, e
+ 	}

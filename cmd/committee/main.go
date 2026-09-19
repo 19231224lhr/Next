@@ -89,6 +89,8 @@ func run() error {
 	cmtcfg.EnsureRoot(cc.RootDir)
 	cc.Moniker = fmt.Sprintf("committee-%d", c.Index)
 	cc.RPC.ListenAddress = ""
+	// Clients follow blocks by height; transaction/event search is unused.
+	cc.TxIndex.Indexer = "null"
 	cc.P2P.ListenAddress = c.P2PListen
 	cc.P2P.PersistentPeers = c.Peers
 	cc.P2P.AllowDuplicateIP = true

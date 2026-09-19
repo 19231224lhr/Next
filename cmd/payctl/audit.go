@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	cfg "utxo/cmd/internal/config"
+	"utxo/internal/member"
 	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/internal/store"
@@ -81,8 +82,12 @@ func audit(args []string) error {
 				item.Approvals = len(approvals)
 				expected := make(map[protocol.ResourceKey]uint64)
 				for _, a := range approvals {
-					for _, d := range a.Debits {
-						residual, e := protocol.Sub(d.Cap, d.Applied)
+					applied, e := member.AppliedDebits(v, a)
+					if e != nil {
+						return e
+					}
+					for i, d := range a.Debits {
+						residual, e := protocol.Sub(d.Cap, applied[i])
 						if e != nil {
 							return e
 						}

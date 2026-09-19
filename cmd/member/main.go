@@ -50,7 +50,11 @@ func run() error {
 	if e != nil {
 		return e
 	}
-	db, e := store.Open(filepath.Join(c.DataDir, "member.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "member", Node: fmt.Sprintf("%s/%d", org.Org, c.Index), Schema: n.Schema()})
+	schema := n.Schema()
+	if n.Direct != nil {
+		schema = member.DirectStoreSchema
+	}
+	db, e := store.Open(filepath.Join(c.DataDir, "member.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "member", Node: fmt.Sprintf("%s/%d", org.Org, c.Index), Schema: schema})
 	if e != nil {
 		return e
 	}
@@ -92,7 +96,7 @@ func run() error {
 		return nil
 	}
 	if n.Direct != nil {
-		defer blockfollow.Start(ctx, stop, group, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, m.ApplyBlock)()
+		defer blockfollow.Start(ctx, stop, group, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, m.PrepareBlock)()
 	}
 	relayDone := make(chan error, 1)
 	go func() { relayDone <- relay.Run(relayCtx) }()

@@ -118,8 +118,8 @@ func demoDirect(args []string) error {
 	httpClient := transport.NewHTTPClient(10 * time.Second)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	defer blockfollow.Start(ctx, cancel, db0, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w0.ApplyBlock)()
-	defer blockfollow.Start(ctx, cancel, db1, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w1.ApplyBlock)()
+	defer blockfollow.Start(ctx, cancel, db0, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w0.PrepareBlock)()
+	defer blockfollow.Start(ctx, cancel, db1, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w1.PrepareBlock)()
 	var sent time.Time
 	send := func(org int, req protocol.DirectRequest) (protocol.OutputCertificate, error) {
 		raw, err := req.MarshalBinary()

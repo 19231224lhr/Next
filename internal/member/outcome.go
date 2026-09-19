@@ -17,8 +17,12 @@ func (m *Member) Outcome(id protocol.SpendFactID) (out Outcome, err error) {
 			return e
 		}
 		out.Approved = found
-		for _, d := range approval.Debits {
-			residual, e := protocol.Sub(d.Cap, d.Applied)
+		applied, e := AppliedDebits(v, approval)
+		if e != nil {
+			return e
+		}
+		for i, d := range approval.Debits {
+			residual, e := protocol.Sub(d.Cap, applied[i])
 			if e != nil {
 				return e
 			}

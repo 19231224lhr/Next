@@ -1,5 +1,7 @@
 # UTXO 快速转账系统 Go 工程架构规范
 
+> **数据库工程修订（2026-09-20）：** 按块解析认证移到写事务外；事务内仍完成最新输入／额度裁决与游标原子更新。direct 成员采用不可变 Approval 加小型累计进度，成员本地 schema 升为 5（无自动迁移），其他节点及 wire 4 保持原版本。关闭未使用的 Comet 搜索索引，保留 BlockStore、按高度执行结果和恢复数据。详见[当前实现规范](../implementation-block-following-v4.md)及[数据库实测](../experiments/database-optimization-2026-09-20/README.md)。
+
 > **公共提交修订（2026-09-19）：** 见[公共提交与新输出 TXCer 分离](../implementation-public-submission-v4.md)。委员会接收交易、组织消费授权及必要输入 TXCer，不接收本笔新 `OutputCertificate` 对象；保留原三票验证，普通新输出不预先登记担保。内部 INSTALL 继续保存完整 TXCer。采用新规则标识及新创世实验网。
 
 
@@ -767,4 +769,3 @@ R 系列和未启用处罚策略明确标记“功能尚未启用、测试待实
 [S5]: https://github.com/etcd-io/bbolt/blob/main/README.md
 [S6]: https://github.com/cometbft/cometbft/blob/v0.38.26/spec/abci/abci%2B%2B_app_requirements.md
 [S7]: https://github.com/cometbft/cometbft/blob/v0.38.26/crypto/merkle/proof.go
-
