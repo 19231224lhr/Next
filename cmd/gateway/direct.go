@@ -52,6 +52,7 @@ func directPaymentHandler(c *gateway.Collector) http.HandlerFunc {
 			return
 		}
 		requesttrace.Mark(ctx, "response_ready")
+		requesttrace.Payment("certificate_ready", cert.QC.Fact)
 		if requesttrace.Enabled(ctx) {
 			w.Header().Set(requesttrace.HeaderName, requesttrace.Header(ctx))
 		}
@@ -59,8 +60,12 @@ func directPaymentHandler(c *gateway.Collector) http.HandlerFunc {
 		w.Header().Set("Content-Length", strconv.Itoa(len(raw)))
 		_, _ = w.Write(raw)
 		_ = http.NewResponseController(w).Flush()
+		payment := protocol.DirectPayment{Tx: req.Tx, Certificate: cert, InputCertificates: req.InputCertificates}
+		if c.OfferDirect != nil {
+			c.OfferDirect(payment)
+		}
 		requesttrace.Payment("outbox_persist_start", cert.QC.Fact)
-		if err = c.PersistDirect(protocol.DirectPayment{Tx: req.Tx, Certificate: cert, InputCertificates: req.InputCertificates}); err != nil {
+		if err = c.PersistDirect(payment); err != nil {
 			slog.Error("background v3 certificate persistence failed", "error", err)
 		} else {
 			requesttrace.Payment("outbox_persist_done", cert.QC.Fact)

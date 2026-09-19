@@ -139,6 +139,8 @@ func run() error {
 	relay := &gateway.Relay{DB: db, Public: transport.NewCommitteeClient(n.CommitteeURLs[0]), Trust: trust, Organizations: make(map[protocol.Hash]protocol.OrgConfig), Members: make(map[protocol.Hash][4]gateway.MemberClient)}
 	relay.Direct = n.Direct != nil
 	if relay.Direct {
+		relay.Early = gateway.NewDirectInbox()
+		collector.OfferDirect = relay.Early.Offer
 		wake := make(chan protocol.SpendFactID, 256)
 		relay.Wake = wake
 		collector.NotifyPersisted = func(fact protocol.SpendFactID) {

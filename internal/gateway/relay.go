@@ -22,6 +22,7 @@ type PublicClient interface {
 	Certificate(context.Context, protocol.SpendFactID) (protocol.TXCer, error)
 }
 type Relay struct {
+	Early         *DirectInbox
 	Wake          <-chan protocol.SpendFactID
 	Direct        bool
 	MemberRelay   bool

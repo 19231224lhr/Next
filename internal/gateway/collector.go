@@ -15,6 +15,8 @@ type MemberClient interface {
 	Install(context.Context, protocol.TXCer) error
 }
 type Collector struct {
+	// OfferDirect is optional, nonblocking early delivery; PersistDirect still runs.
+	OfferDirect func(protocol.DirectPayment) bool
 	// NotifyPersisted is a best-effort scheduling hint, never the durable queue.
 	NotifyPersisted func(protocol.SpendFactID)
 	org             protocol.OrgConfig

@@ -28,7 +28,12 @@ type directLane struct {
 func (r *Relay) runDirect(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	var workers sync.WaitGroup
-	defer func() { cancel(); workers.Wait() }()
+	defer func() { cancel(); workers.Wait(); r.Early.close() }()
+	var earlyWake <-chan struct{}
+	if r.Early != nil {
+		earlyWake = r.Early.wake
+	}
+	preferEarly := false
 	lanes := [2]directLane{{limit: 4, scanning: true, wrapped: true}, {limit: 4, scanning: true, wrapped: true}}
 	busy := make(map[directTask]bool)
 	// Only pacing lives here. Durable outbox and verified block following still
@@ -124,11 +129,23 @@ func (r *Relay) runDirect(ctx context.Context) error {
 		}
 		// Alternate bounded pages, so notifications and either lane cannot starve
 		// old durable tasks or monopolize the event loop.
+		early := r.Early.snapshot()
 		for i := range lanes {
-			if err := refill(i); err != nil {
-				return err
+			if !preferEarly {
+				if err := refill(i); err != nil {
+					return err
+				}
+			}
+			for _, p := range early {
+				schedule(p, i)
+			}
+			if preferEarly {
+				if err := refill(i); err != nil {
+					return err
+				}
 			}
 		}
+		preferEarly = !preferEarly
 		var more <-chan struct{}
 		for _, lane := range lanes {
 			if lane.scanning && lane.active < lane.limit {
@@ -139,6 +156,7 @@ func (r *Relay) runDirect(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-earlyWake:
 		case task := <-done:
 			delete(busy, task)
 			index := 0
@@ -165,6 +183,12 @@ func (r *Relay) runDirect(ctx context.Context) error {
 				}
 			}
 		case <-ticker.C:
+			// Lost persistence hints cannot retain early payloads indefinitely.
+			for _, p := range r.Early.snapshot() {
+				if _, _, err := r.directPending(p.Fact); err != nil {
+					return err
+				}
+			}
 			for fact, due := range nextSubmit {
 				if !busy[directTask{fact, -1}] && !time.Now().Before(due) {
 					delete(nextSubmit, fact)
@@ -201,16 +225,25 @@ func (r *Relay) reserveDirectInstall(fact protocol.SpendFactID, target int) bool
 }
 
 func (r *Relay) directPending(fact protocol.SpendFactID) (p state.Outbox, found bool, err error) {
+	observed := false
 	err = r.DB.View(func(v state.ReadView) error {
-		if _, observed, e := state.Load[bool](v, state.Key(state.KeyObserved, fact[:])); e != nil {
+		if _, complete, e := state.Load[bool](v, state.Key(state.KeyObserved, fact[:])); e != nil {
 			return e
-		} else if observed {
+		} else if complete {
+			observed = true
 			return nil
 		}
 		var e error
 		p, found, e = state.Load[state.Outbox](v, state.Key(state.KeyOutbox, fact[:]))
 		return e
 	})
+	if err == nil {
+		if observed || found {
+			r.Early.forget(fact)
+		} else {
+			p, found = r.Early.get(fact)
+		}
+	}
 	return
 }
 
