@@ -1,0 +1,644 @@
+diff --git a/cmd/gateway/direct.go b/cmd/gateway/direct.go
+index d6a1bca..3659551 100644
+--- a/cmd/gateway/direct.go
++++ b/cmd/gateway/direct.go
+@@ -6,6 +6,7 @@ import (
+ 	"net/http"
+ 	"strconv"
+ 	"utxo/internal/gateway"
++	"utxo/internal/requesttrace"
+ 	"utxo/internal/transport"
+ 	"utxo/protocol"
+ )
+@@ -13,6 +14,11 @@ import (
+ func directPaymentHandler(c *gateway.Collector) http.HandlerFunc {
+ 	slots := make(chan struct{}, 128)
+ 	return func(w http.ResponseWriter, r *http.Request) {
++		ctx := r.Context()
++		if r.Header.Get(requesttrace.HeaderName) == "1" {
++			ctx = requesttrace.Start(ctx, "gateway")
++		}
++		requesttrace.Mark(ctx, "http_handler_enter")
+ 		select {
+ 		case slots <- struct{}{}:
+ 			defer func() { <-slots }()
+@@ -34,7 +40,8 @@ func directPaymentHandler(c *gateway.Collector) http.HandlerFunc {
+ 			http.Error(w, "INVALID_ENCODING", 400)
+ 			return
+ 		}
+-		cert, err := c.CollectDirect(r.Context(), req)
++		requesttrace.Mark(ctx, "request_decoded")
++		cert, err := c.CollectDirect(ctx, req)
+ 		if err != nil {
+ 			http.Error(w, "QUORUM_UNAVAILABLE", 503)
+ 			return
+@@ -44,12 +51,19 @@ func directPaymentHandler(c *gateway.Collector) http.HandlerFunc {
+ 			http.Error(w, "INVALID_CERTIFICATE", 500)
+ 			return
+ 		}
++		requesttrace.Mark(ctx, "response_ready")
++		if requesttrace.Enabled(ctx) {
++			w.Header().Set(requesttrace.HeaderName, requesttrace.Header(ctx))
++		}
+ 		w.Header().Set("Content-Type", transport.MediaType)
+ 		w.Header().Set("Content-Length", strconv.Itoa(len(raw)))
+ 		_, _ = w.Write(raw)
+ 		_ = http.NewResponseController(w).Flush()
++		requesttrace.Payment("outbox_persist_start", cert.QC.Fact)
+ 		if err = c.PersistDirect(protocol.DirectPayment{Tx: req.Tx, Certificate: cert, InputCertificates: req.InputCertificates}); err != nil {
+ 			slog.Error("background v3 certificate persistence failed", "error", err)
++		} else {
++			requesttrace.Payment("outbox_persist_done", cert.QC.Fact)
+ 		}
+ 	}
+ }
+diff --git a/cmd/gateway/main.go b/cmd/gateway/main.go
+index 52bd018..fd47c1f 100644
+--- a/cmd/gateway/main.go
++++ b/cmd/gateway/main.go
+@@ -118,6 +118,7 @@ func run() error {
+ 		return e
+ 	}
+ 	mux := http.NewServeMux()
++	requesttrace.RegisterTimeline(mux)
+ 	mux.HandleFunc("POST /v1/transactions", paymentHandler(collector))
+ 	if n.Direct != nil {
+ 		mux.HandleFunc("POST /v3/transactions", directPaymentHandler(collector))
+diff --git a/cmd/payctl/direct_bench.go b/cmd/payctl/direct_bench.go
+index fc7f98d..cd7732f 100644
+--- a/cmd/payctl/direct_bench.go
++++ b/cmd/payctl/direct_bench.go
+@@ -15,6 +15,7 @@ import (
+ 	cfg "utxo/cmd/internal/config"
+ 	"utxo/internal/blockfollow"
+ 	"utxo/internal/member"
++	"utxo/internal/requesttrace"
+ 	"utxo/internal/store"
+ 	"utxo/internal/transport"
+ 	"utxo/internal/wallet"
+@@ -29,6 +30,7 @@ func benchDirect(args []string) error {
+ 	start := flags.Int("start", 100, "unused genesis input index")
+ 	count := flags.Int("count", 128, "transactions")
+ 	concurrency := flags.Int("concurrency", 16, "outstanding payments")
++	trace := flags.Bool("trace", false, "include opt-in per-payment and block timing")
+ 	if err := flags.Parse(args); err != nil {
+ 		return err
+ 	}
+@@ -124,10 +126,12 @@ func benchDirect(args []string) error {
+ 		}
+ 	}
+ 	type sample struct {
+-		Index                                    int
+-		FastMS, BlockObservedMS, MemberAppliedMS float64
+-		Fact                                     string
+-		Error                                    string `json:",omitempty"`
++		Index                                                                                        int
++		SentUnixNS, CertificateReceivedUnixNS, FastUnixNS, BlockObservedUnixNS, MemberObservedUnixNS int64
++		Foreground                                                                                   []requesttrace.Event `json:",omitempty"`
++		FastMS, BlockObservedMS, MemberAppliedMS                                                     float64
++		Fact                                                                                         string
++		Error                                                                                        string `json:",omitempty"`
+ 	}
+ 	samples := make([]sample, *count)
+ 	httpClient := transport.NewHTTPClient(10 * time.Second)
+@@ -154,13 +158,23 @@ func benchDirect(args []string) error {
+ 						return err
+ 					}
+ 					req.Header.Set("Content-Type", transport.MediaType)
++					if *trace {
++						req.Header.Set(requesttrace.HeaderName, "1")
++					}
+ 					sent := time.Now()
++					samples[i].SentUnixNS = sent.UnixNano()
+ 					resp, err := httpClient.Do(req)
+ 					if err != nil {
+ 						return err
+ 					}
+ 					raw, err := io.ReadAll(io.LimitReader(resp.Body, protocol.MaxCertificateBytes))
+ 					resp.Body.Close()
++					samples[i].CertificateReceivedUnixNS = time.Now().UnixNano()
++					if *trace {
++						traceCtx := requesttrace.Start(ctx, "wallet")
++						requesttrace.Import(traceCtx, resp.Header.Get(requesttrace.HeaderName), "")
++						samples[i].Foreground = requesttrace.Events(traceCtx)
++					}
+ 					if err != nil {
+ 						return err
+ 					}
+@@ -174,6 +188,7 @@ func benchDirect(args []string) error {
+ 					if err = receiver.ReceiveDirect(requests[i].Tx.Body.Outputs[0], cert, 0); err != nil {
+ 						return err
+ 					}
++					samples[i].FastUnixNS = time.Now().UnixNano()
+ 					samples[i].FastMS = float64(time.Since(sent)) / float64(time.Millisecond)
+ 					samples[i].Fact = protocol.Hash(cert.QC.Fact).String()
+ 					ticker := time.NewTicker(25 * time.Millisecond)
+@@ -188,6 +203,7 @@ func benchDirect(args []string) error {
+ 							}
+ 							if ok {
+ 								created = true
++								samples[i].BlockObservedUnixNS = time.Now().UnixNano()
+ 								samples[i].BlockObservedMS = float64(time.Since(sent)) / float64(time.Millisecond)
+ 							}
+ 						}
+@@ -212,6 +228,7 @@ func benchDirect(args []string) error {
+ 								}
+ 							}
+ 							if complete {
++								samples[i].MemberObservedUnixNS = time.Now().UnixNano()
+ 								samples[i].MemberAppliedMS = float64(time.Since(sent)) / float64(time.Millisecond)
+ 								return nil
+ 							}
+@@ -253,10 +270,18 @@ func benchDirect(args []string) error {
+ 		return xs[int(float64(len(xs)-1)*q)]
+ 	}
+ 	summary := map[string]any{"timing_origin": "wallet_http_submit_v4", "workload": "closed_loop_final_utxo_cross_org", "count": *count, "concurrency": *concurrency, "failed": failed, "elapsed_s": elapsed.Seconds(), "completed_per_second": float64(*count-failed) / elapsed.Seconds(), "fast_p50_ms": quantile(fast, .5), "fast_p95_ms": quantile(fast, .95), "block_observed_p50_ms": quantile(proof, .5), "member_applied_p50_ms": quantile(credit, .5), "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested."}
++	summary["trace"] = *trace
++	summary["started_unix_ns"] = began.UnixNano()
++	summary["finished_unix_ns"] = began.Add(elapsed).UnixNano()
++	var timeline []requesttrace.ConsensusEvent
++	if *trace {
++		timeline = requesttrace.Consensus.Snapshot()
++	}
+ 	report := struct {
+-		Summary map[string]any
+-		Samples []sample
+-	}{summary, samples}
++		Summary  map[string]any
++		Samples  []sample
++		Timeline []requesttrace.ConsensusEvent `json:",omitempty"`
++	}{summary, samples, timeline}
+ 	path := filepath.Join(*dir, "reports", fmt.Sprintf("bench-v4-%d.json", *start))
+ 	if err = cfg.Write(path, report); err != nil {
+ 		return err
+diff --git a/internal/blockfollow/follow.go b/internal/blockfollow/follow.go
+index 61466ff..f0c6b92 100644
+--- a/internal/blockfollow/follow.go
++++ b/internal/blockfollow/follow.go
+@@ -8,6 +8,7 @@ import (
+ 	"log/slog"
+ 	"time"
+ 	"utxo/finality"
++	"utxo/internal/requesttrace"
+ 	"utxo/internal/state"
+ 	"utxo/internal/store"
+ )
+@@ -28,7 +29,9 @@ func Height(db store.Store) (height int64, err error) {
+ 	return
+ }
+ func Commit(db store.Store, b finality.VerifiedBlock, apply Apply) error {
+-	return db.Update(func(v state.ReadView) ([]state.Change, error) {
++	requesttrace.Consensus.Mark("follow_update_requested", "height", b.Height())
++	err := db.Update(func(v state.ReadView) ([]state.Change, error) {
++		requesttrace.Consensus.Mark("follow_update_started", "height", b.Height())
+ 		c, _, err := state.Load[Cursor](v, cursorKey)
+ 		if err != nil {
+ 			return nil, err
+@@ -40,14 +43,20 @@ func Commit(db store.Store, b finality.VerifiedBlock, apply Apply) error {
+ 			return nil, finality.ErrProof
+ 		}
+ 		o := state.NewOverlay(v)
++		requesttrace.Consensus.Mark("follow_apply_start", "height", b.Height())
+ 		if err = apply(o, b); err != nil {
+ 			return nil, err
+ 		}
++		requesttrace.Consensus.Mark("follow_apply_done", "height", b.Height())
+ 		if err = state.Put(o, cursorKey, Cursor{b.Height(), b.Hash()}); err != nil {
+ 			return nil, err
+ 		}
+ 		return o.Changes(), nil
+ 	})
++	if err == nil {
++		requesttrace.Consensus.Mark("follow_committed", "height", b.Height())
++	}
++	return err
+ }
+ func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, apply Apply) error {
+ 	if t.Validate() != nil {
+@@ -55,18 +64,25 @@ func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, apply
+ 	}
+ 	ticker := time.NewTicker(25 * time.Millisecond)
+ 	defer ticker.Stop()
++	var waiting int64
+ 	for {
+ 		height, err := Height(db)
+ 		if err != nil {
+ 			return err
+ 		}
++		if waiting != height+1 {
++			waiting = height + 1
++			requesttrace.Consensus.Mark("follow_wait_start", "height", waiting)
++		}
+ 		p, err := s.Block(ctx, height+1)
+ 		if err == nil {
++			requesttrace.Consensus.Mark("follow_verify_start", "height", height+1)
+ 			var b finality.VerifiedBlock
+ 			b, err = finality.VerifyBlock(t, p)
+ 			if err != nil {
+ 				return err
+ 			}
++			requesttrace.Consensus.Mark("follow_verify_done", "height", height+1)
+ 			if err = Commit(db, b, apply); err != nil {
+ 				return err
+ 			}
+diff --git a/internal/committee/app.go b/internal/committee/app.go
+index 47f5e68..7de1244 100644
+--- a/internal/committee/app.go
++++ b/internal/committee/app.go
+@@ -248,11 +248,13 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
+ 		}
+ 		for i, tx := range r.Txs {
+ 			response.TxResults[i] = &abci.ExecTxResult{}
++			requesttrace.Settlement.Command(tx, "final_check_start", r.Height)
+ 			if err := a.check(tx); err != nil {
+ 				response.TxResults[i].Code = 1
+ 				response.TxResults[i].Log = "invalid command"
+ 				continue
+ 			}
++			requesttrace.Settlement.Command(tx, "final_check_done", r.Height)
+ 			requesttrace.Settlement.Command(tx, "execute_start", r.Height)
+ 			var transition state.Transition
+ 			var err error
+@@ -339,6 +341,7 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
+ 	a.pending = &commitRecord{Height: r.Height, BlockID: bytes.Clone(r.Hash), Response: raw, Commitment: commitment, Leaves: leaves}
+ 	a.pendingChanges = changes
+ 	requesttrace.Settlement.Block(r.Height, "finalize_done")
++	requesttrace.Consensus.Mark("finalize_done", "height", r.Height)
+ 	return cloneResponse(response), nil
+ }
+ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit, error) {
+@@ -351,6 +354,7 @@ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit
+ 		return &abci.ResponseCommit{}, nil
+ 	}
+ 	requesttrace.Settlement.Block(a.pending.Height, "commit_start")
++	requesttrace.Consensus.Mark("commit_start", "height", a.pending.Height)
+ 	raw, e := json.Marshal(a.pending)
+ 	if e != nil {
+ 		return nil, e
+@@ -380,6 +384,7 @@ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit
+ 		return nil, e
+ 	}
+ 	requesttrace.Settlement.Block(a.pending.Height, "commit_done")
++	requesttrace.Consensus.Mark("commit_done", "height", a.pending.Height)
+ 	a.pending = nil
+ 	a.pendingChanges = nil
+ 	return &abci.ResponseCommit{}, nil
+diff --git a/internal/gateway/direct.go b/internal/gateway/direct.go
+index ac6b5f4..8253f5a 100644
+--- a/internal/gateway/direct.go
++++ b/internal/gateway/direct.go
+@@ -5,6 +5,7 @@ import (
+ 	"crypto/ed25519"
+ 	"errors"
+ 	"time"
++	"utxo/internal/requesttrace"
+ 	"utxo/internal/state"
+ 	"utxo/protocol"
+ )
+@@ -106,6 +107,7 @@ func (c *Collector) PersistDirect(p protocol.DirectPayment) error {
+ }
+ 
+ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Outbox) error {
++	requesttrace.Payment("relay_enter", pending.Fact)
+ 	payment, err := protocol.DecodeDirectPayment(pending.Certificate)
+ 	if err != nil {
+ 		return err
+@@ -119,6 +121,7 @@ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Out
+ 		return nil
+ 	}
+ 	if !r.MemberRelay {
++		requesttrace.Payment("install_fanout_start", pending.Fact)
+ 		targets := r.installTargets(pending.Fact)
+ 		done := make(chan struct{}, 4)
+ 		for i, m := range r.Members[c.Summary.Issuer] {
+@@ -138,10 +141,13 @@ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Out
+ 			}
+ 		}
+ 	}
++	requesttrace.Payment("relay_ready", pending.Fact)
+ 	now := time.Now().UnixNano()
+ 	if now >= pending.NextSubmitUnixNS {
+ 		// No random outer envelope: retries preserve the redaction-aware identity.
++		requesttrace.Payment("submit_start", pending.Fact)
+ 		_ = r.Public.Submit(ctx, pending.Certificate)
++		requesttrace.Payment("submit_done", pending.Fact)
+ 		pending.NextSubmitUnixNS = now + int64(2*time.Second)
+ 	}
+ 	return r.DB.Update(func(v state.ReadView) ([]state.Change, error) {
+diff --git a/internal/member/direct.go b/internal/member/direct.go
+index 4422a89..8106c5e 100644
+--- a/internal/member/direct.go
++++ b/internal/member/direct.go
+@@ -75,7 +75,9 @@ func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest)
+ 	requesttrace.Mark(ctx, "validation_complete")
+ 	id := tx.ID()
+ 	worker := uint32(id[0]) % m.cfg.Workers
++	requesttrace.Mark(ctx, "commit_requested")
+ 	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
++		requesttrace.Mark(ctx, "update_started")
+ 		o := state.NewOverlay(v)
+ 		key := state.Key(state.KeyApproval, fact[:])
+ 		if _, found, err := state.Load[state.Approval](o, key); err != nil {
+@@ -151,6 +153,7 @@ func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest)
+ 		if err := state.Put(o, state.Key(state.KeyIntent, t.Intent[:]), id); err != nil {
+ 			return nil, err
+ 		}
++		requesttrace.Mark(ctx, "update_evaluated")
+ 		return o.Changes(), nil
+ 	})
+ 	if err != nil {
+@@ -165,6 +168,7 @@ func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest)
+ // InstallDirect saves a full relay command in the background. It does not
+ // reserve a second budget or make an unvoted local output spendable.
+ func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
++	requesttrace.Payment("install_enter", payment.Certificate.QC.Fact)
+ 	if m.direct == nil || payment.Tx.Body.Config != m.cfg.Organization.Hash() {
+ 		return protocol.ErrAuth
+ 	}
+@@ -176,7 +180,8 @@ func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
+ 		return err
+ 	}
+ 	fact := payment.Certificate.QC.Fact
+-	return m.db.Update(func(v state.ReadView) ([]state.Change, error) {
++	requesttrace.Payment("install_store_start", fact)
++	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+ 		o := state.NewOverlay(v)
+ 		key := state.Key(state.KeyInstall, fact[:])
+ 		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
+@@ -213,4 +218,8 @@ func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
+ 		}
+ 		return o.Changes(), nil
+ 	})
++	if err == nil {
++		requesttrace.Payment("install_store_done", fact)
++	}
++	return err
+ }
+diff --git a/internal/requesttrace/direct_test.go b/internal/requesttrace/direct_test.go
+new file mode 100644
+index 0000000..e0744ee
+--- /dev/null
++++ b/internal/requesttrace/direct_test.go
+@@ -0,0 +1,63 @@
++package requesttrace_test
++
++import (
++	"crypto/x509"
++	"encoding/pem"
++	"os"
++	"testing"
++	"utxo/internal/requesttrace"
++	"utxo/internal/rules"
++	"utxo/internal/testkit"
++	"utxo/protocol"
++)
++
++func TestSettlementRecordsV4DirectCommand(t *testing.T) {
++	f := testkit.NewFixture("trace-v4", "org", 1)
++	f.EnableDirect()
++	raw, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
++	if err != nil {
++		t.Fatal(err)
++	}
++	block, _ := pem.Decode(raw)
++	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
++	if err != nil {
++		t.Fatal(err)
++	}
++	settings := rules.DirectSettings{Modulus: key.N.Bytes(), TimeoutSeconds: 30, RepairCost: 5}
++	policy, err := settings.Policy(f.Schedule, []protocol.OrgConfig{f.Org})
++	if err != nil {
++		t.Fatal(err)
++	}
++	tx, err := f.FastTransaction(0, 1, policy)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cert, err := f.DirectCertificate(tx, policy)
++	if err != nil {
++		t.Fatal(err)
++	}
++	raw, err = (protocol.DirectPayment{Tx: tx, Certificate: cert}).MarshalBinary()
++	if err != nil {
++		t.Fatal(err)
++	}
++	r := requesttrace.NewSettlementRecorder(4)
++	r.Receive(raw, 1, 2, "gateway")
++	for _, stage := range []string{"accepted", "prepared", "proposal_seen", "final_check_start", "final_check_done", "execute_start", "execute_done"} {
++		r.Command(raw, stage, 7)
++	}
++	r.Block(7, "commit_done")
++	fact := protocol.Hash(cert.QC.Fact).String()
++	got := r.ForSpend(fact)
++	if len(got) != 1 {
++		t.Fatalf("v4 trace missing: %+v", got)
++	}
++	e := got[0]
++	if e.Height != 7 || e.FinalCheckStartUnixNS == 0 || e.FinalCheckDoneUnixNS < e.FinalCheckStartUnixNS || e.ExecuteStartUnixNS < e.FinalCheckDoneUnixNS || e.CommittedUnixNS < e.ExecuteDoneUnixNS {
++		t.Fatalf("incorrect boundaries: %+v", e)
++	}
++	r.Command(raw, "final_check_start", 8)
++	r.Command(raw, "execute_start", 8)
++	if again := r.ForSpend(fact)[0]; again != e {
++		t.Fatal("retry overwrote original timing")
++	}
++}
+diff --git a/internal/requesttrace/settlement.go b/internal/requesttrace/settlement.go
+index c861179..5af6172 100644
+--- a/internal/requesttrace/settlement.go
++++ b/internal/requesttrace/settlement.go
+@@ -22,22 +22,24 @@ var Settlement = func() *SettlementRecorder {
+ }()
+ 
+ type SettlementTiming struct {
+-	PreparedUnixNS     int64
+-	PreparedHeight     int64
+-	ProposalSeenUnixNS int64
+-	ProposalHeight     int64
+-	Attempt            string
+-	Spend              string
+-	Sender             string
+-	Height             int64
+-	DeliveredUnixNS    int64
+-	ReceivedUnixNS     int64
+-	AcceptedUnixNS     int64
+-	ExecuteStartUnixNS int64
+-	ExecuteDoneUnixNS  int64
+-	FinalizeDoneUnixNS int64
+-	CommitStartUnixNS  int64
+-	CommittedUnixNS    int64
++	FinalCheckStartUnixNS int64
++	FinalCheckDoneUnixNS  int64
++	PreparedUnixNS        int64
++	PreparedHeight        int64
++	ProposalSeenUnixNS    int64
++	ProposalHeight        int64
++	Attempt               string
++	Spend                 string
++	Sender                string
++	Height                int64
++	DeliveredUnixNS       int64
++	ReceivedUnixNS        int64
++	AcceptedUnixNS        int64
++	ExecuteStartUnixNS    int64
++	ExecuteDoneUnixNS     int64
++	FinalizeDoneUnixNS    int64
++	CommitStartUnixNS     int64
++	CommittedUnixNS       int64
+ }
+ 
+ type SettlementRecorder struct {
+@@ -64,11 +66,15 @@ func (r *SettlementRecorder) get(raw []byte) *SettlementTiming {
+ 	if submission, err := protocol.DecodeSubmission(raw); err == nil {
+ 		body = submission.Body
+ 	}
+-	cert, err := protocol.DecodeCertificate(body)
+-	if err != nil {
++	var fact protocol.SpendFactID
++	if cert, err := protocol.DecodeCertificate(body); err == nil {
++		fact = cert.QC.Fact
++	} else if payment, err := protocol.DecodeDirectPayment(body); err == nil {
++		fact = payment.Certificate.QC.Fact
++	} else {
+ 		return nil
+ 	}
+-	event := &SettlementTiming{Attempt: id, Spend: protocol.Hash(cert.QC.Fact).String()}
++	event := &SettlementTiming{Attempt: id, Spend: protocol.Hash(fact).String()}
+ 	if len(r.order) < r.limit {
+ 		r.order = append(r.order, id)
+ 	} else {
+@@ -108,6 +114,14 @@ func (r *SettlementRecorder) Command(raw []byte, stage string, height int64) {
+ 		return
+ 	}
+ 	switch stage {
++	case "final_check_start":
++		if event.FinalCheckStartUnixNS == 0 {
++			event.FinalCheckStartUnixNS = now
++		}
++	case "final_check_done":
++		if event.FinalCheckDoneUnixNS == 0 {
++			event.FinalCheckDoneUnixNS = now
++		}
+ 	case "prepared":
+ 		if event.PreparedUnixNS == 0 {
+ 			event.PreparedUnixNS = now
+diff --git a/internal/requesttrace/timeline.go b/internal/requesttrace/timeline.go
+new file mode 100644
+index 0000000..d986e53
+--- /dev/null
++++ b/internal/requesttrace/timeline.go
+@@ -0,0 +1,24 @@
++package requesttrace
++
++import (
++	"encoding/json"
++	"net/http"
++	"utxo/protocol"
++)
++
++// Payment records only local diagnostics; disabled tracing does not encode IDs.
++func Payment(stage string, fact protocol.SpendFactID) {
++	if Consensus != nil {
++		Consensus.Mark(stage, "spend", protocol.Hash(fact).String())
++	}
++}
++
++// RegisterTimeline exposes the bounded trace only in explicitly enabled experiments.
++func RegisterTimeline(mux *http.ServeMux) {
++	if Consensus != nil {
++		mux.HandleFunc("GET /debug/timeline", func(w http.ResponseWriter, r *http.Request) {
++			w.Header().Set("Content-Type", "application/json")
++			_ = json.NewEncoder(w).Encode(Consensus.Snapshot())
++		})
++	}
++}
+diff --git a/internal/transport/blocks.go b/internal/transport/blocks.go
+index 97f2a7c..c6c9ba2 100644
+--- a/internal/transport/blocks.go
++++ b/internal/transport/blocks.go
+@@ -5,16 +5,23 @@ import (
+ 	"fmt"
+ 	cmtjson "github.com/cometbft/cometbft/libs/json"
+ 	core "github.com/cometbft/cometbft/rpc/core/types"
++	"time"
+ 	"utxo/finality"
++	"utxo/internal/requesttrace"
+ )
+ 
+ func (c *CommitteeClient) Block(ctx context.Context, height int64) (p finality.BlockData, err error) {
+ 	get := func(path string, v any) error {
++		started := time.Now().UnixNano()
+ 		raw, e := c.get(ctx, path, 64<<20)
+ 		if e != nil {
+ 			return e
+ 		}
+-		return cmtjson.Unmarshal(raw, v)
++		err := cmtjson.Unmarshal(raw, v)
++		if err == nil {
++			requesttrace.Consensus.Mark("follow_fetch", "height", height, "path", path, "start_ns", started, "bytes", len(raw))
++		}
++		return err
+ 	}
+ 	var next core.ResultCommit
+ 	// Ask for the next header first: no repeated large block fetch while idle.
+diff --git a/internal/transport/direct.go b/internal/transport/direct.go
+index 3d39599..ac39d5d 100644
+--- a/internal/transport/direct.go
++++ b/internal/transport/direct.go
+@@ -5,11 +5,17 @@ import (
+ 	"encoding/json"
+ 	"net/http"
+ 	"utxo/internal/member"
++	"utxo/internal/requesttrace"
+ 	"utxo/protocol"
+ )
+ 
+ func addDirectHandlers(mux *http.ServeMux, m *member.Member, fg, bg chan struct{}, wrap func(chan struct{}, http.HandlerFunc) http.HandlerFunc) {
+ 	mux.HandleFunc("POST /v3/transactions", wrap(fg, func(w http.ResponseWriter, r *http.Request) {
++		ctx := r.Context()
++		if r.Header.Get(requesttrace.HeaderName) == "1" {
++			ctx = requesttrace.Start(ctx, "member")
++		}
++		requesttrace.Mark(ctx, "http_handler_enter")
+ 		raw, err := binaryBody(w, r, protocol.MaxRequestBytes)
+ 		if err != nil {
+ 			fail(w, err)
+@@ -20,11 +26,16 @@ func addDirectHandlers(mux *http.ServeMux, m *member.Member, fg, bg chan struct{
+ 			fail(w, err)
+ 			return
+ 		}
+-		approval, err := m.ApproveDirect(r.Context(), req)
++		requesttrace.Mark(ctx, "request_decoded")
++		approval, err := m.ApproveDirect(ctx, req)
+ 		if err != nil {
+ 			fail(w, err)
+ 			return
+ 		}
++		requesttrace.Mark(ctx, "response_ready")
++		if requesttrace.Enabled(ctx) {
++			w.Header().Set(requesttrace.HeaderName, requesttrace.Header(ctx))
++		}
+ 		w.Header().Set("Content-Type", "application/json")
+ 		_ = json.NewEncoder(w).Encode(approval)
+ 	}))
+diff --git a/internal/transport/member.go b/internal/transport/member.go
+index ab5d02c..41612ba 100644
+--- a/internal/transport/member.go
++++ b/internal/transport/member.go
+@@ -54,6 +54,7 @@ func binaryResponse(w http.ResponseWriter, b []byte) {
+ }
+ func MemberHandler(m *member.Member, foreground, background int) http.Handler {
+ 	mux := http.NewServeMux()
++	requesttrace.RegisterTimeline(mux)
+ 	fg := make(chan struct{}, foreground)
+ 	bg := make(chan struct{}, background)
+ 	wrap := func(tokens chan struct{}, handler http.HandlerFunc) http.HandlerFunc {
+@@ -183,7 +184,7 @@ func (c *MemberClient) post(ctx context.Context, path string, raw []byte, limit
+ 		return nil, e
+ 	}
+ 	request.Header.Set("Content-Type", MediaType)
+-	if path == "/v1/transactions" && requesttrace.Enabled(ctx) {
++	if (path == "/v1/transactions" || path == "/v3/transactions") && requesttrace.Enabled(ctx) {
+ 		request.Header.Set(requesttrace.HeaderName, "1")
+ 	}
+ 	response, e := c.HTTP.Do(request)

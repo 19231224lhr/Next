@@ -54,6 +54,7 @@ func binaryResponse(w http.ResponseWriter, b []byte) {
 }
 func MemberHandler(m *member.Member, foreground, background int) http.Handler {
 	mux := http.NewServeMux()
+	requesttrace.RegisterTimeline(mux)
 	fg := make(chan struct{}, foreground)
 	bg := make(chan struct{}, background)
 	wrap := func(tokens chan struct{}, handler http.HandlerFunc) http.HandlerFunc {
@@ -183,7 +184,7 @@ func (c *MemberClient) post(ctx context.Context, path string, raw []byte, limit 
 		return nil, e
 	}
 	request.Header.Set("Content-Type", MediaType)
-	if path == "/v1/transactions" && requesttrace.Enabled(ctx) {
+	if (path == "/v1/transactions" || path == "/v3/transactions") && requesttrace.Enabled(ctx) {
 		request.Header.Set(requesttrace.HeaderName, "1")
 	}
 	response, e := c.HTTP.Do(request)

@@ -118,6 +118,7 @@ func run() error {
 		return e
 	}
 	mux := http.NewServeMux()
+	requesttrace.RegisterTimeline(mux)
 	mux.HandleFunc("POST /v1/transactions", paymentHandler(collector))
 	if n.Direct != nil {
 		mux.HandleFunc("POST /v3/transactions", directPaymentHandler(collector))

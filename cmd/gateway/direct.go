@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"utxo/internal/gateway"
+	"utxo/internal/requesttrace"
 	"utxo/internal/transport"
 	"utxo/protocol"
 )
@@ -13,6 +14,11 @@ import (
 func directPaymentHandler(c *gateway.Collector) http.HandlerFunc {
 	slots := make(chan struct{}, 128)
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if r.Header.Get(requesttrace.HeaderName) == "1" {
+			ctx = requesttrace.Start(ctx, "gateway")
+		}
+		requesttrace.Mark(ctx, "http_handler_enter")
 		select {
 		case slots <- struct{}{}:
 			defer func() { <-slots }()
@@ -34,7 +40,8 @@ func directPaymentHandler(c *gateway.Collector) http.HandlerFunc {
 			http.Error(w, "INVALID_ENCODING", 400)
 			return
 		}
-		cert, err := c.CollectDirect(r.Context(), req)
+		requesttrace.Mark(ctx, "request_decoded")
+		cert, err := c.CollectDirect(ctx, req)
 		if err != nil {
 			http.Error(w, "QUORUM_UNAVAILABLE", 503)
 			return
@@ -44,12 +51,19 @@ func directPaymentHandler(c *gateway.Collector) http.HandlerFunc {
 			http.Error(w, "INVALID_CERTIFICATE", 500)
 			return
 		}
+		requesttrace.Mark(ctx, "response_ready")
+		if requesttrace.Enabled(ctx) {
+			w.Header().Set(requesttrace.HeaderName, requesttrace.Header(ctx))
+		}
 		w.Header().Set("Content-Type", transport.MediaType)
 		w.Header().Set("Content-Length", strconv.Itoa(len(raw)))
 		_, _ = w.Write(raw)
 		_ = http.NewResponseController(w).Flush()
+		requesttrace.Payment("outbox_persist_start", cert.QC.Fact)
 		if err = c.PersistDirect(protocol.DirectPayment{Tx: req.Tx, Certificate: cert, InputCertificates: req.InputCertificates}); err != nil {
 			slog.Error("background v3 certificate persistence failed", "error", err)
+		} else {
+			requesttrace.Payment("outbox_persist_done", cert.QC.Fact)
 		}
 	}
 }

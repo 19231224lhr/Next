@@ -15,6 +15,7 @@ import (
 	cfg "utxo/cmd/internal/config"
 	"utxo/internal/blockfollow"
 	"utxo/internal/member"
+	"utxo/internal/requesttrace"
 	"utxo/internal/store"
 	"utxo/internal/transport"
 	"utxo/internal/wallet"
@@ -29,6 +30,7 @@ func benchDirect(args []string) error {
 	start := flags.Int("start", 100, "unused genesis input index")
 	count := flags.Int("count", 128, "transactions")
 	concurrency := flags.Int("concurrency", 16, "outstanding payments")
+	trace := flags.Bool("trace", false, "include opt-in per-payment and block timing")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -124,10 +126,12 @@ func benchDirect(args []string) error {
 		}
 	}
 	type sample struct {
-		Index                                    int
-		FastMS, BlockObservedMS, MemberAppliedMS float64
-		Fact                                     string
-		Error                                    string `json:",omitempty"`
+		Index                                                                                        int
+		SentUnixNS, CertificateReceivedUnixNS, FastUnixNS, BlockObservedUnixNS, MemberObservedUnixNS int64
+		Foreground                                                                                   []requesttrace.Event `json:",omitempty"`
+		FastMS, BlockObservedMS, MemberAppliedMS                                                     float64
+		Fact                                                                                         string
+		Error                                                                                        string `json:",omitempty"`
 	}
 	samples := make([]sample, *count)
 	httpClient := transport.NewHTTPClient(10 * time.Second)
@@ -154,13 +158,23 @@ func benchDirect(args []string) error {
 						return err
 					}
 					req.Header.Set("Content-Type", transport.MediaType)
+					if *trace {
+						req.Header.Set(requesttrace.HeaderName, "1")
+					}
 					sent := time.Now()
+					samples[i].SentUnixNS = sent.UnixNano()
 					resp, err := httpClient.Do(req)
 					if err != nil {
 						return err
 					}
 					raw, err := io.ReadAll(io.LimitReader(resp.Body, protocol.MaxCertificateBytes))
 					resp.Body.Close()
+					samples[i].CertificateReceivedUnixNS = time.Now().UnixNano()
+					if *trace {
+						traceCtx := requesttrace.Start(ctx, "wallet")
+						requesttrace.Import(traceCtx, resp.Header.Get(requesttrace.HeaderName), "")
+						samples[i].Foreground = requesttrace.Events(traceCtx)
+					}
 					if err != nil {
 						return err
 					}
@@ -174,6 +188,7 @@ func benchDirect(args []string) error {
 					if err = receiver.ReceiveDirect(requests[i].Tx.Body.Outputs[0], cert, 0); err != nil {
 						return err
 					}
+					samples[i].FastUnixNS = time.Now().UnixNano()
 					samples[i].FastMS = float64(time.Since(sent)) / float64(time.Millisecond)
 					samples[i].Fact = protocol.Hash(cert.QC.Fact).String()
 					ticker := time.NewTicker(25 * time.Millisecond)
@@ -188,6 +203,7 @@ func benchDirect(args []string) error {
 							}
 							if ok {
 								created = true
+								samples[i].BlockObservedUnixNS = time.Now().UnixNano()
 								samples[i].BlockObservedMS = float64(time.Since(sent)) / float64(time.Millisecond)
 							}
 						}
@@ -212,6 +228,7 @@ func benchDirect(args []string) error {
 								}
 							}
 							if complete {
+								samples[i].MemberObservedUnixNS = time.Now().UnixNano()
 								samples[i].MemberAppliedMS = float64(time.Since(sent)) / float64(time.Millisecond)
 								return nil
 							}
@@ -253,10 +270,18 @@ func benchDirect(args []string) error {
 		return xs[int(float64(len(xs)-1)*q)]
 	}
 	summary := map[string]any{"timing_origin": "wallet_http_submit_v4", "workload": "closed_loop_final_utxo_cross_org", "count": *count, "concurrency": *concurrency, "failed": failed, "elapsed_s": elapsed.Seconds(), "completed_per_second": float64(*count-failed) / elapsed.Seconds(), "fast_p50_ms": quantile(fast, .5), "fast_p95_ms": quantile(fast, .95), "block_observed_p50_ms": quantile(proof, .5), "member_applied_p50_ms": quantile(credit, .5), "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested."}
+	summary["trace"] = *trace
+	summary["started_unix_ns"] = began.UnixNano()
+	summary["finished_unix_ns"] = began.Add(elapsed).UnixNano()
+	var timeline []requesttrace.ConsensusEvent
+	if *trace {
+		timeline = requesttrace.Consensus.Snapshot()
+	}
 	report := struct {
-		Summary map[string]any
-		Samples []sample
-	}{summary, samples}
+		Summary  map[string]any
+		Samples  []sample
+		Timeline []requesttrace.ConsensusEvent `json:",omitempty"`
+	}{summary, samples, timeline}
 	path := filepath.Join(*dir, "reports", fmt.Sprintf("bench-v4-%d.json", *start))
 	if err = cfg.Write(path, report); err != nil {
 		return err

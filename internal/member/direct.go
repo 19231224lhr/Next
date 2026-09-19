@@ -75,7 +75,9 @@ func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest) 
 	requesttrace.Mark(ctx, "validation_complete")
 	id := tx.ID()
 	worker := uint32(id[0]) % m.cfg.Workers
+	requesttrace.Mark(ctx, "commit_requested")
 	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		requesttrace.Mark(ctx, "update_started")
 		o := state.NewOverlay(v)
 		key := state.Key(state.KeyApproval, fact[:])
 		if _, found, err := state.Load[state.Approval](o, key); err != nil {
@@ -151,6 +153,7 @@ func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest) 
 		if err := state.Put(o, state.Key(state.KeyIntent, t.Intent[:]), id); err != nil {
 			return nil, err
 		}
+		requesttrace.Mark(ctx, "update_evaluated")
 		return o.Changes(), nil
 	})
 	if err != nil {
@@ -165,6 +168,7 @@ func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest) 
 // InstallDirect saves a full relay command in the background. It does not
 // reserve a second budget or make an unvoted local output spendable.
 func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
+	requesttrace.Payment("install_enter", payment.Certificate.QC.Fact)
 	if m.direct == nil || payment.Tx.Body.Config != m.cfg.Organization.Hash() {
 		return protocol.ErrAuth
 	}
@@ -176,7 +180,8 @@ func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
 		return err
 	}
 	fact := payment.Certificate.QC.Fact
-	return m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+	requesttrace.Payment("install_store_start", fact)
+	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
 		key := state.Key(state.KeyInstall, fact[:])
 		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
@@ -213,4 +218,8 @@ func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
 		}
 		return o.Changes(), nil
 	})
+	if err == nil {
+		requesttrace.Payment("install_store_done", fact)
+	}
+	return err
 }

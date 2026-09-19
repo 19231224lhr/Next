@@ -5,16 +5,23 @@ import (
 	"fmt"
 	cmtjson "github.com/cometbft/cometbft/libs/json"
 	core "github.com/cometbft/cometbft/rpc/core/types"
+	"time"
 	"utxo/finality"
+	"utxo/internal/requesttrace"
 )
 
 func (c *CommitteeClient) Block(ctx context.Context, height int64) (p finality.BlockData, err error) {
 	get := func(path string, v any) error {
+		started := time.Now().UnixNano()
 		raw, e := c.get(ctx, path, 64<<20)
 		if e != nil {
 			return e
 		}
-		return cmtjson.Unmarshal(raw, v)
+		err := cmtjson.Unmarshal(raw, v)
+		if err == nil {
+			requesttrace.Consensus.Mark("follow_fetch", "height", height, "path", path, "start_ns", started, "bytes", len(raw))
+		}
+		return err
 	}
 	var next core.ResultCommit
 	// Ask for the next header first: no repeated large block fetch while idle.

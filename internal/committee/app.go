@@ -248,11 +248,13 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 		}
 		for i, tx := range r.Txs {
 			response.TxResults[i] = &abci.ExecTxResult{}
+			requesttrace.Settlement.Command(tx, "final_check_start", r.Height)
 			if err := a.check(tx); err != nil {
 				response.TxResults[i].Code = 1
 				response.TxResults[i].Log = "invalid command"
 				continue
 			}
+			requesttrace.Settlement.Command(tx, "final_check_done", r.Height)
 			requesttrace.Settlement.Command(tx, "execute_start", r.Height)
 			var transition state.Transition
 			var err error
@@ -339,6 +341,7 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 	a.pending = &commitRecord{Height: r.Height, BlockID: bytes.Clone(r.Hash), Response: raw, Commitment: commitment, Leaves: leaves}
 	a.pendingChanges = changes
 	requesttrace.Settlement.Block(r.Height, "finalize_done")
+	requesttrace.Consensus.Mark("finalize_done", "height", r.Height)
 	return cloneResponse(response), nil
 }
 func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit, error) {
@@ -351,6 +354,7 @@ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit
 		return &abci.ResponseCommit{}, nil
 	}
 	requesttrace.Settlement.Block(a.pending.Height, "commit_start")
+	requesttrace.Consensus.Mark("commit_start", "height", a.pending.Height)
 	raw, e := json.Marshal(a.pending)
 	if e != nil {
 		return nil, e
@@ -380,6 +384,7 @@ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit
 		return nil, e
 	}
 	requesttrace.Settlement.Block(a.pending.Height, "commit_done")
+	requesttrace.Consensus.Mark("commit_done", "height", a.pending.Height)
 	a.pending = nil
 	a.pendingChanges = nil
 	return &abci.ResponseCommit{}, nil

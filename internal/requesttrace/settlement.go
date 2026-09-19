@@ -22,22 +22,24 @@ var Settlement = func() *SettlementRecorder {
 }()
 
 type SettlementTiming struct {
-	PreparedUnixNS     int64
-	PreparedHeight     int64
-	ProposalSeenUnixNS int64
-	ProposalHeight     int64
-	Attempt            string
-	Spend              string
-	Sender             string
-	Height             int64
-	DeliveredUnixNS    int64
-	ReceivedUnixNS     int64
-	AcceptedUnixNS     int64
-	ExecuteStartUnixNS int64
-	ExecuteDoneUnixNS  int64
-	FinalizeDoneUnixNS int64
-	CommitStartUnixNS  int64
-	CommittedUnixNS    int64
+	FinalCheckStartUnixNS int64
+	FinalCheckDoneUnixNS  int64
+	PreparedUnixNS        int64
+	PreparedHeight        int64
+	ProposalSeenUnixNS    int64
+	ProposalHeight        int64
+	Attempt               string
+	Spend                 string
+	Sender                string
+	Height                int64
+	DeliveredUnixNS       int64
+	ReceivedUnixNS        int64
+	AcceptedUnixNS        int64
+	ExecuteStartUnixNS    int64
+	ExecuteDoneUnixNS     int64
+	FinalizeDoneUnixNS    int64
+	CommitStartUnixNS     int64
+	CommittedUnixNS       int64
 }
 
 type SettlementRecorder struct {
@@ -64,11 +66,15 @@ func (r *SettlementRecorder) get(raw []byte) *SettlementTiming {
 	if submission, err := protocol.DecodeSubmission(raw); err == nil {
 		body = submission.Body
 	}
-	cert, err := protocol.DecodeCertificate(body)
-	if err != nil {
+	var fact protocol.SpendFactID
+	if cert, err := protocol.DecodeCertificate(body); err == nil {
+		fact = cert.QC.Fact
+	} else if payment, err := protocol.DecodeDirectPayment(body); err == nil {
+		fact = payment.Certificate.QC.Fact
+	} else {
 		return nil
 	}
-	event := &SettlementTiming{Attempt: id, Spend: protocol.Hash(cert.QC.Fact).String()}
+	event := &SettlementTiming{Attempt: id, Spend: protocol.Hash(fact).String()}
 	if len(r.order) < r.limit {
 		r.order = append(r.order, id)
 	} else {
@@ -108,6 +114,14 @@ func (r *SettlementRecorder) Command(raw []byte, stage string, height int64) {
 		return
 	}
 	switch stage {
+	case "final_check_start":
+		if event.FinalCheckStartUnixNS == 0 {
+			event.FinalCheckStartUnixNS = now
+		}
+	case "final_check_done":
+		if event.FinalCheckDoneUnixNS == 0 {
+			event.FinalCheckDoneUnixNS = now
+		}
 	case "prepared":
 		if event.PreparedUnixNS == 0 {
 			event.PreparedUnixNS = now

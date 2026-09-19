@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"time"
+	"utxo/internal/requesttrace"
 	"utxo/internal/state"
 	"utxo/protocol"
 )
@@ -106,6 +107,7 @@ func (c *Collector) PersistDirect(p protocol.DirectPayment) error {
 }
 
 func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Outbox) error {
+	requesttrace.Payment("relay_enter", pending.Fact)
 	payment, err := protocol.DecodeDirectPayment(pending.Certificate)
 	if err != nil {
 		return err
@@ -119,6 +121,7 @@ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Out
 		return nil
 	}
 	if !r.MemberRelay {
+		requesttrace.Payment("install_fanout_start", pending.Fact)
 		targets := r.installTargets(pending.Fact)
 		done := make(chan struct{}, 4)
 		for i, m := range r.Members[c.Summary.Issuer] {
@@ -138,10 +141,13 @@ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Out
 			}
 		}
 	}
+	requesttrace.Payment("relay_ready", pending.Fact)
 	now := time.Now().UnixNano()
 	if now >= pending.NextSubmitUnixNS {
 		// No random outer envelope: retries preserve the redaction-aware identity.
+		requesttrace.Payment("submit_start", pending.Fact)
 		_ = r.Public.Submit(ctx, pending.Certificate)
+		requesttrace.Payment("submit_done", pending.Fact)
 		pending.NextSubmitUnixNS = now + int64(2*time.Second)
 	}
 	return r.DB.Update(func(v state.ReadView) ([]state.Change, error) {

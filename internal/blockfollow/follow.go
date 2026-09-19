@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 	"utxo/finality"
+	"utxo/internal/requesttrace"
 	"utxo/internal/state"
 	"utxo/internal/store"
 )
@@ -28,7 +29,9 @@ func Height(db store.Store) (height int64, err error) {
 	return
 }
 func Commit(db store.Store, b finality.VerifiedBlock, apply Apply) error {
-	return db.Update(func(v state.ReadView) ([]state.Change, error) {
+	requesttrace.Consensus.Mark("follow_update_requested", "height", b.Height())
+	err := db.Update(func(v state.ReadView) ([]state.Change, error) {
+		requesttrace.Consensus.Mark("follow_update_started", "height", b.Height())
 		c, _, err := state.Load[Cursor](v, cursorKey)
 		if err != nil {
 			return nil, err
@@ -40,14 +43,20 @@ func Commit(db store.Store, b finality.VerifiedBlock, apply Apply) error {
 			return nil, finality.ErrProof
 		}
 		o := state.NewOverlay(v)
+		requesttrace.Consensus.Mark("follow_apply_start", "height", b.Height())
 		if err = apply(o, b); err != nil {
 			return nil, err
 		}
+		requesttrace.Consensus.Mark("follow_apply_done", "height", b.Height())
 		if err = state.Put(o, cursorKey, Cursor{b.Height(), b.Hash()}); err != nil {
 			return nil, err
 		}
 		return o.Changes(), nil
 	})
+	if err == nil {
+		requesttrace.Consensus.Mark("follow_committed", "height", b.Height())
+	}
+	return err
 }
 func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, apply Apply) error {
 	if t.Validate() != nil {
@@ -55,18 +64,25 @@ func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, apply 
 	}
 	ticker := time.NewTicker(25 * time.Millisecond)
 	defer ticker.Stop()
+	var waiting int64
 	for {
 		height, err := Height(db)
 		if err != nil {
 			return err
 		}
+		if waiting != height+1 {
+			waiting = height + 1
+			requesttrace.Consensus.Mark("follow_wait_start", "height", waiting)
+		}
 		p, err := s.Block(ctx, height+1)
 		if err == nil {
+			requesttrace.Consensus.Mark("follow_verify_start", "height", height+1)
 			var b finality.VerifiedBlock
 			b, err = finality.VerifyBlock(t, p)
 			if err != nil {
 				return err
 			}
+			requesttrace.Consensus.Mark("follow_verify_done", "height", height+1)
 			if err = Commit(db, b, apply); err != nil {
 				return err
 			}

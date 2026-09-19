@@ -5,11 +5,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"utxo/internal/member"
+	"utxo/internal/requesttrace"
 	"utxo/protocol"
 )
 
 func addDirectHandlers(mux *http.ServeMux, m *member.Member, fg, bg chan struct{}, wrap func(chan struct{}, http.HandlerFunc) http.HandlerFunc) {
 	mux.HandleFunc("POST /v3/transactions", wrap(fg, func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if r.Header.Get(requesttrace.HeaderName) == "1" {
+			ctx = requesttrace.Start(ctx, "member")
+		}
+		requesttrace.Mark(ctx, "http_handler_enter")
 		raw, err := binaryBody(w, r, protocol.MaxRequestBytes)
 		if err != nil {
 			fail(w, err)
@@ -20,10 +26,15 @@ func addDirectHandlers(mux *http.ServeMux, m *member.Member, fg, bg chan struct{
 			fail(w, err)
 			return
 		}
-		approval, err := m.ApproveDirect(r.Context(), req)
+		requesttrace.Mark(ctx, "request_decoded")
+		approval, err := m.ApproveDirect(ctx, req)
 		if err != nil {
 			fail(w, err)
 			return
+		}
+		requesttrace.Mark(ctx, "response_ready")
+		if requesttrace.Enabled(ctx) {
+			w.Header().Set(requesttrace.HeaderName, requesttrace.Header(ctx))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(approval)
