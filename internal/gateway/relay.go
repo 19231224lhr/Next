@@ -5,9 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 	"utxo/finality"
+	"utxo/internal/requesttrace"
 	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/internal/store"
@@ -78,7 +80,11 @@ func (r *Relay) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
+			scanStart := time.Now().UnixNano()
 			entries, e := store.Scan(r.DB, state.Key(state.KeyOutbox), cursor, 16)
+			if !r.MemberRelay && requesttrace.Consensus != nil {
+				requesttrace.Consensus.Mark("relay_scan", "start_ns", scanStart, "count", len(entries), "after", fmt.Sprintf("%x", cursor))
+			}
 			if e != nil {
 				return e
 			}
@@ -93,6 +99,9 @@ func (r *Relay) Run(ctx context.Context) error {
 					return nil
 				}
 				end := min(start+4, len(entries))
+				if !r.MemberRelay {
+					requesttrace.Consensus.Mark("relay_group_start", "scan_ns", scanStart, "offset", start, "count", end-start)
+				}
 				done := make(chan error, end-start)
 				for _, entry := range entries[start:end] {
 					cursor = entry.Key
@@ -114,6 +123,9 @@ func (r *Relay) Run(ctx context.Context) error {
 					if err := <-done; err != nil {
 						failure = err
 					}
+				}
+				if !r.MemberRelay {
+					requesttrace.Consensus.Mark("relay_group_done", "scan_ns", scanStart, "offset", start)
 				}
 				if failure != nil {
 					return failure

@@ -1,0 +1,291 @@
+{
+  "benchmark": {
+    "block_observed_p50_ms": 2823.053167,
+    "completed_per_second": 17.613890183596908,
+    "concurrency": 64,
+    "count": 100,
+    "elapsed_s": 5.677337542,
+    "failed": 0,
+    "fast_p50_ms": 243.38275,
+    "fast_p95_ms": 245.738584,
+    "finished_unix_ns": 1789785407502392542,
+    "member_applied_p50_ms": 2858.250084,
+    "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.",
+    "started_unix_ns": 1789785401825055000,
+    "timing_origin": "wallet_http_submit_v4",
+    "trace": true,
+    "workload": "closed_loop_final_utxo_cross_org"
+  },
+  "store_by_kind": {
+    "new_payment": {
+      "count": 100,
+      "changed": 100,
+      "lock_wait_ms": {
+        "n": 100,
+        "median": 223.1805,
+        "p95": 720.229,
+        "max": 788.013,
+        "mean": 308.74523,
+        "sum": 30874.523
+      },
+      "business_ms": {
+        "n": 100,
+        "median": 0.0115,
+        "p95": 0.026,
+        "max": 0.28,
+        "mean": 0.01665,
+        "sum": 1.665
+      },
+      "mutations_ms": {
+        "n": 100,
+        "median": 0.003,
+        "p95": 0.006,
+        "max": 0.012,
+        "mean": 0.00359,
+        "sum": 0.359
+      },
+      "commit_ms": {
+        "n": 100,
+        "median": 14.951,
+        "p95": 29.671,
+        "max": 47.129,
+        "mean": 16.21228,
+        "sum": 1621.228
+      },
+      "bbolt_write_sync_ms": {
+        "n": 100,
+        "median": 14.9312295,
+        "p95": 29.661625,
+        "max": 47.118417,
+        "mean": 16.02704712,
+        "sum": 1602.704712
+      },
+      "bbolt_spill_ms": {
+        "n": 100,
+        "median": 0.0047290000000000006,
+        "p95": 0.009291,
+        "max": 0.212041,
+        "mean": 0.00826248,
+        "sum": 0.826248
+      },
+      "total_ms": {
+        "n": 100,
+        "median": 245.4765,
+        "p95": 728.229,
+        "max": 799.964,
+        "mean": 324.98561,
+        "sum": 32498.561
+      }
+    },
+    "retry_status": {
+      "count": 145,
+      "changed": 100,
+      "lock_wait_ms": {
+        "n": 145,
+        "median": 13.64,
+        "p95": 162.821,
+        "max": 795.742,
+        "mean": 38.20223448275862,
+        "sum": 5539.324
+      },
+      "business_ms": {
+        "n": 145,
+        "median": 0.01,
+        "p95": 0.018,
+        "max": 0.077,
+        "mean": 0.010517241379310345,
+        "sum": 1.525
+      },
+      "mutations_ms": {
+        "n": 145,
+        "median": 0.001,
+        "p95": 0.003,
+        "max": 0.009,
+        "mean": 0.0015724137931034483,
+        "sum": 0.228
+      },
+      "commit_ms": {
+        "n": 145,
+        "median": 14.977,
+        "p95": 31.975,
+        "max": 54.785,
+        "mean": 13.797406896551724,
+        "sum": 2000.624
+      },
+      "bbolt_write_sync_ms": {
+        "n": 145,
+        "median": 14.970875,
+        "p95": 31.968709,
+        "max": 54.775417,
+        "mean": 13.791035944827586,
+        "sum": 1999.700212
+      },
+      "bbolt_spill_ms": {
+        "n": 145,
+        "median": 0.003375,
+        "p95": 0.004459,
+        "max": 0.006833,
+        "mean": 0.002584193103448276,
+        "sum": 0.374708
+      },
+      "total_ms": {
+        "n": 145,
+        "median": 32.719,
+        "p95": 177.81,
+        "max": 803.747,
+        "mean": 52.01457931034483,
+        "sum": 7542.114
+      }
+    },
+    "block_follow": {
+      "count": 16,
+      "changed": 16,
+      "lock_wait_ms": {
+        "n": 16,
+        "median": 0.0005,
+        "p95": 81.057,
+        "max": 630.053,
+        "mean": 59.333625,
+        "sum": 949.338
+      },
+      "business_ms": {
+        "n": 16,
+        "median": 0.9924999999999999,
+        "p95": 2.097,
+        "max": 3.101,
+        "mean": 1.0065625,
+        "sum": 16.105
+      },
+      "mutations_ms": {
+        "n": 16,
+        "median": 0.0135,
+        "p95": 0.021,
+        "max": 0.025,
+        "mean": 0.0121875,
+        "sum": 0.195
+      },
+      "commit_ms": {
+        "n": 16,
+        "median": 31.605,
+        "p95": 38.354,
+        "max": 40.341,
+        "mean": 30.5965,
+        "sum": 489.544
+      },
+      "bbolt_write_sync_ms": {
+        "n": 16,
+        "median": 31.581,
+        "p95": 38.340458,
+        "max": 40.319333,
+        "mean": 30.5801066875,
+        "sum": 489.281707
+      },
+      "bbolt_spill_ms": {
+        "n": 16,
+        "median": 0.0069375,
+        "p95": 0.012625,
+        "max": 0.015708,
+        "mean": 0.0074503125,
+        "sum": 0.119205
+      },
+      "total_ms": {
+        "n": 16,
+        "median": 40.1775,
+        "p95": 119.019,
+        "max": 648.074,
+        "mean": 90.95325,
+        "sum": 1455.252
+      }
+    }
+  },
+  "payments": {
+    "save_ms": {
+      "n": 100,
+      "median": 251.14600000000002,
+      "p95": 736.409,
+      "max": 800.166,
+      "mean": 326.89284,
+      "sum": 32689.284
+    },
+    "pre_store_ms": {
+      "n": 100,
+      "median": 0.197,
+      "p95": 12.707,
+      "max": 13.338,
+      "mean": 1.89644,
+      "sum": 189.644
+    },
+    "queue_ms": {
+      "n": 100,
+      "median": 1408.173,
+      "p95": 3336.219,
+      "max": 3980.127,
+      "mean": 1609.19354,
+      "sum": 160919.354
+    },
+    "queue_during_groups_ms": {
+      "n": 100,
+      "median": 1391.4805000000001,
+      "p95": 3302.812,
+      "max": 3946.719,
+      "mean": 1594.62622,
+      "sum": 159462.622
+    },
+    "queue_during_scans_ms": {
+      "n": 100,
+      "median": 0.052,
+      "p95": 0.116,
+      "max": 0.163,
+      "mean": 0.06359000000000001,
+      "sum": 6.359
+    },
+    "queue_other_ms": {
+      "n": 100,
+      "median": 0.009000000000096403,
+      "p95": 33.27000000000015,
+      "max": 95.62600000000022,
+      "mean": 14.50373000000001,
+      "sum": 1450.373000000001
+    }
+  },
+  "groups": {
+    "duration_ms": {
+      "n": 38,
+      "median": 118.5565,
+      "p95": 317.954,
+      "max": 883.161,
+      "mean": 129.5858947368421,
+      "sum": 4924.264
+    },
+    "all_install_done_ms": {
+      "n": 38,
+      "median": 50.465,
+      "p95": 94.041,
+      "max": 99.221,
+      "mean": 45.14557894736842,
+      "sum": 1715.532
+    },
+    "tail_after_submit_ms": {
+      "n": 27,
+      "median": 72.737,
+      "p95": 253.444,
+      "max": 803.754,
+      "mean": 115.38425925925925,
+      "sum": 3115.375
+    }
+  },
+  "scan_ms": {
+    "n": 18,
+    "median": 0.014499999999999999,
+    "p95": 0.035,
+    "max": 0.097,
+    "mean": 0.01938888888888889,
+    "sum": 0.34900000000000003
+  },
+  "coverage": {
+    "events": 2139,
+    "store": 261,
+    "payments": 100,
+    "groups": 38
+  }
+}

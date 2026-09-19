@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"utxo/internal/requesttrace"
 	"utxo/internal/state"
 )
 
@@ -21,6 +22,7 @@ type Bolt struct {
 	db        *bolt.DB
 	writeMu   sync.Mutex
 	uncertain bool
+	trace     bool
 }
 type boltView struct{ b *bolt.Bucket }
 
@@ -64,21 +66,36 @@ func Open(path string, id Identity) (*Bolt, error) {
 		db.Close()
 		return nil, e
 	}
-	return &Bolt{db: db}, nil
+	return &Bolt{db: db, trace: id.Role == "gateway" && requesttrace.Consensus != nil}, nil
 }
 func (b *Bolt) View(fn func(state.ReadView) error) error {
 	return b.db.View(func(tx *bolt.Tx) error { return fn(boltView{tx.Bucket(dataBucket)}) })
 }
 func (b *Bolt) Update(fn func(state.ReadView) ([]state.Change, error)) error {
+	var requested, locked, callback, evaluated, writes int64
+	var before bolt.Stats
+	if b.trace {
+		requested = time.Now().UnixNano()
+	}
 	b.writeMu.Lock()
 	defer b.writeMu.Unlock()
+	if b.trace {
+		locked = time.Now().UnixNano()
+		before = b.db.Stats()
+	}
 	if b.uncertain {
 		return ErrUncertain
 	}
 	var businessErr error
 	err := b.db.Update(func(tx *bolt.Tx) error {
+		if b.trace {
+			callback = time.Now().UnixNano()
+		}
 		bucket := tx.Bucket(dataBucket)
 		cs, e := fn(boltView{bucket})
+		if b.trace {
+			evaluated = time.Now().UnixNano()
+		}
 		if e != nil {
 			businessErr = e
 			return e
@@ -102,11 +119,24 @@ func (b *Bolt) Update(fn func(state.ReadView) ([]state.Change, error)) error {
 				return e
 			}
 		}
+		if b.trace {
+			writes = time.Now().UnixNano()
+		}
 		if !changed {
 			return errNoWrites
 		}
 		return nil
 	})
+	if b.trace {
+		returned := time.Now().UnixNano()
+		after := b.db.Stats()
+		diff := after.Sub(&before)
+		requesttrace.Consensus.Mark("store_update", "requested_ns", requested, "locked_ns", locked,
+			"callback_ns", callback, "evaluated_ns", evaluated, "writes_ns", writes, "returned_ns", returned,
+			"write_ns", int64(diff.TxStats.GetWriteTime()), "spill_ns", int64(diff.TxStats.GetSpillTime()),
+			"rebalance_ns", int64(diff.TxStats.GetRebalanceTime()), "write_count", diff.TxStats.GetWrite(),
+			"page_bytes", diff.TxStats.GetPageAlloc(), "no_changes", errors.Is(err, errNoWrites), "failed", err != nil && !errors.Is(err, errNoWrites))
+	}
 	if errors.Is(err, errNoWrites) {
 		return nil
 	}

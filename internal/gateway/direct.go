@@ -85,7 +85,9 @@ func (c *Collector) PersistDirect(p protocol.DirectPayment) error {
 	}
 	fact := p.Certificate.QC.Fact
 	id := p.Tx.ID()
+	requesttrace.Payment("persist_update_requested", fact)
 	return c.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		requesttrace.Payment("persist_callback", fact)
 		o := state.NewOverlay(v)
 		key := state.Key(state.KeyCollected, id[:])
 		if _, err := o.Get(key); err == nil {
@@ -150,7 +152,9 @@ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Out
 		requesttrace.Payment("submit_done", pending.Fact)
 		pending.NextSubmitUnixNS = now + int64(2*time.Second)
 	}
-	return r.DB.Update(func(v state.ReadView) ([]state.Change, error) {
+	requesttrace.Payment("relay_update_requested", pending.Fact)
+	err = r.DB.Update(func(v state.ReadView) ([]state.Change, error) {
+		requesttrace.Payment("relay_callback", pending.Fact)
 		if _, err := v.Get(key); errors.Is(err, state.ErrNotFound) {
 			r.forgetInstall(pending.Fact)
 			return nil, nil
@@ -163,4 +167,6 @@ func (r *Relay) deliverDirect(ctx context.Context, key []byte, pending state.Out
 		}
 		return o.Changes(), nil
 	})
+	requesttrace.Payment("relay_update_returned", pending.Fact)
+	return err
 }
