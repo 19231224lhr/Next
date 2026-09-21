@@ -36,8 +36,22 @@ import (
 type configuration struct {
 	Network, DataDir, KeyFile, P2PListen, Peers, Listen string
 	RepairKeyFile                                       string
+	P2PSendRate, P2PRecvRate                            int64
 	Index                                               uint16
 	TLS                                                 cfg.TLS
+}
+
+func configureBandwidth(p2p *cmtcfg.P2PConfig, c configuration) error {
+	if c.P2PSendRate < 0 || c.P2PRecvRate < 0 {
+		return fmt.Errorf("P2P bandwidth limits must be nonnegative bytes per second")
+	}
+	if c.P2PSendRate > 0 {
+		p2p.SendRate = c.P2PSendRate
+	}
+	if c.P2PRecvRate > 0 {
+		p2p.RecvRate = c.P2PRecvRate
+	}
+	return nil
 }
 
 func run() error {
@@ -86,6 +100,7 @@ func run() error {
 		return e
 	}
 	cc := cmtcfg.DefaultConfig().SetRoot(filepath.Join(c.DataDir, "comet"))
+	cc.Mempool.Size = 10000
 	cmtcfg.EnsureRoot(cc.RootDir)
 	cc.Moniker = fmt.Sprintf("committee-%d", c.Index)
 	cc.RPC.ListenAddress = ""
@@ -96,7 +111,17 @@ func run() error {
 	cc.P2P.AllowDuplicateIP = true
 	cc.P2P.AddrBookStrict = false
 	cc.P2P.PexReactor = false
+	cc.P2P.FlushThrottleTimeout = 10 * time.Millisecond
+	cc.Consensus.PeerGossipSleepDuration = 10 * time.Millisecond
+	if e = configureBandwidth(cc.P2P, c); e != nil {
+		return e
+	}
 	cc.Consensus.TimeoutCommit = 100 * time.Millisecond
+	if network.Direct != nil {
+		// Amortize each height's durable writes under sustained payment traffic.
+		// This overlaps execution/Commit; it is not an additional post-Commit sleep.
+		cc.Consensus.TimeoutCommit = 500 * time.Millisecond
+	}
 	// Wait when idle; CometBFT still produces blocks needed to authenticate AppHash changes.
 	cc.Consensus.CreateEmptyBlocks = false
 	cc.Consensus.CreateEmptyBlocksInterval = 0
@@ -115,12 +140,15 @@ func run() error {
 		}
 		cc.Consensus.PeerGossipSleepDuration = d
 	}
-	requesttrace.Consensus.Mark("configuration", "flush", cc.P2P.FlushThrottleTimeout, "gossip", cc.Consensus.PeerGossipSleepDuration, "commit", cc.Consensus.TimeoutCommit)
+	requesttrace.Consensus.Mark("configuration", "flush", cc.P2P.FlushThrottleTimeout, "gossip", cc.Consensus.PeerGossipSleepDuration, "commit", cc.Consensus.TimeoutCommit, "send_rate", cc.P2P.SendRate, "recv_rate", cc.P2P.RecvRate)
 	cc.StateSync.Enable = false
 	requesttrace.EnableCometProfile()
 	var validator *privval.FilePV
 	_, keyErr := os.Stat(cc.PrivValidatorKeyFile())
 	_, stateErr := os.Stat(cc.PrivValidatorStateFile())
+	if _, err := os.Stat(filepath.Join(filepath.Dir(cc.PrivValidatorStateFile()), "signing_state.db")); !os.IsNotExist(err) {
+		return fmt.Errorf("experimental signing database exists; use its original experiment binary, not stale JSON")
+	}
 	if os.IsNotExist(keyErr) && os.IsNotExist(stateErr) {
 		validator = privval.NewFilePV(cmted.PrivKey(key), cc.PrivValidatorKeyFile(), cc.PrivValidatorStateFile())
 		validator.Save()
@@ -149,7 +177,17 @@ func run() error {
 	}
 	logger := log.NewFilter(log.NewTMLogger(log.NewSyncWriter(os.Stderr)), log.AllowError())
 	logger = requesttrace.Consensus.Logger(logger)
-	consensus, e := node.NewNode(cc, validator, nk, proxy.NewLocalClientCreator(app), func() (*ct.GenesisDoc, error) { return genesis, nil }, cmtcfg.DefaultDBProvider, node.DefaultMetricsProvider(cc.Instrumentation), logger)
+	creator := proxy.NewLocalClientCreator(app)
+	if network.Direct != nil {
+		// Direct CheckTx verifies immutable authorization; App keeps stateful
+		// execution, commit and query serialization under its own mutex.
+		creator = committee.NewParallelCheckClientCreator(app, engine)
+	}
+	dbProvider := cmtcfg.DefaultDBProvider
+	if network.Direct != nil {
+		dbProvider = directDBProvider
+	}
+	consensus, e := node.NewNode(cc, validator, nk, creator, func() (*ct.GenesisDoc, error) { return genesis, nil }, dbProvider, node.DefaultMetricsProvider(cc.Instrumentation), logger)
 	if e != nil {
 		return e
 	}

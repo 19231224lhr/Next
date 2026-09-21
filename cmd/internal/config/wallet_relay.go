@@ -16,7 +16,7 @@ func (n Network) StartWalletRelay(db store.Store) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	relay := gateway.Relay{DB: db, Public: transport.NewCommitteeClient(n.CommitteeURLs[0]), Trust: trust, Organizations: make(map[protocol.Hash]protocol.OrgConfig), Members: make(map[protocol.Hash][4]gateway.MemberClient)}
+	relay := gateway.Relay{DB: db, Public: transport.NewCommitteeClient(n.CommitteeURLs[0], n.CommitteeURLs[1:]...), Trust: trust, Organizations: make(map[protocol.Hash]protocol.OrgConfig), Members: make(map[protocol.Hash][4]gateway.MemberClient)}
 	for _, org := range n.Organizations {
 		relay.Organizations[org.Hash()] = org
 		var clients [4]gateway.MemberClient

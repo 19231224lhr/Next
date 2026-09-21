@@ -136,11 +136,32 @@ func (bs *BlockStore) LoadOriginalBlock(height int64) (*types.Block, error) {
 // OriginalBlockPart serves consensus catch-up with original execution bytes.
 // Current redacted parts remain available through LoadBlockPart for inspection.
 func (bs *BlockStore) OriginalBlockPart(height int64, index int) (*types.Part, error) {
-	b, err := bs.LoadOriginalBlock(height)
-	if err != nil || b == nil {
+	bs.revisionMtx.RLock()
+	defer bs.revisionMtx.RUnlock()
+	raw, err := bs.db.Get(originalKey(height))
+	if err != nil {
 		return nil, err
 	}
-	parts, err := b.MakePartSet(types.BlockPartSizeBytes)
+	if len(raw) == 0 {
+		meta := bs.LoadBlockMeta(height)
+		if meta == nil {
+			return nil, nil
+		}
+		if index < 0 || uint64(index) >= uint64(meta.BlockID.PartSetHeader.Total) {
+			return nil, types.ErrRedaction
+		}
+		return bs.LoadBlockPart(height, index), nil
+	}
+	// Rewritten history still serves the immutable original execution bytes.
+	pb := new(cmtproto.Block)
+	if err = pb.Unmarshal(raw); err != nil {
+		return nil, err
+	}
+	block, err := types.BlockFromProto(pb)
+	if err != nil {
+		return nil, err
+	}
+	parts, err := block.MakePartSet(types.BlockPartSizeBytes)
 	if err != nil {
 		return nil, err
 	}

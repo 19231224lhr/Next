@@ -1,14 +1,17 @@
 """One fresh 100/64 closed-loop run; retain reports, never export lab keys."""
 import json, os, signal, subprocess, sys, time, urllib.request, shutil, hashlib
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 root = Path('/Users/richz/lab/man/utxo-fastpay-v12')
 label, binaries, tracing = sys.argv[1:4]
 fault = len(sys.argv) > 4 and sys.argv[4] == 'reject-gateway'
-count, concurrency = (16, 8) if fault else (int(os.environ.get("UTXO_BENCH_COUNT", "100")), 64)
+count, concurrency = (16, 8) if fault else (int(os.environ.get("UTXO_BENCH_COUNT", "100")), int(os.environ.get("UTXO_BENCH_CONCURRENCY", "64")))
 warmup = int(os.environ.get("UTXO_BENCH_WARMUP", "0"))
+rate = float(os.environ.get("UTXO_BENCH_RATE", "0"))
+max_pending = int(os.environ.get("UTXO_BENCH_MAX_PENDING", "0"))
 tracing = tracing == 'trace'
 bin_dir = root / '.run' / binaries
 labdir = root / '.run' / ('group-' + label)
@@ -49,13 +52,19 @@ if warmup:
         groups.setdefault(json.dumps(output['Output']['Recipient']['Owner']), []).append(output)
     expanded = []
     for owner, outputs in groups.items():
-        for i in range(len(outputs), 2048):
+        for i in range(len(outputs), max(2048, warmup+count, int(os.environ.get('UTXO_BENCH_GENESIS_COUNT', '0')))):
             seed = (network['ChainID']+owner+str(i)).encode()
             outputs.append({'ID':list(hashlib.sha256(b'ID'+seed).digest()),
                             'Fact':hashlib.sha256(b'FACT'+seed).hexdigest(), 'Output':outputs[0]['Output']})
         expanded.extend(outputs)
     network['Genesis']['Outputs'] = expanded
-    path.write_text(json.dumps(network))
+    path.write_text(json.dumps(network, separators=(',', ':')))
+bandwidth = int(os.environ.get('UTXO_BENCH_P2P_RATE', '0'))
+if bandwidth:
+    for path in (labdir/'config').glob('committee[0-9].json'):
+        config = json.loads(path.read_text())
+        config.update(P2PSendRate=bandwidth, P2PRecvRate=bandwidth)
+        path.write_text(json.dumps(config))
 lab = json.loads((labdir / 'lab.json').read_text())
 proxy = None
 rejected = []
@@ -100,17 +109,37 @@ with (labdir / 'runner.log').open('w') as log:
             if time.monotonic() > deadline: raise TimeoutError('lab readiness')
             time.sleep(.1)
         time.sleep(3)
+        profiles = []
+        profile_pool = None
+        if os.environ.get('UTXO_RUNTIME_TRACE') == '1':
+            profile_dir = labdir/'reports/runtime'
+            profile_dir.mkdir()
+            def capture_runtime(node):
+                with urllib.request.urlopen(node['URL']+'/debug/pprof/trace?seconds=8', timeout=20) as response:
+                    (profile_dir/(node['Name']+'.trace')).write_bytes(response.read())
+            profile_pool = ThreadPoolExecutor(max_workers=5)
+            profiles = [profile_pool.submit(capture_runtime, node) for node in lab['Nodes']
+                        if node['Name'] == 'gateway0' or node['Name'].startswith('org0-member')]
+            time.sleep(.5)
         if warmup:
             with (labdir/'reports/warmup-output.txt').open('w') as warm:
                 run(ctl,'bench-v4','-dir',str(labdir),'-start','0','-count',str(warmup),'-concurrency',str(concurrency),stdout=warm,stderr=subprocess.STDOUT,timeout=300)
             sizes = {str(p.relative_to(labdir)):p.stat().st_size for p in labdir.rglob('*.db') if p.is_file()}
             (labdir/'reports/warm-sizes-before.json').write_text(json.dumps(sizes,indent=2))
         args = [ctl, 'bench-v4', '-dir', str(labdir), '-start', str(warmup), '-count', str(count), '-concurrency', str(concurrency)]
+        if rate:
+            args.extend(['-rate', str(rate)])
+        if max_pending:
+            args.extend(['-max-pending', str(max_pending)])
         if tracing: args.append('-trace')
         with (labdir / 'reports' / 'bench-output.txt').open('w') as out:
-            run(*args, stdout=out, stderr=subprocess.STDOUT, timeout=180)
+            run(*args, stdout=out, stderr=subprocess.STDOUT, timeout=max(180, count/rate+300) if rate else 180)
         if tracing:
-            run('python3', str(root / '.run' / 'collect_trace100.py'), str(labdir), timeout=90)
+            run('python3', str(Path(__file__).with_name('collect_trace.py')), str(labdir), str(warmup), timeout=90)
+        for future in profiles:
+            future.result(timeout=20)
+        if profile_pool:
+            profile_pool.shutdown()
     finally:
         proc.send_signal(signal.SIGINT)
         proc.wait(timeout=35)
@@ -120,7 +149,7 @@ with (labdir / 'runner.log').open('w') as log:
 with (labdir / 'reports' / 'audit-output.txt').open('w') as out:
     run(ctl, 'audit', '-dir', str(labdir), stdout=out, stderr=subprocess.STDOUT, timeout=30)
 bench = json.loads((labdir / 'reports' / f'bench-v4-{warmup}.json').read_text())
-(labdir / 'reports' / 'experiment.json').write_text(json.dumps({'label': label, 'binaries': binaries, 'trace': tracing, 'count': count, 'concurrency': concurrency, 'flush': '10ms', 'gossip': '10ms', 'reject_gateway_submit': fault}, indent=2))
+(labdir / 'reports' / 'experiment.json').write_text(json.dumps({'label': label, 'binaries': binaries, 'trace': tracing, 'count': count, 'concurrency': concurrency, 'rate': rate, 'flush': '10ms', 'gossip': '10ms', 'reject_gateway_submit': fault}, indent=2))
 if warmup:
     sizes = {str(p.relative_to(labdir)):p.stat().st_size for p in labdir.rglob('*.db') if p.is_file()}
     (labdir/'reports/warm-sizes-after.json').write_text(json.dumps(sizes,indent=2))

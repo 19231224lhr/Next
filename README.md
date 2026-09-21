@@ -10,12 +10,36 @@ member updates (wire/application version 4). Active branch:
 
 Normal settlement emits no per-payment output or member credit proofs. A shared
 block follower verifies committed execution results once per height and applies
-local changes atomically. Existing durable three-vote fast delivery, background
+local changes atomically. Existing three-vote fast delivery, background
 INSTALL, direct issuer liability and real historical input repair remain.
+
+Member processes now open their bbolt database with **NoSync** by default for
+fresh-start experiments. Transactions still apply atomically during normal
+operation and votes follow the committed update, but member state is not guaranteed
+durable or crash-consistent. Restart the whole experiment with fresh state after
+failure. Gateway, wallet and committee application stores keep synchronous writes.
+The startup log reports `storage_no_sync=true`. See
+[the change and validation](docs/experiments/member-nosync-default-2026-09-21/README.md).
+
+For the experimental in-memory member mode, set
+`UTXO_EXPERIMENT_MEMBER_MEMORY=1`. It uses an ordered B-tree under the same
+transaction boundary and signing order. A clean shutdown exports an **audit-only**
+`member.db`; startup refuses audit snapshots and incomplete `.pending` files.
+There is no crash recovery or resume mode. `bench-v4 -wallet-no-sync` independently
+opts the benchmark wallet out of disk synchronization (the default is false).
+See [full-path measurements and the all-source reproduction tool](docs/experiments/full-path-opt-2026-09-22/README.md).
 
 Run `python3 third_party/cometbft/overlay.py` before building. Keep the existing
 `-tags=comet_v3` fork build switch, but use `payctl init-lab -v4`, `bench-v4` and
 `demo-v4` with a fresh genesis. Do not reuse wire-v3 databases.
+
+For paced load, `bench-v4 -rate 200 -concurrency 256 -max-pending 2048`
+releases a send permit after the receiving wallet verifies and commits
+TXCer locally (durability follows the selected wallet mode), while bounded tasks continue observing public settlement and member
+completion. Omit `-max-pending` to retain the original complete-lifecycle worker
+pool. Reports include dispatch/permit waiting, progress-query load, per-stage
+outcomes, and a 250 ms reconstruction of unfinished counts and oldest age.
+See [the benchmark admission plan and experiments](docs/experiments/dispatch-lag-2026-09-20/PLAN.md).
 
 The prior wire-v3 baseline is commit `039374d`; its historical measurements are
 in [v1.2 implementation notes](docs/implementation-v1.2.md). Current short tests
@@ -141,14 +165,18 @@ deadlines remain persisted and are not extended by retries or HTTP acceptance.
 See [the isolated comparisons](docs/experiments/parallel-relay-2026-09-19/README.md).
 
 After three verified votes the gateway sends the full Content-Length response
-and flushes it, then persists the certificate and outbox in the same bounded
-handler. The existing 128 handler slots also bound pending persistence; no new
-worker queue or unbounded goroutines are introduced. Slow background writes can
-still occupy slots or HTTP/1 connections and limit sustained throughput; this
-change removes the single-payment foreground dependency, not disk work.
+and flushes it, then hands the certificate and outbox save to a background task.
+At most 128 such tasks may run; when full, the handler performs the save itself.
+Concurrent saves still use the existing Group store batching. The normal handler
+returns without waiting for disk, allowing the next request on its HTTP/1
+connection to proceed. Shutdown closes admission and joins handlers and saves
+before closing storage. Save failures retain the payment identity in error logs.
+The handoff is volatile, not a durable receipt; a crash before persistence still
+requires an existing full-payment holder to resubmit. This removes a connection
+dependency, not disk work.
 
-Member persistence before signing and recipient-wallet persistence before READY
-remain unchanged. Demo and bench now run the existing relay over each wallet
+Member state commits before signing and recipient-wallet state updates before READY
+remain ordered; durability follows the explicitly selected experiment mode. Demo and bench now run the existing relay over each wallet
 outbox. To resume an offline wallet's pending certificates without making a new
 payment, run `bin/payctl wallet-relay -dir experiments/lab -owner 0` (or owner 1).
 Do not open the same wallet database in another process simultaneously.

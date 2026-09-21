@@ -186,14 +186,18 @@ func (c *MemberClient) post(ctx context.Context, path string, raw []byte, limit 
 	request.Header.Set("Content-Type", MediaType)
 	if (path == "/v1/transactions" || path == "/v3/transactions") && requesttrace.Enabled(ctx) {
 		request.Header.Set(requesttrace.HeaderName, "1")
+		request = traceMemberRequest(request, c.BaseURL)
 	}
+	requesttrace.MarkNode(ctx, c.BaseURL, "http_do_start")
 	response, e := c.HTTP.Do(request)
+	requesttrace.MarkNode(ctx, c.BaseURL, "http_do_done")
 	if e != nil {
 		return nil, e
 	}
 	defer response.Body.Close()
 	requesttrace.Import(ctx, response.Header.Get(requesttrace.HeaderName), c.BaseURL)
 	body, e := io.ReadAll(io.LimitReader(response.Body, int64(limit+1)))
+	requesttrace.MarkNode(ctx, c.BaseURL, "http_body_read")
 	if e != nil {
 		return nil, e
 	}

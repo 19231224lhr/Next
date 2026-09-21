@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 	"utxo/internal/gateway"
@@ -19,10 +21,13 @@ import (
 type blockedStore struct {
 	store.Store
 	entered, release chan struct{}
+	enterOnce        sync.Once
+	updates          atomic.Int32
 }
 
 func (s *blockedStore) Update(fn func(state.ReadView) ([]state.Change, error)) error {
-	close(s.entered)
+	s.updates.Add(1)
+	s.enterOnce.Do(func() { close(s.entered) })
 	<-s.release
 	return s.Store.Update(fn)
 }

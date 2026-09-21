@@ -5,13 +5,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"runtime/trace"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 )
 
 const HeaderName = "X-UTXO-Diagnostic-Trace"
-const maxEvents = 64
+const maxEvents = 128
 const maxHeader = 24576
 
 type Event struct {
@@ -33,15 +35,26 @@ func Start(ctx context.Context, node string) context.Context {
 }
 func Enabled(ctx context.Context) bool { return ctx.Value(key{}) != nil }
 func Mark(ctx context.Context, stage string) {
+	MarkNode(ctx, "", stage)
+}
+
+// MarkNode labels concurrent client-side spans without changing the recorder.
+func MarkNode(ctx context.Context, node, stage string) {
 	r, _ := ctx.Value(key{}).(*recorder)
 	if r == nil {
 		return
 	}
 	now := time.Now()
+	if trace.IsEnabled() {
+		trace.Log(ctx, "utxo", strconv.FormatInt(now.UnixNano(), 10)+":"+stage)
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if len(r.events) < maxEvents {
-		r.events = append(r.events, Event{r.node, stage, now.UnixNano(), now.Sub(r.start).Nanoseconds()})
+		if node == "" {
+			node = r.node
+		}
+		r.events = append(r.events, Event{node, stage, now.UnixNano(), now.Sub(r.start).Nanoseconds()})
 	}
 }
 func Events(ctx context.Context) []Event {

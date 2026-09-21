@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -27,7 +28,7 @@ type configuration struct {
 	TLS                               cfg.TLS
 }
 
-func run() error {
+func run() (result error) {
 	path := flag.String("config", "", "member config JSON")
 	flag.Parse()
 	var c configuration
@@ -54,7 +55,13 @@ func run() error {
 	if n.Direct != nil {
 		schema = member.DirectStoreSchema
 	}
-	db, e := store.Open(filepath.Join(c.DataDir, "member.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "member", Node: fmt.Sprintf("%s/%d", org.Org, c.Index), Schema: schema})
+	id := store.Identity{Network: n.Genesis.Network.String(), Role: "member", Node: fmt.Sprintf("%s/%d", org.Org, c.Index), Schema: schema}
+	var db store.Store
+	if os.Getenv("UTXO_EXPERIMENT_MEMBER_MEMORY") == "1" {
+		db, e = store.OpenEphemeral(filepath.Join(c.DataDir, "member.db"), id)
+	} else {
+		db, e = store.OpenNoSync(filepath.Join(c.DataDir, "member.db"), id)
+	}
 	if e != nil {
 		return e
 	}
@@ -63,7 +70,7 @@ func run() error {
 		db.Close()
 		return e
 	}
-	defer group.Close()
+	defer func() { result = errors.Join(result, group.Close()) }()
 	m, e := member.New(member.Config{Organization: org, Index: c.Index, Key: key, Peers: n.Organizations, Committee: trust, Schedule: n.Schedule, Workers: c.Workers, Direct: n.Direct}, group, n.Genesis)
 	if e != nil {
 		return e
@@ -75,7 +82,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	relayCtx, relayCancel := context.WithCancel(ctx)
-	relay := &gateway.Relay{DB: group, Public: transport.NewCommitteeClient(n.CommitteeURLs[0]), Trust: trust, Organizations: make(map[protocol.Hash]protocol.OrgConfig), Members: make(map[protocol.Hash][4]gateway.MemberClient)}
+	relay := &gateway.Relay{DB: group, Public: transport.NewCommitteeClient(n.CommitteeURLs[0], n.CommitteeURLs[1:]...), Trust: trust, Organizations: make(map[protocol.Hash]protocol.OrgConfig), Members: make(map[protocol.Hash][4]gateway.MemberClient)}
 	for _, organization := range n.Organizations {
 		relay.Organizations[organization.Hash()] = organization
 		var endpoints [4]gateway.MemberClient
@@ -109,7 +116,7 @@ func run() error {
 
 	done := make(chan error, 1)
 	go func() { done <- cfg.Serve(server) }()
-	slog.Info("member started", "listen", c.Listen, "organization", org.Org.String(), "index", c.Index)
+	slog.Info("member started", "listen", c.Listen, "organization", org.Org.String(), "index", c.Index, "storage_no_sync", true, "storage_memory", os.Getenv("UTXO_EXPERIMENT_MEMBER_MEMORY") == "1")
 	select {
 	case e = <-done:
 		return e

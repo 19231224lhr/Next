@@ -10,18 +10,27 @@ import (
 )
 
 func TestStorageContracts(t *testing.T) {
-	for _, backend := range []string{"memory", "bbolt", "group-bbolt"} {
+	for _, backend := range []string{"memory", "bbolt", "group-bbolt", "bbolt-nosync", "group-bbolt-nosync"} {
 		t.Run(backend, func(t *testing.T) {
 			var db Store
 			if backend == "memory" {
 				db = NewMemory()
 			} else {
-				b, e := Open(filepath.Join(t.TempDir(), "member.db"), Identity{Network: "test", Role: "member", Node: "0", Schema: 2})
+				open := Open
+				noSync := backend == "bbolt-nosync" || backend == "group-bbolt-nosync"
+				if noSync {
+					open = OpenNoSync
+				}
+				b, e := open(filepath.Join(t.TempDir(), "member.db"), Identity{Network: "test", Role: "member", Node: "0", Schema: 2})
 				if e != nil {
 					t.Fatal(e)
 				}
+				if b.db.NoSync != noSync {
+					b.Close()
+					t.Fatal("wrong storage sync mode")
+				}
 				db = b
-				if backend == "group-bbolt" {
+				if backend == "group-bbolt" || backend == "group-bbolt-nosync" {
 					db, e = NewGroup(b, 256, 64)
 					if e != nil {
 						b.Close()

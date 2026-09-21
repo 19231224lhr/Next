@@ -1,6 +1,7 @@
 package member
 
 import (
+	"errors"
 	"utxo/internal/state"
 	"utxo/protocol"
 )
@@ -18,8 +19,9 @@ func (m *Member) DirectStatus(f protocol.SpendFactID) (s DirectStatus, err error
 		if err != nil {
 			return err
 		}
-		_, s.Signed, err = state.Load[state.Approval](v, state.Key(state.KeyApproval, f[:]))
-		if err != nil {
+		_, err = v.Get(state.Key(state.KeyApproval, f[:]))
+		s.Signed = err == nil
+		if err != nil && !errors.Is(err, state.ErrNotFound) {
 			return err
 		}
 		p, _, err := state.Load[LocalProgress](v, ProgressKey(f))

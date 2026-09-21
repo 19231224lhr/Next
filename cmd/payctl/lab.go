@@ -171,6 +171,8 @@ func initialize(args []string) error {
 		c := map[string]any{"Network": lab.Network, "DataDir": filepath.Join(root, name), "KeyFile": committeeFiles[i], "P2PListen": fmt.Sprintf("tcp://127.0.0.1:%d", *base+200+i), "Peers": strings.Join(others, ","), "Listen": strings.TrimPrefix(network.CommitteeURLs[i], "http://"), "Index": i}
 		if *direct {
 			c["RepairKeyFile"] = repairFiles[i]
+			// This command creates a loopback laboratory, not a WAN deployment.
+			c["P2PSendRate"], c["P2PRecvRate"] = int64(51_200_000), int64(51_200_000)
 		}
 		if e = cfg.Write(file, c); e != nil {
 			return e

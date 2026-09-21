@@ -68,7 +68,7 @@ func Commit(db store.Store, b finality.VerifiedBlock, prepare Prepare) error {
 	}
 	return err
 }
-func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, prepare Prepare) error {
+func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, prepare Prepare, committed ...func(int64)) error {
 	if t.Validate() != nil {
 		return finality.ErrProof
 	}
@@ -96,6 +96,10 @@ func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, prepar
 			if err = Commit(db, b, prepare); err != nil {
 				return err
 			}
+			// Observers see only successfully committed local state.
+			for _, publish := range committed {
+				publish(b.Height())
+			}
 			continue
 		}
 		select {
@@ -108,11 +112,11 @@ func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, prepar
 
 // Start joins the follower before its database is closed. An apply error cancels
 // the service context instead of silently leaving quota permanently occupied.
-func Start(ctx context.Context, cancel context.CancelFunc, db store.Store, s Source, t finality.Trust, prepare Prepare) func() {
+func Start(ctx context.Context, cancel context.CancelFunc, db store.Store, s Source, t finality.Trust, prepare Prepare, committed ...func(int64)) func() {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		if err := Run(ctx, db, s, t, prepare); err != nil {
+		if err := Run(ctx, db, s, t, prepare, committed...); err != nil {
 			slog.Error("block follower stopped", "error", err)
 			cancel()
 		}

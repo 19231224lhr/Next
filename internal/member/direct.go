@@ -10,7 +10,8 @@ import (
 )
 
 // ApproveDirect retains the one-round contract: input locks and all five
-// resource debits reach durable storage before the vote is returned.
+// resource debits commit atomically before the vote is returned. Crash durability
+// depends on the configured store; the fresh-start member experiment uses NoSync.
 func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest) (protocol.DirectApproval, error) {
 	if m.direct == nil {
 		return protocol.DirectApproval{}, protocol.ErrUnsupported
@@ -19,10 +20,20 @@ func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest) 
 	if err != nil {
 		return protocol.DirectApproval{}, err
 	}
-	req, err = protocol.DecodeDirectRequest(raw)
+	return m.ApproveDirectBytes(ctx, raw)
+}
+
+// ApproveDirectBytes owns decoding and authentication at the HTTP boundary.
+// Typed callers use the wrapper above; neither entry point trusts parsed input.
+func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.DirectApproval, error) {
+	if m.direct == nil {
+		return protocol.DirectApproval{}, protocol.ErrUnsupported
+	}
+	req, err := protocol.DecodeDirectRequest(raw)
 	if err != nil {
 		return protocol.DirectApproval{}, err
 	}
+	requesttrace.Mark(ctx, "request_decoded")
 	tx := req.Tx
 	t := tx.Body
 	cfg := m.cfg.Organization

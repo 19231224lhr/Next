@@ -12,8 +12,9 @@ type mutation struct {
 }
 
 // Group coalesces only already queued mutations. Each operation sees prior
-// successful changes in the batch. Responses are released after one durable
-// transaction; individual business rejections never merge their child overlay.
+// successful changes in the batch. Responses are released after one committed
+// backing transaction; durability follows the store mode. Individual business
+// rejections never merge their child overlay.
 type Group struct {
 	base    Store
 	queue   chan mutation

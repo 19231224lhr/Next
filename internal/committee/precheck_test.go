@@ -12,7 +12,7 @@ func TestVerificationCacheOversizePreservesEntries(t *testing.T) {
 	var c verificationCache[rules.VerifiedCertificate]
 	small, large := protocol.Digest("small"), protocol.Digest("large")
 	c.put(small, rules.VerifiedCertificate{}, 10)
-	c.put(large, rules.VerifiedCertificate{}, (8<<20)+1)
+	c.put(large, rules.VerifiedCertificate{}, verificationCacheBytes+1)
 	if _, ok := c.get(small); !ok {
 		t.Fatal("oversized entry evicted a reusable result")
 	}

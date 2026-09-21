@@ -21,13 +21,7 @@ func addDirectHandlers(mux *http.ServeMux, m *member.Member, fg, bg chan struct{
 			fail(w, err)
 			return
 		}
-		req, err := protocol.DecodeDirectRequest(raw)
-		if err != nil {
-			fail(w, err)
-			return
-		}
-		requesttrace.Mark(ctx, "request_decoded")
-		approval, err := m.ApproveDirect(ctx, req)
+		approval, err := m.ApproveDirectBytes(ctx, raw)
 		if err != nil {
 			fail(w, err)
 			return
@@ -56,16 +50,25 @@ func addDirectHandlers(mux *http.ServeMux, m *member.Member, fg, bg chan struct{
 		binaryResponse(w, []byte("installed"))
 	}))
 }
-func (c *MemberClient) ApproveDirect(ctx context.Context, r protocol.DirectRequest) (a protocol.DirectApproval, err error) {
+func (c *MemberClient) ApproveDirect(ctx context.Context, r protocol.DirectRequest) (protocol.DirectApproval, error) {
 	raw, err := r.MarshalBinary()
 	if err != nil {
-		return a, err
+		return protocol.DirectApproval{}, err
 	}
+	return c.ApproveDirectBytes(ctx, raw)
+}
+
+// ApproveDirectBytes sends the collector's immutable request encoding. The
+// receiving member performs the same decoding and authorization checks.
+func (c *MemberClient) ApproveDirectBytes(ctx context.Context, raw []byte) (a protocol.DirectApproval, err error) {
+	requesttrace.MarkNode(ctx, c.BaseURL, "client_approve_enter")
+	requesttrace.MarkNode(ctx, c.BaseURL, "request_serialized")
 	raw, err = c.post(ctx, "/v3/transactions", raw, 256*1024)
 	if err != nil {
 		return a, err
 	}
 	err = json.Unmarshal(raw, &a)
+	requesttrace.MarkNode(ctx, c.BaseURL, "approval_decoded")
 	return a, err
 }
 func (c *MemberClient) InstallDirect(ctx context.Context, p protocol.DirectPayment) error {

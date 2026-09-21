@@ -75,7 +75,7 @@ func (l consensusLogger) capture(msg string, fields ...any) {
 	case "entering new round", "entering propose step", "signed proposal",
 		"received complete proposal block", "entering prevote step",
 		"entering precommit step", "signed and pushed vote", "entering commit step",
-		"finalizing commit of block", "received tock":
+		"finalizing commit of block", "received tock", "batched proposal WAL":
 		all := append(append([]any(nil), l.fields...), fields...)
 		l.recorder.Mark(msg, all...)
 	}

@@ -6,14 +6,19 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"os"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"utxo/internal/gateway"
 	"utxo/internal/rules"
+	"utxo/internal/state"
 	"utxo/internal/store"
 	"utxo/internal/testkit"
 	"utxo/internal/transport"
@@ -30,7 +35,8 @@ func (m readyDirectMember) ApproveDirect(context.Context, protocol.DirectRequest
 }
 func (m readyDirectMember) InstallDirect(context.Context, protocol.DirectPayment) error { return nil }
 
-func TestDirectHTTPResponseAndEarlyOfferBeforePersistence(t *testing.T) {
+func directHTTPFixture(t *testing.T, db store.Store) (*gateway.Collector, protocol.DirectRequest, protocol.OrgConfig) {
+	t.Helper()
 	f := testkit.NewFixture("early-http", "org", 1)
 	f.EnableDirect()
 	raw, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
@@ -58,22 +64,32 @@ func TestDirectHTTPResponseAndEarlyOfferBeforePersistence(t *testing.T) {
 	for i := range clients {
 		clients[i] = readyDirectMember{approval: protocol.DirectApproval{Summary: cert.Summary, Vote: protocol.SignSpend(cert.QC.Fact, uint16(i), f.Keys[i])}}
 	}
-	db := &blockedStore{Store: store.NewMemory(), entered: make(chan struct{}), release: make(chan struct{})}
-	defer db.Close()
 	c, err := gateway.New(f.Org, clients, db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	offered := make(chan protocol.DirectPayment, 1)
+	return c, protocol.DirectRequest{Tx: tx}, f.Org
+}
+
+func TestDirectHTTPResponseAndEarlyOfferBeforePersistence(t *testing.T) {
+	db := &blockedStore{Store: store.NewMemory(), entered: make(chan struct{}), release: make(chan struct{})}
+	defer db.Close()
+	c, request, org := directHTTPFixture(t, db)
+	tx := request.Tx
+	offered := make(chan protocol.DirectPayment, 2)
 	c.OfferDirect = func(p protocol.DirectPayment) bool { offered <- p; return true }
-	srv := httptest.NewServer(directPaymentHandler(c))
+	handler, drain := directPaymentHandler(c)
+	defer drain()
+	srv := httptest.NewServer(handler)
 	defer srv.Close()
 	defer close(db.release)
-	raw, err = (protocol.DirectRequest{Tx: tx}).MarshalBinary()
+	raw, err := request.MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
 	}
-	client := &http.Client{Timeout: 2 * time.Second}
+	tr := &http.Transport{MaxConnsPerHost: 1}
+	defer tr.CloseIdleConnections()
+	client := &http.Client{Transport: tr, Timeout: 2 * time.Second}
 	resp, err := client.Post(srv.URL, transport.MediaType, bytes.NewReader(raw))
 	if err != nil {
 		t.Fatal(err)
@@ -84,12 +100,12 @@ func TestDirectHTTPResponseAndEarlyOfferBeforePersistence(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := protocol.DecodeOutputCertificate(body)
-	if err != nil || got.Verify(f.Org) != nil {
+	if err != nil || got.Verify(org) != nil {
 		t.Fatal("invalid response", err)
 	}
 	select {
 	case p := <-offered:
-		if p.Tx.ID() != tx.ID() || p.Certificate.Verify(f.Org) != nil {
+		if p.Tx.ID() != tx.ID() || p.Certificate.Verify(org) != nil {
 			t.Fatal("wrong early payload")
 		}
 	case <-time.After(time.Second):
@@ -99,5 +115,152 @@ func TestDirectHTTPResponseAndEarlyOfferBeforePersistence(t *testing.T) {
 	case <-db.entered:
 	case <-time.After(time.Second):
 		t.Fatal("durable save was skipped")
+	}
+	// Reuse exactly the connection whose first handler is still saving.
+	reused := make(chan bool, 1)
+	req, err := http.NewRequest("POST", srv.URL, bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", transport.MediaType)
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
+		GotConn: func(info httptrace.GotConnInfo) { reused <- info.Reused },
+	}))
+	second, err := client.Do(req)
+	if err != nil {
+		t.Fatal("second payment waited for preceding handler persistence:", err)
+	}
+	body, err = io.ReadAll(second.Body)
+	second.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !<-reused {
+		t.Fatal("second request did not reuse the original connection")
+	}
+	got, err = protocol.DecodeOutputCertificate(body)
+	if err != nil || got.Verify(org) != nil {
+		t.Fatal("invalid second response", err)
+	}
+}
+
+func TestDirectPersistenceBoundAndDrain(t *testing.T) {
+	db := &blockedStore{Store: store.NewMemory(), entered: make(chan struct{}), release: make(chan struct{})}
+	c, request, _ := directHTTPFixture(t, db)
+	raw, err := request.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, drain := directPaymentHandler(c)
+	returned := make(chan context.Context, directPersistenceLimit+1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler(w, r)
+		returned <- r.Context()
+	}))
+	release := sync.OnceFunc(func() { close(db.release) })
+	defer func() { release(); srv.Close(); drain(); db.Close() }()
+	tr := &http.Transport{MaxConnsPerHost: 1}
+	defer tr.CloseIdleConnections()
+	client := &http.Client{Transport: tr, Timeout: 3 * time.Second}
+	send := func() {
+		t.Helper()
+		resp, err := client.Post(srv.URL, transport.MediaType, bytes.NewReader(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		if err != nil || resp.StatusCode != 200 {
+			t.Fatalf("response %d: %v", resp.StatusCode, err)
+		}
+	}
+	for i := 0; i < directPersistenceLimit; i++ {
+		send()
+		select {
+		case ctx := <-returned:
+			select {
+			case <-ctx.Done():
+			case <-time.After(time.Second):
+				t.Fatal("handler context still active")
+			}
+		case <-time.After(time.Second):
+			t.Fatal("handler waited for background save")
+		}
+	}
+	// The next save must stay in the handler, not spawn an unbounded extra task.
+	send()
+	deadline := time.Now().Add(time.Second)
+	for db.updates.Load() != directPersistenceLimit+1 {
+		if time.Now().After(deadline) {
+			t.Fatal("full capacity dropped a save")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	select {
+	case <-returned:
+		t.Fatal("full capacity did not use synchronous fallback")
+	default:
+	}
+	drained := make(chan struct{})
+	go func() { drain(); close(drained) }()
+	select {
+	case <-drained:
+		t.Fatal("drain returned before saves finished")
+	case <-time.After(20 * time.Millisecond):
+	}
+	release()
+	select {
+	case <-drained:
+	case <-time.After(3 * time.Second):
+		t.Fatal("drain did not complete")
+	}
+	// Saving outlives all request contexts; the durable record is still written.
+	if err := db.View(func(v state.ReadView) error {
+		id := request.Tx.ID()
+		_, err := v.Get(state.Key(state.KeyCollected, id[:]))
+		return err
+	}); err != nil {
+		t.Fatal("accepted save missing after drain:", err)
+	}
+	w := httptest.NewRecorder()
+	handler(w, httptest.NewRequest("POST", "/v3/transactions", bytes.NewReader(raw)))
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatal("drained handler accepted another request")
+	}
+}
+
+type failingDirectStore struct{ store.Store }
+
+func (failingDirectStore) Update(func(state.ReadView) ([]state.Change, error)) error {
+	return io.ErrClosedPipe
+}
+
+func TestDirectPersistenceFailureIsLoggedBeforeDrainReturns(t *testing.T) {
+	db := failingDirectStore{store.NewMemory()}
+	defer db.Close()
+	c, request, _ := directHTTPFixture(t, db)
+	raw, err := request.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	defer slog.SetDefault(previous)
+	handler, drain := directPaymentHandler(c)
+	defer drain()
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest("POST", "/v3/transactions", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", transport.MediaType)
+		w := httptest.NewRecorder()
+		handler(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatal("persistence failure changed the already returned certificate")
+		}
+	}
+	drain()
+	if strings.Count(logs.String(), "background v3 certificate persistence failed") != 3 ||
+		!strings.Contains(logs.String(), "spend=") || !strings.Contains(logs.String(), io.ErrClosedPipe.Error()) {
+		t.Fatal("background persistence errors were lost:", logs.String())
 	}
 }

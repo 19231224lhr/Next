@@ -75,7 +75,8 @@ func Read(path string, dst any) error {
 		return e
 	}
 	defer file.Close()
-	decoder := json.NewDecoder(io.LimitReader(file, 16<<20))
+	// Includes large laboratory genesis configurations for sustained benchmarks.
+	decoder := json.NewDecoder(io.LimitReader(file, 64<<20))
 	decoder.DisallowUnknownFields()
 	if e = decoder.Decode(dst); e != nil {
 		return e
@@ -146,6 +147,7 @@ func HTTP(listen string, handler http.Handler, t TLS) (*http.Server, error) {
 		debug := http.NewServeMux()
 		debug.Handle("/", handler)
 		debug.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
+		debug.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
 		debug.Handle("GET /debug/pprof/goroutine", pprof.Handler("goroutine"))
 		handler = debug
 	}

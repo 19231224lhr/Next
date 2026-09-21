@@ -1,6 +1,7 @@
 package member_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/pem"
@@ -63,7 +64,29 @@ func TestDirectDurableApprovalAndBackgroundInstall(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		vote, err := m.ApproveDirect(context.Background(), protocol.DirectRequest{Tx: tx})
+		byteApprover, ok := any(m).(interface {
+			ApproveDirectBytes(context.Context, []byte) (protocol.DirectApproval, error)
+		})
+		if !ok {
+			t.Fatal("member has no single-decode HTTP entry point")
+		}
+		encoded, err := (protocol.DirectRequest{Tx: tx}).MarshalBinary()
+		if err != nil {
+			t.Fatal(err)
+		}
+		bad := bytes.Clone(encoded)
+		sig := bytes.Index(bad, tx.Auth[0].Signature[:])
+		if sig < 0 {
+			t.Fatal("signature absent in encoding")
+		}
+		bad[sig] ^= 1
+		if _, err := byteApprover.ApproveDirectBytes(context.Background(), bad); err == nil {
+			t.Fatal("invalid signature accepted by byte entry point")
+		}
+		if _, err := byteApprover.ApproveDirectBytes(context.Background(), encoded[:len(encoded)-1]); err == nil {
+			t.Fatal("truncated request accepted")
+		}
+		vote, err := byteApprover.ApproveDirectBytes(context.Background(), encoded)
 		if err != nil {
 			t.Fatal(err)
 		}

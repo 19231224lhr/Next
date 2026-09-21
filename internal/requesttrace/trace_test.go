@@ -41,7 +41,19 @@ func TestOptionalConcurrentRoundTrip(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		Mark(ctx, "bounded")
 	}
-	if len(Events(ctx)) > 64 {
+	if len(Events(ctx)) != maxEvents {
 		t.Fatal("unbounded diagnostics")
+	}
+}
+
+func TestFanoutTraceFitsHeader(t *testing.T) {
+	ctx := Start(context.Background(), "gateway")
+	for i := 0; i < 112; i++ {
+		MarkNode(ctx, "http://127.0.0.1:28003", "http_got_conn_reused")
+	}
+	received := Start(context.Background(), "wallet")
+	Import(received, Header(ctx), "")
+	if len(Events(received)) != 112 {
+		t.Fatal("fanout diagnostic metadata was truncated")
 	}
 }

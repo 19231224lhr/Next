@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-// Share a bounded standard-library pool within each process. The default of
-// two idle connections per host churns sockets under concurrent proof polling.
+// Share a bounded standard-library pool within each process. Retain a complete
+// burst between calls instead of closing half its sockets after every wave.
 var rpcTransport = func() *http.Transport {
 	t := http.DefaultTransport.(*http.Transport).Clone()
-	t.MaxIdleConns = 512
-	t.MaxIdleConnsPerHost = 64
+	t.MaxIdleConns = 1024
+	t.MaxIdleConnsPerHost = 128
 	t.MaxConnsPerHost = 128
 	return t
 }()

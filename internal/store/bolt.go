@@ -7,6 +7,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 	"utxo/internal/requesttrace"
@@ -34,13 +35,30 @@ func (v boltView) Get(k []byte) ([]byte, error) {
 	return bytes.Clone(b), nil
 }
 func Open(path string, id Identity) (*Bolt, error) {
+	return openBolt(path, id, false)
+}
+
+// OpenNoSync is for fresh-start experiments. Updates remain atomic during normal
+// operation, but transaction and file-growth writes are not synchronized; crash
+// recovery is unsupported. Growth sync is skipped only on macOS;
+// bbolt does not support that option on ext3/ext4.
+func OpenNoSync(path string, id Identity) (*Bolt, error) {
+	return openBolt(path, id, true)
+}
+
+func openBolt(path string, id Identity, noSync bool) (*Bolt, error) {
+	if _, e := os.Stat(path + ".pending"); e == nil {
+		return nil, ErrAuditSnapshot
+	} else if !os.IsNotExist(e) {
+		return nil, e
+	}
 	if id.Network == "" || id.Role == "" || id.Node == "" || id.Schema == 0 {
 		return nil, ErrIdentity
 	}
 	if e := os.MkdirAll(filepath.Dir(path), 0700); e != nil {
 		return nil, e
 	}
-	db, e := bolt.Open(path, 0600, &bolt.Options{Timeout: time.Second, InitialMmapSize: 16 << 20})
+	db, e := bolt.Open(path, 0600, &bolt.Options{Timeout: time.Second, InitialMmapSize: 16 << 20, NoSync: noSync, NoGrowSync: noSync && runtime.GOOS == "darwin"})
 	if e != nil {
 		return nil, e
 	}
@@ -49,6 +67,9 @@ func Open(path string, id Identity) (*Bolt, error) {
 		meta, e := tx.CreateBucketIfNotExists(metaBucket)
 		if e != nil {
 			return e
+		}
+		if meta.Get(auditOnlyKey) != nil {
+			return ErrAuditSnapshot
 		}
 		previous := meta.Get([]byte("identity"))
 		if previous != nil && !bytes.Equal(previous, expected) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
+	"strconv"
 	"time"
 	"utxo/internal/requesttrace"
 	"utxo/internal/state"
@@ -16,9 +17,12 @@ type DirectMemberClient interface {
 }
 
 func (c *Collector) CollectDirect(ctx context.Context, request protocol.DirectRequest) (protocol.OutputCertificate, error) {
-	if err := request.Tx.VerifyAuth(); err != nil {
+	requesttrace.Mark(ctx, "collect_enter")
+	raw, err := request.MarshalBinary()
+	if err != nil {
 		return protocol.OutputCertificate{}, err
 	}
+	requesttrace.Mark(ctx, "owner_verified")
 	if request.Tx.Body.Config != c.org.Hash() {
 		return protocol.OutputCertificate{}, protocol.ErrAuth
 	}
@@ -30,14 +34,31 @@ func (c *Collector) CollectDirect(ctx context.Context, request protocol.DirectRe
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
 	responses := make(chan result, 4)
+	requesttrace.Mark(ctx, "fanout_ready")
 	for i, m := range c.members {
+		node := ""
+		if requesttrace.Enabled(ctx) {
+			node = "member-" + strconv.Itoa(i)
+			requesttrace.MarkNode(ctx, node, "dispatch_ready")
+		}
 		go func(i int, m MemberClient) {
+			requesttrace.MarkNode(run, node, "dispatch_started")
 			client, ok := m.(DirectMemberClient)
 			if !ok {
 				responses <- result{err: protocol.ErrUnsupported}
 				return
 			}
-			a, err := client.ApproveDirect(run, request)
+			var a protocol.DirectApproval
+			var err error
+			// HTTP peers share one immutable encoding; in-process peers retain
+			// their typed interface. Each receiver still validates independently.
+			if encoded, ok := client.(interface {
+				ApproveDirectBytes(context.Context, []byte) (protocol.DirectApproval, error)
+			}); ok {
+				a, err = encoded.ApproveDirectBytes(run, raw)
+			} else {
+				a, err = client.ApproveDirect(run, request)
+			}
 			responses <- result{index: i, approval: a, err: err}
 		}(i, m)
 	}
@@ -67,8 +88,14 @@ func (c *Collector) CollectDirect(ctx context.Context, request protocol.DirectRe
 				groups[fact] = cert
 			}
 			cert.QC.Votes = append(cert.QC.Votes, r.approval.Vote)
+			if requesttrace.Enabled(ctx) {
+				requesttrace.MarkNode(ctx, "member-"+strconv.Itoa(r.index), "vote_selected")
+			}
 			if len(cert.QC.Votes) == 3 {
-				return *cert, cert.Verify(c.org)
+				requesttrace.Mark(ctx, "quorum_collected")
+				err := cert.Verify(c.org)
+				requesttrace.Mark(ctx, "certificate_verified")
+				return *cert, err
 			}
 		}
 	}

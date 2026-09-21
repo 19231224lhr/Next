@@ -125,8 +125,11 @@ func run() error {
 	mux := http.NewServeMux()
 	requesttrace.RegisterTimeline(mux)
 	mux.HandleFunc("POST /v1/transactions", paymentHandler(collector))
+	drainDirect := func() {}
 	if n.Direct != nil {
-		mux.HandleFunc("POST /v3/transactions", directPaymentHandler(collector))
+		var handler http.HandlerFunc
+		handler, drainDirect = directPaymentHandler(collector)
+		mux.HandleFunc("POST /v3/transactions", handler)
 	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("alive\n")) })
 	server, e := cfg.HTTP(c.Listen, mux, c.TLS)
@@ -136,7 +139,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	relayCtx, relayCancel := context.WithCancel(ctx)
-	relay := &gateway.Relay{DB: db, Public: transport.NewCommitteeClient(n.CommitteeURLs[0]), Trust: trust, Organizations: make(map[protocol.Hash]protocol.OrgConfig), Members: make(map[protocol.Hash][4]gateway.MemberClient)}
+	relay := &gateway.Relay{DB: db, Public: transport.NewCommitteeClient(n.CommitteeURLs[0], n.CommitteeURLs[1:]...), Trust: trust, Organizations: make(map[protocol.Hash]protocol.OrgConfig), Members: make(map[protocol.Hash][4]gateway.MemberClient)}
 	relay.Direct = n.Direct != nil
 	if relay.Direct {
 		relay.Early = gateway.NewDirectInbox()
@@ -171,6 +174,7 @@ func run() error {
 		}
 	}()
 
+	defer drainDirect() // Handlers/saves finish before relay, follower and database cleanup.
 	done := make(chan error, 1)
 	go func() { done <- cfg.Serve(server) }()
 	slog.Info("gateway started", "listen", c.Listen, "organization", org.Org.String())

@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sort"
-	"sync"
+	"sync/atomic"
 	"time"
 	cfg "utxo/cmd/internal/config"
 	"utxo/internal/blockfollow"
@@ -22,20 +22,22 @@ import (
 	"utxo/protocol"
 )
 
-// This is a bounded closed-loop experiment, not a maximum-throughput claim.
-// Each worker has one outstanding payment and observes its own receipts.
+// The default preserves complete-lifecycle concurrency. -max-pending separates
+// the fast-receipt limit from bounded background observation.
 func benchDirect(args []string) error {
 	flags := flag.NewFlagSet("bench-v4", flag.ContinueOnError)
 	dir := flags.String("dir", "", "v3 laboratory")
 	start := flags.Int("start", 100, "unused genesis input index")
 	count := flags.Int("count", 128, "transactions")
-	concurrency := flags.Int("concurrency", 16, "outstanding payments")
+	concurrency := flags.Int("concurrency", 16, "concurrent fast receipts (complete lifecycles when max-pending is 0)")
+	maxPending := flags.Int("max-pending", 0, "total unfinished tasks; 0 keeps the original coupled worker pool")
 	rate := flags.Float64("rate", 0, "target sends per second (0: closed loop); backpressure is reported as dispatch lag")
 	trace := flags.Bool("trace", false, "include opt-in per-payment and block timing")
+	walletNoSync := flags.Bool("wallet-no-sync", false, "fresh experiment wallet without disk synchronization; no crash recovery")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if *start < 0 || *count < 1 || *count > 10000 || *concurrency < 1 || *concurrency > 256 || !(*rate >= 0) || *rate > 100000 {
+	if *start < 0 || *count < 1 || *count > 30000 || *concurrency < 1 || *concurrency > 256 || *maxPending < 0 || *maxPending > 30000 || (*maxPending > 0 && *maxPending < *concurrency) || !(*rate >= 0) || *rate > 100000 {
 		return protocol.ErrRule
 	}
 	var lab cfg.Lab
@@ -78,7 +80,11 @@ func benchDirect(args []string) error {
 	if *start+*count > len(inputs) {
 		return protocol.ErrRule
 	}
-	db, err := store.Open(filepath.Join(*dir, fmt.Sprintf("bench-v4-%d.db", *start)), store.Identity{Network: n.ChainID, Role: "bench", Node: fmt.Sprint(*start), Schema: 4})
+	openWallet := store.Open
+	if *walletNoSync {
+		openWallet = store.OpenNoSync
+	}
+	db, err := openWallet(filepath.Join(*dir, fmt.Sprintf("bench-v4-%d.db", *start)), store.Identity{Network: n.ChainID, Role: "bench", Node: fmt.Sprint(*start), Schema: 4})
 	if err != nil {
 		return err
 	}
@@ -126,141 +132,149 @@ func benchDirect(args []string) error {
 			return err
 		}
 	}
-	type sample struct {
-		DispatchLagMS                                                                                float64 `json:",omitempty"`
-		ScheduledUnixNS                                                                              int64   `json:",omitempty"`
-		Index                                                                                        int
-		SentUnixNS, CertificateReceivedUnixNS, FastUnixNS, BlockObservedUnixNS, MemberObservedUnixNS int64
-		Foreground                                                                                   []requesttrace.Event `json:",omitempty"`
-		FastMS, BlockObservedMS, MemberAppliedMS                                                     float64
-		Fact                                                                                         string
-		Error                                                                                        string `json:",omitempty"`
-	}
-	samples := make([]sample, *count)
+	samples := make([]directBenchSample, *count)
 	for i := range samples {
 		samples[i].Index = *start + i
 		samples[i].Error = "not dispatched"
+		samples[i].Outcome = "NOT_SENT"
 	}
 	httpClient := transport.NewHTTPClient(10 * time.Second)
 	public := transport.NewCommitteeClient(n.CommitteeURLs[0])
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	defer blockfollow.Start(ctx, cancel, group, public, trust, receiver.PrepareBlock)()
-	var wg sync.WaitGroup
+	var walletHeight atomic.Int64
+	defer blockfollow.Start(ctx, cancel, group, public, trust, receiver.PrepareBlock, walletHeight.Store)()
 	began := time.Now()
 	jobs := directBenchJobs(ctx, *count, *rate, began)
-	for worker := 0; worker < *concurrency; worker++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := range jobs {
-				samples[i].Index = *start + i
-				samples[i].Error = ""
-				var scheduled time.Time
-				if *rate > 0 {
-					scheduled = began.Add(time.Duration(float64(i) / (*rate) * float64(time.Second)))
-					samples[i].ScheduledUnixNS = scheduled.UnixNano()
-				}
-				run := func() error {
-					req, err := http.NewRequestWithContext(ctx, "POST", lab.Gateways[0]+"/v3/transactions", bytes.NewReader(encoded[i]))
-					if err != nil {
-						return err
-					}
-					req.Header.Set("Content-Type", transport.MediaType)
-					if *trace {
-						req.Header.Set(requesttrace.HeaderName, "1")
-					}
-					sent := time.Now()
-					samples[i].SentUnixNS = sent.UnixNano()
-					if !scheduled.IsZero() {
-						samples[i].DispatchLagMS = float64(sent.Sub(scheduled)) / float64(time.Millisecond)
-					}
-					resp, err := httpClient.Do(req)
-					if err != nil {
-						return err
-					}
-					raw, err := io.ReadAll(io.LimitReader(resp.Body, protocol.MaxCertificateBytes))
-					resp.Body.Close()
-					samples[i].CertificateReceivedUnixNS = time.Now().UnixNano()
-					if *trace {
-						traceCtx := requesttrace.Start(ctx, "wallet")
-						requesttrace.Import(traceCtx, resp.Header.Get(requesttrace.HeaderName), "")
-						samples[i].Foreground = requesttrace.Events(traceCtx)
-					}
-					if err != nil {
-						return err
-					}
-					if resp.StatusCode != 200 {
-						return fmt.Errorf("gateway %d: %s", resp.StatusCode, raw)
-					}
-					cert, err := protocol.DecodeOutputCertificate(raw)
-					if err != nil {
-						return err
-					}
-					if err = receiver.ReceiveDirect(requests[i].Tx.Body.Outputs[0], cert, 0); err != nil {
-						return err
-					}
-					samples[i].FastUnixNS = time.Now().UnixNano()
-					samples[i].FastMS = float64(time.Since(sent)) / float64(time.Millisecond)
-					samples[i].Fact = protocol.Hash(cert.QC.Fact).String()
-					ticker := time.NewTicker(25 * time.Millisecond)
-					defer ticker.Stop()
-					created := false
-					for {
+	waits := make([]directDispatchWait, *count)
+	pace := newDirectPacer(*rate)
+	runDirectBench(ctx, jobs, *concurrency, *maxPending, waits, func(i int, fastDone func()) {
+		defer func() { samples[i].TaskDoneUnixNS = time.Now().UnixNano() }()
+		samples[i].Index = *start + i
+		samples[i].Error = ""
+		var scheduled time.Time
+		if *rate > 0 {
+			scheduled = began.Add(time.Duration(float64(i) / (*rate) * float64(time.Second)))
+			samples[i].ScheduledUnixNS = scheduled.UnixNano()
+			samples[i].DispatchQueueMS = max(0, float64(waits[i].ReceivedAt.Sub(scheduled))/float64(time.Millisecond))
+		}
+		run := func() error {
+			req, err := http.NewRequestWithContext(ctx, "POST", lab.Gateways[0]+"/v3/transactions", bytes.NewReader(encoded[i]))
+			if err != nil {
+				return err
+			}
+			req.Header.Set("Content-Type", transport.MediaType)
+			if *trace {
+				req.Header.Set(requesttrace.HeaderName, "1")
+			}
+			pacingStart := time.Now()
+			if err := pace(ctx); err != nil {
+				return err
+			}
+			samples[i].PacingWaitMS = float64(time.Since(pacingStart)) / float64(time.Millisecond)
+			sent := time.Now()
+			samples[i].SentUnixNS = sent.UnixNano()
+			samples[i].Outcome = "UNKNOWN"
+			if !scheduled.IsZero() {
+				samples[i].DispatchLagMS = float64(sent.Sub(scheduled)) / float64(time.Millisecond)
+			}
+			resp, err := httpClient.Do(req)
+			if err != nil {
+				return err
+			}
+			raw, err := io.ReadAll(io.LimitReader(resp.Body, protocol.MaxCertificateBytes))
+			resp.Body.Close()
+			samples[i].CertificateReceivedUnixNS = time.Now().UnixNano()
+			if *trace {
+				traceCtx := requesttrace.Start(ctx, "wallet")
+				requesttrace.Import(traceCtx, resp.Header.Get(requesttrace.HeaderName), "")
+				samples[i].Foreground = requesttrace.Events(traceCtx)
+			}
+			if err != nil {
+				return err
+			}
+			if resp.StatusCode != 200 {
+				return fmt.Errorf("gateway %d: %s", resp.StatusCode, raw)
+			}
+			cert, err := protocol.DecodeOutputCertificate(raw)
+			if err != nil {
+				return err
+			}
+			if err = receiver.ReceiveDirect(requests[i].Tx.Body.Outputs[0], cert, 0); err != nil {
+				return err
+			}
+			samples[i].FastUnixNS = time.Now().UnixNano()
+			samples[i].FastMS = float64(time.Since(sent)) / float64(time.Millisecond)
+			samples[i].Fact = protocol.Hash(cert.QC.Fact).String()
+			fastDone()
+			ticker := time.NewTicker(25 * time.Millisecond)
+			defer ticker.Stop()
+			created := false
+			var finalCheck finalObservation
+			var memberCheck memberObservation
+			for {
 
-						if !created {
-							ok, err := receiver.DirectFinal(cert.Summary.OutputID(0), 0)
-							if err != nil {
-								return err
-							}
-							if ok {
-								created = true
-								samples[i].BlockObservedUnixNS = time.Now().UnixNano()
-								samples[i].BlockObservedMS = float64(time.Since(sent)) / float64(time.Millisecond)
-							}
-						}
-						if created {
-							complete := true
-							for _, url := range n.Members[org.Org] {
-								r, err := http.NewRequestWithContext(ctx, "GET", url+"/v4/progress/"+protocol.Hash(cert.QC.Fact).String(), nil)
-								if err != nil {
-									return err
-								}
-								response, err := httpClient.Do(r)
-								if err != nil {
-									complete = false
-									break
-								}
-								var status member.DirectStatus
-								err = json.NewDecoder(response.Body).Decode(&status)
-								response.Body.Close()
-								if err != nil || response.StatusCode != 200 || !status.Observed || status.Signed && !status.Closed {
-									complete = false
-									break
-								}
-							}
-							if complete {
-								samples[i].MemberObservedUnixNS = time.Now().UnixNano()
-								samples[i].MemberAppliedMS = float64(time.Since(sent)) / float64(time.Millisecond)
-								return nil
-							}
-						}
-
-						select {
-						case <-ctx.Done():
-							return ctx.Err()
-						case <-ticker.C:
-						}
+				if !created {
+					ok, err := finalCheck.Check(walletHeight.Load(), func() (bool, error) {
+						samples[i].WalletQueries++
+						return receiver.DirectFinal(cert.Summary.OutputID(0), 0)
+					})
+					if err != nil {
+						return err
+					}
+					if ok {
+						created = true
+						samples[i].BlockObservedUnixNS = time.Now().UnixNano()
+						samples[i].BlockObservedMS = float64(time.Since(sent)) / float64(time.Millisecond)
 					}
 				}
-				if err := run(); err != nil {
-					samples[i].Error = err.Error()
+				if created {
+					urls := n.Members[org.Org]
+					complete, err := memberCheck.Check(len(urls), func(index int) (bool, error) {
+						r, err := http.NewRequestWithContext(ctx, "GET", urls[index]+"/v4/progress/"+protocol.Hash(cert.QC.Fact).String(), nil)
+						if err != nil {
+							return false, err
+						}
+						queryStart := time.Now()
+						samples[i].ProgressRequests++
+						response, err := httpClient.Do(r)
+						if err != nil {
+							samples[i].recordProgressQuery(queryStart, false)
+							return false, nil
+						}
+						var status member.DirectStatus
+						err = json.NewDecoder(response.Body).Decode(&status)
+						response.Body.Close()
+						samples[i].recordProgressQuery(queryStart, err == nil && response.StatusCode == 200)
+						return err == nil && response.StatusCode == 200 && status.Observed && (!status.Signed || status.Closed), nil
+					})
+					if err != nil {
+						return err
+					}
+					if complete {
+						samples[i].MemberObservedUnixNS = time.Now().UnixNano()
+						samples[i].MemberAppliedMS = float64(time.Since(sent)) / float64(time.Millisecond)
+						samples[i].Outcome = "COMPLETE"
+						return nil
+					}
+				}
+
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-ticker.C:
 				}
 			}
-		}()
-	}
-	wg.Wait()
-	elapsed := time.Since(began)
+		}
+		if err := run(); err != nil {
+			samples[i].Error = err.Error()
+			if *maxPending > 0 {
+				cancel()
+			} // Stop adding load after an uncertain outcome.
+		}
+	})
+	finished := time.Now()
+	elapsed := finished.Sub(began)
 	fast := []float64{}
 	proof := []float64{}
 	credit := []float64{}
@@ -268,11 +282,16 @@ func benchDirect(args []string) error {
 	for _, s := range samples {
 		if s.Error != "" {
 			failed++
-			continue
 		}
-		fast = append(fast, s.FastMS)
-		proof = append(proof, s.BlockObservedMS)
-		credit = append(credit, s.MemberAppliedMS)
+		if s.FastUnixNS != 0 {
+			fast = append(fast, s.FastMS)
+		}
+		if s.BlockObservedUnixNS != 0 {
+			proof = append(proof, s.BlockObservedMS)
+		}
+		if s.MemberObservedUnixNS != 0 {
+			credit = append(credit, s.MemberAppliedMS)
+		}
 	}
 	quantile := func(xs []float64, q float64) float64 {
 		if len(xs) == 0 {
@@ -283,6 +302,7 @@ func benchDirect(args []string) error {
 	}
 	summary := map[string]any{"timing_origin": "wallet_http_submit_v4", "workload": "closed_loop_final_utxo_cross_org", "count": *count, "concurrency": *concurrency, "failed": failed, "elapsed_s": elapsed.Seconds(), "completed_per_second": float64(*count-failed) / elapsed.Seconds(), "fast_p50_ms": quantile(fast, .5), "fast_p95_ms": quantile(fast, .95), "block_observed_p50_ms": quantile(proof, .5), "member_applied_p50_ms": quantile(credit, .5), "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested."}
 	summary["trace"] = *trace
+	summary["wallet_no_sync"] = *walletNoSync
 	if *rate > 0 {
 		summary["workload"] = "paced_final_utxo_cross_org"
 		summary["target_send_rate"] = *rate
@@ -294,17 +314,38 @@ func benchDirect(args []string) error {
 		}
 		summary["dispatch_lag_p50_ms"], summary["dispatch_lag_p95_ms"] = quantile(lag, .5), quantile(lag, .95)
 	}
+	if *maxPending > 0 {
+		summary["workload"] = "bounded_fast_receipt_with_independent_observation"
+	}
+	summary["max_pending"] = *maxPending
+	summary["pending_limit"] = *concurrency
+	if *maxPending > 0 {
+		summary["pending_limit"] = *maxPending
+	}
+	for i := range samples {
+		samples[i].Dispatch = waits[i]
+		if *rate > 0 && samples[i].ScheduledUnixNS == 0 {
+			samples[i].ScheduledUnixNS = began.Add(time.Duration(float64(i) / (*rate) * float64(time.Second))).UnixNano()
+		}
+		if *rate > 0 && !waits[i].ReceivedAt.IsZero() {
+			due := began.Add(time.Duration(float64(i) / (*rate) * float64(time.Second)))
+			samples[i].DispatchQueueMS = max(0, float64(waits[i].ReceivedAt.Sub(due))/float64(time.Millisecond))
+		}
+	}
+	queue := directQueueTimeline(samples, began, finished)
+	addDirectBenchMetrics(summary, samples, queue, elapsed)
 	summary["started_unix_ns"] = began.UnixNano()
-	summary["finished_unix_ns"] = began.Add(elapsed).UnixNano()
+	summary["finished_unix_ns"] = finished.UnixNano()
 	var timeline []requesttrace.ConsensusEvent
 	if *trace {
 		timeline = requesttrace.Consensus.Snapshot()
 	}
 	report := struct {
 		Summary  map[string]any
-		Samples  []sample
+		Samples  []directBenchSample
 		Timeline []requesttrace.ConsensusEvent `json:",omitempty"`
-	}{summary, samples, timeline}
+		Queue    []directQueueSample
+	}{summary, samples, timeline, queue}
 	path := filepath.Join(*dir, "reports", fmt.Sprintf("bench-v4-%d.json", *start))
 	if err = cfg.Write(path, report); err != nil {
 		return err
