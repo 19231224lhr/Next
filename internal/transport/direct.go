@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"utxo/internal/member"
 	"utxo/internal/requesttrace"
@@ -10,6 +11,29 @@ import (
 )
 
 func addDirectHandlers(mux *http.ServeMux, m *member.Member, fg, bg chan struct{}, wrap func(chan struct{}, http.HandlerFunc) http.HandlerFunc) {
+	mux.HandleFunc("POST /v4/progress", wrap(bg, func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Content-Type") != "application/json" {
+			fail(w, protocol.ErrEncoding)
+			return
+		}
+		var facts []protocol.SpendFactID
+		d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+		if err := d.Decode(&facts); err != nil {
+			fail(w, err)
+			return
+		}
+		if err := d.Decode(new(any)); err != io.EOF {
+			fail(w, protocol.ErrEncoding)
+			return
+		}
+		statuses, err := m.DirectStatuses(facts)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(statuses)
+	}))
 	mux.HandleFunc("POST /v3/transactions", wrap(fg, func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if r.Header.Get(requesttrace.HeaderName) == "1" {

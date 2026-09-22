@@ -56,10 +56,14 @@ func (d ReceiveDescriptor) Verify(network Hash) error {
 	if d.Wire != WireVersion || d.Network != network || d.Route.Validate() != nil {
 		return ErrRule
 	}
+	if verifiedReceiveDescriptors.Contains(d) {
+		return nil
+	}
 	h := d.digest()
 	if !ed25519.Verify(d.Owner[:], h[:], d.Signature[:]) {
 		return ErrAuth
 	}
+	verifiedReceiveDescriptors.Add(d, struct{}{})
 	return nil
 }
 func (d ReceiveDescriptor) encode(e *Encoder) {

@@ -141,6 +141,13 @@ func run() (result error) {
 		}
 		cc.Consensus.PeerGossipSleepDuration = d
 	}
+	if value := os.Getenv("UTXO_EXPERIMENT_COMMIT"); value != "" {
+		d, err := time.ParseDuration(value)
+		if err != nil || d <= 0 {
+			return fmt.Errorf("invalid UTXO_EXPERIMENT_COMMIT")
+		}
+		cc.Consensus.TimeoutCommit = d
+	}
 	requesttrace.Consensus.Mark("configuration", "flush", cc.P2P.FlushThrottleTimeout, "gossip", cc.Consensus.PeerGossipSleepDuration, "commit", cc.Consensus.TimeoutCommit, "send_rate", cc.P2P.SendRate, "recv_rate", cc.P2P.RecvRate)
 	cc.StateSync.Enable = false
 	requesttrace.EnableCometProfile()

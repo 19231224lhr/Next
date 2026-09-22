@@ -33,6 +33,8 @@ func benchDirect(args []string) error {
 	maxPending := flags.Int("max-pending", 0, "total unfinished tasks; 0 keeps the original coupled worker pool")
 	rate := flags.Float64("rate", 0, "target sends per second (0: closed loop); backpressure is reported as dispatch lag")
 	trace := flags.Bool("trace", false, "include opt-in per-payment and block timing")
+	sameOrg := flags.Bool("same-org", false, "recipient uses the issuing organization")
+	batchProgress := flags.Bool("batch-progress", true, "batch exact member status reads; does not infer completion from height")
 	walletNoSync := flags.Bool("wallet-no-sync", false, "fresh experiment wallet without disk synchronization; no crash recovery")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -68,7 +70,11 @@ func benchDirect(args []string) error {
 		return err
 	}
 	org := n.Organizations[0]
-	target := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: n.Organizations[1].Org}, recipient)
+	targetOrg := n.Organizations[1].Org
+	if *sameOrg {
+		targetOrg = org.Org
+	}
+	target := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: targetOrg}, recipient)
 	var publicOwner protocol.PublicKey
 	copy(publicOwner[:], owner[32:])
 	var inputs []int
@@ -142,6 +148,21 @@ func benchDirect(args []string) error {
 	public := transport.NewCommitteeClient(n.CommitteeURLs[0])
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
+	var progressBatches []*progressBatcher
+	if *batchProgress {
+		batchCtx, stopBatches := context.WithCancel(ctx)
+		for _, url := range n.Members[org.Org] {
+			progressBatches = append(progressBatches, newProgressBatcher(batchCtx, max(*maxPending, *concurrency), func(ctx context.Context, facts []protocol.SpendFactID) ([]member.DirectStatus, error) {
+				return loadProgressBatch(ctx, httpClient, url, facts)
+			}))
+		}
+		defer func() {
+			stopBatches()
+			for _, b := range progressBatches {
+				<-b.done
+			}
+		}()
+	}
 	var walletHeight atomic.Int64
 	defer blockfollow.Start(ctx, cancel, group, public, trust, receiver.PrepareBlock, walletHeight.Store)()
 	began := time.Now()
@@ -231,6 +252,13 @@ func benchDirect(args []string) error {
 				if created {
 					urls := n.Members[org.Org]
 					complete, err := memberCheck.Check(len(urls), func(index int) (bool, error) {
+						if *batchProgress {
+							started := time.Now()
+							samples[i].ProgressRequests++
+							status, err := progressBatches[index].Check(ctx, cert.QC.Fact)
+							samples[i].recordProgressQuery(started, err == nil)
+							return err == nil && status.Observed && (!status.Signed || status.Closed), nil
+						}
 						r, err := http.NewRequestWithContext(ctx, "GET", urls[index]+"/v4/progress/"+protocol.Hash(cert.QC.Fact).String(), nil)
 						if err != nil {
 							return false, err
@@ -300,11 +328,33 @@ func benchDirect(args []string) error {
 		sort.Float64s(xs)
 		return xs[int(float64(len(xs)-1)*q)]
 	}
-	summary := map[string]any{"timing_origin": "wallet_http_submit_v4", "workload": "closed_loop_final_utxo_cross_org", "count": *count, "concurrency": *concurrency, "failed": failed, "elapsed_s": elapsed.Seconds(), "completed_per_second": float64(*count-failed) / elapsed.Seconds(), "fast_p50_ms": quantile(fast, .5), "fast_p95_ms": quantile(fast, .95), "block_observed_p50_ms": quantile(proof, .5), "member_applied_p50_ms": quantile(credit, .5), "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested."}
+	orgMode := "cross_org"
+	if *sameOrg {
+		orgMode = "same_org"
+	}
+	summary := map[string]any{"timing_origin": "wallet_http_submit_v4", "workload": "closed_loop_final_utxo_" + orgMode, "count": *count, "concurrency": *concurrency, "failed": failed, "elapsed_s": elapsed.Seconds(), "completed_per_second": float64(*count-failed) / elapsed.Seconds(), "fast_p50_ms": quantile(fast, .5), "fast_p95_ms": quantile(fast, .95), "block_observed_p50_ms": quantile(proof, .5), "member_applied_p50_ms": quantile(credit, .5), "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested."}
+	summary["batch_progress"] = *batchProgress
+	if *batchProgress {
+		var requests, failures, facts, httpNS, queueNS uint64
+		for _, b := range progressBatches {
+			requests += b.requests.Load()
+			failures += b.failures.Load()
+			facts += b.facts.Load()
+			httpNS += b.httpNS.Load()
+			queueNS += b.queueNS.Load()
+		}
+		summary["progress_batch_http_requests"] = requests
+		summary["progress_batch_http_errors"] = failures
+		summary["progress_batch_facts"] = facts
+		summary["progress_batch_http_total_ms"] = float64(httpNS) / 1e6
+		summary["progress_batch_queue_total_ms"] = float64(queueNS) / 1e6
+		summary["progress_metric_note"] = "progress_requests counts logical fact checks; progress_http durations include batch queue wait. Actual batch HTTP requests/errors are separate."
+	}
+	summary["same_org"] = *sameOrg
 	summary["trace"] = *trace
 	summary["wallet_no_sync"] = *walletNoSync
 	if *rate > 0 {
-		summary["workload"] = "paced_final_utxo_cross_org"
+		summary["workload"] = "paced_final_utxo_" + orgMode
 		summary["target_send_rate"] = *rate
 		lag := make([]float64, 0, len(samples))
 		for _, s := range samples {
