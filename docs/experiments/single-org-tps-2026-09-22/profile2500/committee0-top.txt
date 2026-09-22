@@ -1,0 +1,68 @@
+File: committee
+Type: cpu
+Time: 2026-09-22 18:25:30 CST
+Duration: 12.15s, Total samples = 18.97s (156.07%)
+Showing nodes accounting for 16.56s, 87.30% of 18.97s total
+Dropped 542 nodes (cum <= 0.09s)
+Showing top 60 nodes out of 250
+      flat  flat%   sum%        cum   cum%
+     9.13s 48.13% 48.13%      9.13s 48.13%  syscall.rawsyscalln
+     1.35s  7.12% 55.25%      1.36s  7.17%  runtime.pthread_cond_signal
+     1.27s  6.69% 61.94%      1.27s  6.69%  runtime.usleep
+     1.16s  6.11% 68.05%      1.16s  6.11%  runtime.madvise
+     0.70s  3.69% 71.74%      0.70s  3.69%  runtime.kevent
+     0.48s  2.53% 74.28%      0.48s  2.53%  runtime.pthread_cond_wait
+     0.27s  1.42% 75.70%      0.27s  1.42%  crypto/internal/fips140/sha3.keccakF1600NEON
+     0.24s  1.27% 76.96%      0.24s  1.27%  crypto/internal/fips140/sha256.blockSHA2
+     0.23s  1.21% 78.18%      0.23s  1.21%  runtime.pthread_kill
+     0.20s  1.05% 79.23%      0.20s  1.05%  crypto/internal/fips140/edwards25519/field.addMul19 (inline)
+     0.18s  0.95% 80.18%      0.18s  0.95%  crypto/internal/fips140/edwards25519/field.addMul (inline)
+     0.18s  0.95% 81.13%      0.18s  0.95%  runtime.memclrNoHeapPointers
+     0.17s   0.9% 82.02%      0.17s   0.9%  runtime.memmove
+     0.16s  0.84% 82.87%      0.23s  1.21%  runtime.tryDeferToSpanScan
+     0.12s  0.63% 83.50%      0.16s  0.84%  reflect.StructTag.Lookup
+     0.10s  0.53% 84.03%      0.40s  2.11%  runtime.scanObject
+     0.09s  0.47% 84.50%      0.42s  2.21%  crypto/internal/fips140/edwards25519/field.feMulGeneric
+     0.08s  0.42% 84.92%      0.19s  1.00%  crypto/internal/fips140/edwards25519/field.feSquare
+     0.08s  0.42% 85.35%      0.62s  3.27%  runtime.mallocgc
+     0.05s  0.26% 85.61%      0.10s  0.53%  crypto/internal/fips140/edwards25519/field.feSquareN
+     0.03s  0.16% 85.77%      0.11s  0.58%  encoding/json/v2.makeStructArshaler.func2
+     0.03s  0.16% 85.93%      0.43s  2.27%  runtime.growslice
+     0.02s  0.11% 86.03%      0.71s  3.74%  crypto/internal/fips140/edwards25519.(*Point).VarTimeDoubleScalarBaseMult
+     0.02s  0.11% 86.14%      0.17s   0.9%  encoding/json/jsontext.(*decoderState).consumeValue
+     0.02s  0.11% 86.24%      0.20s  1.05%  encoding/json/v2.makeStructArshaler.func3
+     0.02s  0.11% 86.35%      0.13s  0.69%  runtime.(*mheap).initSpan
+     0.01s 0.053% 86.40%      0.10s  0.53%  crypto/internal/fips140/edwards25519.(*Point).fromP1xP1
+     0.01s 0.053% 86.45%      0.21s  1.11%  crypto/internal/fips140/edwards25519.(*projP1xP1).Double
+     0.01s 0.053% 86.51%      0.11s  0.58%  encoding/json/v2.makeUintArshaler.func2
+     0.01s 0.053% 86.56%      0.34s  1.79%  encoding/json/v2.unmarshalDecode
+     0.01s 0.053% 86.61%      0.16s  0.84%  github.com/cosmos/gogoproto/jsonpb.(*Marshaler).marshalField
+     0.01s 0.053% 86.66%      0.14s  0.74%  github.com/cosmos/gogoproto/jsonpb.checkRequiredFields
+     0.01s 0.053% 86.72%      0.33s  1.74%  runtime.(*mcache).refill
+     0.01s 0.053% 86.77%      2.05s 10.81%  runtime.(*mheap).allocSpan
+     0.01s 0.053% 86.82%      0.22s  1.16%  runtime.(*sweepLocked).sweep
+     0.01s 0.053% 86.87%      1.21s  6.38%  runtime.lock2
+     0.01s 0.053% 86.93%      0.12s  0.63%  runtime.newMarkBits
+     0.01s 0.053% 86.98%      4.65s 24.51%  runtime.systemstack
+     0.01s 0.053% 87.03%      9.14s 48.18%  syscall.syscalln
+     0.01s 0.053% 87.08%      1.18s  6.22%  utxo/internal/committee.(*App).FinalizeBlock
+     0.01s 0.053% 87.14%      1.26s  6.64%  utxo/internal/committee.(*Engine).verifyV3
+     0.01s 0.053% 87.19%      0.20s  1.05%  utxo/protocol.(*Encoder).Fixed (inline)
+     0.01s 0.053% 87.24%      0.18s  0.95%  utxo/protocol.Digest
+     0.01s 0.053% 87.30%      0.14s  0.74%  utxo/protocol.FastTx.MarshalBinary
+         0     0% 87.30%      1.10s  5.80%  _.goready.func1
+         0     0% 87.30%      5.62s 29.63%  bufio.(*Reader).Read
+         0     0% 87.30%      3.19s 16.82%  bufio.(*Writer).Flush
+         0     0% 87.30%      1.57s  8.28%  bufio.(*Writer).Write
+         0     0% 87.30%      0.22s  1.16%  bytes.Clone (inline)
+         0     0% 87.30%      0.85s  4.48%  crypto/ed25519.Verify (inline)
+         0     0% 87.30%      0.85s  4.48%  crypto/ed25519.VerifyWithOptions
+         0     0% 87.30%      0.78s  4.11%  crypto/internal/fips140/ed25519.Verify (inline)
+         0     0% 87.30%      0.78s  4.11%  crypto/internal/fips140/ed25519.verify
+         0     0% 87.30%      0.78s  4.11%  crypto/internal/fips140/ed25519.verifyWithDom
+         0     0% 87.30%      0.24s  1.27%  crypto/internal/fips140/edwards25519.(*projP2).FromP1xP1
+         0     0% 87.30%      0.42s  2.21%  crypto/internal/fips140/edwards25519/field.(*Element).Multiply (inline)
+         0     0% 87.30%      0.19s  1.00%  crypto/internal/fips140/edwards25519/field.(*Element).Square (inline)
+         0     0% 87.30%      0.10s  0.53%  crypto/internal/fips140/edwards25519/field.(*Element).SquareN (inline)
+         0     0% 87.30%      0.42s  2.21%  crypto/internal/fips140/edwards25519/field.feMul (inline)
+         0     0% 87.30%      0.24s  1.27%  crypto/internal/fips140/sha256.(*Digest).Write

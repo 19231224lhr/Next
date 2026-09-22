@@ -1,0 +1,26 @@
+File: member-real
+Type: cpu
+Time: 2026-09-22 17:55:28 CST
+Duration: 12.16s, Total samples = 17.72s (145.70%)
+Showing nodes accounting for 6.17s, 34.82% of 17.72s total
+Dropped 363 nodes (cum <= 0.09s)
+Showing top 18 nodes out of 218
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%      8.36s 47.18%  net/http.(*conn).serve
+     6.15s 34.71% 34.71%      6.15s 34.71%  syscall.rawsyscalln
+         0     0% 34.71%      6.15s 34.71%  syscall.syscall
+         0     0% 34.71%      6.15s 34.71%  syscall.syscalln
+         0     0% 34.71%      6.13s 34.59%  internal/poll.ignoringEINTRIO (inline)
+     0.01s 0.056% 34.76%      5.13s 28.95%  bufio.(*Writer).Flush
+         0     0% 34.76%      5.10s 28.78%  internal/poll.(*FD).Write
+         0     0% 34.76%      5.10s 28.78%  net.(*conn).Write
+         0     0% 34.76%      5.10s 28.78%  net.(*netFD).Write
+         0     0% 34.76%      5.10s 28.78%  syscall.Write (inline)
+         0     0% 34.76%      5.10s 28.78%  syscall.write
+         0     0% 34.76%      5.04s 28.44%  net/http.checkConnErrorWriter.Write
+         0     0% 34.76%      4.96s 27.99%  net/http.(*response).finishRequest
+         0     0% 34.76%      3.73s 21.05%  crypto/ed25519.Verify (inline)
+         0     0% 34.76%      3.73s 21.05%  crypto/ed25519.VerifyWithOptions
+     0.01s 0.056% 34.82%      3.68s 20.77%  runtime.systemstack
+         0     0% 34.82%      3.47s 19.58%  crypto/internal/fips140/ed25519.Verify (inline)
+         0     0% 34.82%      3.47s 19.58%  crypto/internal/fips140/ed25519.verify

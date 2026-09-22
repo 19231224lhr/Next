@@ -1,0 +1,68 @@
+File: gateway
+Type: cpu
+Time: 2026-09-22 18:25:30 CST
+Duration: 12.14s, Total samples = 37.88s (311.95%)
+Showing nodes accounting for 35.08s, 92.61% of 37.88s total
+Dropped 523 nodes (cum <= 0.19s)
+Showing top 60 nodes out of 199
+      flat  flat%   sum%        cum   cum%
+    23.13s 61.06% 61.06%     23.13s 61.06%  syscall.rawsyscalln
+     3.03s  8.00% 69.06%      3.03s  8.00%  runtime.madvise
+     1.99s  5.25% 74.31%      1.99s  5.25%  runtime.usleep
+     1.51s  3.99% 78.30%      1.51s  3.99%  runtime.kevent
+     1.03s  2.72% 81.02%      1.03s  2.72%  runtime.pthread_cond_wait
+     0.77s  2.03% 83.05%      0.78s  2.06%  crypto/internal/fips140/edwards25519/field.addMul (inline)
+     0.74s  1.95% 85.01%      0.74s  1.95%  runtime.pthread_cond_signal
+     0.63s  1.66% 86.67%      0.66s  1.74%  crypto/internal/fips140/edwards25519/field.addMul19 (inline)
+     0.49s  1.29% 87.96%      0.49s  1.29%  runtime.pthread_kill
+     0.22s  0.58% 88.54%      0.29s  0.77%  crypto/internal/fips140/edwards25519/field.(*Element).carryPropagate (inline)
+     0.20s  0.53% 89.07%      1.46s  3.85%  crypto/internal/fips140/edwards25519/field.feMulGeneric
+     0.20s  0.53% 89.60%      0.20s  0.53%  crypto/internal/fips140/edwards25519/field.mul (inline)
+     0.19s   0.5% 90.10%      0.76s  2.01%  crypto/internal/fips140/edwards25519/field.feSquare
+     0.18s  0.48% 90.58%      0.32s  0.84%  crypto/internal/fips140/edwards25519/field.feSquareN
+     0.17s  0.45% 91.02%      0.21s  0.55%  runtime.tryDeferToSpanScan
+     0.08s  0.21% 91.24%      0.32s  0.84%  runtime.scanObject
+     0.06s  0.16% 91.39%      2.77s  7.31%  crypto/internal/fips140/edwards25519.(*Point).VarTimeDoubleScalarBaseMult
+     0.06s  0.16% 91.55%      0.22s  0.58%  crypto/internal/fips140/edwards25519/field.(*Element).Subtract
+     0.06s  0.16% 91.71%      0.23s  0.61%  runtime.unlock2
+     0.04s  0.11% 91.82%      1.04s  2.75%  crypto/internal/fips140/edwards25519.(*projP1xP1).Double
+     0.04s  0.11% 91.92%      0.39s  1.03%  runtime.growslice
+     0.04s  0.11% 92.03%      0.30s  0.79%  utxo/protocol.(*Encoder).Fixed (inline)
+     0.02s 0.053% 92.08%      0.22s  0.58%  encoding/json/jsontext.(*decoderState).consumeValue
+     0.02s 0.053% 92.13%      0.29s  0.77%  runtime.(*mcache).refill
+     0.02s 0.053% 92.19%      0.95s  2.51%  utxo/protocol.decodeDirectSubmission
+     0.01s 0.026% 92.21%      0.20s  0.53%  crypto/internal/fips140/edwards25519.(*projP1xP1).Add
+     0.01s 0.026% 92.24%      1.47s  3.88%  crypto/internal/fips140/edwards25519/field.(*Element).Multiply (inline)
+     0.01s 0.026% 92.27%      0.45s  1.19%  net/http.(*connReader).backgroundRead
+     0.01s 0.026% 92.29%      0.31s  0.82%  runtime.(*mcache).nextFree
+     0.01s 0.026% 92.32%      0.22s  0.58%  runtime.(*mcentral).cacheSpan
+     0.01s 0.026% 92.34%      0.21s  0.55%  runtime.(*sweepLocked).sweep
+     0.01s 0.026% 92.37%      3.04s  8.03%  runtime.findRunnable
+     0.01s 0.026% 92.40%      1.78s  4.70%  runtime.lock (partial-inline)
+     0.01s 0.026% 92.42%      1.78s  4.70%  runtime.lock2
+     0.01s 0.026% 92.45%      0.57s  1.50%  runtime.mallocgc
+     0.01s 0.026% 92.48%      0.62s  1.64%  runtime.runqsteal
+     0.01s 0.026% 92.50%      0.64s  1.69%  runtime.stealWork
+     0.01s 0.026% 92.53%      0.53s  1.40%  runtime.wakep
+     0.01s 0.026% 92.56%         2s  5.28%  utxo/internal/gateway.(*Relay).runDirectTask
+     0.01s 0.026% 92.58%      0.20s  0.53%  utxo/protocol.Digest
+     0.01s 0.026% 92.61%      0.71s  1.87%  utxo/protocol.FastTx.MarshalBinary
+         0     0% 92.61%      0.40s  1.06%  _.goready.func1
+         0     0% 92.61%      5.97s 15.76%  bufio.(*Reader).Peek
+         0     0% 92.61%      5.97s 15.76%  bufio.(*Reader).fill
+         0     0% 92.61%     14.99s 39.57%  bufio.(*Writer).Flush
+         0     0% 92.61%      3.20s  8.45%  crypto/ed25519.Verify (inline)
+         0     0% 92.61%      3.20s  8.45%  crypto/ed25519.VerifyWithOptions
+         0     0% 92.61%      3.03s  8.00%  crypto/internal/fips140/ed25519.Verify (inline)
+         0     0% 92.61%      3.03s  8.00%  crypto/internal/fips140/ed25519.verify
+         0     0% 92.61%      3.03s  8.00%  crypto/internal/fips140/ed25519.verifyWithDom
+         0     0% 92.61%      0.22s  0.58%  crypto/internal/fips140/edwards25519.(*Point).Bytes (inline)
+         0     0% 92.61%      0.22s  0.58%  crypto/internal/fips140/edwards25519.(*Point).bytes
+         0     0% 92.61%      0.34s   0.9%  crypto/internal/fips140/edwards25519.(*Point).fromP1xP1
+         0     0% 92.61%      0.69s  1.82%  crypto/internal/fips140/edwards25519.(*projP2).FromP1xP1
+         0     0% 92.61%      0.22s  0.58%  crypto/internal/fips140/edwards25519/field.(*Element).Invert
+         0     0% 92.61%      0.76s  2.01%  crypto/internal/fips140/edwards25519/field.(*Element).Square (inline)
+         0     0% 92.61%      0.32s  0.84%  crypto/internal/fips140/edwards25519/field.(*Element).SquareN (inline)
+         0     0% 92.61%      1.46s  3.85%  crypto/internal/fips140/edwards25519/field.feMul (inline)
+         0     0% 92.61%      0.36s  0.95%  encoding/json.Unmarshal (inline)
+         0     0% 92.61%      0.36s  0.95%  encoding/json/v2.Unmarshal

@@ -1,0 +1,776 @@
+{
+  "summary": {
+    "batch_progress": true,
+    "block_observed_p50_ms": 2138.704209,
+    "completed_per_second": 1314.5322163912429,
+    "concurrency": 256,
+    "count": 49500,
+    "dispatch_delivery_wait_p95_ms": 2512.286043,
+    "dispatch_lag_p50_ms": 945.755334,
+    "dispatch_lag_p95_ms": 2663.065376,
+    "elapsed_s": 37.655980875,
+    "failed": 0,
+    "fast_completed": 49500,
+    "fast_p50_ms": 5.202375,
+    "fast_p95_ms": 89.247584,
+    "final_unfinished": 0,
+    "finished_unix_ns": 1790070813943684000,
+    "max_pending": 4096,
+    "member_applied_p50_ms": 2286.511459,
+    "member_completed": 49500,
+    "not_sent": 0,
+    "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.",
+    "pending_limit": 4096,
+    "progress_batch_facts": 247770,
+    "progress_batch_http_errors": 0,
+    "progress_batch_http_requests": 2103,
+    "progress_errors": 0,
+    "progress_http_max_ms": 183.25625,
+    "progress_http_mean_ms": 28.128978211982865,
+    "progress_metric_note": "progress_requests counts logical fact checks; progress_http durations include batch queue wait. Actual batch HTTP requests/errors are separate.",
+    "progress_requests": 247770,
+    "progress_requests_per_second": 6579.831257681984,
+    "sampled_oldest_unfinished_max_ms": 5076.023,
+    "sampled_peak_unfinished": 4096,
+    "send_limit_hits": 28041,
+    "send_pacing_wait_p95_ms": 183.212292,
+    "send_permit_wait_p95_ms": 1.64225,
+    "started_unix_ns": 1790070776276490000,
+    "target_send_rate": 1500,
+    "timing_origin": "wallet_http_submit_v4",
+    "total_limit_hits": 1701,
+    "total_permit_wait_p95_ms": 0.00025,
+    "trace": true,
+    "unknown": 0,
+    "wallet_block_observed": 49500,
+    "wallet_no_sync": true,
+    "wallet_queries": 253139,
+    "workload": "bounded_fast_receipt_with_independent_observation"
+  },
+  "send_span_s": 35.809009,
+  "actual_send_tps": 1382.3057767390321,
+  "successful_executions": 49500,
+  "failed_executions": 0,
+  "committee_equal": true,
+  "outbox_pending": 0,
+  "errors": {},
+  "all_stages_ms": {
+    "send_to_response": {
+      "n": 49500,
+      "mean": 16.72846878787879,
+      "p50": 4.591,
+      "p95": 80.87,
+      "p99": 112.916,
+      "max": 212.978,
+      "negative": 0
+    },
+    "wallet_verify_save": {
+      "n": 49500,
+      "mean": 2.324512484848485,
+      "p50": 0.201,
+      "p95": 4.739,
+      "p99": 70.85,
+      "max": 178.723,
+      "negative": 0
+    },
+    "send_to_fast": {
+      "n": 49500,
+      "mean": 19.052981272727273,
+      "p50": 5.203,
+      "p95": 89.257,
+      "p99": 125.0,
+      "max": 321.651,
+      "negative": 0
+    },
+    "fast_to_wallet_block": {
+      "n": 49500,
+      "mean": 2333.3090757777777,
+      "p50": 2127.517,
+      "p95": 4054.324,
+      "p99": 4429.728,
+      "max": 4980.823,
+      "negative": 0
+    },
+    "send_to_wallet_block": {
+      "n": 49500,
+      "mean": 2352.362057050505,
+      "p50": 2139.42,
+      "p95": 4066.258,
+      "p99": 4457.038,
+      "max": 4987.176,
+      "negative": 0
+    },
+    "wallet_block_to_members": {
+      "n": 49500,
+      "mean": 148.74411551515152,
+      "p50": 144.34,
+      "p95": 263.287,
+      "p99": 314.984,
+      "max": 335.052,
+      "negative": 0
+    },
+    "send_to_member_completion": {
+      "n": 49500,
+      "mean": 2501.1061725656564,
+      "p50": 2287.828,
+      "p95": 4216.697,
+      "p99": 4615.616,
+      "max": 5228.136,
+      "negative": 0
+    }
+  },
+  "trace_coverage": {
+    "expected": 495,
+    "received": 495,
+    "three_selected_complete": 495,
+    "event_counts": {
+      "107": 1,
+      "99": 58,
+      "86": 178,
+      "87": 13,
+      "82": 3,
+      "101": 6,
+      "88": 114,
+      "98": 4,
+      "97": 12,
+      "90": 49,
+      "92": 20,
+      "91": 7,
+      "84": 4,
+      "94": 8,
+      "85": 5,
+      "95": 3,
+      "89": 4,
+      "100": 3,
+      "103": 1,
+      "80": 2
+    },
+    "selected_votes": 1485
+  },
+  "gateway_ms": {
+    "send_to_gateway": {
+      "n": 495,
+      "mean": 1.9495838383838384,
+      "p50": 0.403,
+      "p95": 8.765,
+      "p99": 28.426,
+      "max": 37.614,
+      "negative": 0
+    },
+    "gateway_decode": {
+      "n": 495,
+      "mean": 0.30224242424242426,
+      "p50": 0.123,
+      "p95": 0.532,
+      "p99": 2.296,
+      "max": 17.506,
+      "negative": 0
+    },
+    "gateway_authorize": {
+      "n": 495,
+      "mean": 0.16694343434343434,
+      "p50": 0.089,
+      "p95": 0.301,
+      "p99": 1.111,
+      "max": 7.033,
+      "negative": 0
+    },
+    "gateway_pre_fanout": {
+      "n": 495,
+      "mean": 0.4824,
+      "p50": 0.217,
+      "p95": 1.025,
+      "p99": 3.903,
+      "max": 22.042,
+      "negative": 0
+    },
+    "fanout_to_quorum": {
+      "n": 495,
+      "mean": 14.861375757575757,
+      "p50": 2.835,
+      "p95": 84.414,
+      "p99": 108.767,
+      "max": 179.636,
+      "negative": 0
+    },
+    "quorum_to_response": {
+      "n": 495,
+      "mean": 0.23617575757575757,
+      "p50": 0.089,
+      "p95": 0.541,
+      "p99": 3.052,
+      "max": 12.34,
+      "negative": 0
+    },
+    "gateway_response_to_wallet": {
+      "n": 495,
+      "mean": 0.7594686868686868,
+      "p50": 0.123,
+      "p95": 3.057,
+      "p99": 11.05,
+      "max": 46.334,
+      "negative": 0
+    }
+  },
+  "selected_member_ms": {
+    "dispatch_schedule": {
+      "n": 1485,
+      "mean": 0.20464713804713805,
+      "p50": 0.034,
+      "p95": 0.88,
+      "p99": 2.931,
+      "max": 12.466,
+      "negative": 0
+    },
+    "dispatch_to_handler": {
+      "n": 1485,
+      "mean": 1.4926356902356903,
+      "p50": 0.168,
+      "p95": 4.939,
+      "p99": 23.053,
+      "max": 173.634,
+      "negative": 0
+    },
+    "member_decode": {
+      "n": 1485,
+      "mean": 0.16713063973063974,
+      "p50": 0.123,
+      "p95": 0.393,
+      "p99": 0.533,
+      "max": 5.049,
+      "negative": 0
+    },
+    "member_validation": {
+      "n": 1485,
+      "mean": 0.3064882154882155,
+      "p50": 0.234,
+      "p95": 0.699,
+      "p99": 0.814,
+      "max": 10.731,
+      "negative": 0
+    },
+    "validation_to_commit_request": {
+      "n": 1485,
+      "mean": 0.0029393939393939396,
+      "p50": 0.002,
+      "p95": 0.006,
+      "p99": 0.01,
+      "max": 0.103,
+      "negative": 0
+    },
+    "member_update_queue": {
+      "n": 1485,
+      "mean": 4.121199326599327,
+      "p50": 0.002,
+      "p95": 35.678,
+      "p99": 85.805,
+      "max": 114.217,
+      "negative": 0
+    },
+    "member_update_callback": {
+      "n": 1485,
+      "mean": 0.07268215488215488,
+      "p50": 0.061,
+      "p95": 0.143,
+      "p99": 0.187,
+      "max": 0.843,
+      "negative": 0
+    },
+    "member_update_finish": {
+      "n": 1485,
+      "mean": 0.2971791245791246,
+      "p50": 0.009,
+      "p95": 2.182,
+      "p99": 4.232,
+      "max": 25.997,
+      "negative": 0
+    },
+    "member_sign": {
+      "n": 1485,
+      "mean": 0.017511111111111113,
+      "p50": 0.014,
+      "p95": 0.04,
+      "p99": 0.047,
+      "max": 0.884,
+      "negative": 0
+    },
+    "member_sign_to_response": {
+      "n": 1485,
+      "mean": 0.0001373737373737374,
+      "p50": 0.0,
+      "p95": 0.001,
+      "p99": 0.001,
+      "max": 0.001,
+      "negative": 0
+    },
+    "member_response_to_selected": {
+      "n": 1485,
+      "mean": 1.8738478114478114,
+      "p50": 0.591,
+      "p95": 6.537,
+      "p99": 19.077,
+      "max": 102.025,
+      "negative": 0
+    },
+    "member_handler_total": {
+      "n": 1485,
+      "mean": 4.98526734006734,
+      "p50": 0.482,
+      "p95": 38.553,
+      "p99": 89.251,
+      "max": 120.347,
+      "negative": 0
+    }
+  },
+  "critical_third_vote_ms": {
+    "dispatch_schedule": {
+      "n": 495,
+      "mean": 0.2384969696969697,
+      "p50": 0.036,
+      "p95": 0.993,
+      "p99": 3.083,
+      "max": 12.466,
+      "negative": 0
+    },
+    "dispatch_to_handler": {
+      "n": 495,
+      "mean": 1.9632545454545454,
+      "p50": 0.294,
+      "p95": 6.278,
+      "p99": 26.972,
+      "max": 170.762,
+      "negative": 0
+    },
+    "member_decode": {
+      "n": 495,
+      "mean": 0.1984949494949495,
+      "p50": 0.126,
+      "p95": 0.406,
+      "p99": 0.635,
+      "max": 5.049,
+      "negative": 0
+    },
+    "member_validation": {
+      "n": 495,
+      "mean": 0.3543858585858586,
+      "p50": 0.235,
+      "p95": 0.708,
+      "p99": 0.901,
+      "max": 10.731,
+      "negative": 0
+    },
+    "validation_to_commit_request": {
+      "n": 495,
+      "mean": 0.003286868686868687,
+      "p50": 0.003,
+      "p95": 0.006,
+      "p99": 0.013,
+      "max": 0.103,
+      "negative": 0
+    },
+    "member_update_queue": {
+      "n": 495,
+      "mean": 8.675907070707071,
+      "p50": 0.003,
+      "p95": 67.663,
+      "p99": 95.258,
+      "max": 114.217,
+      "negative": 0
+    },
+    "member_update_callback": {
+      "n": 495,
+      "mean": 0.07700404040404041,
+      "p50": 0.061,
+      "p95": 0.15,
+      "p99": 0.174,
+      "max": 0.843,
+      "negative": 0
+    },
+    "member_update_finish": {
+      "n": 495,
+      "mean": 0.5826444444444444,
+      "p50": 0.011,
+      "p95": 3.416,
+      "p99": 5.662,
+      "max": 22.809,
+      "negative": 0
+    },
+    "member_sign": {
+      "n": 495,
+      "mean": 0.018662626262626263,
+      "p50": 0.014,
+      "p95": 0.041,
+      "p99": 0.047,
+      "max": 0.291,
+      "negative": 0
+    },
+    "member_sign_to_response": {
+      "n": 495,
+      "mean": 0.00015353535353535353,
+      "p50": 0.0,
+      "p95": 0.001,
+      "p99": 0.001,
+      "max": 0.001,
+      "negative": 0
+    },
+    "member_response_to_selected": {
+      "n": 495,
+      "mean": 2.739028282828283,
+      "p50": 0.897,
+      "p95": 10.893,
+      "p99": 24.3,
+      "max": 102.025,
+      "negative": 0
+    },
+    "member_handler_total": {
+      "n": 495,
+      "mean": 9.910539393939393,
+      "p50": 0.554,
+      "p95": 71.314,
+      "p99": 99.208,
+      "max": 120.347,
+      "negative": 0
+    }
+  },
+  "selected_http_ms": {
+    "serialize": {
+      "n": 1485,
+      "mean": 0.008641750841750841,
+      "p50": 0.0,
+      "p95": 0.001,
+      "p99": 0.001,
+      "max": 11.174,
+      "negative": 0
+    },
+    "get_connection": {
+      "n": 1485,
+      "mean": 0.15154343434343434,
+      "p50": 0.001,
+      "p95": 0.641,
+      "p99": 3.123,
+      "max": 39.979,
+      "negative": 0
+    },
+    "connection_to_written": {
+      "n": 1485,
+      "mean": 0.15297171717171718,
+      "p50": 0.003,
+      "p95": 0.045,
+      "p99": 0.712,
+      "max": 169.754,
+      "negative": 0
+    },
+    "written_to_handler": {
+      "n": 1485,
+      "mean": 0.656389898989899,
+      "p50": 0.08,
+      "p95": 1.725,
+      "p99": 10.709,
+      "max": 75.001,
+      "negative": 0
+    },
+    "response_to_first_byte": {
+      "n": 1485,
+      "mean": 1.2390565656565657,
+      "p50": 0.439,
+      "p95": 5.482,
+      "p99": 9.935,
+      "max": 32.026,
+      "negative": 0
+    },
+    "first_byte_to_approval_decoded": {
+      "n": 1485,
+      "mean": 0.532010101010101,
+      "p50": 0.026,
+      "p95": 0.34,
+      "p99": 12.341,
+      "max": 101.349,
+      "negative": 0
+    },
+    "decoded_to_selected": {
+      "n": 1485,
+      "mean": 0.10278114478114478,
+      "p50": 0.037,
+      "p95": 0.147,
+      "p99": 1.082,
+      "max": 10.249,
+      "negative": 0
+    }
+  },
+  "traced_fast_ms": {
+    "n": 495,
+    "mean": 20.400811276767676,
+    "p50": 5.499667,
+    "p95": 94.977625,
+    "p99": 130.872375,
+    "max": 185.914125,
+    "negative": 0
+  },
+  "untraced_fast_ms": {
+    "n": 49005,
+    "mean": 19.034050435690236,
+    "p50": 5.199333,
+    "p95": 89.111166,
+    "p99": 124.9575,
+    "max": 321.38175,
+    "negative": 0
+  },
+  "windows": [
+    {
+      "end_s": 30,
+      "sent_tps": 1391.4,
+      "observed_commit_tps": 1280.9666666666667,
+      "active": 4079,
+      "pending": {
+        "members": 766,
+        "wallet_block": 3291,
+        "fast": 22
+      },
+      "fast_ms": {
+        "n": 41742,
+        "mean": 18.15286615885679,
+        "p50": 5.338,
+        "p95": 82.889208,
+        "p99": 113.0755,
+        "max": 213.171125,
+        "negative": 0
+      },
+      "critical_member_ms": {
+        "dispatch_schedule": {
+          "n": 418,
+          "mean": 0.2544401913875598,
+          "p50": 0.035,
+          "p95": 1.046,
+          "p99": 2.931,
+          "max": 12.466,
+          "negative": 0
+        },
+        "dispatch_to_handler": {
+          "n": 418,
+          "mean": 2.0490143540669856,
+          "p50": 0.265,
+          "p95": 6.278,
+          "p99": 26.972,
+          "max": 170.762,
+          "negative": 0
+        },
+        "member_decode": {
+          "n": 418,
+          "mean": 0.19874162679425839,
+          "p50": 0.126,
+          "p95": 0.406,
+          "p99": 0.604,
+          "max": 5.049,
+          "negative": 0
+        },
+        "member_validation": {
+          "n": 418,
+          "mean": 0.3567153110047847,
+          "p50": 0.235,
+          "p95": 0.708,
+          "p99": 0.814,
+          "max": 10.731,
+          "negative": 0
+        },
+        "validation_to_commit_request": {
+          "n": 418,
+          "mean": 0.003133971291866029,
+          "p50": 0.003,
+          "p95": 0.006,
+          "p99": 0.01,
+          "max": 0.022,
+          "negative": 0
+        },
+        "member_update_queue": {
+          "n": 418,
+          "mean": 8.491516746411483,
+          "p50": 0.003,
+          "p95": 63.323,
+          "p99": 93.303,
+          "max": 114.217,
+          "negative": 0
+        },
+        "member_update_callback": {
+          "n": 418,
+          "mean": 0.07720095693779905,
+          "p50": 0.06,
+          "p95": 0.15,
+          "p99": 0.171,
+          "max": 0.843,
+          "negative": 0
+        },
+        "member_update_finish": {
+          "n": 418,
+          "mean": 0.5965023923444976,
+          "p50": 0.012,
+          "p95": 3.308,
+          "p99": 5.204,
+          "max": 22.809,
+          "negative": 0
+        },
+        "member_sign": {
+          "n": 418,
+          "mean": 0.019016746411483255,
+          "p50": 0.014,
+          "p95": 0.041,
+          "p99": 0.047,
+          "max": 0.291,
+          "negative": 0
+        },
+        "member_sign_to_response": {
+          "n": 418,
+          "mean": 0.00016267942583732058,
+          "p50": 0.0,
+          "p95": 0.001,
+          "p99": 0.001,
+          "max": 0.001,
+          "negative": 0
+        },
+        "member_response_to_selected": {
+          "n": 418,
+          "mean": 2.5642416267942583,
+          "p50": 0.895,
+          "p95": 10.893,
+          "p99": 21.806,
+          "max": 32.09,
+          "negative": 0
+        },
+        "member_handler_total": {
+          "n": 418,
+          "mean": 9.74299043062201,
+          "p50": 0.574,
+          "p95": 70.243,
+          "p99": 97.341,
+          "max": 120.347,
+          "negative": 0
+        }
+      }
+    },
+    {
+      "end_s": 60,
+      "sent_tps": 258.6,
+      "observed_commit_tps": 369.03333333333336,
+      "active": 0,
+      "pending": {},
+      "fast_ms": {
+        "n": 7758,
+        "mean": 23.862477955658676,
+        "p50": 4.474125,
+        "p95": 114.591083,
+        "p99": 164.995959,
+        "max": 321.38175,
+        "negative": 0
+      },
+      "critical_member_ms": {
+        "dispatch_schedule": {
+          "n": 77,
+          "mean": 0.15194805194805194,
+          "p50": 0.036,
+          "p95": 0.662,
+          "p99": 2.085,
+          "max": 3.083,
+          "negative": 0
+        },
+        "dispatch_to_handler": {
+          "n": 77,
+          "mean": 1.4977012987012988,
+          "p50": 0.471,
+          "p95": 5.37,
+          "p99": 20.503,
+          "max": 21.762,
+          "negative": 0
+        },
+        "member_decode": {
+          "n": 77,
+          "mean": 0.19715584415584417,
+          "p50": 0.125,
+          "p95": 0.406,
+          "p99": 0.548,
+          "max": 1.714,
+          "negative": 0
+        },
+        "member_validation": {
+          "n": 77,
+          "mean": 0.34174025974025973,
+          "p50": 0.235,
+          "p95": 0.707,
+          "p99": 0.72,
+          "max": 1.782,
+          "negative": 0
+        },
+        "validation_to_commit_request": {
+          "n": 77,
+          "mean": 0.004116883116883117,
+          "p50": 0.003,
+          "p95": 0.006,
+          "p99": 0.009,
+          "max": 0.103,
+          "negative": 0
+        },
+        "member_update_queue": {
+          "n": 77,
+          "mean": 9.676883116883117,
+          "p50": 0.002,
+          "p95": 78.61,
+          "p99": 95.721,
+          "max": 111.665,
+          "negative": 0
+        },
+        "member_update_callback": {
+          "n": 77,
+          "mean": 0.07593506493506494,
+          "p50": 0.062,
+          "p95": 0.147,
+          "p99": 0.165,
+          "max": 0.174,
+          "negative": 0
+        },
+        "member_update_finish": {
+          "n": 77,
+          "mean": 0.5074155844155844,
+          "p50": 0.01,
+          "p95": 3.645,
+          "p99": 4.989,
+          "max": 6.293,
+          "negative": 0
+        },
+        "member_sign": {
+          "n": 77,
+          "mean": 0.01674025974025974,
+          "p50": 0.014,
+          "p95": 0.04,
+          "p99": 0.041,
+          "max": 0.041,
+          "negative": 0
+        },
+        "member_sign_to_response": {
+          "n": 77,
+          "mean": 0.0001038961038961039,
+          "p50": 0.0,
+          "p95": 0.001,
+          "p99": 0.001,
+          "max": 0.001,
+          "negative": 0
+        },
+        "member_response_to_selected": {
+          "n": 77,
+          "mean": 3.68787012987013,
+          "p50": 0.909,
+          "p95": 8.978,
+          "p99": 24.3,
+          "max": 102.025,
+          "negative": 0
+        },
+        "member_handler_total": {
+          "n": 77,
+          "mean": 10.82009090909091,
+          "p50": 0.497,
+          "p95": 79.883,
+          "p99": 102.438,
+          "max": 115.78,
+          "negative": 0
+        }
+      }
+    }
+  ]
+}

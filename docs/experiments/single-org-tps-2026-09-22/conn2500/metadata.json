@@ -1,0 +1,71 @@
+{
+  "member_urls": [
+    "http://127.0.0.1:24000",
+    "http://127.0.0.1:24001",
+    "http://127.0.0.1:24002",
+    "http://127.0.0.1:24003"
+  ],
+  "arguments": {
+    "label": "conn2500",
+    "count": 49500,
+    "rate": 2500.0,
+    "port": 24000,
+    "trace_every": 100,
+    "template": "/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-base1100",
+    "member_memory": true,
+    "wallet_no_sync": true,
+    "gateway_memory": true,
+    "no_trace": true,
+    "unbatched_progress": false,
+    "max_pending": 4096,
+    "profile": false,
+    "conn_stats": true,
+    "no_descriptor_cache": false,
+    "committee_memory": true,
+    "commit_ms": 250,
+    "member_foreground": 256
+  },
+  "bench_args": [
+    "/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-conn2500-bin/payctl",
+    "bench-v4",
+    "-dir",
+    "/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-conn2500",
+    "-start",
+    "0",
+    "-count",
+    "49500",
+    "-concurrency",
+    "256",
+    "-max-pending",
+    "4096",
+    "-rate",
+    "2500.0",
+    "-same-org",
+    "-wallet-no-sync"
+  ],
+  "genesis_sha256": "4855c4e7a51f4615b3fbfd44a54df01e683aeb3c2eee94b87aa626bc6a3dbaf5",
+  "binaries": {
+    "payctl": "ca330f977e2aae1a84248a234e8fd387fe3d29fb735a713faecb2a7a8b8a2950",
+    "member-real": "ceb7d6a7c90e2d3283b8520cbfe33f734dd67454de4cf2f80bb834861be8ea6b",
+    "gateway": "13d3045aec8c6b82613e72d403f6489c075ca327aa84e9210bf455e0ea1ebece",
+    "committee": "e0b12a673502edf831e7a1307b958afc3c04ad3fdd328312c60701c87c9d874b"
+  },
+  "source_head": "e3870e1cb269df1b961794a7c215e920b8ddda92",
+  "nodes": 9,
+  "member_memory": true,
+  "gateway_memory": true,
+  "wallet_no_sync": true,
+  "committee_mem_blockstore": true,
+  "trace_every": 100,
+  "concurrency": 256,
+  "max_pending": 4096,
+  "new_source_sha256": {
+    "cmd/payctl/progress_batch.go": "a587d5caaab2b73615ef8521c07096ec3cd5962c32961573504b42b38d631273",
+    "cmd/payctl/progress_batch_test.go": "35f1c3e13a62faa2ef900b31f7a7fdf7ff74743482e214bd6fe7f0e364be23d0",
+    "internal/member/progress_batch_test.go": "8aabc695b40636eccac23e6b0668c8d4f3831a844204adbba7bbbedbea01cce3",
+    "internal/transport/progress_batch_test.go": "d8156535674603526774dd64bd10f27bd4c0f5f5780fdc365d7e846e9a1ef997",
+    "protocol/descriptor_cache.go": "0fe1d2aff986a81a63faf7b744f19f6b1b153f1b3771361bc9f700c0a364d1cf",
+    "protocol/descriptor_cache_test.go": "8d331e2e4516beb2ef058a82e6c1f2c30bfbe05af180d08a1d94942c6ceba013"
+  },
+  "shutdown_and_audit_export_s": 2.0568889160000055
+}

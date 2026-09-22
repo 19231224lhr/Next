@@ -1,0 +1,159 @@
+{
+  "summary": {
+    "batch_progress": false,
+    "block_observed_p50_ms": 1405.45425,
+    "completed_per_second": 1820.8706259701567,
+    "concurrency": 256,
+    "count": 49500,
+    "dispatch_delivery_wait_p95_ms": 1178.497,
+    "dispatch_lag_p50_ms": 626.579833,
+    "dispatch_lag_p95_ms": 1288.00825,
+    "elapsed_s": 27.184797917,
+    "failed": 0,
+    "fast_completed": 49500,
+    "fast_p50_ms": 5.220292,
+    "fast_p95_ms": 116.835542,
+    "final_unfinished": 0,
+    "finished_unix_ns": 1790072632393748000,
+    "max_pending": 4096,
+    "member_applied_p50_ms": 1549.349375,
+    "member_completed": 49500,
+    "not_sent": 0,
+    "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.",
+    "pending_limit": 4096,
+    "progress_errors": 251125,
+    "progress_http_max_ms": 221.483958,
+    "progress_http_mean_ms": 2.604746958039426,
+    "progress_requests": 454951,
+    "progress_requests_per_second": 16735.49317486361,
+    "same_org": true,
+    "sampled_oldest_unfinished_max_ms": 3590.127,
+    "sampled_peak_unfinished": 3814,
+    "send_limit_hits": 33110,
+    "send_pacing_wait_p95_ms": 133.368792,
+    "send_permit_wait_p95_ms": 1.4345,
+    "started_unix_ns": 1790072605208877000,
+    "target_send_rate": 2000,
+    "timing_origin": "wallet_http_submit_v4",
+    "total_limit_hits": 0,
+    "total_permit_wait_p95_ms": 0.000209,
+    "trace": false,
+    "unknown": 0,
+    "wallet_block_observed": 49500,
+    "wallet_no_sync": true,
+    "wallet_queries": 177798,
+    "workload": "bounded_fast_receipt_with_independent_observation"
+  },
+  "send_span_s": 26.080118,
+  "actual_send_tps": 1897.9592040189389,
+  "successful_executions": 49500,
+  "failed_executions": 0,
+  "committee_equal": true,
+  "outbox_pending": 0,
+  "errors": {},
+  "all_stages_ms": {
+    "send_to_response": {
+      "n": 49500,
+      "mean": 28.744090767676767,
+      "p50": 4.777,
+      "p95": 116.213,
+      "p99": 192.244,
+      "max": 345.491,
+      "negative": 0
+    },
+    "wallet_verify_save": {
+      "n": 49500,
+      "mean": 0.6531083434343434,
+      "p50": 0.202,
+      "p95": 1.75,
+      "p99": 7.505,
+      "max": 74.374,
+      "negative": 0
+    },
+    "send_to_fast": {
+      "n": 49500,
+      "mean": 29.39719911111111,
+      "p50": 5.221,
+      "p95": 116.836,
+      "p99": 192.823,
+      "max": 346.516,
+      "negative": 0
+    },
+    "fast_to_wallet_block": {
+      "n": 49500,
+      "mean": 1389.4166863838384,
+      "p50": 1400.031,
+      "p95": 1800.241,
+      "p99": 2000.042,
+      "max": 3725.05,
+      "negative": 0
+    },
+    "send_to_wallet_block": {
+      "n": 49500,
+      "mean": 1418.8138854949495,
+      "p50": 1405.458,
+      "p95": 1866.297,
+      "p99": 2054.733,
+      "max": 3729.388,
+      "negative": 0
+    },
+    "wallet_block_to_members": {
+      "n": 49500,
+      "mean": 141.30983303030303,
+      "p50": 132.386,
+      "p95": 232.195,
+      "p99": 270.68,
+      "max": 343.384,
+      "negative": 0
+    },
+    "send_to_member_completion": {
+      "n": 49500,
+      "mean": 1560.1237185252526,
+      "p50": 1549.353,
+      "p95": 2023.085,
+      "p99": 2220.807,
+      "max": 3807.006,
+      "negative": 0
+    }
+  },
+  "trace_coverage": {
+    "expected": 495,
+    "received": 0,
+    "three_selected_complete": 0,
+    "event_counts": {},
+    "selected_votes": 0
+  },
+  "gateway_ms": {},
+  "selected_member_ms": {},
+  "critical_third_vote_ms": {},
+  "selected_http_ms": {},
+  "traced_fast_ms": null,
+  "untraced_fast_ms": {
+    "n": 49500,
+    "mean": 29.39717482591919,
+    "p50": 5.220292,
+    "p95": 116.835542,
+    "p99": 192.82175,
+    "max": 346.516125,
+    "negative": 0
+  },
+  "windows": [
+    {
+      "end_s": 30,
+      "sent_tps": 1650.0,
+      "observed_commit_tps": 1650.0,
+      "active": 0,
+      "pending": {},
+      "fast_ms": {
+        "n": 49500,
+        "mean": 29.39717482591919,
+        "p50": 5.220292,
+        "p95": 116.835542,
+        "p99": 192.82175,
+        "max": 346.516125,
+        "negative": 0
+      },
+      "critical_member_ms": {}
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+File: member-real
+Type: cpu
+Time: 2026-09-22 18:25:30 CST
+Duration: 12.11s, Total samples = 15.35s (126.71%)
+Showing nodes accounting for 8.38s, 54.59% of 15.35s total
+Dropped 365 nodes (cum <= 0.08s)
+Showing top 60 nodes out of 235
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%      6.34s 41.30%  net/http.(*conn).serve
+     6.07s 39.54% 39.54%      6.07s 39.54%  syscall.rawsyscalln
+         0     0% 39.54%      6.07s 39.54%  syscall.syscall
+         0     0% 39.54%      6.07s 39.54%  syscall.syscalln
+         0     0% 39.54%      6.02s 39.22%  internal/poll.ignoringEINTRIO (inline)
+         0     0% 39.54%      4.39s 28.60%  bufio.(*Writer).Flush
+         0     0% 39.54%      4.38s 28.53%  internal/poll.(*FD).Write
+         0     0% 39.54%      4.38s 28.53%  net.(*conn).Write
+         0     0% 39.54%      4.38s 28.53%  net.(*netFD).Write
+         0     0% 39.54%      4.38s 28.53%  syscall.Write (inline)
+         0     0% 39.54%      4.38s 28.53%  syscall.write
+         0     0% 39.54%      4.33s 28.21%  net/http.checkConnErrorWriter.Write
+         0     0% 39.54%      4.23s 27.56%  net/http.(*response).finishRequest
+         0     0% 39.54%      2.82s 18.37%  runtime.systemstack
+         0     0% 39.54%      1.97s 12.83%  utxo/internal/store.(*Ephemeral).Update
+         0     0% 39.54%      1.97s 12.83%  utxo/internal/store.(*Group).run
+         0     0% 39.54%      1.86s 12.12%  utxo/internal/store.(*Group).run.func1
+         0     0% 39.54%      1.80s 11.73%  net/http.(*ServeMux).ServeHTTP
+         0     0% 39.54%      1.80s 11.73%  net/http.serverHandler.ServeHTTP
+         0     0% 39.54%      1.79s 11.66%  net/http.HandlerFunc.ServeHTTP
+         0     0% 39.54%      1.79s 11.66%  utxo/internal/transport.MemberHandler.func2.1
+         0     0% 39.54%      1.64s 10.68%  internal/poll.(*FD).Read
+         0     0% 39.54%      1.64s 10.68%  net.(*conn).Read
+         0     0% 39.54%      1.64s 10.68%  net.(*netFD).Read
+         0     0% 39.54%      1.64s 10.68%  runtime.mcall
+         0     0% 39.54%      1.64s 10.68%  runtime.schedule
+         0     0% 39.54%      1.64s 10.68%  syscall.Read (inline)
+         0     0% 39.54%      1.64s 10.68%  syscall.read
+         0     0% 39.54%      1.61s 10.49%  runtime.findRunnable
+         0     0% 39.54%      1.60s 10.42%  runtime.park_m
+         0     0% 39.54%      1.37s  8.93%  net/http.(*connReader).backgroundRead
+         0     0% 39.54%      1.37s  8.93%  runtime.(*mheap).alloc.func1
+     0.02s  0.13% 39.67%      1.37s  8.93%  runtime.(*mheap).allocSpan
+     1.31s  8.53% 48.21%      1.31s  8.53%  runtime.pthread_cond_signal
+         0     0% 48.21%      1.31s  8.53%  runtime.semawakeup
+         0     0% 48.21%      1.30s  8.47%  runtime.notewakeup
+         0     0% 48.21%      1.30s  8.47%  utxo/protocol.FastTx.VerifyAuth
+         0     0% 48.21%      1.29s  8.40%  runtime.startm
+         0     0% 48.21%      1.27s  8.27%  crypto/ed25519.Verify (inline)
+         0     0% 48.21%      1.27s  8.27%  crypto/ed25519.VerifyWithOptions
+         0     0% 48.21%      1.26s  8.21%  runtime.wakep
+         0     0% 48.21%      1.20s  7.82%  crypto/internal/fips140/ed25519.Verify (inline)
+         0     0% 48.21%      1.20s  7.82%  crypto/internal/fips140/ed25519.verify
+         0     0% 48.21%      1.20s  7.82%  crypto/internal/fips140/ed25519.verifyWithDom
+         0     0% 48.21%      1.09s  7.10%  utxo/protocol.VerifyOwner
+     0.03s   0.2% 48.40%      1.06s  6.91%  crypto/internal/fips140/edwards25519.(*Point).VarTimeDoubleScalarBaseMult
+         0     0% 48.40%      1.05s  6.84%  utxo/internal/blockfollow.Commit.func1
+         0     0% 48.40%      1.04s  6.78%  _.goready.func1
+         0     0% 48.40%      1.04s  6.78%  runtime.ready
+         0     0% 48.40%      1.03s  6.71%  utxo/internal/member.(*Member).PrepareBlock.func2
+         0     0% 48.40%      1.03s  6.71%  utxo/internal/member.(*Member).PrepareBlock.func3
+         0     0% 48.40%      1.03s  6.71%  utxo/internal/member.(*Member).applyPayment
+         0     0% 48.40%      0.99s  6.45%  utxo/internal/transport.addDirectHandlers.func2
+     0.02s  0.13% 48.53%      0.97s  6.32%  runtime.growslice
+         0     0% 48.53%      0.97s  6.32%  utxo/internal/blockfollow.Run
+         0     0% 48.53%      0.97s  6.32%  utxo/internal/blockfollow.Start.func1
+         0     0% 48.53%      0.97s  6.32%  utxo/internal/member.(*Member).ApproveDirectBytes
+         0     0% 48.53%      0.93s  6.06%  encoding/json/v2.Unmarshal
+     0.93s  6.06% 54.59%      0.93s  6.06%  runtime.madvise
+         0     0% 54.59%      0.93s  6.06%  runtime.sysUsed (inline)

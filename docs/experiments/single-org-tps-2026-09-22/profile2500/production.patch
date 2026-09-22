@@ -1,0 +1,233 @@
+diff --git a/cmd/committee/main.go b/cmd/committee/main.go
+index 9a78bee..bb5948c 100644
+--- a/cmd/committee/main.go
++++ b/cmd/committee/main.go
+@@ -141,6 +141,13 @@ func run() (result error) {
+ 		}
+ 		cc.Consensus.PeerGossipSleepDuration = d
+ 	}
++	if value := os.Getenv("UTXO_EXPERIMENT_COMMIT"); value != "" {
++		d, err := time.ParseDuration(value)
++		if err != nil || d <= 0 {
++			return fmt.Errorf("invalid UTXO_EXPERIMENT_COMMIT")
++		}
++		cc.Consensus.TimeoutCommit = d
++	}
+ 	requesttrace.Consensus.Mark("configuration", "flush", cc.P2P.FlushThrottleTimeout, "gossip", cc.Consensus.PeerGossipSleepDuration, "commit", cc.Consensus.TimeoutCommit, "send_rate", cc.P2P.SendRate, "recv_rate", cc.P2P.RecvRate)
+ 	cc.StateSync.Enable = false
+ 	requesttrace.EnableCometProfile()
+diff --git a/cmd/payctl/direct_bench.go b/cmd/payctl/direct_bench.go
+index 78401bf..08fb964 100644
+--- a/cmd/payctl/direct_bench.go
++++ b/cmd/payctl/direct_bench.go
+@@ -33,6 +33,8 @@ func benchDirect(args []string) error {
+ 	maxPending := flags.Int("max-pending", 0, "total unfinished tasks; 0 keeps the original coupled worker pool")
+ 	rate := flags.Float64("rate", 0, "target sends per second (0: closed loop); backpressure is reported as dispatch lag")
+ 	trace := flags.Bool("trace", false, "include opt-in per-payment and block timing")
++	sameOrg := flags.Bool("same-org", false, "recipient uses the issuing organization")
++	batchProgress := flags.Bool("batch-progress", true, "batch exact member status reads; does not infer completion from height")
+ 	walletNoSync := flags.Bool("wallet-no-sync", false, "fresh experiment wallet without disk synchronization; no crash recovery")
+ 	if err := flags.Parse(args); err != nil {
+ 		return err
+@@ -68,7 +70,11 @@ func benchDirect(args []string) error {
+ 		return err
+ 	}
+ 	org := n.Organizations[0]
+-	target := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: n.Organizations[1].Org}, recipient)
++	targetOrg := n.Organizations[1].Org
++	if *sameOrg {
++		targetOrg = org.Org
++	}
++	target := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: targetOrg}, recipient)
+ 	var publicOwner protocol.PublicKey
+ 	copy(publicOwner[:], owner[32:])
+ 	var inputs []int
+@@ -142,6 +148,21 @@ func benchDirect(args []string) error {
+ 	public := transport.NewCommitteeClient(n.CommitteeURLs[0])
+ 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+ 	defer cancel()
++	var progressBatches []*progressBatcher
++	if *batchProgress {
++		batchCtx, stopBatches := context.WithCancel(ctx)
++		for _, url := range n.Members[org.Org] {
++			progressBatches = append(progressBatches, newProgressBatcher(batchCtx, max(*maxPending, *concurrency), func(ctx context.Context, facts []protocol.SpendFactID) ([]member.DirectStatus, error) {
++				return loadProgressBatch(ctx, httpClient, url, facts)
++			}))
++		}
++		defer func() {
++			stopBatches()
++			for _, b := range progressBatches {
++				<-b.done
++			}
++		}()
++	}
+ 	var walletHeight atomic.Int64
+ 	defer blockfollow.Start(ctx, cancel, group, public, trust, receiver.PrepareBlock, walletHeight.Store)()
+ 	began := time.Now()
+@@ -231,6 +252,13 @@ func benchDirect(args []string) error {
+ 				if created {
+ 					urls := n.Members[org.Org]
+ 					complete, err := memberCheck.Check(len(urls), func(index int) (bool, error) {
++						if *batchProgress {
++							started := time.Now()
++							samples[i].ProgressRequests++
++							status, err := progressBatches[index].Check(ctx, cert.QC.Fact)
++							samples[i].recordProgressQuery(started, err == nil)
++							return err == nil && status.Observed && (!status.Signed || status.Closed), nil
++						}
+ 						r, err := http.NewRequestWithContext(ctx, "GET", urls[index]+"/v4/progress/"+protocol.Hash(cert.QC.Fact).String(), nil)
+ 						if err != nil {
+ 							return false, err
+@@ -301,6 +329,24 @@ func benchDirect(args []string) error {
+ 		return xs[int(float64(len(xs)-1)*q)]
+ 	}
+ 	summary := map[string]any{"timing_origin": "wallet_http_submit_v4", "workload": "closed_loop_final_utxo_cross_org", "count": *count, "concurrency": *concurrency, "failed": failed, "elapsed_s": elapsed.Seconds(), "completed_per_second": float64(*count-failed) / elapsed.Seconds(), "fast_p50_ms": quantile(fast, .5), "fast_p95_ms": quantile(fast, .95), "block_observed_p50_ms": quantile(proof, .5), "member_applied_p50_ms": quantile(credit, .5), "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested."}
++	summary["batch_progress"] = *batchProgress
++	if *batchProgress {
++		var requests, failures, facts, httpNS, queueNS uint64
++		for _, b := range progressBatches {
++			requests += b.requests.Load()
++			failures += b.failures.Load()
++			facts += b.facts.Load()
++			httpNS += b.httpNS.Load()
++			queueNS += b.queueNS.Load()
++		}
++		summary["progress_batch_http_requests"] = requests
++		summary["progress_batch_http_errors"] = failures
++		summary["progress_batch_facts"] = facts
++		summary["progress_batch_http_total_ms"] = float64(httpNS) / 1e6
++		summary["progress_batch_queue_total_ms"] = float64(queueNS) / 1e6
++		summary["progress_metric_note"] = "progress_requests counts logical fact checks; progress_http durations include batch queue wait. Actual batch HTTP requests/errors are separate."
++	}
++	summary["same_org"] = *sameOrg
+ 	summary["trace"] = *trace
+ 	summary["wallet_no_sync"] = *walletNoSync
+ 	if *rate > 0 {
+diff --git a/internal/member/progress.go b/internal/member/progress.go
+index 4a5df3d..c8c6776 100644
+--- a/internal/member/progress.go
++++ b/internal/member/progress.go
+@@ -12,22 +12,47 @@ type DirectStatus struct {
+ 	Height                   int64
+ }
+ 
++const MaxProgressBatch = 128
++
++func directStatus(v state.ReadView, f protocol.SpendFactID) (s DirectStatus, err error) {
++	s.Observed, _, err = state.Load[bool](v, state.Key(state.KeyObserved, f[:]))
++	if err != nil {
++		return s, err
++	}
++	_, err = v.Get(state.Key(state.KeyApproval, f[:]))
++	s.Signed = err == nil
++	if err != nil && !errors.Is(err, state.ErrNotFound) {
++		return s, err
++	}
++	p, _, err := state.Load[LocalProgress](v, ProgressKey(f))
++	s.Closed = p.Fee.Closed
++	s.Height = p.Height
++	return s, err
++}
+ func (m *Member) DirectStatus(f protocol.SpendFactID) (s DirectStatus, err error) {
+-	err = m.db.View(func(v state.ReadView) error {
+-		var err error
+-		s.Observed, _, err = state.Load[bool](v, state.Key(state.KeyObserved, f[:]))
+-		if err != nil {
+-			return err
+-		}
+-		_, err = v.Get(state.Key(state.KeyApproval, f[:]))
+-		s.Signed = err == nil
+-		if err != nil && !errors.Is(err, state.ErrNotFound) {
+-			return err
++	err = m.db.View(func(v state.ReadView) error { s, err = directStatus(v, f); return err })
++	return
++}
++
++// DirectStatuses reads a bounded group in one snapshot. Results preserve input
++// order, including duplicates and unknown facts; no height implies completion.
++func (m *Member) DirectStatuses(facts []protocol.SpendFactID) ([]DirectStatus, error) {
++	if len(facts) == 0 || len(facts) > MaxProgressBatch {
++		return nil, protocol.ErrRule
++	}
++	out := make([]DirectStatus, len(facts))
++	err := m.db.View(func(v state.ReadView) error {
++		for i, f := range facts {
++			s, err := directStatus(v, f)
++			if err != nil {
++				return err
++			}
++			out[i] = s
+ 		}
+-		p, _, err := state.Load[LocalProgress](v, ProgressKey(f))
+-		s.Closed = p.Fee.Closed
+-		s.Height = p.Height
+-		return err
++		return nil
+ 	})
+-	return
++	if err != nil {
++		return nil, err
++	}
++	return out, nil
+ }
+diff --git a/internal/transport/direct.go b/internal/transport/direct.go
+index e79c8d1..4f9a4d6 100644
+--- a/internal/transport/direct.go
++++ b/internal/transport/direct.go
+@@ -3,6 +3,7 @@ package transport
+ import (
+ 	"context"
+ 	"encoding/json"
++	"io"
+ 	"net/http"
+ 	"utxo/internal/member"
+ 	"utxo/internal/requesttrace"
+@@ -10,6 +11,29 @@ import (
+ )
+ 
+ func addDirectHandlers(mux *http.ServeMux, m *member.Member, fg, bg chan struct{}, wrap func(chan struct{}, http.HandlerFunc) http.HandlerFunc) {
++	mux.HandleFunc("POST /v4/progress", wrap(bg, func(w http.ResponseWriter, r *http.Request) {
++		if r.Header.Get("Content-Type") != "application/json" {
++			fail(w, protocol.ErrEncoding)
++			return
++		}
++		var facts []protocol.SpendFactID
++		d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
++		if err := d.Decode(&facts); err != nil {
++			fail(w, err)
++			return
++		}
++		if err := d.Decode(new(any)); err != io.EOF {
++			fail(w, protocol.ErrEncoding)
++			return
++		}
++		statuses, err := m.DirectStatuses(facts)
++		if err != nil {
++			fail(w, err)
++			return
++		}
++		w.Header().Set("Content-Type", "application/json")
++		_ = json.NewEncoder(w).Encode(statuses)
++	}))
+ 	mux.HandleFunc("POST /v3/transactions", wrap(fg, func(w http.ResponseWriter, r *http.Request) {
+ 		ctx := r.Context()
+ 		if r.Header.Get(requesttrace.HeaderName) == "1" {
+diff --git a/protocol/organization.go b/protocol/organization.go
+index f7d4208..72fb123 100644
+--- a/protocol/organization.go
++++ b/protocol/organization.go
+@@ -56,10 +56,14 @@ func (d ReceiveDescriptor) Verify(network Hash) error {
+ 	if d.Wire != WireVersion || d.Network != network || d.Route.Validate() != nil {
+ 		return ErrRule
+ 	}
++	if verifiedReceiveDescriptors.Contains(d) {
++		return nil
++	}
+ 	h := d.digest()
+ 	if !ed25519.Verify(d.Owner[:], h[:], d.Signature[:]) {
+ 		return ErrAuth
+ 	}
++	verifiedReceiveDescriptors.Add(d, struct{}{})
+ 	return nil
+ }
+ func (d ReceiveDescriptor) encode(e *Encoder) {

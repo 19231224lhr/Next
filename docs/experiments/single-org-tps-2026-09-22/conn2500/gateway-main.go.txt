@@ -1,0 +1,203 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"io"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strconv"
+	"syscall"
+	"time"
+	cfg "utxo/cmd/internal/config"
+	"utxo/internal/blockfollow"
+	"utxo/internal/gateway"
+	"utxo/internal/requesttrace"
+	"utxo/internal/store"
+	"utxo/internal/transport"
+	"utxo/protocol"
+)
+
+type configuration struct {
+	Network, DataDir, Listen string
+	Organization             protocol.Hash
+	Members                  [4]string
+	TLS                      cfg.TLS
+}
+
+func paymentHandler(collector *gateway.Collector) http.HandlerFunc {
+	slots := make(chan struct{}, 128)
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if r.Header.Get(requesttrace.HeaderName) == "1" {
+			ctx = requesttrace.Start(ctx, "gateway")
+		}
+		requesttrace.Mark(ctx, "http_handler_enter")
+		select {
+		case slots <- struct{}{}:
+			defer func() { <-slots }()
+		default:
+			http.Error(w, "LIMITED", 429)
+			return
+		}
+		if r.Header.Get("Content-Type") != transport.MediaType {
+			http.Error(w, "INVALID_ENCODING", 400)
+			return
+		}
+		raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, protocol.MaxRequestBytes))
+		if e != nil {
+			http.Error(w, "INVALID_ENCODING", 400)
+			return
+		}
+		request, e := protocol.DecodeRequest(raw)
+		if e != nil {
+			http.Error(w, "INVALID_ENCODING", 400)
+			return
+		}
+		requesttrace.Mark(ctx, "request_decoded")
+		certificate, e := collector.Collect(ctx, request)
+		if e != nil {
+			http.Error(w, "QUORUM_UNAVAILABLE", 503)
+			return
+		}
+		raw, e = certificate.MarshalBinary()
+		if e != nil {
+			http.Error(w, "INVALID_CERTIFICATE", 500)
+			return
+		}
+		requesttrace.Mark(ctx, "response_ready")
+		if requesttrace.Enabled(ctx) {
+			w.Header().Set(requesttrace.HeaderName, requesttrace.Header(ctx))
+		}
+		w.Header().Set("Content-Type", transport.MediaType)
+		// Exact length lets clients finish reading before this handler's storage work.
+		w.Header().Set("Content-Length", strconv.Itoa(len(raw)))
+		_, _ = w.Write(raw)
+		_ = http.NewResponseController(w).Flush()
+		// ponytail: reuse the bounded request handler instead of another worker queue.
+		// Keep its slot until persistence ends; server shutdown drains active handlers.
+		if err := collector.Persist(certificate); err != nil {
+			slog.Error("background certificate persistence failed; wallet may resubmit", "spend", protocol.Hash(certificate.QC.Fact).String(), "error", err)
+		}
+	}
+}
+
+func run() (result error) {
+	path := flag.String("config", "", "gateway config JSON")
+	flag.Parse()
+	var c configuration
+	if e := cfg.Read(*path, &c); e != nil {
+		return e
+	}
+	var n cfg.Network
+	if e := cfg.Read(c.Network, &n); e != nil {
+		return e
+	}
+	trust, e := n.Trust()
+	if e != nil {
+		return e
+	}
+	org, e := n.Organization(c.Organization)
+	if e != nil {
+		return e
+	}
+	id := store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: n.Schema()}
+	var base store.Store
+	if os.Getenv("UTXO_EXPERIMENT_GATEWAY_MEMORY") == "1" {
+		base, e = store.OpenEphemeral(filepath.Join(c.DataDir, "gateway.db"), id)
+	} else {
+		base, e = store.Open(filepath.Join(c.DataDir, "gateway.db"), id)
+	}
+	if e != nil {
+		return e
+	}
+	db, e := store.NewGroup(base, 256, 64)
+	if e != nil {
+		base.Close()
+		return e
+	}
+	defer func() { result = errors.Join(result, db.Close()) }()
+	var clients [4]gateway.MemberClient
+	for i, url := range c.Members {
+		clients[i] = transport.NewMemberClient(url)
+	}
+	collector, e := gateway.New(org, clients, db)
+	if e != nil {
+		return e
+	}
+	mux := http.NewServeMux()
+	requesttrace.RegisterTimeline(mux)
+	mux.HandleFunc("POST /v1/transactions", paymentHandler(collector))
+	drainDirect := func() {}
+	if n.Direct != nil {
+		var handler http.HandlerFunc
+		handler, drainDirect = directPaymentHandler(collector)
+		mux.HandleFunc("POST /v3/transactions", handler)
+	}
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("alive\n")) })
+	server, e := cfg.HTTP(c.Listen, mux, c.TLS)
+	if e != nil {
+		return e
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	relayCtx, relayCancel := context.WithCancel(ctx)
+	relay := &gateway.Relay{DB: db, Public: transport.NewCommitteeClient(n.CommitteeURLs[0], n.CommitteeURLs[1:]...), Trust: trust, Organizations: make(map[protocol.Hash]protocol.OrgConfig), Members: make(map[protocol.Hash][4]gateway.MemberClient)}
+	relay.Direct = n.Direct != nil
+	if relay.Direct {
+		relay.Early = gateway.NewDirectInbox()
+		collector.OfferDirect = relay.Early.Offer
+		wake := make(chan protocol.SpendFactID, 256)
+		relay.Wake = wake
+		collector.NotifyPersisted = func(fact protocol.SpendFactID) {
+			select {
+			case wake <- fact:
+			default:
+			}
+		}
+	}
+	for _, organization := range n.Organizations {
+		relay.Organizations[organization.Hash()] = organization
+		var endpoints [4]gateway.MemberClient
+		for i, url := range n.Members[organization.Org] {
+			endpoints[i] = transport.NewMemberClient(url)
+		}
+		relay.Members[organization.Org] = endpoints
+	}
+
+	if n.Direct != nil {
+		defer blockfollow.Start(ctx, stop, db, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, relay.ObserveBlock(org.Hash()))()
+	}
+	relayDone := make(chan error, 1)
+	go func() { relayDone <- relay.Run(relayCtx) }()
+	defer func() {
+		relayCancel()
+		if err := <-relayDone; err != nil {
+			slog.Error("relay stopped", "error", err)
+		}
+	}()
+
+	defer drainDirect() // Handlers/saves finish before relay, follower and database cleanup.
+	done := make(chan error, 1)
+	go func() { done <- cfg.Serve(server) }()
+	slog.Info("gateway started", "listen", c.Listen, "organization", org.Org.String())
+	select {
+	case e = <-done:
+		return e
+	case <-ctx.Done():
+		shutdown, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		return server.Shutdown(shutdown)
+	}
+}
+func main() {
+defer func(){slog.Info("APPROVAL_CONNECTIONS", "requests_fresh_reused_canceled",transport.ApprovalConnectionStats())}()
+	if e := run(); e != nil {
+		slog.Error("gateway stopped", "error", e)
+		os.Exit(1)
+	}
+}

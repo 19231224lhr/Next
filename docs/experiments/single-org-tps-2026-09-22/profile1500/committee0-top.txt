@@ -1,0 +1,26 @@
+File: committee
+Type: cpu
+Time: 2026-09-22 17:55:28 CST
+Duration: 12.14s, Total samples = 16.33s (134.56%)
+Showing nodes accounting for 14.13s, 86.53% of 16.33s total
+Dropped 463 nodes (cum <= 0.08s)
+Showing top 18 nodes out of 230
+      flat  flat%   sum%        cum   cum%
+     7.87s 48.19% 48.19%      7.87s 48.19%  syscall.rawsyscalln
+     1.64s 10.04% 58.24%      1.64s 10.04%  runtime.pthread_cond_signal
+     1.10s  6.74% 64.97%      1.10s  6.74%  runtime.madvise
+     0.93s  5.70% 70.67%      0.93s  5.70%  runtime.usleep
+     0.67s  4.10% 74.77%      0.67s  4.10%  runtime.kevent
+     0.44s  2.69% 77.46%      0.44s  2.69%  runtime.pthread_cond_wait
+     0.32s  1.96% 79.42%      0.32s  1.96%  crypto/internal/fips140/edwards25519/field.addMul (inline)
+     0.29s  1.78% 81.20%      0.29s  1.78%  crypto/internal/fips140/edwards25519/field.addMul19 (inline)
+     0.11s  0.67% 81.87%      0.67s  4.10%  crypto/internal/fips140/edwards25519/field.feMulGeneric
+     0.11s  0.67% 82.55%      0.11s  0.67%  crypto/internal/fips140/sha256.blockSHA2
+     0.11s  0.67% 83.22%      0.11s  0.67%  crypto/internal/fips140/sha3.keccakF1600NEON
+     0.11s  0.67% 83.89%      0.11s  0.67%  runtime.pthread_kill
+     0.11s  0.67% 84.57%      0.13s   0.8%  runtime.tryDeferToSpanScan
+     0.10s  0.61% 85.18%      0.25s  1.53%  crypto/internal/fips140/edwards25519/field.feSquare
+     0.10s  0.61% 85.79%      0.10s  0.61%  runtime.memmove
+     0.06s  0.37% 86.16%      0.12s  0.73%  crypto/internal/fips140/edwards25519/field.feSquareN
+     0.03s  0.18% 86.34%      0.34s  2.08%  crypto/internal/fips140/edwards25519.(*projP1xP1).Double
+     0.03s  0.18% 86.53%      0.39s  2.39%  runtime.growslice

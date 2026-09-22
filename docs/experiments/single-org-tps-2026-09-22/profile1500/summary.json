@@ -1,0 +1,183 @@
+{
+  "summary": {
+    "batch_progress": true,
+    "block_observed_p50_ms": 1380.062125,
+    "completed_per_second": 1402.255300315228,
+    "concurrency": 256,
+    "count": 49500,
+    "dispatch_delivery_wait_p95_ms": 874.860584,
+    "dispatch_lag_p50_ms": 501.708042,
+    "dispatch_lag_p95_ms": 1006.503209,
+    "elapsed_s": 35.300276625,
+    "failed": 0,
+    "fast_completed": 49500,
+    "fast_p50_ms": 5.816917,
+    "fast_p95_ms": 85.472125,
+    "final_unfinished": 0,
+    "finished_unix_ns": 1790070956077879000,
+    "max_pending": 4096,
+    "member_applied_p50_ms": 1532.934209,
+    "member_completed": 49500,
+    "not_sent": 0,
+    "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.",
+    "pending_limit": 4096,
+    "progress_batch_facts": 229080,
+    "progress_batch_http_errors": 0,
+    "progress_batch_http_requests": 1974,
+    "progress_errors": 0,
+    "progress_http_max_ms": 202.346833,
+    "progress_http_mean_ms": 32.183250236175084,
+    "progress_metric_note": "progress_requests counts logical fact checks; progress_http durations include batch queue wait. Actual batch HTTP requests/errors are separate.",
+    "progress_requests": 229080,
+    "progress_requests_per_second": 6489.467559519443,
+    "sampled_oldest_unfinished_max_ms": 3826.184,
+    "sampled_peak_unfinished": 2967,
+    "send_limit_hits": 32976,
+    "send_pacing_wait_p95_ms": 184.687084,
+    "send_permit_wait_p95_ms": 1.768583,
+    "started_unix_ns": 1790070920777497000,
+    "target_send_rate": 1500,
+    "timing_origin": "wallet_http_submit_v4",
+    "total_limit_hits": 0,
+    "total_permit_wait_p95_ms": 0.000208,
+    "trace": false,
+    "unknown": 0,
+    "wallet_block_observed": 49500,
+    "wallet_no_sync": true,
+    "wallet_queries": 179617,
+    "workload": "bounded_fast_receipt_with_independent_observation"
+  },
+  "send_span_s": 34.109184,
+  "actual_send_tps": 1451.1927344846479,
+  "successful_executions": 49500,
+  "failed_executions": 0,
+  "committee_equal": true,
+  "outbox_pending": 0,
+  "errors": {},
+  "all_stages_ms": {
+    "send_to_response": {
+      "n": 49500,
+      "mean": 17.714233171717172,
+      "p50": 5.237,
+      "p95": 81.718,
+      "p99": 112.457,
+      "max": 183.76,
+      "negative": 0
+    },
+    "wallet_verify_save": {
+      "n": 49500,
+      "mean": 1.4073666666666667,
+      "p50": 0.195,
+      "p95": 1.351,
+      "p99": 24.387,
+      "max": 198.054,
+      "negative": 0
+    },
+    "send_to_fast": {
+      "n": 49500,
+      "mean": 19.121599838383837,
+      "p50": 5.817,
+      "p95": 85.472,
+      "p99": 118.419,
+      "max": 289.65,
+      "negative": 0
+    },
+    "fast_to_wallet_block": {
+      "n": 49500,
+      "mean": 1360.2851941414142,
+      "p50": 1375.027,
+      "p95": 1700.054,
+      "p99": 1801.848,
+      "max": 3650.06,
+      "negative": 0
+    },
+    "send_to_wallet_block": {
+      "n": 49500,
+      "mean": 1379.406793979798,
+      "p50": 1380.066,
+      "p95": 1729.513,
+      "p99": 1861.653,
+      "max": 3652.978,
+      "negative": 0
+    },
+    "wallet_block_to_members": {
+      "n": 49500,
+      "mean": 154.72830123232322,
+      "p50": 146.745,
+      "p95": 269.247,
+      "p99": 351.411,
+      "max": 359.626,
+      "negative": 0
+    },
+    "send_to_member_completion": {
+      "n": 49500,
+      "mean": 1534.1350952121213,
+      "p50": 1532.939,
+      "p95": 1905.155,
+      "p99": 2035.968,
+      "max": 3914.959,
+      "negative": 0
+    }
+  },
+  "trace_coverage": {
+    "expected": 495,
+    "received": 0,
+    "three_selected_complete": 0,
+    "event_counts": {},
+    "selected_votes": 0
+  },
+  "gateway_ms": {},
+  "selected_member_ms": {},
+  "critical_third_vote_ms": {},
+  "selected_http_ms": {},
+  "traced_fast_ms": null,
+  "untraced_fast_ms": {
+    "n": 49500,
+    "mean": 19.12157813250505,
+    "p50": 5.816917,
+    "p95": 85.472125,
+    "p99": 118.41875,
+    "max": 289.649084,
+    "negative": 0
+  },
+  "windows": [
+    {
+      "end_s": 30,
+      "sent_tps": 1451.2,
+      "observed_commit_tps": 1425.8,
+      "active": 2506,
+      "pending": {
+        "members": 921,
+        "wallet_block": 1544,
+        "fast": 41
+      },
+      "fast_ms": {
+        "n": 43536,
+        "mean": 18.764730827384234,
+        "p50": 5.814708,
+        "p95": 84.02875,
+        "p99": 114.97875,
+        "max": 197.332041,
+        "negative": 0
+      },
+      "critical_member_ms": {}
+    },
+    {
+      "end_s": 60,
+      "sent_tps": 198.8,
+      "observed_commit_tps": 224.2,
+      "active": 0,
+      "pending": {},
+      "fast_ms": {
+        "n": 5964,
+        "mean": 21.726491659624415,
+        "p50": 5.838334,
+        "p95": 98.064,
+        "p99": 165.230042,
+        "max": 289.649084,
+        "negative": 0
+      },
+      "critical_member_ms": {}
+    }
+  ]
+}

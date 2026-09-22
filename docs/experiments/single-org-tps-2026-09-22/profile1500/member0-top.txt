@@ -1,0 +1,26 @@
+File: member-real
+Type: cpu
+Time: 2026-09-22 17:55:28 CST
+Duration: 12.16s, Total samples = 17.72s (145.70%)
+Showing nodes accounting for 15.01s, 84.71% of 17.72s total
+Dropped 363 nodes (cum <= 0.09s)
+Showing top 18 nodes out of 218
+      flat  flat%   sum%        cum   cum%
+     6.15s 34.71% 34.71%      6.15s 34.71%  syscall.rawsyscalln
+     2.02s 11.40% 46.11%      2.02s 11.40%  runtime.pthread_cond_signal
+     1.21s  6.83% 52.93%      1.21s  6.83%  runtime.madvise
+     0.87s  4.91% 57.84%      0.87s  4.91%  crypto/internal/fips140/edwards25519/field.addMul (inline)
+     0.86s  4.85% 62.70%      0.86s  4.85%  runtime.pthread_cond_wait
+     0.70s  3.95% 66.65%      0.70s  3.95%  crypto/internal/fips140/edwards25519/field.addMul19 (inline)
+     0.56s  3.16% 69.81%      0.56s  3.16%  runtime.usleep
+     0.48s  2.71% 72.52%      0.48s  2.71%  runtime.kevent
+     0.36s  2.03% 74.55%      1.60s  9.03%  crypto/internal/fips140/edwards25519/field.feMulGeneric
+     0.30s  1.69% 76.24%      0.34s  1.92%  crypto/internal/fips140/edwards25519/field.(*Element).carryPropagate (inline)
+     0.29s  1.64% 77.88%      0.80s  4.51%  crypto/internal/fips140/edwards25519/field.feSquare
+     0.29s  1.64% 79.51%      0.63s  3.56%  crypto/internal/fips140/edwards25519/field.feSquareN
+     0.22s  1.24% 80.76%      0.24s  1.35%  crypto/internal/fips140/edwards25519/field.mul (inline)
+     0.16s   0.9% 81.66%      0.16s   0.9%  runtime.memmove
+     0.15s  0.85% 82.51%      0.15s  0.85%  runtime.memclrNoHeapPointers
+     0.14s  0.79% 83.30%      0.14s  0.79%  encoding/json/internal/jsonwire.ConsumeSimpleString
+     0.13s  0.73% 84.03%      0.35s  1.98%  crypto/internal/fips140/edwards25519/field.(*Element).Subtract
+     0.12s  0.68% 84.71%      0.12s  0.68%  crypto/internal/fips140/edwards25519/field.shiftRightBy51 (inline)

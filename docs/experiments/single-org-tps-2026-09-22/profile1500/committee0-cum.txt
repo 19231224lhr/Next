@@ -1,0 +1,26 @@
+File: committee
+Type: cpu
+Time: 2026-09-22 17:55:28 CST
+Duration: 12.14s, Total samples = 16.33s (134.56%)
+Showing nodes accounting for 7.87s, 48.19% of 16.33s total
+Dropped 463 nodes (cum <= 0.08s)
+Showing top 18 nodes out of 230
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%      7.87s 48.19%  internal/poll.ignoringEINTRIO (inline)
+     7.87s 48.19% 48.19%      7.87s 48.19%  syscall.rawsyscalln
+         0     0% 48.19%      7.87s 48.19%  syscall.syscall
+         0     0% 48.19%      7.87s 48.19%  syscall.syscalln
+         0     0% 48.19%      5.92s 36.25%  github.com/cometbft/cometbft/p2p/conn.(*MConnection).recvRoutine
+         0     0% 48.19%      5.06s 30.99%  internal/poll.(*FD).Read
+         0     0% 48.19%      5.06s 30.99%  net.(*conn).Read
+         0     0% 48.19%      5.06s 30.99%  net.(*netFD).Read
+         0     0% 48.19%      5.06s 30.99%  syscall.Read (inline)
+         0     0% 48.19%      5.06s 30.99%  syscall.read
+         0     0% 48.19%      4.94s 30.25%  bufio.(*Reader).Read
+         0     0% 48.19%      4.94s 30.25%  github.com/cometbft/cometbft/libs/protoio.(*varintReader).ReadMsg
+         0     0% 48.19%      4.94s 30.25%  github.com/cometbft/cometbft/p2p/conn.(*SecretConnection).Read
+         0     0% 48.19%      4.94s 30.25%  io.ReadAtLeast
+         0     0% 48.19%      4.94s 30.25%  io.ReadFull (inline)
+         0     0% 48.19%      3.95s 24.19%  runtime.systemstack
+         0     0% 48.19%      3.18s 19.47%  net/http.(*conn).serve
+         0     0% 48.19%      2.81s 17.21%  internal/poll.(*FD).Write

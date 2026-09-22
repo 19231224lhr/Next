@@ -1,0 +1,12 @@
+goos: darwin
+goarch: arm64
+pkg: utxo/protocol
+cpu: Apple M4 Max
+BenchmarkReceiveDescriptorReuse/reuse2-16         	53830220	        22.07 ns/op	       0 B/op	       0 allocs/op
+BenchmarkReceiveDescriptorReuse/reuse2-16         	55451475	        22.12 ns/op	       0 B/op	       0 allocs/op
+BenchmarkReceiveDescriptorReuse/reuse2-16         	54502615	        22.10 ns/op	       0 B/op	       0 allocs/op
+BenchmarkReceiveDescriptorReuse/churn2048-16      	   47727	     25206 ns/op	     912 B/op	       9 allocs/op
+BenchmarkReceiveDescriptorReuse/churn2048-16      	   50634	     25107 ns/op	     912 B/op	       9 allocs/op
+BenchmarkReceiveDescriptorReuse/churn2048-16      	   48386	     25080 ns/op	     912 B/op	       9 allocs/op
+PASS
+ok  	utxo/protocol	12.096s

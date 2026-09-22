@@ -1,0 +1,69 @@
+{
+  "member_urls": [
+    "http://127.0.0.1:24000",
+    "http://127.0.0.1:24001",
+    "http://127.0.0.1:24002",
+    "http://127.0.0.1:24003"
+  ],
+  "arguments": {
+    "label": "timer250",
+    "count": 49500,
+    "rate": 2000.0,
+    "port": 24000,
+    "trace_every": 100,
+    "template": "/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-base1100",
+    "member_memory": true,
+    "wallet_no_sync": true,
+    "gateway_memory": true,
+    "no_trace": true,
+    "unbatched_progress": false,
+    "max_pending": 4096,
+    "profile": false,
+    "no_descriptor_cache": false,
+    "committee_memory": true,
+    "commit_ms": 250,
+    "member_foreground": 256
+  },
+  "bench_args": [
+    "/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-timer250-bin/payctl",
+    "bench-v4",
+    "-dir",
+    "/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-timer250",
+    "-start",
+    "0",
+    "-count",
+    "49500",
+    "-concurrency",
+    "256",
+    "-max-pending",
+    "4096",
+    "-rate",
+    "2000.0",
+    "-wallet-no-sync"
+  ],
+  "genesis_sha256": "4855c4e7a51f4615b3fbfd44a54df01e683aeb3c2eee94b87aa626bc6a3dbaf5",
+  "binaries": {
+    "payctl": "9d41b7dc3c83cfdf9748f80425bbb309f0ba772b051d94b37d64f70c22cee197",
+    "member-real": "68de2792bf1c20d0f483cc3c825984d8c6236038b82be39405b9580e86fecce0",
+    "gateway": "162ad1e955501851b80345ba7cc75fe5b80c4ff31d1e41434d1d8cd4584a6143",
+    "committee": "dc637e0603212b6f6e15ee4f899e17b8f9903576cccc6e4fbc544cc546746258"
+  },
+  "source_head": "e3870e1cb269df1b961794a7c215e920b8ddda92",
+  "nodes": 9,
+  "member_memory": true,
+  "gateway_memory": true,
+  "wallet_no_sync": true,
+  "committee_mem_blockstore": true,
+  "trace_every": 100,
+  "concurrency": 256,
+  "max_pending": 4096,
+  "new_source_sha256": {
+    "cmd/payctl/progress_batch.go": "387ec0efebc8be167354b0a4ab0208d991e45792f4e884dee3ae85f2eee67f3b",
+    "cmd/payctl/progress_batch_test.go": "c9133fe4ffcf0088d4d5c83e3507d53b90dbc308360bc3268ed5a61efd55eeb6",
+    "internal/member/progress_batch_test.go": "8aabc695b40636eccac23e6b0668c8d4f3831a844204adbba7bbbedbea01cce3",
+    "internal/transport/progress_batch_test.go": "d8156535674603526774dd64bd10f27bd4c0f5f5780fdc365d7e846e9a1ef997",
+    "protocol/descriptor_cache.go": "0fe1d2aff986a81a63faf7b744f19f6b1b153f1b3771361bc9f700c0a364d1cf",
+    "protocol/descriptor_cache_test.go": "8d331e2e4516beb2ef058a82e6c1f2c30bfbe05af180d08a1d94942c6ceba013"
+  },
+  "shutdown_and_audit_export_s": 2.0895348749999982
+}

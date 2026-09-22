@@ -50,6 +50,28 @@ pool. Reports include dispatch/permit waiting, progress-query load, per-stage
 outcomes, and a 250 ms reconstruction of unfinished counts and oldest age.
 See [the benchmark admission plan and experiments](docs/experiments/dispatch-lag-2026-09-20/PLAN.md).
 
+### Single-organization whole-system experiments
+
+`bench-v4 -same-org` sends between two wallet identities through the issuing
+organization. The new bounded `POST /v4/progress` endpoint coalesces up to 128
+exact fact reads in one store view. `-batch-progress` is enabled by default;
+`-batch-progress=false` retains the original per-fact observer for comparisons.
+Completion still requires each member's own observed/closed state, not height
+or HTTP acceptance. Reports separate physical batch requests and time from
+logical checks and queue waiting.
+
+Repeated, successfully verified recipient descriptors use a bounded 1024-entry
+cache keyed by their entire signed value. Network/routing rules and every
+payment's owner authorization, quorum and mutable input/budget checks remain.
+This particularly benefits address reuse; address-churn results are reported
+separately. No new output certificate is submitted to the committee.
+
+`UTXO_EXPERIMENT_COMMIT=250ms` optionally shortens the direct-mode height timing
+for whole-system latency experiments. The default remains 500ms, overlapping
+execution/Commit. This changes no quorum, proof, timeout-repair or durability rule.
+The complete nine-service workload, storage modes, controls and results are in
+[the single-organization TPS report](docs/experiments/single-org-tps-2026-09-22/README.md).
+
 The prior wire-v3 baseline is commit `039374d`; its historical measurements are
 in [v1.2 implementation notes](docs/implementation-v1.2.md). Current short tests
 do not establish sustained high TPS or bounded long-term storage.

@@ -1,0 +1,68 @@
+File: committee
+Type: cpu
+Time: 2026-09-22 18:25:30 CST
+Duration: 12.15s, Total samples = 18.97s (156.07%)
+Showing nodes accounting for 11.81s, 62.26% of 18.97s total
+Dropped 542 nodes (cum <= 0.09s)
+Showing top 60 nodes out of 250
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%      9.14s 48.18%  syscall.syscall
+     0.01s 0.053% 0.053%      9.14s 48.18%  syscall.syscalln
+     9.13s 48.13% 48.18%      9.13s 48.13%  syscall.rawsyscalln
+         0     0% 48.18%      9.10s 47.97%  internal/poll.ignoringEINTRIO (inline)
+         0     0% 48.18%      6.32s 33.32%  github.com/cometbft/cometbft/p2p/conn.(*MConnection).recvRoutine
+         0     0% 48.18%      5.72s 30.15%  internal/poll.(*FD).Read
+         0     0% 48.18%      5.72s 30.15%  net.(*conn).Read
+         0     0% 48.18%      5.72s 30.15%  net.(*netFD).Read
+         0     0% 48.18%      5.72s 30.15%  syscall.Read (inline)
+         0     0% 48.18%      5.72s 30.15%  syscall.read
+         0     0% 48.18%      5.62s 29.63%  bufio.(*Reader).Read
+         0     0% 48.18%      5.62s 29.63%  github.com/cometbft/cometbft/libs/protoio.(*varintReader).ReadMsg
+         0     0% 48.18%      5.62s 29.63%  github.com/cometbft/cometbft/p2p/conn.(*SecretConnection).Read
+         0     0% 48.18%      5.62s 29.63%  io.ReadAtLeast
+         0     0% 48.18%      5.62s 29.63%  io.ReadFull (inline)
+     0.01s 0.053% 48.23%      4.65s 24.51%  runtime.systemstack
+         0     0% 48.23%      3.86s 20.35%  net/http.(*conn).serve
+         0     0% 48.23%      3.38s 17.82%  internal/poll.(*FD).Write
+         0     0% 48.23%      3.38s 17.82%  syscall.Write (inline)
+         0     0% 48.23%      3.38s 17.82%  syscall.write
+         0     0% 48.23%      3.19s 16.82%  bufio.(*Writer).Flush
+         0     0% 48.23%      3.19s 16.82%  net.(*conn).Write
+         0     0% 48.23%      3.19s 16.82%  net.(*netFD).Write
+         0     0% 48.23%      2.23s 11.76%  net/http.(*ServeMux).ServeHTTP
+         0     0% 48.23%      2.23s 11.76%  net/http.HandlerFunc.ServeHTTP
+         0     0% 48.23%      2.23s 11.76%  net/http.serverHandler.ServeHTTP
+         0     0% 48.23%      2.07s 10.91%  net/http.checkConnErrorWriter.Write
+         0     0% 48.23%      2.06s 10.86%  runtime.(*mheap).alloc.func1
+     0.01s 0.053% 48.29%      2.05s 10.81%  runtime.(*mheap).allocSpan
+         0     0% 48.29%      1.75s  9.23%  main.blockRoutes.func1
+         0     0% 48.29%      1.62s  8.54%  github.com/cometbft/cometbft/consensus.(*State).receiveRoutine
+         0     0% 48.29%      1.57s  8.28%  bufio.(*Writer).Write
+         0     0% 48.29%      1.55s  8.17%  net/http.(*response).finishRequest
+         0     0% 48.29%      1.44s  7.59%  github.com/cometbft/cometbft/consensus.(*State).handleMsg
+     1.35s  7.12% 55.40%      1.36s  7.17%  runtime.pthread_cond_signal
+         0     0% 55.40%      1.36s  7.17%  runtime.semawakeup
+         0     0% 55.40%      1.35s  7.12%  github.com/cometbft/cometbft/consensus.(*State).addVote
+         0     0% 55.40%      1.35s  7.12%  github.com/cometbft/cometbft/consensus.(*State).tryAddVote
+         0     0% 55.40%      1.34s  7.06%  runtime.wakep
+         0     0% 55.40%      1.31s  6.91%  runtime.notewakeup
+         0     0% 55.40%      1.31s  6.91%  runtime.startm
+         0     0% 55.40%      1.30s  6.85%  github.com/cometbft/cometbft/consensus.(*State).enterCommit
+         0     0% 55.40%      1.30s  6.85%  github.com/cometbft/cometbft/consensus.(*State).enterCommit.func1
+         0     0% 55.40%      1.30s  6.85%  github.com/cometbft/cometbft/consensus.(*State).finalizeCommit
+         0     0% 55.40%      1.30s  6.85%  github.com/cometbft/cometbft/consensus.(*State).tryFinalizeCommit
+         0     0% 55.40%      1.29s  6.80%  github.com/cometbft/cometbft/state.(*BlockExecutor).ApplyVerifiedBlock (inline)
+         0     0% 55.40%      1.29s  6.80%  github.com/cometbft/cometbft/state.(*BlockExecutor).applyBlock
+     1.27s  6.69% 62.10%      1.27s  6.69%  runtime.usleep
+     0.01s 0.053% 62.15%      1.26s  6.64%  utxo/internal/committee.(*Engine).verifyV3
+         0     0% 62.15%      1.25s  6.59%  utxo/internal/committee.(*Engine).Check
+         0     0% 62.15%      1.21s  6.38%  runtime.lock (partial-inline)
+     0.01s 0.053% 62.20%      1.21s  6.38%  runtime.lock2
+         0     0% 62.20%      1.21s  6.38%  runtime.lockWithRank (inline)
+         0     0% 62.20%      1.18s  6.22%  github.com/cometbft/cometbft/abci/client.(*localClient).FinalizeBlock
+         0     0% 62.20%      1.18s  6.22%  github.com/cometbft/cometbft/proxy.(*appConnConsensus).FinalizeBlock
+     0.01s 0.053% 62.26%      1.18s  6.22%  utxo/internal/committee.(*App).FinalizeBlock
+         0     0% 62.26%      1.17s  6.17%  github.com/cometbft/cometbft/proxy.(*appConnMempool).CheckTxAsync
+         0     0% 62.26%      1.17s  6.17%  utxo/internal/committee.(*parallelCheckClient).CheckTxAsync
+         0     0% 62.26%      1.16s  6.11%  github.com/cometbft/cometbft/mempool.(*CListMempool).CheckTx
+         0     0% 62.26%      1.16s  6.11%  github.com/cometbft/cometbft/p2p/conn.(*MConnection).sendRoutine

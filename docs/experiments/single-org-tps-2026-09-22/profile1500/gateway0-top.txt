@@ -1,0 +1,26 @@
+File: gateway
+Type: cpu
+Time: 2026-09-22 17:55:28 CST
+Duration: 12.12s, Total samples = 40.25s (332.08%)
+Showing nodes accounting for 36.56s, 90.83% of 40.25s total
+Dropped 491 nodes (cum <= 0.20s)
+Showing top 18 nodes out of 195
+      flat  flat%   sum%        cum   cum%
+    21.73s 53.99% 53.99%     21.73s 53.99%  syscall.rawsyscalln
+     4.73s 11.75% 65.74%      4.73s 11.75%  runtime.madvise
+     1.83s  4.55% 70.29%      1.83s  4.55%  runtime.usleep
+     1.47s  3.65% 73.94%      1.51s  3.75%  crypto/internal/fips140/edwards25519/field.addMul (inline)
+     1.20s  2.98% 76.92%      1.20s  2.98%  runtime.kevent
+     0.94s  2.34% 79.25%      0.96s  2.39%  crypto/internal/fips140/edwards25519/field.addMul19 (inline)
+     0.78s  1.94% 81.19%      0.78s  1.94%  runtime.pthread_cond_wait
+     0.51s  1.27% 82.46%      0.51s  1.27%  runtime.pthread_cond_signal
+     0.50s  1.24% 83.70%      0.50s  1.24%  runtime.pthread_kill
+     0.48s  1.19% 84.89%      2.74s  6.81%  crypto/internal/fips140/edwards25519/field.feMulGeneric
+     0.47s  1.17% 86.06%      0.55s  1.37%  crypto/internal/fips140/edwards25519/field.(*Element).carryPropagate (inline)
+     0.41s  1.02% 87.08%      1.24s  3.08%  crypto/internal/fips140/edwards25519/field.feSquare
+     0.39s  0.97% 88.05%      0.39s  0.97%  crypto/internal/fips140/edwards25519/field.mul (inline)
+     0.37s  0.92% 88.97%      0.78s  1.94%  crypto/internal/fips140/edwards25519/field.feSquareN
+     0.33s  0.82% 89.79%      0.34s  0.84%  crypto/internal/fips140/edwards25519/field.shiftRightBy51 (inline)
+     0.14s  0.35% 90.14%      5.16s 12.82%  crypto/internal/fips140/edwards25519.(*Point).VarTimeDoubleScalarBaseMult
+     0.14s  0.35% 90.48%      0.32s   0.8%  crypto/internal/fips140/edwards25519/field.(*Element).Add
+     0.14s  0.35% 90.83%      0.52s  1.29%  crypto/internal/fips140/edwards25519/field.(*Element).Subtract
