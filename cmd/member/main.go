@@ -75,7 +75,7 @@ func run() (result error) {
 	if e != nil {
 		return e
 	}
-	server, e := cfg.HTTP(c.Listen, transport.MemberHandler(m, 128, 32), c.TLS)
+	server, e := cfg.HTTP(c.Listen, transport.MemberHandler(m, 256, 32), c.TLS)
 	if e != nil {
 		return e
 	}

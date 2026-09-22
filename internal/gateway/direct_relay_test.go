@@ -407,3 +407,93 @@ func TestDirectRelayCompletionWinsOverInflightWork(t *testing.T) {
 		t.Fatal("late ACK revived completed scheduling state")
 	}
 }
+
+func TestDirectRelayRetainsFirstUnscheduledSubmit(t *testing.T) {
+	_, r, _ := directRelayFixture(t, 32)
+	// Exclude INSTALL completions: only public-slot availability advances this test.
+	r.Members = nil
+	entries, err := store.Scan(r.DB, state.Key(state.KeyOutbox), nil, 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var expected protocol.SpendFactID
+	copy(expected[:], entries[8].Key[len(entries[8].Key)-len(expected):])
+	seen := make(chan protocol.SpendFactID, 32)
+	release := make(chan struct{})
+	r.Public = relayPublic{submit: func(ctx context.Context, raw []byte) error {
+		p, err := protocol.DecodeDirectSubmission(raw)
+		if err != nil {
+			return err
+		}
+		seen <- p.Authorization.Fact
+		select {
+		case <-release:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}}
+	startDirectRelay(t, r)
+	for i := 0; i < 8; i++ {
+		select {
+		case <-seen:
+		case <-time.After(time.Second):
+			t.Fatal("initial slots did not fill")
+		}
+	}
+	// Release exactly one slot; the next unseen durable item must not be skipped.
+	release <- struct{}{}
+	select {
+	case fact := <-seen:
+		if fact != expected {
+			t.Fatalf("cursor skipped first unscheduled payment: got %x want %x", fact, expected)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("vacant slot was not filled")
+	}
+}
+
+func TestDirectRelayBoundedSlotsDrainOnShutdown(t *testing.T) {
+	_, r, payments := directRelayFixture(t, 32)
+	submitted := make(chan struct{}, 32)
+	installed := make(chan struct{}, 32)
+	r.Public = relayPublic{submit: func(ctx context.Context, _ []byte) error {
+		submitted <- struct{}{}
+		<-ctx.Done()
+		return ctx.Err()
+	}}
+	clients := r.Members[payments[0].Tx.Body.Certifier]
+	for i := range clients {
+		clients[i] = relayInstaller{install: func(ctx context.Context, _ protocol.DirectPayment) error {
+			installed <- struct{}{}
+			<-ctx.Done()
+			return ctx.Err()
+		}}
+	}
+	r.Members[payments[0].Tx.Body.Certifier] = clients
+	startDirectRelay(t, r) // Cleanup must join all eight submit plus four INSTALL tasks.
+	for i := 0; i < 8; i++ {
+		select {
+		case <-submitted:
+		case <-time.After(time.Second):
+			t.Fatalf("only %d public slots started", i)
+		}
+	}
+	for i := 0; i < 4; i++ {
+		select {
+		case <-installed:
+		case <-time.After(time.Second):
+			t.Fatalf("only %d INSTALL slots started", i)
+		}
+	}
+	select {
+	case <-submitted:
+		t.Fatal("public concurrency exceeded eight")
+	default:
+	}
+	select {
+	case <-installed:
+		t.Fatal("INSTALL concurrency exceeded four")
+	default:
+	}
+}

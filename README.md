@@ -29,6 +29,15 @@ There is no crash recovery or resume mode. `bench-v4 -wallet-no-sync` independen
 opts the benchmark wallet out of disk synchronization (the default is false).
 See [full-path measurements and the all-source reproduction tool](docs/experiments/full-path-opt-2026-09-22/README.md).
 
+The same fresh-start storage mode is available to gateways with
+`UTXO_EXPERIMENT_GATEWAY_MEMORY=1`. It retains atomic updates, completed-block
+checks and bounded background work, but performs no runtime gateway database
+writes. Shutdown exports an audit-only `gateway.db`; failed exports are returned
+as errors and are not usable for restart. The default gateway remains synchronous
+bbolt. Public relay submission has 8 bounded slots (INSTALL remains 4), and
+member foreground admission has 256 slots (background remains 32). These limits
+absorb measured bursts; they do not remove overload or validation. See [the isolated comparisons and reproduction commands](docs/experiments/tps-opt2-2026-09-22/RESULTS.md).
+
 Run `python3 third_party/cometbft/overlay.py` before building. Keep the existing
 `-tags=comet_v3` fork build switch, but use `payctl init-lab -v4`, `bench-v4` and
 `demo-v4` with a fresh genesis. Do not reuse wire-v3 databases.

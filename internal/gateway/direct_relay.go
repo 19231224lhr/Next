@@ -34,13 +34,13 @@ func (r *Relay) runDirect(ctx context.Context) error {
 		earlyWake = r.Early.wake
 	}
 	preferEarly := false
-	lanes := [2]directLane{{limit: 4, scanning: true, wrapped: true}, {limit: 4, scanning: true, wrapped: true}}
+	lanes := [2]directLane{{limit: 8, scanning: true, wrapped: true}, {limit: 4, scanning: true, wrapped: true}}
 	busy := make(map[directTask]bool)
 	// Only pacing lives here. Durable outbox and verified block following still
 	// own recovery and completion. Restart may resend the identical command early.
 	nextSubmit := make(map[protocol.SpendFactID]time.Time)
 	const maxCooling = 8192
-	done := make(chan directTask, 8)
+	done := make(chan directTask, lanes[0].limit+lanes[1].limit)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	again := make(chan struct{})
@@ -110,6 +110,10 @@ func (r *Relay) runDirect(ctx context.Context) error {
 			}
 		}
 		for _, entry := range entries {
+			// Keep the cursor before a payment that could not get a submit slot.
+			if index == 0 && lane.active == lane.limit {
+				return nil
+			}
 			var pending state.Outbox
 			if err := json.Unmarshal(entry.Value, &pending); err != nil {
 				return err

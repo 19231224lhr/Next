@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"io"
 	"log/slog"
@@ -85,7 +86,7 @@ func paymentHandler(collector *gateway.Collector) http.HandlerFunc {
 	}
 }
 
-func run() error {
+func run() (result error) {
 	path := flag.String("config", "", "gateway config JSON")
 	flag.Parse()
 	var c configuration
@@ -104,7 +105,13 @@ func run() error {
 	if e != nil {
 		return e
 	}
-	base, e := store.Open(filepath.Join(c.DataDir, "gateway.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: n.Schema()})
+	id := store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: n.Schema()}
+	var base store.Store
+	if os.Getenv("UTXO_EXPERIMENT_GATEWAY_MEMORY") == "1" {
+		base, e = store.OpenEphemeral(filepath.Join(c.DataDir, "gateway.db"), id)
+	} else {
+		base, e = store.Open(filepath.Join(c.DataDir, "gateway.db"), id)
+	}
 	if e != nil {
 		return e
 	}
@@ -113,7 +120,7 @@ func run() error {
 		base.Close()
 		return e
 	}
-	defer db.Close()
+	defer func() { result = errors.Join(result, db.Close()) }()
 	var clients [4]gateway.MemberClient
 	for i, url := range c.Members {
 		clients[i] = transport.NewMemberClient(url)

@@ -16,7 +16,7 @@ import (
 var ErrAuditSnapshot = errors.New("ephemeral audit snapshot or unfinished experiment; use a fresh directory")
 var auditOnlyKey = []byte("audit-only")
 
-// Ephemeral keeps experimental member state in memory. It has atomic updates
+// Ephemeral keeps experimental node state in memory. It has atomic updates
 // and ordered scans, but no crash recovery. Close exports a final audit snapshot;
 // that export is outside the payment benchmark and is never used to resume.
 type Ephemeral struct {
