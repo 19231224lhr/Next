@@ -1,0 +1,169 @@
+{
+  "prepare_enter": {
+    "n": 24,
+    "p50_ms": 2.261,
+    "p95_ms": 3.067,
+    "max_ms": 3.408
+  },
+  "process_enter": {
+    "n": 94,
+    "p50_ms": 2.2960000000000003,
+    "p95_ms": 5.963,
+    "max_ms": 10.446
+  },
+  "finalize_enter": {
+    "n": 93,
+    "p50_ms": 90.745,
+    "p95_ms": 119.287,
+    "max_ms": 132.189
+  },
+  "commit_start": {
+    "n": 93,
+    "p50_ms": 157.238,
+    "p95_ms": 197.444,
+    "max_ms": 209.77
+  },
+  "last_cache": {
+    "bytes": "77922304",
+    "cached": "true",
+    "duration_ns": "1542",
+    "entries": "32768",
+    "evictions": "87232",
+    "hits": "544576",
+    "key": "d3b376b1a4822578280d088b88d1b73816e3ea4675d16bb6971d1cdfecac34f4",
+    "misses": "120000",
+    "oversized": "0"
+  },
+  "ops": {
+    "atomic_file_open": {
+      "n": 215,
+      "p50_ms": 0.09525,
+      "max_ms": 8.261958
+    },
+    "atomic_file_write_sync": {
+      "n": 215,
+      "p50_ms": 0.080459,
+      "max_ms": 5.543542
+    },
+    "atomic_file_close": {
+      "n": 215,
+      "p50_ms": 0.009291,
+      "max_ms": 4.149958
+    },
+    "atomic_file_rename": {
+      "n": 215,
+      "p50_ms": 0.121375,
+      "max_ms": 7.884375
+    },
+    "filepv_encode": {
+      "n": 213,
+      "p50_ms": 0.013333,
+      "max_ms": 0.451709
+    },
+    "filepv_save": {
+      "n": 213,
+      "p50_ms": 0.394917,
+      "max_ms": 13.525958
+    },
+    "consensus_state_save": {
+      "n": 94,
+      "p50_ms": 0.010666499999999999,
+      "max_ms": 0.020083
+    },
+    "autofile_sync_needed": {
+      "n": 673,
+      "p50_ms": 3.978875,
+      "max_ms": 17.664334
+    },
+    "vote_wal_flush": {
+      "n": 185,
+      "p50_ms": 6.387584,
+      "max_ms": 16.463792
+    },
+    "vote_sign": {
+      "n": 169,
+      "p50_ms": 0.490417,
+      "max_ms": 13.557708
+    },
+    "internal_message_wal": {
+      "n": 189,
+      "p50_ms": 4.206833,
+      "max_ms": 14.848333
+    },
+    "blockstore_save": {
+      "n": 94,
+      "p50_ms": 0.30281250000000004,
+      "max_ms": 1.277042
+    },
+    "endheight_wal": {
+      "n": 94,
+      "p50_ms": 4.480999499999999,
+      "max_ms": 15.370208
+    },
+    "finalize_history_encode": {
+      "n": 93,
+      "p50_ms": 0.011583,
+      "max_ms": 0.028625
+    },
+    "finalize_history_batch_set": {
+      "n": 93,
+      "p50_ms": 0.000584,
+      "max_ms": 0.005875
+    },
+    "finalize_recovery_encode": {
+      "n": 92,
+      "p50_ms": 0.0115415,
+      "max_ms": 0.023708
+    },
+    "finalize_batch_write_sync": {
+      "n": 93,
+      "p50_ms": 0.004042,
+      "max_ms": 0.006791
+    },
+    "commit_mempool_lock": {
+      "n": 93,
+      "p50_ms": 0.000375,
+      "max_ms": 0.681875
+    },
+    "commit_mempool_flush": {
+      "n": 93,
+      "p50_ms": 0.000417,
+      "max_ms": 0.00125
+    },
+    "proposal_build": {
+      "n": 24,
+      "p50_ms": 4.7513749999999995,
+      "max_ms": 6.553083
+    },
+    "proposal_parts": {
+      "n": 24,
+      "p50_ms": 4.0706454999999995,
+      "max_ms": 5.703917
+    },
+    "autofile_sync_skipped": {
+      "n": 33,
+      "p50_ms": 4.2e-05,
+      "max_ms": 0.000208
+    },
+    "proposal_wal_flush": {
+      "n": 24,
+      "p50_ms": 4.064667,
+      "max_ms": 6.7395
+    },
+    "proposal_batch_wal": {
+      "n": 151,
+      "p50_ms": 4.159333,
+      "max_ms": 10.86075
+    },
+    "finalize_response_save": {
+      "n": 57,
+      "p50_ms": 0.036167,
+      "max_ms": 0.063542
+    },
+    "proposal_sign": {
+      "n": 19,
+      "p50_ms": 0.369583,
+      "max_ms": 0.552083
+    }
+  }
+}

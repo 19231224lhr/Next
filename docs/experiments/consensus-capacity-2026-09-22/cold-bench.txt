@@ -1,0 +1,27 @@
+baseline
+goos: darwin
+goarch: arm64
+pkg: utxo/internal/committee
+cpu: Apple M4 Max
+BenchmarkDirectColdVerification-16    	    4263	    558842 ns/op	  157461 B/op	     760 allocs/op
+BenchmarkDirectColdVerification-16    	    4292	    558219 ns/op	  157449 B/op	     760 allocs/op
+PASS
+ok  	utxo/internal/committee	5.648s
+clone
+goos: darwin
+goarch: arm64
+pkg: utxo/internal/committee
+cpu: Apple M4 Max
+BenchmarkDirectColdVerification-16    	    6219	    379315 ns/op	  117840 B/op	     570 allocs/op
+BenchmarkDirectColdVerification-16    	    6312	    379490 ns/op	  117835 B/op	     570 allocs/op
+PASS
+ok  	utxo/internal/committee	5.360s
+baseline-repeat
+goos: darwin
+goarch: arm64
+pkg: utxo/internal/committee
+cpu: Apple M4 Max
+BenchmarkDirectColdVerification-16    	    4263	    557966 ns/op	  157447 B/op	     760 allocs/op
+BenchmarkDirectColdVerification-16    	    4317	    557691 ns/op	  157451 B/op	     760 allocs/op
+PASS
+ok  	utxo/internal/committee	5.442s

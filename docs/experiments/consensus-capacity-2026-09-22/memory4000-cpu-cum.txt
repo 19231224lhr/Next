@@ -1,0 +1,53 @@
+File: committee-finaldiag
+Type: cpu
+Time: 2026-09-22 16:53:11 CST
+Duration: 15.14s, Total samples = 45.96s (303.61%)
+Showing nodes accounting for 27.43s, 59.68% of 45.96s total
+Dropped 653 nodes (cum <= 0.23s)
+Showing top 45 nodes out of 227
+      flat  flat%   sum%        cum   cum%
+    20.38s 44.34% 44.34%     20.38s 44.34%  syscall.rawsyscalln
+         0     0% 44.34%     20.38s 44.34%  syscall.syscalln
+         0     0% 44.34%     20.37s 44.32%  syscall.syscall
+         0     0% 44.34%     20.35s 44.28%  internal/poll.ignoringEINTRIO (inline)
+         0     0% 44.34%     19.06s 41.47%  github.com/cometbft/cometbft/p2p/conn.(*MConnection).recvRoutine
+         0     0% 44.34%     14.35s 31.22%  internal/poll.(*FD).Read
+         0     0% 44.34%     14.35s 31.22%  net.(*conn).Read
+         0     0% 44.34%     14.35s 31.22%  net.(*netFD).Read
+         0     0% 44.34%     14.35s 31.22%  syscall.Read (inline)
+         0     0% 44.34%     14.35s 31.22%  syscall.read
+         0     0% 44.34%     14.21s 30.92%  github.com/cometbft/cometbft/libs/protoio.(*varintReader).ReadMsg
+         0     0% 44.34%     14.20s 30.90%  bufio.(*Reader).Read
+     0.01s 0.022% 44.36%     14.20s 30.90%  github.com/cometbft/cometbft/p2p/conn.(*SecretConnection).Read
+         0     0% 44.36%     14.20s 30.90%  io.ReadAtLeast
+         0     0% 44.36%     14.20s 30.90%  io.ReadFull (inline)
+         0     0% 44.36%      9.28s 20.19%  runtime.systemstack
+         0     0% 44.36%      8.66s 18.84%  utxo/internal/committee.(*Engine).Check
+     0.03s 0.065% 44.43%      8.46s 18.41%  utxo/internal/committee.(*Engine).verifyV3
+         0     0% 44.43%      8.26s 17.97%  github.com/cometbft/cometbft/mempool.(*CListMempool).CheckTx
+         0     0% 44.43%      8.26s 17.97%  github.com/cometbft/cometbft/proxy.(*appConnMempool).CheckTxAsync
+         0     0% 44.43%      8.24s 17.93%  utxo/internal/committee.(*parallelCheckClient).CheckTxAsync
+         0     0% 44.43%      8.09s 17.60%  utxo/internal/committee.(*parallelCheckCreator).warm
+         0     0% 44.43%      7.15s 15.56%  net/http.(*conn).serve
+     0.01s 0.022% 44.45%      6.89s 14.99%  runtime.semawakeup
+     6.88s 14.97% 59.42%      6.88s 14.97%  runtime.pthread_cond_signal
+         0     0% 59.42%      6.87s 14.95%  runtime.notewakeup
+         0     0% 59.42%      6.87s 14.95%  runtime.startm
+         0     0% 59.42%      6.87s 14.95%  runtime.wakep
+         0     0% 59.42%      6.51s 14.16%  utxo/internal/rules.VerifyDirectSubmission
+         0     0% 59.42%      6.41s 13.95%  crypto/ed25519.Verify (inline)
+         0     0% 59.42%      6.41s 13.95%  crypto/ed25519.VerifyWithOptions
+         0     0% 59.42%      6.33s 13.77%  _.goready.func1
+         0     0% 59.42%      6.33s 13.77%  runtime.ready
+         0     0% 59.42%         6s 13.05%  internal/poll.(*FD).Write
+         0     0% 59.42%         6s 13.05%  syscall.Write (inline)
+         0     0% 59.42%         6s 13.05%  syscall.write
+         0     0% 59.42%      5.84s 12.71%  crypto/internal/fips140/ed25519.Verify (inline)
+         0     0% 59.42%      5.84s 12.71%  crypto/internal/fips140/ed25519.verify
+         0     0% 59.42%      5.84s 12.71%  crypto/internal/fips140/ed25519.verifyWithDom
+         0     0% 59.42%      5.82s 12.66%  bufio.(*Writer).Flush
+         0     0% 59.42%      5.75s 12.51%  net.(*conn).Write
+         0     0% 59.42%      5.75s 12.51%  net.(*netFD).Write
+     0.12s  0.26% 59.68%      5.34s 11.62%  crypto/internal/fips140/edwards25519.(*Point).VarTimeDoubleScalarBaseMult
+         0     0% 59.68%      4.85s 10.55%  github.com/cometbft/cometbft/p2p.createMConnection.func1
+         0     0% 59.68%      4.82s 10.49%  github.com/cometbft/cometbft/mempool.(*Reactor).Receive

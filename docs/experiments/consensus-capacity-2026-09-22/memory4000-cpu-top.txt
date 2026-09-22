@@ -1,0 +1,38 @@
+File: committee-finaldiag
+Type: cpu
+Time: 2026-09-22 16:53:11 CST
+Duration: 15.14s, Total samples = 45.96s (303.61%)
+Showing nodes accounting for 40s, 87.03% of 45.96s total
+Dropped 653 nodes (cum <= 0.23s)
+Showing top 30 nodes out of 227
+      flat  flat%   sum%        cum   cum%
+    20.38s 44.34% 44.34%     20.38s 44.34%  syscall.rawsyscalln
+     6.88s 14.97% 59.31%      6.88s 14.97%  runtime.pthread_cond_signal
+     1.89s  4.11% 63.42%      1.89s  4.11%  runtime.usleep
+     1.67s  3.63% 67.06%      1.67s  3.63%  runtime.kevent
+     1.42s  3.09% 70.15%      1.42s  3.09%  crypto/internal/fips140/edwards25519/field.addMul (inline)
+     1.11s  2.42% 72.56%      1.11s  2.42%  crypto/internal/fips140/edwards25519/field.addMul19 (inline)
+     0.67s  1.46% 74.02%      0.67s  1.46%  runtime.pthread_cond_wait
+     0.62s  1.35% 75.37%      2.80s  6.09%  crypto/internal/fips140/edwards25519/field.feMulGeneric
+     0.53s  1.15% 76.52%      0.53s  1.15%  crypto/internal/fips140/edwards25519/field.mul (inline)
+     0.50s  1.09% 77.61%      1.45s  3.15%  crypto/internal/fips140/edwards25519/field.feSquare
+     0.45s  0.98% 78.59%      0.87s  1.89%  crypto/internal/fips140/edwards25519/field.feSquareN
+     0.41s  0.89% 79.48%      0.41s  0.89%  runtime.madvise
+     0.40s  0.87% 80.35%      0.40s  0.87%  crypto/internal/fips140/sha256.blockSHA2
+     0.37s  0.81% 81.16%      0.37s  0.81%  runtime.memclrNoHeapPointers
+     0.37s  0.81% 81.96%      0.37s  0.81%  runtime.memmove
+     0.36s  0.78% 82.75%      0.43s  0.94%  crypto/internal/fips140/edwards25519/field.(*Element).carryPropagate (inline)
+     0.29s  0.63% 83.38%      0.29s  0.63%  bytes.Equal
+     0.25s  0.54% 83.92%      0.25s  0.54%  crypto/internal/fips140/edwards25519/field.shiftRightBy51 (inline)
+     0.22s  0.48% 84.40%      0.28s  0.61%  runtime.tryDeferToSpanScan
+     0.18s  0.39% 84.79%      0.34s  0.74%  crypto/internal/fips140/edwards25519/field.(*Element).Add
+     0.18s  0.39% 85.18%      0.36s  0.78%  sort.Search (inline)
+     0.14s   0.3% 85.49%      0.41s  0.89%  crypto/internal/fips140/edwards25519/field.(*Element).Subtract
+     0.13s  0.28% 85.77%      0.61s  1.33%  runtime.scanObject
+     0.12s  0.26% 86.03%      5.34s 11.62%  crypto/internal/fips140/edwards25519.(*Point).VarTimeDoubleScalarBaseMult
+     0.10s  0.22% 86.25%      2.09s  4.55%  crypto/internal/fips140/edwards25519.(*projP1xP1).Double
+     0.10s  0.22% 86.47%      0.46s  1.00%  github.com/google/btree.items[go.shape.struct { Key []uint8; Value []uint8 }].find
+     0.08s  0.17% 86.64%      0.31s  0.67%  math/big.nat.divBasic
+     0.07s  0.15% 86.79%      0.40s  0.87%  runtime.(*sweepLocked).sweep
+     0.06s  0.13% 86.92%      1.29s  2.81%  runtime.growslice
+     0.05s  0.11% 87.03%      0.26s  0.57%  encoding/json/jsontext.(*decoderState).consumeValue
