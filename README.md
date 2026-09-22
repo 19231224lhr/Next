@@ -3,10 +3,30 @@
 Public submissions now use `DirectSubmission` (406): transaction, existing organization spend authorization and immediate input certificates. New output TXCer remains in wallet/INSTALL delivery (405). See [the current amendment](docs/implementation-public-submission-v4.md). Use a fresh genesis for this accounting-rule revision.
 
 Current implementation: direct-liability payments with block-driven wallet and
-member updates (wire/application version 4). Active experimental branch:
-`implementation/full-path-600tps`.
+member updates (wire/application version 4). `main` preserves the tested
+performance baseline; `re` adds the continuous-respending experiment and its results.
 
 **Start with [current architecture, build instructions and measurements](docs/implementation-block-following-v4.md).**
+
+## 实验索引与已验证性能
+
+以下结果来自 Mac Studio M4 Max（16 核、64 GB）同机多进程实验，使用真实签名与四成员三票认证。性能轮采用组织/委员会应用内存状态、Comet MemDB 和钱包 bbolt NoSync，保留既有 Comet WAL/FilePV 同步；每轮重新创世，不提供崩溃恢复保证。钱包在同一压测进程内运行，不包含独立远端收款设备的网络交付时间。
+
+| 实验 | 已验证结果 | 报告与复现材料 |
+|---|---|---|
+| 四委员纯共识 | 目标 3000 TPS，连续 3 分钟、54 万笔，两次全部成功；含收尾实际吞吐约 **2986 TPS**。3500 档单次通过，4000 档大样本未全部成功 | [共识容量实验](docs/experiments/consensus-capacity-2026-09-22/README.md) |
+| 单担保组织完整快速支付 | 两轮各 15 万笔，目标 2200、实际发送约 2127 TPS；含公共结算和成员收尾约 **2104–2106 TPS**，快速到账 P50 **4.54–4.55 ms**、P95 **69.46–69.95 ms**；每轮约 71 秒 | [单组织整体 TPS 与单变量对照](docs/experiments/single-org-tps-2026-09-22/README.md) |
+| 较低负载下的完整快速支付 | 目标 2000 TPS，两轮实际完整闭环约 **1949–1950 TPS**；快速到账 P50 **2.52–2.57 ms**、P95 **50.50–50.76 ms** | [同一报告中的 2000 档](docs/experiments/single-org-tps-2026-09-22/README.md) |
+| 单笔快速付款 | 连续续花实验的 1 跳快速组三次为 **1.749 / 2.017 / 2.274 ms**，中位 **2.017 ms**；这是低负载采样，不是高负载尾延迟 | [逐轮数据与计时定义](https://github.com/19231224lhr/Next/blob/re/docs/experiments/continuous-respending-2026-09-22/README.md) |
+| 真实连续续花（论文实验一） | 链长 1/10/100，两种方式各三轮，**18 案例、666 笔全部通过审计**。100 跳最后钱包快速可用中位 **198.630 ms**，整链后台收尾 **785.519 ms**；逐跳等待公共确认的对照组最后钱包快速可用为 **64.384 s** | [连续续花结果、图表和原始数据](https://github.com/19231224lhr/Next/blob/re/docs/experiments/continuous-respending-2026-09-22/README.md) · [实验方案](https://github.com/19231224lhr/Next/blob/re/docs/research/continuous-respending-experiment-design-2026-09-22.md) |
+
+**计时与结论范围：** 快速到账从付款钱包开始 HTTP 发送计时，到收款钱包验证 TXCer 与输出绑定、完成本地原子接收；是否耐久落盘取决于实验存储模式。完整闭环还包括公共结算观察和各成员逐事实收尾。纯共识不包含在线组织签发和钱包接收，不能用它代替整系统 TPS。上述 TPS 使用独立最终 UTXO、少量地址高复用；连续续花则使用真实前后依赖输出，不能把单链跳数/秒当系统容量。
+
+连续续花快速组的 **324/324 次后继发送早于父交易最早应用 Commit**；96 项实际缺失输出责任均由父交易正常到达解除。固定单输入/单输出下，TXCer 为 941 字节，100 跳内未观察到单跳延迟明显增长。等待组包含钱包确认观察、成员跟块及重试成本，因此对照属于本实现的两种付款方式，不代表纯共识加速或相对其他协议的性能优势。
+
+每份报告保留参数、独立重复、审计与复现入口。目标速率不是实际吞吐；2400 的完整系统测试触及在途上限，不列为稳定工作点。当前结果不外推至广域网、大规模地址轮换、无限链长或无限期运行。
+
+## Current runtime
 
 Normal settlement emits no per-payment output or member credit proofs. A shared
 block follower verifies committed execution results once per height and applies
@@ -17,7 +37,8 @@ Member processes now open their bbolt database with **NoSync** by default for
 fresh-start experiments. Transactions still apply atomically during normal
 operation and votes follow the committed update, but member state is not guaranteed
 durable or crash-consistent. Restart the whole experiment with fresh state after
-failure. Gateway, wallet and committee application stores keep synchronous writes.
+failure. Gateway, wallet and committee application stores default to synchronous
+writes unless their explicit experimental memory/NoSync modes are selected.
 The startup log reports `storage_no_sync=true`. See
 [the change and validation](docs/experiments/member-nosync-default-2026-09-21/README.md).
 
@@ -78,7 +99,7 @@ do not establish sustained high TPS or bounded long-term storage.
 
 The sections below document the **v1.1 baseline**, not the current runtime path.
 
-## Current implementation
+## Legacy v1.1 implementation
 
 - Canonical binary transaction/certificate envelopes, Ed25519 owner/recipient/quorum signatures.
 - Checked amounts, per-grant rounding, cumulative accounting and bounded fee lifecycle rules.
