@@ -1,0 +1,1 @@
+Stopped early: experiment logging included every background progress429, adding excessive log traffic. No performance conclusions. Next run logs only foreground admission refusals and business slice limits; production unchanged.

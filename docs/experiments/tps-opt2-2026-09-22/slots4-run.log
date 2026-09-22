@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/richz/lab/man/utxo-fastpay-v12/docs/experiments/tps-opt2-2026-09-22/reproduce.py", line 175, in <module>
+    if __name__=='__main__':main()
+  File "/Users/richz/lab/man/utxo-fastpay-v12/docs/experiments/tps-opt2-2026-09-22/reproduce.py", line 83, in main
+    command([go,'build','-tags=comet_v3','-overlay',E/'overlay.json','-o',target,'./cmd/'+role],log)
+  File "/Users/richz/lab/man/utxo-fastpay-v12/docs/experiments/tps-opt2-2026-09-22/reproduce.py", line 35, in command
+    def command(args, log): return subprocess.run([str(x) for x in args],cwd=R,env=env,stdout=log,stderr=log,check=True)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/usr/local/go/bin/go', 'build', '-tags=comet_v3', '-overlay', '/Users/richz/lab/man/utxo-fastpay-v12/docs/experiments/tps-opt2-2026-09-22/slots4/overlay.json', '-o', '/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-slots4-bin/payctl', './cmd/payctl']' returned non-zero exit status 1.

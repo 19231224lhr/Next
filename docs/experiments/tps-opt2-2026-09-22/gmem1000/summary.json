@@ -1,0 +1,772 @@
+{
+  "summary": {
+    "block_observed_p50_ms": 1213.208708,
+    "completed_per_second": 975.6558890542459,
+    "concurrency": 256,
+    "count": 48000,
+    "dispatch_delivery_wait_p95_ms": 1.046208,
+    "dispatch_lag_p50_ms": 95.090083,
+    "dispatch_lag_p95_ms": 200.517375,
+    "elapsed_s": 49.197673625,
+    "failed": 0,
+    "fast_completed": 48000,
+    "fast_p50_ms": 2.664583,
+    "fast_p95_ms": 34.324333,
+    "final_unfinished": 0,
+    "finished_unix_ns": 1790051222371941000,
+    "max_pending": 2048,
+    "member_applied_p50_ms": 1279.401208,
+    "member_completed": 48000,
+    "not_sent": 0,
+    "note": "Block observation includes block verification and wallet polling; member applied queries local member status for all four nodes. No committee payment proofs are requested.",
+    "pending_limit": 2048,
+    "progress_errors": 89022,
+    "progress_http_max_ms": 90.587833,
+    "progress_http_mean_ms": 1.1792210183080223,
+    "progress_requests": 306150,
+    "progress_requests_per_second": 6222.855217374112,
+    "sampled_oldest_unfinished_max_ms": 3241.78,
+    "sampled_peak_unfinished": 1639,
+    "send_limit_hits": 4,
+    "send_pacing_wait_p95_ms": 200.462583,
+    "send_permit_wait_p95_ms": 8.3e-05,
+    "started_unix_ns": 1790051173174034000,
+    "target_send_rate": 1000,
+    "timing_origin": "wallet_http_submit_v4",
+    "total_limit_hits": 0,
+    "total_permit_wait_p95_ms": 0.000292,
+    "trace": true,
+    "unknown": 0,
+    "wallet_block_observed": 48000,
+    "wallet_no_sync": true,
+    "wallet_queries": 166360,
+    "workload": "bounded_fast_receipt_with_independent_observation"
+  },
+  "send_span_s": 48.20036,
+  "actual_send_tps": 995.8224378407132,
+  "successful_executions": 48000,
+  "failed_executions": 0,
+  "committee_equal": true,
+  "outbox_pending": 0,
+  "errors": {},
+  "all_stages_ms": {
+    "send_to_response": {
+      "n": 48000,
+      "mean": 6.939519375,
+      "p50": 2.389,
+      "p95": 32.899,
+      "p99": 51.278,
+      "max": 180.956,
+      "negative": 0
+    },
+    "wallet_verify_save": {
+      "n": 48000,
+      "mean": 0.563296875,
+      "p50": 0.192,
+      "p95": 0.707,
+      "p99": 10.61,
+      "max": 64.998,
+      "negative": 0
+    },
+    "send_to_fast": {
+      "n": 48000,
+      "mean": 7.50281625,
+      "p50": 2.664,
+      "p95": 34.324,
+      "p99": 53.965,
+      "max": 181.498,
+      "negative": 0
+    },
+    "fast_to_wallet_block": {
+      "n": 48000,
+      "mean": 1210.405506875,
+      "p50": 1200.03,
+      "p95": 1500.021,
+      "p99": 1651.181,
+      "max": 3325.035,
+      "negative": 0
+    },
+    "send_to_wallet_block": {
+      "n": 48000,
+      "mean": 1217.908323125,
+      "p50": 1213.214,
+      "p95": 1501.602,
+      "p99": 1654.681,
+      "max": 3328.374,
+      "negative": 0
+    },
+    "wallet_block_to_members": {
+      "n": 48000,
+      "mean": 64.813906875,
+      "p50": 56.688,
+      "p95": 125.809,
+      "p99": 152.474,
+      "max": 177.969,
+      "negative": 0
+    },
+    "send_to_member_completion": {
+      "n": 48000,
+      "mean": 1282.72223,
+      "p50": 1279.407,
+      "p95": 1555.752,
+      "p99": 1727.018,
+      "max": 3360.063,
+      "negative": 0
+    }
+  },
+  "trace_coverage": {
+    "expected": 480,
+    "received": 480,
+    "three_selected_complete": 480,
+    "event_counts": {
+      "107": 2,
+      "99": 137,
+      "87": 20,
+      "86": 160,
+      "88": 70,
+      "101": 11,
+      "89": 2,
+      "95": 1,
+      "100": 3,
+      "98": 2,
+      "92": 21,
+      "90": 33,
+      "93": 1,
+      "97": 4,
+      "82": 2,
+      "94": 1,
+      "105": 1,
+      "91": 3,
+      "102": 2,
+      "84": 1,
+      "79": 2,
+      "103": 1
+    },
+    "selected_votes": 1440
+  },
+  "gateway_ms": {
+    "send_to_gateway": {
+      "n": 480,
+      "mean": 0.9044,
+      "p50": 0.151,
+      "p95": 5.362,
+      "p99": 10.741,
+      "max": 29.975,
+      "negative": 0
+    },
+    "gateway_decode": {
+      "n": 480,
+      "mean": 0.32288333333333336,
+      "p50": 0.131,
+      "p95": 0.626,
+      "p99": 2.317,
+      "max": 16.782,
+      "negative": 0
+    },
+    "gateway_authorize": {
+      "n": 480,
+      "mean": 0.26155,
+      "p50": 0.09,
+      "p95": 0.362,
+      "p99": 2.256,
+      "max": 39.649,
+      "negative": 0
+    },
+    "gateway_pre_fanout": {
+      "n": 480,
+      "mean": 0.5877625,
+      "p50": 0.23,
+      "p95": 1.086,
+      "p99": 3.494,
+      "max": 40.064,
+      "negative": 0
+    },
+    "fanout_to_quorum": {
+      "n": 480,
+      "mean": 4.7444291666666665,
+      "p50": 1.501,
+      "p95": 24.235,
+      "p99": 39.786,
+      "max": 70.717,
+      "negative": 0
+    },
+    "quorum_to_response": {
+      "n": 480,
+      "mean": 0.26935624999999996,
+      "p50": 0.09,
+      "p95": 0.35,
+      "p99": 1.813,
+      "max": 36.486,
+      "negative": 0
+    },
+    "gateway_response_to_wallet": {
+      "n": 480,
+      "mean": 0.33724166666666666,
+      "p50": 0.125,
+      "p95": 1.306,
+      "p99": 4.352,
+      "max": 8.726,
+      "negative": 0
+    }
+  },
+  "selected_member_ms": {
+    "dispatch_schedule": {
+      "n": 1440,
+      "mean": 0.13920416666666666,
+      "p50": 0.022,
+      "p95": 0.363,
+      "p99": 2.049,
+      "max": 32.383,
+      "negative": 0
+    },
+    "dispatch_to_handler": {
+      "n": 1440,
+      "mean": 0.5958673611111112,
+      "p50": 0.079,
+      "p95": 2.214,
+      "p99": 7.852,
+      "max": 45.088,
+      "negative": 0
+    },
+    "member_decode": {
+      "n": 1440,
+      "mean": 0.16317361111111112,
+      "p50": 0.123,
+      "p95": 0.389,
+      "p99": 0.54,
+      "max": 1.589,
+      "negative": 0
+    },
+    "member_validation": {
+      "n": 1440,
+      "mean": 0.29544375,
+      "p50": 0.231,
+      "p95": 0.692,
+      "p99": 0.98,
+      "max": 2.605,
+      "negative": 0
+    },
+    "validation_to_commit_request": {
+      "n": 1440,
+      "mean": 0.003191666666666667,
+      "p50": 0.002,
+      "p95": 0.007,
+      "p99": 0.012,
+      "max": 0.12,
+      "negative": 0
+    },
+    "member_update_queue": {
+      "n": 1440,
+      "mean": 0.7389958333333333,
+      "p50": 0.002,
+      "p95": 0.955,
+      "p99": 22.213,
+      "max": 56.413,
+      "negative": 0
+    },
+    "member_update_callback": {
+      "n": 1440,
+      "mean": 0.0758298611111111,
+      "p50": 0.064,
+      "p95": 0.151,
+      "p99": 0.196,
+      "max": 1.308,
+      "negative": 0
+    },
+    "member_update_finish": {
+      "n": 1440,
+      "mean": 0.08387916666666667,
+      "p50": 0.009,
+      "p95": 0.25,
+      "p99": 1.696,
+      "max": 10.204,
+      "negative": 0
+    },
+    "member_sign": {
+      "n": 1440,
+      "mean": 0.01936875,
+      "p50": 0.014,
+      "p95": 0.04,
+      "p99": 0.05,
+      "max": 3.586,
+      "negative": 0
+    },
+    "member_sign_to_response": {
+      "n": 1440,
+      "mean": 0.00012222222222222221,
+      "p50": 0.0,
+      "p95": 0.001,
+      "p99": 0.001,
+      "max": 0.005,
+      "negative": 0
+    },
+    "member_response_to_selected": {
+      "n": 1440,
+      "mean": 0.8521604166666666,
+      "p50": 0.277,
+      "p95": 3.458,
+      "p99": 9.31,
+      "max": 26.974,
+      "negative": 0
+    },
+    "member_handler_total": {
+      "n": 1440,
+      "mean": 1.380004861111111,
+      "p50": 0.465,
+      "p95": 2.444,
+      "p99": 24.347,
+      "max": 64.547,
+      "negative": 0
+    }
+  },
+  "critical_third_vote_ms": {
+    "dispatch_schedule": {
+      "n": 480,
+      "mean": 0.13990416666666666,
+      "p50": 0.025,
+      "p95": 0.488,
+      "p99": 2.088,
+      "max": 6.051,
+      "negative": 0
+    },
+    "dispatch_to_handler": {
+      "n": 480,
+      "mean": 0.9292083333333333,
+      "p50": 0.151,
+      "p95": 3.521,
+      "p99": 12.702,
+      "max": 45.088,
+      "negative": 0
+    },
+    "member_decode": {
+      "n": 480,
+      "mean": 0.18135416666666668,
+      "p50": 0.126,
+      "p95": 0.399,
+      "p99": 0.531,
+      "max": 0.867,
+      "negative": 0
+    },
+    "member_validation": {
+      "n": 480,
+      "mean": 0.33257291666666666,
+      "p50": 0.234,
+      "p95": 0.708,
+      "p99": 1.0,
+      "max": 2.605,
+      "negative": 0
+    },
+    "validation_to_commit_request": {
+      "n": 480,
+      "mean": 0.003320833333333333,
+      "p50": 0.003,
+      "p95": 0.007,
+      "p99": 0.011,
+      "max": 0.051,
+      "negative": 0
+    },
+    "member_update_queue": {
+      "n": 480,
+      "mean": 1.6170333333333333,
+      "p50": 0.003,
+      "p95": 15.723,
+      "p99": 28.74,
+      "max": 56.413,
+      "negative": 0
+    },
+    "member_update_callback": {
+      "n": 480,
+      "mean": 0.081675,
+      "p50": 0.065,
+      "p95": 0.154,
+      "p99": 0.196,
+      "max": 1.308,
+      "negative": 0
+    },
+    "member_update_finish": {
+      "n": 480,
+      "mean": 0.16358958333333334,
+      "p50": 0.01,
+      "p95": 1.096,
+      "p99": 1.924,
+      "max": 10.204,
+      "negative": 0
+    },
+    "member_sign": {
+      "n": 480,
+      "mean": 0.025920833333333334,
+      "p50": 0.014,
+      "p95": 0.041,
+      "p99": 0.052,
+      "max": 3.586,
+      "negative": 0
+    },
+    "member_sign_to_response": {
+      "n": 480,
+      "mean": 0.00016666666666666666,
+      "p50": 0.0,
+      "p95": 0.001,
+      "p99": 0.001,
+      "max": 0.005,
+      "negative": 0
+    },
+    "member_response_to_selected": {
+      "n": 480,
+      "mean": 1.2657104166666666,
+      "p50": 0.358,
+      "p95": 5.196,
+      "p99": 14.52,
+      "max": 26.974,
+      "negative": 0
+    },
+    "member_handler_total": {
+      "n": 480,
+      "mean": 2.4056333333333333,
+      "p50": 0.512,
+      "p95": 17.313,
+      "p99": 30.784,
+      "max": 64.547,
+      "negative": 0
+    }
+  },
+  "selected_http_ms": {
+    "serialize": {
+      "n": 1440,
+      "mean": 0.00022916666666666666,
+      "p50": 0.0,
+      "p95": 0.001,
+      "p99": 0.001,
+      "max": 0.054,
+      "negative": 0
+    },
+    "get_connection": {
+      "n": 1440,
+      "mean": 0.12412083333333333,
+      "p50": 0.001,
+      "p95": 0.286,
+      "p99": 2.206,
+      "max": 21.217,
+      "negative": 0
+    },
+    "connection_to_written": {
+      "n": 1440,
+      "mean": 0.033418750000000004,
+      "p50": 0.003,
+      "p95": 0.024,
+      "p99": 0.372,
+      "max": 12.502,
+      "negative": 0
+    },
+    "written_to_handler": {
+      "n": 1440,
+      "mean": 0.2987194444444444,
+      "p50": 0.041,
+      "p95": 1.342,
+      "p99": 3.51,
+      "max": 34.758,
+      "negative": 0
+    },
+    "response_to_first_byte": {
+      "n": 1440,
+      "mean": 0.6437180555555555,
+      "p50": 0.131,
+      "p95": 3.008,
+      "p99": 8.041,
+      "max": 18.322,
+      "negative": 0
+    },
+    "first_byte_to_approval_decoded": {
+      "n": 1440,
+      "mean": 0.10967291666666666,
+      "p50": 0.029,
+      "p95": 0.174,
+      "p99": 1.794,
+      "max": 15.526,
+      "negative": 0
+    },
+    "decoded_to_selected": {
+      "n": 1440,
+      "mean": 0.09876944444444445,
+      "p50": 0.041,
+      "p95": 0.207,
+      "p99": 0.73,
+      "max": 8.788,
+      "negative": 0
+    }
+  },
+  "traced_fast_ms": {
+    "n": 480,
+    "mean": 7.502515341666666,
+    "p50": 2.951166,
+    "p95": 30.095458,
+    "p99": 53.486167,
+    "max": 73.599041,
+    "negative": 0
+  },
+  "untraced_fast_ms": {
+    "n": 47520,
+    "mean": 7.502821670265152,
+    "p50": 2.66225,
+    "p95": 34.352667,
+    "p99": 53.917334,
+    "max": 181.496542,
+    "negative": 0
+  },
+  "windows": [
+    {
+      "end_s": 30,
+      "sent_tps": 995.6666666666666,
+      "observed_commit_tps": 969.3666666666667,
+      "active": 1384,
+      "pending": {
+        "wallet_block": 1380,
+        "fast": 4
+      },
+      "fast_ms": {
+        "n": 29870,
+        "mean": 8.069462719149648,
+        "p50": 2.689125,
+        "p95": 36.552917,
+        "p99": 56.988834,
+        "max": 181.496542,
+        "negative": 0
+      },
+      "critical_member_ms": {
+        "dispatch_schedule": {
+          "n": 299,
+          "mean": 0.11535117056856187,
+          "p50": 0.025,
+          "p95": 0.343,
+          "p99": 1.766,
+          "max": 5.978,
+          "negative": 0
+        },
+        "dispatch_to_handler": {
+          "n": 299,
+          "mean": 1.1427391304347827,
+          "p50": 0.148,
+          "p95": 4.647,
+          "p99": 15.952,
+          "max": 45.088,
+          "negative": 0
+        },
+        "member_decode": {
+          "n": 299,
+          "mean": 0.18130434782608695,
+          "p50": 0.126,
+          "p95": 0.402,
+          "p99": 0.583,
+          "max": 0.867,
+          "negative": 0
+        },
+        "member_validation": {
+          "n": 299,
+          "mean": 0.3276254180602007,
+          "p50": 0.233,
+          "p95": 0.697,
+          "p99": 0.972,
+          "max": 2.605,
+          "negative": 0
+        },
+        "validation_to_commit_request": {
+          "n": 299,
+          "mean": 0.0034046822742474915,
+          "p50": 0.003,
+          "p95": 0.007,
+          "p99": 0.011,
+          "max": 0.051,
+          "negative": 0
+        },
+        "member_update_queue": {
+          "n": 299,
+          "mean": 1.56476254180602,
+          "p50": 0.003,
+          "p95": 11.446,
+          "p99": 27.564,
+          "max": 47.217,
+          "negative": 0
+        },
+        "member_update_callback": {
+          "n": 299,
+          "mean": 0.08064882943143813,
+          "p50": 0.065,
+          "p95": 0.152,
+          "p99": 0.189,
+          "max": 1.308,
+          "negative": 0
+        },
+        "member_update_finish": {
+          "n": 299,
+          "mean": 0.16490301003344482,
+          "p50": 0.011,
+          "p95": 0.982,
+          "p99": 1.924,
+          "max": 10.204,
+          "negative": 0
+        },
+        "member_sign": {
+          "n": 299,
+          "mean": 0.030702341137123744,
+          "p50": 0.014,
+          "p95": 0.041,
+          "p99": 0.053,
+          "max": 3.586,
+          "negative": 0
+        },
+        "member_sign_to_response": {
+          "n": 299,
+          "mean": 0.00017725752508361204,
+          "p50": 0.0,
+          "p95": 0.001,
+          "p99": 0.001,
+          "max": 0.005,
+          "negative": 0
+        },
+        "member_response_to_selected": {
+          "n": 299,
+          "mean": 1.3698561872909698,
+          "p50": 0.339,
+          "p95": 5.747,
+          "p99": 18.385,
+          "max": 26.974,
+          "negative": 0
+        },
+        "member_handler_total": {
+          "n": 299,
+          "mean": 2.3535284280936453,
+          "p50": 0.52,
+          "p95": 12.623,
+          "p99": 29.826,
+          "max": 58.595,
+          "negative": 0
+        }
+      }
+    },
+    {
+      "end_s": 60,
+      "sent_tps": 604.3333333333334,
+      "observed_commit_tps": 630.6333333333333,
+      "active": 0,
+      "pending": {},
+      "fast_ms": {
+        "n": 18130,
+        "mean": 6.569246647214562,
+        "p50": 2.629667,
+        "p95": 29.631125,
+        "p99": 47.353208,
+        "max": 101.495917,
+        "negative": 0
+      },
+      "critical_member_ms": {
+        "dispatch_schedule": {
+          "n": 181,
+          "mean": 0.18046408839779005,
+          "p50": 0.028,
+          "p95": 0.729,
+          "p99": 2.233,
+          "max": 6.051,
+          "negative": 0
+        },
+        "dispatch_to_handler": {
+          "n": 181,
+          "mean": 0.5764696132596685,
+          "p50": 0.157,
+          "p95": 2.606,
+          "p99": 5.605,
+          "max": 7.369,
+          "negative": 0
+        },
+        "member_decode": {
+          "n": 181,
+          "mean": 0.18143646408839778,
+          "p50": 0.126,
+          "p95": 0.393,
+          "p99": 0.454,
+          "max": 0.621,
+          "negative": 0
+        },
+        "member_validation": {
+          "n": 181,
+          "mean": 0.34074585635359117,
+          "p50": 0.235,
+          "p95": 0.71,
+          "p99": 1.0,
+          "max": 1.663,
+          "negative": 0
+        },
+        "validation_to_commit_request": {
+          "n": 181,
+          "mean": 0.0031823204419889504,
+          "p50": 0.003,
+          "p95": 0.007,
+          "p99": 0.01,
+          "max": 0.017,
+          "negative": 0
+        },
+        "member_update_queue": {
+          "n": 181,
+          "mean": 1.7033812154696133,
+          "p50": 0.003,
+          "p95": 15.723,
+          "p99": 28.74,
+          "max": 56.413,
+          "negative": 0
+        },
+        "member_update_callback": {
+          "n": 181,
+          "mean": 0.08337016574585636,
+          "p50": 0.067,
+          "p95": 0.165,
+          "p99": 0.196,
+          "max": 0.417,
+          "negative": 0
+        },
+        "member_update_finish": {
+          "n": 181,
+          "mean": 0.16141988950276243,
+          "p50": 0.009,
+          "p95": 1.096,
+          "p99": 1.874,
+          "max": 6.915,
+          "negative": 0
+        },
+        "member_sign": {
+          "n": 181,
+          "mean": 0.01802209944751381,
+          "p50": 0.014,
+          "p95": 0.041,
+          "p99": 0.044,
+          "max": 0.059,
+          "negative": 0
+        },
+        "member_sign_to_response": {
+          "n": 181,
+          "mean": 0.00014917127071823204,
+          "p50": 0.0,
+          "p95": 0.001,
+          "p99": 0.001,
+          "max": 0.001,
+          "negative": 0
+        },
+        "member_response_to_selected": {
+          "n": 181,
+          "mean": 1.0936685082872928,
+          "p50": 0.383,
+          "p95": 4.941,
+          "p99": 9.958,
+          "max": 10.636,
+          "negative": 0
+        },
+        "member_handler_total": {
+          "n": 181,
+          "mean": 2.4917071823204417,
+          "p50": 0.495,
+          "p95": 17.313,
+          "p99": 30.784,
+          "max": 64.547,
+          "negative": 0
+        }
+      }
+    }
+  ]
+}

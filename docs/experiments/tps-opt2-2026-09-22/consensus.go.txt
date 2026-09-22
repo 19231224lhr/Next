@@ -1,0 +1,97 @@
+package requesttrace
+
+import (
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/cometbft/cometbft/libs/log"
+)
+
+// Consensus is a bounded, opt-in observation of existing Comet log boundaries.
+// Events are not consensus evidence and never enter the ledger or synchronous logs.
+var Consensus = func() *ConsensusRecorder {
+	if Settlement == nil {
+		return nil
+	}
+	return &ConsensusRecorder{}
+}()
+
+type ConsensusEvent struct {
+	UnixNS int64
+	Stage  string
+	Fields map[string]string
+}
+
+type ConsensusRecorder struct {
+	mu     sync.Mutex
+	next   int
+	events []ConsensusEvent
+}
+
+func (r *ConsensusRecorder) Mark(stage string, fields ...any) {
+	if r == nil {
+		return
+	}
+ sampled := false
+ for i:=0;i+1<len(fields);i+=2 {if fields[i]=="spend" {s,ok:=fields[i+1].(string);if !ok || len(s)<2 || s[:2]>="03" {return}; sampled=true}}
+ if !sampled {switch stage {case "comet_operation","prepare_enter","prepare_done","process_enter","process_done","finalize_enter","finalize_locked","finalize_done","commit_start","commit_lock","commit_update_start","commit_update_callback","commit_update_return","commit_done","store_update","follow_prepare_start","follow_prepare_done","follow_update_requested","follow_update_started","follow_apply_start","follow_apply_done","follow_committed","follow_wait_start","follow_verify_start","follow_verify_done","block_received","entering new round","entering propose step","entering prevote step","entering precommit step","entering commit step","received complete proposal block","finalizing commit of block","configuration":default:return}}
+
+	e := ConsensusEvent{UnixNS: time.Now().UnixNano(), Stage: stage, Fields: make(map[string]string)}
+	for i := 0; i+1 < len(fields); i += 2 {
+		e.Fields[fmt.Sprint(fields[i])] = fmt.Sprint(fields[i+1])
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.events) < 4096 {
+		r.events = append(r.events, e)
+	} else {
+		r.events[r.next] = e
+		r.next = (r.next + 1) % 4096
+	}
+}
+
+func (r *ConsensusRecorder) Snapshot() []ConsensusEvent {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := append([]ConsensusEvent(nil), r.events[r.next:]...)
+	return append(out, r.events[:r.next]...)
+}
+
+type consensusLogger struct {
+	log.Logger
+	recorder *ConsensusRecorder
+	fields   []any
+}
+
+func (r *ConsensusRecorder) Logger(base log.Logger) log.Logger {
+	if r == nil {
+		return base
+	}
+	return consensusLogger{Logger: base, recorder: r}
+}
+
+func (l consensusLogger) capture(msg string, fields ...any) {
+	switch msg {
+	case "entering new round", "entering propose step", "signed proposal",
+		"received complete proposal block", "entering prevote step",
+		"entering precommit step", "signed and pushed vote", "entering commit step",
+		"finalizing commit of block", "received tock", "batched proposal WAL":
+		all := append(append([]any(nil), l.fields...), fields...)
+		l.recorder.Mark(msg, all...)
+	}
+}
+func (l consensusLogger) Debug(msg string, fields ...any) {
+	l.capture(msg, fields...)
+	l.Logger.Debug(msg, fields...)
+}
+func (l consensusLogger) Info(msg string, fields ...any) {
+	l.capture(msg, fields...)
+	l.Logger.Info(msg, fields...)
+}
+func (l consensusLogger) With(fields ...any) log.Logger {
+	return consensusLogger{Logger: l.Logger.With(fields...), recorder: l.recorder, fields: append(append([]any(nil), l.fields...), fields...)}
+}

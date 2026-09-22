@@ -1,0 +1,56 @@
+{
+  "member_urls": [
+    "http://127.0.0.1:24000",
+    "http://127.0.0.1:24001",
+    "http://127.0.0.1:24002",
+    "http://127.0.0.1:24003"
+  ],
+  "arguments": {
+    "label": "final1100",
+    "count": 198000,
+    "rate": 1100.0,
+    "port": 24000,
+    "trace_every": 100,
+    "template": null,
+    "member_memory": true,
+    "wallet_no_sync": true,
+    "gateway_memory": true,
+    "no_trace": false,
+    "submit_slots": 8
+  },
+  "bench_args": [
+    "/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-final1100-bin/payctl",
+    "bench-v4",
+    "-dir",
+    "/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-final1100",
+    "-start",
+    "0",
+    "-count",
+    "198000",
+    "-concurrency",
+    "256",
+    "-max-pending",
+    "2048",
+    "-rate",
+    "1100.0",
+    "-trace",
+    "-wallet-no-sync"
+  ],
+  "genesis_sha256": "33af6d62defb91b1a102d01beaf301dd3c906de51ff50721f36df98942e047c9",
+  "binaries": {
+    "payctl": "19ebf3f6baa0626e8da66f70f9721c2b4c9c4af5b3f4832e4d73c2be8ca08cba",
+    "member-real": "721675791252762def1f7d9f393c1f3618189943979b6ff58ed824ddf9bf211f",
+    "gateway": "5518827af7c7910bdad1045d63e3915a6659f68316841460d51c035e492978fd",
+    "committee": "a49545233b4d9c81cea719dcdc21d2987b351210c091799721a98538ff43ea82"
+  },
+  "source_head": "3d091b08dad6763a6bca20921d874ab1e785b79c",
+  "nodes": 14,
+  "member_memory": true,
+  "gateway_memory": true,
+  "wallet_no_sync": true,
+  "committee_mem_blockstore": true,
+  "trace_every": 100,
+  "concurrency": 256,
+  "max_pending": 2048,
+  "shutdown_and_audit_export_s": 8.87080000069318e-05
+}

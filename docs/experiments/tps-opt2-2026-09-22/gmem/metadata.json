@@ -1,0 +1,54 @@
+{
+  "member_urls": [
+    "http://127.0.0.1:24000",
+    "http://127.0.0.1:24001",
+    "http://127.0.0.1:24002",
+    "http://127.0.0.1:24003"
+  ],
+  "arguments": {
+    "label": "gmem",
+    "count": 48000,
+    "rate": 800.0,
+    "port": 24000,
+    "trace_every": 100,
+    "template": "/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-base",
+    "member_memory": true,
+    "wallet_no_sync": true,
+    "gateway_memory": true
+  },
+  "bench_args": [
+    "/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-gmem-bin/payctl",
+    "bench-v4",
+    "-dir",
+    "/Users/richz/lab/man/utxo-fastpay-v12/.run/repro-gmem",
+    "-start",
+    "0",
+    "-count",
+    "48000",
+    "-concurrency",
+    "256",
+    "-max-pending",
+    "2048",
+    "-rate",
+    "800.0",
+    "-trace",
+    "-wallet-no-sync"
+  ],
+  "genesis_sha256": "6394c814ab7f348631c78765fb8b00dd98c7809bdaa10dd360d64191ab409efb",
+  "binaries": {
+    "payctl": "cadebd3152b5def011692ed82ef552d2ddefec16c1268b6cc474ce1d5688da04",
+    "member-real": "9b79c36410da24df9d34129f04118e1bfa12709dc541421ae73d090b0bf8c2f2",
+    "gateway": "66200e0d7e8ebdc22bd0fead4f1e155b2280924cd90e3bb54c1c71438927d5d1",
+    "committee": "13eff476e7c9593a52d181b2287417660473165f7f189475ef12919b4f75b8c9"
+  },
+  "source_head": "3d091b08dad6763a6bca20921d874ab1e785b79c",
+  "nodes": 14,
+  "member_memory": true,
+  "gateway_memory": true,
+  "wallet_no_sync": true,
+  "committee_mem_blockstore": true,
+  "trace_every": 100,
+  "concurrency": 256,
+  "max_pending": 2048,
+  "shutdown_and_audit_export_s": 8.358298500000004
+}

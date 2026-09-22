@@ -1,0 +1,187 @@
+diff --git a/cmd/gateway/main.go b/cmd/gateway/main.go
+index adcd0ce..023033a 100644
+--- a/cmd/gateway/main.go
++++ b/cmd/gateway/main.go
+@@ -2,6 +2,7 @@ package main
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"flag"
+ 	"io"
+ 	"log/slog"
+@@ -85,7 +86,7 @@ func paymentHandler(collector *gateway.Collector) http.HandlerFunc {
+ 	}
+ }
+ 
+-func run() error {
++func run() (result error) {
+ 	path := flag.String("config", "", "gateway config JSON")
+ 	flag.Parse()
+ 	var c configuration
+@@ -104,7 +105,13 @@ func run() error {
+ 	if e != nil {
+ 		return e
+ 	}
+-	base, e := store.Open(filepath.Join(c.DataDir, "gateway.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: n.Schema()})
++	id := store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: n.Schema()}
++	var base store.Store
++	if os.Getenv("UTXO_EXPERIMENT_GATEWAY_MEMORY") == "1" {
++		base, e = store.OpenEphemeral(filepath.Join(c.DataDir, "gateway.db"), id)
++	} else {
++		base, e = store.Open(filepath.Join(c.DataDir, "gateway.db"), id)
++	}
+ 	if e != nil {
+ 		return e
+ 	}
+@@ -113,7 +120,7 @@ func run() error {
+ 		base.Close()
+ 		return e
+ 	}
+-	defer db.Close()
++	defer func() { result = errors.Join(result, db.Close()) }()
+ 	var clients [4]gateway.MemberClient
+ 	for i, url := range c.Members {
+ 		clients[i] = transport.NewMemberClient(url)
+diff --git a/internal/gateway/direct_relay.go b/internal/gateway/direct_relay.go
+index 01f81e8..624553c 100644
+--- a/internal/gateway/direct_relay.go
++++ b/internal/gateway/direct_relay.go
+@@ -34,13 +34,13 @@ func (r *Relay) runDirect(ctx context.Context) error {
+ 		earlyWake = r.Early.wake
+ 	}
+ 	preferEarly := false
+-	lanes := [2]directLane{{limit: 4, scanning: true, wrapped: true}, {limit: 4, scanning: true, wrapped: true}}
++	lanes := [2]directLane{{limit: 8, scanning: true, wrapped: true}, {limit: 4, scanning: true, wrapped: true}}
+ 	busy := make(map[directTask]bool)
+ 	// Only pacing lives here. Durable outbox and verified block following still
+ 	// own recovery and completion. Restart may resend the identical command early.
+ 	nextSubmit := make(map[protocol.SpendFactID]time.Time)
+ 	const maxCooling = 8192
+-	done := make(chan directTask, 8)
++	done := make(chan directTask, lanes[0].limit+lanes[1].limit)
+ 	ticker := time.NewTicker(100 * time.Millisecond)
+ 	defer ticker.Stop()
+ 	again := make(chan struct{})
+@@ -110,6 +110,10 @@ func (r *Relay) runDirect(ctx context.Context) error {
+ 			}
+ 		}
+ 		for _, entry := range entries {
++			// Keep the cursor before a payment that could not get a submit slot.
++			if index == 0 && lane.active == lane.limit {
++				return nil
++			}
+ 			var pending state.Outbox
+ 			if err := json.Unmarshal(entry.Value, &pending); err != nil {
+ 				return err
+diff --git a/internal/gateway/direct_relay_test.go b/internal/gateway/direct_relay_test.go
+index 7c1c137..3da9a31 100644
+--- a/internal/gateway/direct_relay_test.go
++++ b/internal/gateway/direct_relay_test.go
+@@ -407,3 +407,93 @@ func TestDirectRelayCompletionWinsOverInflightWork(t *testing.T) {
+ 		t.Fatal("late ACK revived completed scheduling state")
+ 	}
+ }
++
++func TestDirectRelayRetainsFirstUnscheduledSubmit(t *testing.T) {
++	_, r, _ := directRelayFixture(t, 32)
++	// Exclude INSTALL completions: only public-slot availability advances this test.
++	r.Members = nil
++	entries, err := store.Scan(r.DB, state.Key(state.KeyOutbox), nil, 32)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var expected protocol.SpendFactID
++	copy(expected[:], entries[8].Key[len(entries[8].Key)-len(expected):])
++	seen := make(chan protocol.SpendFactID, 32)
++	release := make(chan struct{})
++	r.Public = relayPublic{submit: func(ctx context.Context, raw []byte) error {
++		p, err := protocol.DecodeDirectSubmission(raw)
++		if err != nil {
++			return err
++		}
++		seen <- p.Authorization.Fact
++		select {
++		case <-release:
++			return nil
++		case <-ctx.Done():
++			return ctx.Err()
++		}
++	}}
++	startDirectRelay(t, r)
++	for i := 0; i < 8; i++ {
++		select {
++		case <-seen:
++		case <-time.After(time.Second):
++			t.Fatal("initial slots did not fill")
++		}
++	}
++	// Release exactly one slot; the next unseen durable item must not be skipped.
++	release <- struct{}{}
++	select {
++	case fact := <-seen:
++		if fact != expected {
++			t.Fatalf("cursor skipped first unscheduled payment: got %x want %x", fact, expected)
++		}
++	case <-time.After(time.Second):
++		t.Fatal("vacant slot was not filled")
++	}
++}
++
++func TestDirectRelayBoundedSlotsDrainOnShutdown(t *testing.T) {
++	_, r, payments := directRelayFixture(t, 32)
++	submitted := make(chan struct{}, 32)
++	installed := make(chan struct{}, 32)
++	r.Public = relayPublic{submit: func(ctx context.Context, _ []byte) error {
++		submitted <- struct{}{}
++		<-ctx.Done()
++		return ctx.Err()
++	}}
++	clients := r.Members[payments[0].Tx.Body.Certifier]
++	for i := range clients {
++		clients[i] = relayInstaller{install: func(ctx context.Context, _ protocol.DirectPayment) error {
++			installed <- struct{}{}
++			<-ctx.Done()
++			return ctx.Err()
++		}}
++	}
++	r.Members[payments[0].Tx.Body.Certifier] = clients
++	startDirectRelay(t, r) // Cleanup must join all eight submit plus four INSTALL tasks.
++	for i := 0; i < 8; i++ {
++		select {
++		case <-submitted:
++		case <-time.After(time.Second):
++			t.Fatalf("only %d public slots started", i)
++		}
++	}
++	for i := 0; i < 4; i++ {
++		select {
++		case <-installed:
++		case <-time.After(time.Second):
++			t.Fatalf("only %d INSTALL slots started", i)
++		}
++	}
++	select {
++	case <-submitted:
++		t.Fatal("public concurrency exceeded eight")
++	default:
++	}
++	select {
++	case <-installed:
++		t.Fatal("INSTALL concurrency exceeded four")
++	default:
++	}
++}
+diff --git a/internal/store/ephemeral.go b/internal/store/ephemeral.go
+index 39b6138..4e07edb 100644
+--- a/internal/store/ephemeral.go
++++ b/internal/store/ephemeral.go
+@@ -16,7 +16,7 @@ import (
+ var ErrAuditSnapshot = errors.New("ephemeral audit snapshot or unfinished experiment; use a fresh directory")
+ var auditOnlyKey = []byte("audit-only")
+ 
+-// Ephemeral keeps experimental member state in memory. It has atomic updates
++// Ephemeral keeps experimental node state in memory. It has atomic updates
+ // and ordered scans, but no crash recovery. Close exports a final audit snapshot;
+ // that export is outside the payment benchmark and is never used to resume.
+ type Ephemeral struct {

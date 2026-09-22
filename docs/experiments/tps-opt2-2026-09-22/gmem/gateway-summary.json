@@ -1,0 +1,105 @@
+{
+  "counts": {
+    "follow_wait_start": 105,
+    "follow_verify_start": 104,
+    "follow_verify_done": 104,
+    "follow_prepare_start": 104,
+    "follow_prepare_done": 104,
+    "follow_update_requested": 104,
+    "follow_update_started": 104,
+    "follow_apply_start": 104,
+    "follow_apply_done": 104,
+    "follow_committed": 104,
+    "certificate_ready": 559,
+    "early_offered": 559,
+    "persist_background_queued": 559,
+    "outbox_persist_start": 559,
+    "relay_action_scheduled": 2231,
+    "task_enter": 2231,
+    "pending_loaded": 2231,
+    "persist_update_requested": 559,
+    "persist_callback": 559,
+    "outbox_persist_done": 559,
+    "persist_background_finished": 559,
+    "pending_verified": 2231,
+    "relay_install_start": 1672,
+    "relay_enter": 559,
+    "relay_ready": 559,
+    "submit_start": 559,
+    "relay_install_done": 1672,
+    "submit_done": 559
+  },
+  "stages_ms": {
+    "ready_to_offer": {
+      "n": 559,
+      "p50": 0.11,
+      "p95": 0.453,
+      "max": 40.036
+    },
+    "ready_to_task": {
+      "n": 559,
+      "p50": 0.372,
+      "p95": 110.768,
+      "max": 254.391
+    },
+    "task_database_read": {
+      "n": 559,
+      "p50": 0.007,
+      "p95": 0.067,
+      "max": 1.159
+    },
+    "task_verify": {
+      "n": 559,
+      "p50": 0.226,
+      "p95": 0.875,
+      "max": 12.231
+    },
+    "ready_to_submit": {
+      "n": 559,
+      "p50": 0.91,
+      "p95": 125.575,
+      "max": 254.792
+    },
+    "public_http": {
+      "n": 559,
+      "p50": 0.998,
+      "p95": 4.816,
+      "max": 65.655
+    },
+    "save_total": {
+      "n": 559,
+      "p50": 0.224,
+      "p95": 1.216,
+      "max": 23.318
+    },
+    "save_queue": {
+      "n": 559,
+      "p50": 0.002,
+      "p95": 0.331,
+      "max": 22.121
+    },
+    "payer_get_conn_wait": {
+      "n": 480,
+      "p50": 0.002,
+      "p95": 0.005,
+      "max": 0.263
+    },
+    "payer_write": {
+      "n": 480,
+      "p50": 0.005,
+      "p95": 0.018,
+      "max": 7.234
+    },
+    "payer_written_to_handler": {
+      "n": 480,
+      "p50": 0.053,
+      "p95": 1.803,
+      "max": 25.995
+    }
+  },
+  "store_ms": {
+    "write_ns": null,
+    "spill_ns": null,
+    "rebalance_ns": null
+  }
+}

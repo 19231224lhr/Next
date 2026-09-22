@@ -1,0 +1,33 @@
+File: gateway
+Type: cpu
+Time: 2026-09-22 12:48:23 CST
+Duration: 10.11s, Total samples = 28.82s (284.99%)
+Showing nodes accounting for 13.19s, 45.77% of 28.82s total
+Dropped 477 nodes (cum <= 0.14s)
+Showing top 25 nodes out of 205
+      flat  flat%   sum%        cum   cum%
+    13.01s 45.14% 45.14%     13.01s 45.14%  syscall.rawsyscalln
+         0     0% 45.14%     12.32s 42.75%  syscall.syscalln
+         0     0% 45.14%     12.22s 42.40%  syscall.syscall
+         0     0% 45.14%     11.90s 41.29%  internal/poll.ignoringEINTRIO (inline)
+         0     0% 45.14%      9.73s 33.76%  bufio.(*Writer).Flush
+         0     0% 45.14%      9.71s 33.69%  internal/poll.(*FD).Write
+         0     0% 45.14%      9.71s 33.69%  net.(*conn).Write
+         0     0% 45.14%      9.71s 33.69%  net.(*netFD).Write
+         0     0% 45.14%      9.70s 33.66%  syscall.Write (inline)
+         0     0% 45.14%      9.70s 33.66%  syscall.write
+         0     0% 45.14%      8.55s 29.67%  net/http.(*persistConn).writeLoop
+         0     0% 45.14%      8.51s 29.53%  net/http.persistConnWriter.Write
+         0     0% 45.14%      6.62s 22.97%  crypto/ed25519.Verify (inline)
+         0     0% 45.14%      6.62s 22.97%  crypto/ed25519.VerifyWithOptions
+         0     0% 45.14%      6.15s 21.34%  crypto/internal/fips140/ed25519.Verify (inline)
+     0.01s 0.035% 45.18%      6.15s 21.34%  crypto/internal/fips140/ed25519.verify
+         0     0% 45.18%      6.14s 21.30%  crypto/internal/fips140/ed25519.verifyWithDom
+     0.16s  0.56% 45.73%      5.45s 18.91%  crypto/internal/fips140/edwards25519.(*Point).VarTimeDoubleScalarBaseMult
+         0     0% 45.73%      4.69s 16.27%  net/http.(*conn).serve
+     0.01s 0.035% 45.77%      4.48s 15.54%  utxo/protocol.FastTx.VerifyAuth
+         0     0% 45.77%      4.05s 14.05%  runtime.systemstack
+         0     0% 45.77%      3.77s 13.08%  utxo/internal/gateway.(*Relay).runDirect.func2.1
+         0     0% 45.77%      3.74s 12.98%  utxo/internal/gateway.(*Relay).runDirectTask
+         0     0% 45.77%      3.56s 12.35%  net/http.(*ServeMux).ServeHTTP
+         0     0% 45.77%      3.56s 12.35%  net/http.serverHandler.ServeHTTP

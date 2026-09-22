@@ -1,0 +1,108 @@
+File: gateway
+Type: cpu
+Time: 2026-09-22 12:48:23 CST
+Duration: 10.11s, Total samples = 28.82s (284.99%)
+Showing nodes accounting for 22.51s, 78.11% of 28.82s total
+Dropped 477 nodes (cum <= 0.14s)
+Showing top 100 nodes out of 205
+      flat  flat%   sum%        cum   cum%
+    13.01s 45.14% 45.14%     13.01s 45.14%  syscall.rawsyscalln
+         0     0% 45.14%     12.32s 42.75%  syscall.syscalln
+         0     0% 45.14%     12.22s 42.40%  syscall.syscall
+         0     0% 45.14%     11.90s 41.29%  internal/poll.ignoringEINTRIO (inline)
+         0     0% 45.14%      9.73s 33.76%  bufio.(*Writer).Flush
+         0     0% 45.14%      9.71s 33.69%  internal/poll.(*FD).Write
+         0     0% 45.14%      9.71s 33.69%  net.(*conn).Write
+         0     0% 45.14%      9.71s 33.69%  net.(*netFD).Write
+         0     0% 45.14%      9.70s 33.66%  syscall.Write (inline)
+         0     0% 45.14%      9.70s 33.66%  syscall.write
+         0     0% 45.14%      8.55s 29.67%  net/http.(*persistConn).writeLoop
+         0     0% 45.14%      8.51s 29.53%  net/http.persistConnWriter.Write
+         0     0% 45.14%      6.62s 22.97%  crypto/ed25519.Verify (inline)
+         0     0% 45.14%      6.62s 22.97%  crypto/ed25519.VerifyWithOptions
+         0     0% 45.14%      6.15s 21.34%  crypto/internal/fips140/ed25519.Verify (inline)
+     0.01s 0.035% 45.18%      6.15s 21.34%  crypto/internal/fips140/ed25519.verify
+         0     0% 45.18%      6.14s 21.30%  crypto/internal/fips140/ed25519.verifyWithDom
+     0.16s  0.56% 45.73%      5.45s 18.91%  crypto/internal/fips140/edwards25519.(*Point).VarTimeDoubleScalarBaseMult
+         0     0% 45.73%      4.69s 16.27%  net/http.(*conn).serve
+     0.01s 0.035% 45.77%      4.48s 15.54%  utxo/protocol.FastTx.VerifyAuth
+         0     0% 45.77%      4.05s 14.05%  runtime.systemstack
+         0     0% 45.77%      3.77s 13.08%  utxo/internal/gateway.(*Relay).runDirect.func2.1
+         0     0% 45.77%      3.74s 12.98%  utxo/internal/gateway.(*Relay).runDirectTask
+         0     0% 45.77%      3.56s 12.35%  net/http.(*ServeMux).ServeHTTP
+         0     0% 45.77%      3.56s 12.35%  net/http.serverHandler.ServeHTTP
+         0     0% 45.77%      3.55s 12.32%  net/http.HandlerFunc.ServeHTTP
+         0     0% 45.77%      3.54s 12.28%  main.directPaymentHandler.func2
+         0     0% 45.77%      3.54s 12.28%  utxo/protocol.ReceiveDescriptor.Verify
+         0     0% 45.77%      3.29s 11.42%  utxo/protocol.DecodeFastTx
+     0.04s  0.14% 45.91%      3.01s 10.44%  crypto/internal/fips140/edwards25519/field.(*Element).Multiply (inline)
+         0     0% 45.91%      2.97s 10.31%  crypto/internal/fips140/edwards25519/field.feMul (inline)
+     0.52s  1.80% 47.71%      2.97s 10.31%  crypto/internal/fips140/edwards25519/field.feMulGeneric
+     0.01s 0.035% 47.74%      2.85s  9.89%  runtime.schedule
+         0     0% 47.74%      2.82s  9.78%  runtime.findRunnable
+         0     0% 47.74%      2.78s  9.65%  runtime.mcall
+         0     0% 47.74%      2.72s  9.44%  utxo/protocol.decodeDirectSubmission
+         0     0% 47.74%      2.35s  8.15%  utxo/protocol.TxBody.validateVersion
+         0     0% 47.74%      2.32s  8.05%  internal/poll.(*FD).Read
+         0     0% 47.74%      2.32s  8.05%  net.(*conn).Read
+         0     0% 47.74%      2.32s  8.05%  net.(*netFD).Read
+         0     0% 47.74%      2.22s  7.70%  bufio.(*Reader).Peek
+         0     0% 47.74%      2.22s  7.70%  bufio.(*Reader).fill
+         0     0% 47.74%      2.20s  7.63%  syscall.Read (inline)
+         0     0% 47.74%      2.20s  7.63%  syscall.read
+         0     0% 47.74%      2.17s  7.53%  sync.(*Once).Do
+         0     0% 47.74%      2.17s  7.53%  sync.(*Once).doSlow
+         0     0% 47.74%      2.17s  7.53%  utxo/internal/gateway.(*Relay).verifyDirectPending
+         0     0% 47.74%      2.02s  7.01%  runtime.(*mheap).allocSpan
+         0     0% 47.74%      2.01s  6.97%  runtime.park_m
+         0     0% 47.74%      2.01s  6.97%  utxo/protocol.FastTx.MarshalBinary
+     0.14s  0.49% 48.23%      1.89s  6.56%  crypto/internal/fips140/edwards25519.(*projP1xP1).Double
+         0     0% 48.23%      1.88s  6.52%  runtime.(*mheap).alloc.func1
+         0     0% 48.23%      1.79s  6.21%  sync.OnceValues[go.shape.struct { Tx utxo/protocol.FastTx; Certificate utxo/protocol.OutputCertificate; InputCertificates []utxo/protocol.InputCertificate },go.shape.interface { Error string }].1
+         0     0% 48.23%      1.79s  6.21%  sync.OnceValues[go.shape.struct { Tx utxo/protocol.FastTx; Certificate utxo/protocol.OutputCertificate; InputCertificates []utxo/protocol.InputCertificate },go.shape.interface { Error string }].1.1
+         0     0% 48.23%      1.79s  6.21%  utxo/internal/gateway.(*Relay).runDirect.func3.1
+     1.67s  5.79% 54.02%      1.67s  5.79%  runtime.madvise
+         0     0% 54.02%      1.64s  5.69%  runtime.sysUsed (inline)
+         0     0% 54.02%      1.64s  5.69%  runtime.sysUsedOS (inline)
+     0.01s 0.035% 54.06%      1.60s  5.55%  crypto/internal/fips140/edwards25519.(*projP2).FromP1xP1
+     0.01s 0.035% 54.09%      1.60s  5.55%  utxo/protocol.DirectSubmission.marshal
+     1.44s  5.00% 59.09%      1.47s  5.10%  crypto/internal/fips140/edwards25519/field.addMul (inline)
+         0     0% 59.09%      1.45s  5.03%  utxo/internal/gateway.(*Collector).CollectDirect
+         0     0% 59.09%      1.43s  4.96%  utxo/protocol.VerifyOwner
+     1.39s  4.82% 63.91%      1.39s  4.82%  runtime.kevent
+         0     0% 63.91%      1.39s  4.82%  utxo/protocol.DecodeDirectSubmission (partial-inline)
+         0     0% 63.91%      1.38s  4.79%  runtime.netpoll
+         0     0% 63.91%      1.38s  4.79%  utxo/protocol.OutputCertificate.Verify
+         0     0% 63.91%      1.36s  4.72%  utxo/protocol.DecodeDirectPayment
+         0     0% 63.91%      1.36s  4.72%  utxo/protocol.VerifyQC
+         0     0% 63.91%      1.30s  4.51%  utxo/protocol.DirectPayment.MarshalBinary
+     1.25s  4.34% 68.25%      1.29s  4.48%  crypto/internal/fips140/edwards25519/field.addMul19 (inline)
+         0     0% 68.25%      1.28s  4.44%  crypto/internal/fips140/edwards25519/field.(*Element).Square (inline)
+     0.43s  1.49% 69.74%      1.28s  4.44%  crypto/internal/fips140/edwards25519/field.feSquare
+         0     0% 69.74%      1.21s  4.20%  net/http.(*ResponseController).Flush
+         0     0% 69.74%      1.21s  4.20%  net/http.(*response).FlushError
+     1.21s  4.20% 73.94%      1.21s  4.20%  runtime.usleep
+         0     0% 73.94%      1.20s  4.16%  net/http.checkConnErrorWriter.Write
+     1.19s  4.13% 78.07%      1.19s  4.13%  runtime.pthread_cond_signal
+         0     0% 78.07%      1.19s  4.13%  runtime.semawakeup
+     0.01s 0.035% 78.11%      1.18s  4.09%  net/http.(*persistConn).readLoop
+         0     0% 78.11%      1.16s  4.02%  net/http.(*chunkWriter).flush
+         0     0% 78.11%      1.14s  3.96%  net/http.(*persistConn).Read
+         0     0% 78.11%      1.12s  3.89%  runtime.notewakeup
+         0     0% 78.11%      1.12s  3.89%  runtime.startm
+         0     0% 78.11%      1.12s  3.89%  runtime.wakep
+         0     0% 78.11%      1.09s  3.78%  net/http.(*connReader).Read
+         0     0% 78.11%      1.07s  3.71%  utxo/internal/blockfollow.Run
+         0     0% 78.11%      1.07s  3.71%  utxo/internal/blockfollow.Start.func1
+         0     0% 78.11%      1.02s  3.54%  net.(*Dialer).DialContext
+         0     0% 78.11%      1.02s  3.54%  net/http.(*Transport).dial
+         0     0% 78.11%      1.02s  3.54%  net/http.(*Transport).dialConn
+         0     0% 78.11%      1.02s  3.54%  net/http.(*Transport).dialConnFor
+         0     0% 78.11%      1.02s  3.54%  net/http.(*Transport).startDialConnForLocked.func1
+         0     0% 78.11%      1.01s  3.50%  net.(*sysDialer).dialParallel
+         0     0% 78.11%      1.01s  3.50%  net.(*sysDialer).dialSerial
+         0     0% 78.11%         1s  3.47%  net.(*sysDialer).dialSingle
+         0     0% 78.11%         1s  3.47%  net.(*sysDialer).dialTCP
+         0     0% 78.11%         1s  3.47%  net.(*sysDialer).doDialTCP (inline)
+         0     0% 78.11%         1s  3.47%  net.(*sysDialer).doDialTCPProto
+         0     0% 78.11%         1s  3.47%  net.internetSocket

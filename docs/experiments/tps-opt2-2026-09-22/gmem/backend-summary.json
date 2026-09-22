@@ -1,0 +1,405 @@
+{
+  "coverage": {
+    "first_http_sender_gateway": 578,
+    "matched_payments": 578
+  },
+  "stages_ms": {
+    "send_to_first_mempool_enter": {
+      "n": 578,
+      "mean": 29.73171626297578,
+      "p50": 3.608,
+      "p95": 145.324,
+      "max": 244.21,
+      "negative": 0
+    },
+    "fast_to_first_mempool_enter": {
+      "n": 578,
+      "mean": 25.01409169550173,
+      "p50": 1.751,
+      "p95": 139.383,
+      "max": 226.12,
+      "negative": 3
+    },
+    "send_to_public_delivery": {
+      "n": 578,
+      "mean": 28.069714532871973,
+      "p50": 2.617,
+      "p95": 143.744,
+      "max": 243.426,
+      "negative": 0
+    },
+    "public_delivery_to_receive": {
+      "n": 578,
+      "mean": 0.22191349480968858,
+      "p50": 0.049,
+      "p95": 0.672,
+      "max": 12.447,
+      "negative": 0
+    },
+    "public_receive_to_mempool_enter": {
+      "n": 578,
+      "mean": 1.4400882352941176,
+      "p50": 0.784,
+      "p95": 2.171,
+      "max": 58.144,
+      "negative": 0
+    },
+    "mempool_check": {
+      "n": 578,
+      "mean": 0.003932525951557094,
+      "p50": 0.003,
+      "p95": 0.005,
+      "max": 0.331,
+      "negative": 0
+    },
+    "accepted_to_prepare_enter": {
+      "n": 578,
+      "mean": 274.1217837370242,
+      "p50": 250.332,
+      "p95": 571.298,
+      "max": 669.739,
+      "negative": 0
+    },
+    "prepare_block": {
+      "n": 578,
+      "mean": 1.3465190311418684,
+      "p50": 1.288,
+      "p95": 1.643,
+      "max": 2.838,
+      "negative": 0
+    },
+    "prepare_done_to_commit_decision": {
+      "n": 578,
+      "mean": 93.78201211072664,
+      "p50": 91.246,
+      "p95": 106.233,
+      "max": 195.191,
+      "negative": 0
+    },
+    "decision_to_app_commit_done": {
+      "n": 578,
+      "mean": 153.72752076124567,
+      "p50": 158.059,
+      "p95": 195.976,
+      "max": 210.625,
+      "negative": 0
+    },
+    "app_finalize": {
+      "n": 578,
+      "mean": 81.65294982698961,
+      "p50": 76.318,
+      "p95": 130.422,
+      "max": 133.494,
+      "negative": 0
+    },
+    "app_commit": {
+      "n": 578,
+      "mean": 65.8888633217993,
+      "p50": 63.264,
+      "p95": 102.382,
+      "max": 118.218,
+      "negative": 0
+    },
+    "send_to_app_commit_done": {
+      "n": 578,
+      "mean": 552.7224325259516,
+      "p50": 556.823,
+      "p95": 833.136,
+      "max": 956.508,
+      "negative": 0
+    },
+    "app_commit_to_wallet_observed": {
+      "n": 578,
+      "mean": 593.0479671280277,
+      "p50": 595.267,
+      "p95": 662.216,
+      "max": 711.137,
+      "negative": 0
+    },
+    "app_commit_to_next_header_stored": {
+      "n": 578,
+      "mean": 441.07032946539795,
+      "p50": 438.83125,
+      "p95": 494.864459,
+      "max": 557.103125,
+      "negative": 0
+    },
+    "next_header_stored_to_wallet_observed": {
+      "n": 578,
+      "mean": 151.97763766262975,
+      "p50": 150.110833,
+      "p95": 196.1615,
+      "max": 222.392125,
+      "negative": 0
+    }
+  },
+  "committee0_operations_ms": {
+    "atomic_file_open": {
+      "n": 240,
+      "mean": 0.5083490916666666,
+      "p50": 0.103709,
+      "p95": 3.769166,
+      "max": 9.053417,
+      "negative": 0
+    },
+    "atomic_file_write_sync": {
+      "n": 240,
+      "mean": 0.7579234625,
+      "p50": 0.082,
+      "p95": 3.903709,
+      "max": 10.269042,
+      "negative": 0
+    },
+    "atomic_file_close": {
+      "n": 240,
+      "mean": 0.55814375,
+      "p50": 0.011791,
+      "p95": 3.798166,
+      "max": 5.787667,
+      "negative": 0
+    },
+    "atomic_file_rename": {
+      "n": 240,
+      "mean": 1.2156131791666667,
+      "p50": 0.145458,
+      "p95": 4.077333,
+      "max": 12.336875,
+      "negative": 0
+    },
+    "filepv_encode": {
+      "n": 238,
+      "mean": 0.017498915966386554,
+      "p50": 0.015,
+      "p95": 0.028167,
+      "max": 0.104916,
+      "negative": 0
+    },
+    "filepv_save": {
+      "n": 238,
+      "mean": 3.095421369747899,
+      "p50": 3.08075,
+      "p95": 8.169666,
+      "max": 18.483042,
+      "negative": 0
+    },
+    "consensus_state_save": {
+      "n": 106,
+      "mean": 0.014768103773584906,
+      "p50": 0.013625,
+      "p95": 0.02225,
+      "max": 0.078292,
+      "negative": 0
+    },
+    "autofile_sync_needed": {
+      "n": 650,
+      "mean": 4.819371776923077,
+      "p50": 3.967375,
+      "p95": 9.215625,
+      "max": 25.213708,
+      "negative": 0
+    },
+    "proposal_build": {
+      "n": 27,
+      "mean": 2.235395,
+      "p50": 2.28,
+      "p95": 2.794083,
+      "max": 3.296125,
+      "negative": 0
+    },
+    "proposal_parts": {
+      "n": 27,
+      "mean": 1.3974613703703704,
+      "p50": 1.492,
+      "p95": 1.571375,
+      "max": 1.717917,
+      "negative": 0
+    },
+    "proposal_wal_flush": {
+      "n": 27,
+      "mean": 3.8283672962962965,
+      "p50": 3.96475,
+      "p95": 4.704333,
+      "max": 5.125708,
+      "negative": 0
+    },
+    "proposal_sign": {
+      "n": 27,
+      "mean": 0.5347114444444444,
+      "p50": 0.390292,
+      "p95": 0.520042,
+      "max": 4.087,
+      "negative": 0
+    },
+    "proposal_batch_wal": {
+      "n": 71,
+      "mean": 3.746254718309859,
+      "p50": 3.377583,
+      "p95": 4.300084,
+      "max": 16.736208,
+      "negative": 0
+    },
+    "autofile_sync_skipped": {
+      "n": 31,
+      "mean": 6.319354838709678e-05,
+      "p50": 4.2e-05,
+      "p95": 0.000167,
+      "max": 0.000208,
+      "negative": 0
+    },
+    "vote_wal_flush": {
+      "n": 210,
+      "mean": 5.893835914285714,
+      "p50": 5.553875,
+      "p95": 11.728625,
+      "max": 25.421833,
+      "negative": 0
+    },
+    "vote_sign": {
+      "n": 210,
+      "mean": 3.4764565714285713,
+      "p50": 3.22275,
+      "p95": 9.995667,
+      "max": 18.581292,
+      "negative": 0
+    },
+    "internal_message_wal": {
+      "n": 216,
+      "mean": 5.749790935185185,
+      "p50": 5.424459,
+      "p95": 10.579042,
+      "max": 18.975,
+      "negative": 0
+    },
+    "blockstore_save": {
+      "n": 105,
+      "mean": 0.17389485714285713,
+      "p50": 0.131292,
+      "p95": 0.270166,
+      "max": 1.507208,
+      "negative": 0
+    },
+    "endheight_wal": {
+      "n": 105,
+      "mean": 5.560874142857143,
+      "p50": 5.362458,
+      "p95": 9.427958,
+      "max": 11.503625,
+      "negative": 0
+    },
+    "finalize_history_encode": {
+      "n": 105,
+      "mean": 0.005653942857142857,
+      "p50": 0.004458,
+      "p95": 0.009375,
+      "max": 0.056334,
+      "negative": 0
+    },
+    "finalize_history_batch_set": {
+      "n": 105,
+      "mean": 0.0006079047619047619,
+      "p50": 0.000542,
+      "p95": 0.001084,
+      "max": 0.001333,
+      "negative": 0
+    },
+    "finalize_recovery_encode": {
+      "n": 105,
+      "mean": 0.0056134,
+      "p50": 0.004666,
+      "p95": 0.00975,
+      "max": 0.019792,
+      "negative": 0
+    },
+    "finalize_batch_write_sync": {
+      "n": 105,
+      "mean": 0.003792047619047619,
+      "p50": 0.003458,
+      "p95": 0.006334,
+      "max": 0.013458,
+      "negative": 0
+    },
+    "finalize_response_save": {
+      "n": 105,
+      "mean": 0.022345266666666665,
+      "p50": 0.018375,
+      "p95": 0.044583,
+      "max": 0.068666,
+      "negative": 0
+    },
+    "commit_mempool_lock": {
+      "n": 105,
+      "mean": 0.19568813333333332,
+      "p50": 0.000333,
+      "p95": 0.005625,
+      "max": 18.289292,
+      "negative": 0
+    },
+    "commit_mempool_flush": {
+      "n": 105,
+      "mean": 0.0008003809523809524,
+      "p50": 0.000792,
+      "p95": 0.00125,
+      "max": 0.001583,
+      "negative": 0
+    }
+  },
+  "examples": [
+    {
+      "fact": "b3c0a92b1c48794bb9243bc8d571f41ec119a9a6ef594ef410b25a6ff265b043",
+      "height": 92,
+      "prepared_node": 2,
+      "proof_header_stored": 1790051041777714083,
+      "wallet_block_commit": 0
+    },
+    {
+      "fact": "8bc05732db577ceaf22de32854954d65ba1930861702811915e0d34fc37e77f9",
+      "height": 96,
+      "prepared_node": 2,
+      "proof_header_stored": 1790051044230995708,
+      "wallet_block_commit": 0
+    },
+    {
+      "fact": "d75c4124eff98334f009a68416c439278bed864a8d30748da46b7fecf0ec2f6b",
+      "height": 30,
+      "prepared_node": 3,
+      "proof_header_stored": 1790051004799982500,
+      "wallet_block_commit": 0
+    },
+    {
+      "fact": "d180fb6faf40ca635441e0476e11d1780a30a1c556c8cf57b4f3632eb561505e",
+      "height": 37,
+      "prepared_node": 0,
+      "proof_header_stored": 1790051008949314625,
+      "wallet_block_commit": 0
+    },
+    {
+      "fact": "69deeb9112861aa1e4e217df76128ec9c1c6ab6ae5168c931a74c4baf23ca461",
+      "height": 54,
+      "prepared_node": 3,
+      "proof_header_stored": 1790051018992403791,
+      "wallet_block_commit": 0
+    },
+    {
+      "fact": "2c81aaf6d83691219d183ec314017262455ed560047d28bf64d0e6f56e56e00d",
+      "height": 74,
+      "prepared_node": 3,
+      "proof_header_stored": 1790051031052782875,
+      "wallet_block_commit": 0
+    },
+    {
+      "fact": "ee0844e699c7f8e26be467bec30355b4e5057db89d6d6c0359b68740179030d7",
+      "height": 100,
+      "prepared_node": 2,
+      "proof_header_stored": 1790051046636017375,
+      "wallet_block_commit": 0
+    },
+    {
+      "fact": "d68cd0fd08df8f44ac4832c0cea74c64381c792f5e969c4301f00fd73d53041b",
+      "height": 103,
+      "prepared_node": 1,
+      "proof_header_stored": 1790051048379736916,
+      "wallet_block_commit": 0
+    }
+  ],
+  "note": "Diagnostic sampled payments. H+1 BlockStore Save completion is an availability proxy, not a separately observed HTTP publication time. Stage quantiles are not additive; negative gaps retain overlap/ordering information."
+}
