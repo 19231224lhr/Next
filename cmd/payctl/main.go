@@ -26,6 +26,10 @@ func main() {
 		err = demoDirect(os.Args[2:])
 	case "chain-v4":
 		err = chainDirect(os.Args[2:])
+	case "budget-v4":
+		err = budgetDirect(os.Args[2:])
+	case "budget-audit":
+		err = auditBudget(os.Args[2:])
 	case "bench-v4":
 		err = benchDirect(os.Args[2:])
 	default:

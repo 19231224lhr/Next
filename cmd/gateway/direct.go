@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -17,6 +18,10 @@ const directPersistenceLimit = 128
 // drain closes admission, joins handlers (including synchronous fallback), then
 // joins saves. Call it before closing the collector's store, even if HTTP shutdown times out.
 func directPaymentHandler(c *gateway.Collector) (http.HandlerFunc, func()) {
+	return newDirectPaymentHandler(c, true)
+}
+
+func newDirectPaymentHandler(c *gateway.Collector, publish bool) (http.HandlerFunc, func()) {
 	slots := make(chan struct{}, 128)
 	saves := make(chan struct{}, directPersistenceLimit)
 	var pending sync.WaitGroup
@@ -67,6 +72,10 @@ func directPaymentHandler(c *gateway.Collector) (http.HandlerFunc, func()) {
 		requesttrace.Mark(ctx, "request_decoded")
 		cert, err := c.CollectDirect(ctx, req)
 		if err != nil {
+			if errors.Is(err, gateway.ErrSigningBusy) {
+				http.Error(w, "SIGNING_BUSY", http.StatusTooManyRequests)
+				return
+			}
 			if ctx.Err() == nil {
 				slog.Warn("direct approval quorum unavailable", "tx", req.Tx.ID(), "error", err)
 			}
@@ -87,6 +96,9 @@ func directPaymentHandler(c *gateway.Collector) (http.HandlerFunc, func()) {
 		w.Header().Set("Content-Length", strconv.Itoa(len(raw)))
 		_, _ = w.Write(raw)
 		_ = http.NewResponseController(w).Flush()
+		if !publish {
+			return
+		} // E2 controls parent publication independently.
 		payment := protocol.DirectPayment{Tx: req.Tx, Certificate: cert, InputCertificates: req.InputCertificates}
 		if c.OfferDirect != nil {
 			c.OfferDirect(payment)

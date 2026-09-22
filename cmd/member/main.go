@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"time"
 	cfg "utxo/cmd/internal/config"
 	"utxo/internal/blockfollow"
+	"utxo/internal/budgetprobe"
 	"utxo/internal/gateway"
 	"utxo/internal/member"
 	"utxo/internal/store"
@@ -75,7 +77,14 @@ func run() (result error) {
 	if e != nil {
 		return e
 	}
-	server, e := cfg.HTTP(c.Listen, transport.MemberHandler(m, 256, 32), c.TLS)
+	handler := transport.MemberHandler(m, 256, 32)
+	if os.Getenv("UTXO_EXPERIMENT_BUDGET") == "1" {
+		mux := http.NewServeMux()
+		mux.Handle("GET /debug/budget", budgetprobe.Handler(group, n.Genesis.Grants, org, c.Workers, m.BudgetLimits))
+		mux.Handle("/", handler)
+		handler = mux
+	}
+	server, e := cfg.HTTP(c.Listen, handler, c.TLS)
 	if e != nil {
 		return e
 	}

@@ -129,6 +129,10 @@ func run() (result error) {
 	if e != nil {
 		return e
 	}
+	if os.Getenv("UTXO_EXPERIMENT_SERIAL_DIRECT") == "1" {
+		collector.EnableSerialDirect()
+		slog.Info("experimental single-collector signing admission enabled")
+	}
 	mux := http.NewServeMux()
 	requesttrace.RegisterTimeline(mux)
 	mux.HandleFunc("POST /v1/transactions", paymentHandler(collector))
@@ -137,6 +141,12 @@ func run() (result error) {
 		var handler http.HandlerFunc
 		handler, drainDirect = directPaymentHandler(collector)
 		mux.HandleFunc("POST /v3/transactions", handler)
+		if os.Getenv("UTXO_EXPERIMENT_BUDGET") == "1" {
+			collectOnly, drainCollect := newDirectPaymentHandler(collector, false)
+			mux.HandleFunc("POST /debug/budget/collect", collectOnly)
+			drainPayment := drainDirect
+			drainDirect = func() { drainPayment(); drainCollect() }
+		}
 	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("alive\n")) })
 	server, e := cfg.HTTP(c.Listen, mux, c.TLS)

@@ -22,6 +22,7 @@ type Collector struct {
 	org             protocol.OrgConfig
 	members         [4]MemberClient
 	db              store.Store
+	directGate      *directSigningGate
 }
 
 func New(org protocol.OrgConfig, members [4]MemberClient, db store.Store) (*Collector, error) {

@@ -27,6 +27,7 @@ import (
 	"syscall"
 	"time"
 	cfg "utxo/cmd/internal/config"
+	"utxo/internal/budgetprobe"
 	"utxo/internal/committee"
 	"utxo/internal/requesttrace"
 	"utxo/internal/store"
@@ -205,6 +206,9 @@ func run() (result error) {
 	defer func() { consensus.Stop(); consensus.Wait() }()
 	client := local.New(consensus)
 	mux := http.NewServeMux()
+	if os.Getenv("UTXO_EXPERIMENT_BUDGET") == "1" {
+		mux.Handle("GET /debug/budget", budgetprobe.Handler(db, network.Genesis.Grants, network.Organizations[0], 0, nil))
+	}
 	if network.Direct != nil {
 		blockRoutes(mux, client)
 	}

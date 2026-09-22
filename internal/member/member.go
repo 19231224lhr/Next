@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
+	"sync/atomic"
 	"utxo/finality"
 	"utxo/internal/requesttrace"
 	"utxo/internal/rules"
@@ -26,10 +27,19 @@ type Config struct {
 type Request = protocol.PaymentRequest
 type Approval = protocol.Approval
 type Member struct {
-	cfg    Config
-	db     store.Store
-	peers  map[protocol.Hash]protocol.OrgConfig
-	direct *rules.DirectPolicy
+	cfg           Config
+	db            store.Store
+	peers         map[protocol.Hash]protocol.OrgConfig
+	direct        *rules.DirectPolicy
+	budgetLimited [6]atomic.Uint64
+}
+
+// BudgetLimits counts actual resource rejections, including retried requests.
+func (m *Member) BudgetLimits() (counts [6]uint64) {
+	for i := range counts {
+		counts[i] = m.budgetLimited[i].Load()
+	}
+	return
 }
 
 func New(cfg Config, db store.Store, gen state.Genesis) (*Member, error) {

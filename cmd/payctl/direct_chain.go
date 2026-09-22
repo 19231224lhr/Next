@@ -385,11 +385,15 @@ func submitChain(ctx context.Context, client *http.Client, url string, raw []byt
 	}
 }
 
-func observeChainHop(ctx context.Context, batches [4]*progressBatcher, w *wallet.Wallet, h *chainHop, start time.Time, finalReady chan<- struct{}) error {
+func observeChainHop(ctx context.Context, batches [4]*progressBatcher, w *wallet.Wallet, h *chainHop, start time.Time, finalReady chan<- struct{}, instance ...uint8) error {
+	var outputInstance uint8
+	if len(instance) > 0 {
+		outputInstance = instance[0]
+	}
 	tick := time.NewTicker(5 * time.Millisecond)
 	defer tick.Stop()
 	for {
-		ok, err := w.DirectFinal(h.Output, 0)
+		ok, err := w.DirectFinal(h.Output, outputInstance)
 		if err != nil {
 			return err
 		}

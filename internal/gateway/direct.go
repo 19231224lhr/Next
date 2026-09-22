@@ -26,6 +26,21 @@ func (c *Collector) CollectDirect(ctx context.Context, request protocol.DirectRe
 	if request.Tx.Body.Config != c.org.Hash() {
 		return protocol.OutputCertificate{}, protocol.ErrAuth
 	}
+	complete := false
+	if c.directGate != nil {
+		if cert, found, err := c.directResult(request, raw); err != nil || found {
+			return cert, err
+		}
+		if err := c.directGate.enter(ctx, raw); err != nil {
+			return protocol.OutputCertificate{}, err
+		}
+		defer func() { c.directGate.leave(complete) }()
+		// The previous attempt may have saved a result after our first lookup.
+		if cert, found, err := c.directResult(request, raw); err != nil || found {
+			complete = found && err == nil
+			return cert, err
+		}
+	}
 	type result struct {
 		index    int
 		approval protocol.DirectApproval
@@ -94,6 +109,10 @@ func (c *Collector) CollectDirect(ctx context.Context, request protocol.DirectRe
 			if len(cert.QC.Votes) == 3 {
 				requesttrace.Mark(ctx, "quorum_collected")
 				err := cert.Verify(c.org)
+				if err == nil && c.directGate != nil {
+					err = c.persistDirect(protocol.DirectPayment{Tx: request.Tx, Certificate: *cert, InputCertificates: request.InputCertificates}, false)
+				}
+				complete = err == nil
 				requesttrace.Mark(ctx, "certificate_verified")
 				return *cert, err
 			}
@@ -103,6 +122,10 @@ func (c *Collector) CollectDirect(ctx context.Context, request protocol.DirectRe
 }
 
 func (c *Collector) PersistDirect(p protocol.DirectPayment) error {
+	return c.persistDirect(p, true)
+}
+
+func (c *Collector) persistDirect(p protocol.DirectPayment, publish bool) error {
 	if p.Certificate.Verify(c.org) != nil || p.Certificate.Summary.Tx != p.Tx.ID() {
 		return protocol.ErrAuth
 	}
@@ -117,23 +140,36 @@ func (c *Collector) PersistDirect(p protocol.DirectPayment) error {
 		requesttrace.Payment("persist_callback", fact)
 		o := state.NewOverlay(v)
 		key := state.Key(state.KeyCollected, id[:])
-		if _, err := o.Get(key); err == nil {
-			return nil, nil
-		} else if !errors.Is(err, state.ErrNotFound) {
+		storedRaw, err := o.Get(key)
+		if errors.Is(err, state.ErrNotFound) {
+			o.Set(key, raw)
+			storedRaw = raw
+		} else if err != nil {
 			return nil, err
 		}
-		o.Set(key, raw)
+		if !publish {
+			return o.Changes(), nil
+		}
 		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
 			return nil, err
 		} else if found {
 			return o.Changes(), nil
 		}
-		if err := state.Put(o, state.Key(state.KeyOutbox, fact[:]), state.Outbox{Fact: fact, Certificate: raw, Origin: p.Tx.Body.Certifier}); err != nil {
+		outboxKey := state.Key(state.KeyOutbox, fact[:])
+		if existing, found, err := state.Load[state.Outbox](o, outboxKey); err != nil {
+			return nil, err
+		} else if found {
+			if existing.Fact != fact || existing.Origin != p.Tx.Body.Certifier {
+				return nil, protocol.ErrAuth
+			}
+			return o.Changes(), nil
+		}
+		if err := state.Put(o, outboxKey, state.Outbox{Fact: fact, Certificate: storedRaw, Origin: p.Tx.Body.Certifier}); err != nil {
 			return nil, err
 		}
 		return o.Changes(), nil
 	})
-	if err == nil && c.NotifyPersisted != nil {
+	if err == nil && publish && c.NotifyPersisted != nil {
 		c.NotifyPersisted(fact)
 	}
 	return err

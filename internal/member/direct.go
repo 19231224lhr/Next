@@ -147,6 +147,7 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 				return nil, err
 			}
 			if !found || slice.Available < allocation.Cap {
+				m.budgetLimited[allocation.Key.Kind].Add(1)
 				return nil, rules.ErrLimited
 			}
 			slice.Available -= allocation.Cap

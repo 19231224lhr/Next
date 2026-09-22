@@ -71,6 +71,44 @@ func directHTTPFixture(t *testing.T, db store.Store) (*gateway.Collector, protoc
 	return c, protocol.DirectRequest{Tx: tx}, f.Org
 }
 
+func TestCollectOnlyReturnsCertificateWithoutPublicDelivery(t *testing.T) {
+	db := store.NewMemory()
+	defer db.Close()
+	c, request, org := directHTTPFixture(t, db)
+	c.EnableSerialDirect()
+	c.OfferDirect = func(protocol.DirectPayment) bool { t.Error("withheld parent offered for delivery"); return true }
+	handler, drain := newDirectPaymentHandler(c, false)
+	defer drain()
+	raw, err := request.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest("POST", "/debug/budget/collect", bytes.NewReader(raw))
+	r.Header.Set("Content-Type", transport.MediaType)
+	w := httptest.NewRecorder()
+	handler(w, r)
+	cert, err := protocol.DecodeOutputCertificate(w.Body.Bytes())
+	if w.Code != 200 || err != nil || cert.Verify(org) != nil {
+		t.Fatalf("certificate: %d %v", w.Code, err)
+	}
+	rows, err := store.Scan(db, state.Key(state.KeyOutbox), nil, 1)
+	if err != nil || len(rows) != 0 {
+		t.Fatalf("collect-only created outbox: %v", err)
+	}
+	// Retrying a lost response uses the saved result and still withholds delivery.
+	r = httptest.NewRequest("POST", "/debug/budget/collect", bytes.NewReader(raw))
+	r.Header.Set("Content-Type", transport.MediaType)
+	w = httptest.NewRecorder()
+	handler(w, r)
+	if w.Code != 200 {
+		t.Fatalf("retry: %d", w.Code)
+	}
+	rows, err = store.Scan(db, state.Key(state.KeyOutbox), nil, 1)
+	if err != nil || len(rows) != 0 {
+		t.Fatal("retry published withheld parent")
+	}
+}
+
 func TestDirectHTTPResponseAndEarlyOfferBeforePersistence(t *testing.T) {
 	db := &blockedStore{Store: store.NewMemory(), entered: make(chan struct{}), release: make(chan struct{})}
 	defer db.Close()

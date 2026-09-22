@@ -136,6 +136,7 @@ bin/payctl audit -dir experiments/local-v4
 | 文档 | 主要问题 |
 | :--- | :--- |
 | [真实连续续花](docs/experiments/continuous-respending-2026-09-22/README.md) | 收到 TXCer 后能否继续付款，链长是否增加单跳负担 |
+| [有限资金与权限周转（E2）](docs/experiments/finite-budget-2026-09-23/README.md) | 有限 CAL、FUEL 与工作权限的释放、预算阻塞及费用审计；独立实验分支 |
 | [单组织整体 TPS](docs/experiments/single-org-tps-2026-09-22/README.md) | 快速签发、公共结算与成员收尾的完整系统吞吐 |
 | [四委员共识容量](docs/experiments/consensus-capacity-2026-09-22/README.md) | 独立测量委员会工作点、过载边界及资源开销 |
 | [完整路径优化](docs/experiments/full-path-opt-2026-09-22/README.md) | 成员内存模式、钱包保存及全流程阶段测量 |
