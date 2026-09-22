@@ -10,6 +10,13 @@ def verify(path):
     audit=read(path/'reports/audit.json')
     payments=read(path/'reports/budget-audit.json')['Payments']
     report=read(path/'reports/budget-v4.json')
+    snapshots=read(path/'last-snapshots.json')
+    for node,snapshot in snapshots.items():
+        if not node.startswith('org0-member'):continue
+        for debit in snapshot['Detail'].get('Debits',[]):
+            assert debit['Charged']>=debit['Released']+debit['NetSpent'],('over-release',path,node,debit['Key'])
+            resource=next(r for r in snapshot['Resources'] if r['Key']==debit['Key'])
+            assert sum(s['Reserved'] for s in resource['Slices'])==debit['Charged']-debit['Released'],('reservation mismatch',path,node,debit['Key'])
     committee=[r for r in audit if r['Name'].startswith('committee')]
     assert len(committee)==4, path
     assert len({r['StateHash'] for r in committee})==1, path
