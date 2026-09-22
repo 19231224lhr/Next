@@ -1,316 +1,200 @@
 # UTXO FastPay
 
-Public submissions now use `DirectSubmission` (406): transaction, existing organization spend authorization and immediate input certificates. New output TXCer remains in wallet/INSTALL delivery (405). See [the current amendment](docs/implementation-public-submission-v4.md). Use a fresh genesis for this accounting-rule revision.
+### 基于担保组织的 UTXO 快速支付实验系统
 
-Current implementation: direct-liability payments with block-driven wallet and
-member updates (wire/application version 4). `main` preserves the tested
-performance baseline; `re` adds the continuous-respending experiment and its results.
+收款钱包验证 **TXCer** 后即可继续付款，无需等待前置交易完成公共结算。担保组织负责快速认证与直接担保，委员会负责公共账本、资金结算和异常赔付，钱包与组织成员自行跟块更新状态。
 
-**Start with [current architecture, build instructions and measurements](docs/implementation-block-following-v4.md).**
+[性能结果](#性能结果) · [快速开始](#快速开始) · [文档导航](#文档导航) · [实验配置](#实验配置) · [开发与验证](#开发与验证)
 
-## 实验索引与已验证性能
+> 当前运行协议为 **wire 4**，项目定位为可复现的研究原型。
+> `main` 保留经过测试的性能基线；`re` 在此基础上增加连续续花实验。
 
-以下结果来自 Mac Studio M4 Max（16 核、64 GB）同机多进程实验，使用真实签名与四成员三票认证。性能轮采用组织/委员会应用内存状态、Comet MemDB 和钱包 bbolt NoSync，保留既有 Comet WAL/FilePV 同步；每轮重新创世，不提供崩溃恢复保证。钱包在同一压测进程内运行，不包含独立远端收款设备的网络交付时间。
+## 系统概览
 
-| 实验 | 已验证结果 | 报告与复现材料 |
-|---|---|---|
-| 四委员纯共识 | 目标 3000 TPS，连续 3 分钟、54 万笔，两次全部成功；含收尾实际吞吐约 **2986 TPS**。3500 档单次通过，4000 档大样本未全部成功 | [共识容量实验](docs/experiments/consensus-capacity-2026-09-22/README.md) |
-| 单担保组织完整快速支付 | 两轮各 15 万笔，目标 2200、实际发送约 2127 TPS；含公共结算和成员收尾约 **2104–2106 TPS**，快速到账 P50 **4.54–4.55 ms**、P95 **69.46–69.95 ms**；每轮约 71 秒 | [单组织整体 TPS 与单变量对照](docs/experiments/single-org-tps-2026-09-22/README.md) |
-| 较低负载下的完整快速支付 | 目标 2000 TPS，两轮实际完整闭环约 **1949–1950 TPS**；快速到账 P50 **2.52–2.57 ms**、P95 **50.50–50.76 ms** | [同一报告中的 2000 档](docs/experiments/single-org-tps-2026-09-22/README.md) |
-| 单笔快速付款 | 连续续花实验的 1 跳快速组三次为 **1.749 / 2.017 / 2.274 ms**，中位 **2.017 ms**；这是低负载采样，不是高负载尾延迟 | [逐轮数据与计时定义](https://github.com/19231224lhr/Next/blob/re/docs/experiments/continuous-respending-2026-09-22/README.md) |
-| 真实连续续花（论文实验一） | 链长 1/10/100，两种方式各三轮，**18 案例、666 笔全部通过审计**。100 跳最后钱包快速可用中位 **198.630 ms**，整链后台收尾 **785.519 ms**；逐跳等待公共确认的对照组最后钱包快速可用为 **64.384 s** | [连续续花结果、图表和原始数据](https://github.com/19231224lhr/Next/blob/re/docs/experiments/continuous-respending-2026-09-22/README.md) · [实验方案](https://github.com/19231224lhr/Next/blob/re/docs/research/continuous-respending-experiment-design-2026-09-22.md) |
+| 组件 | 职责 |
+| :--- | :--- |
+| **钱包** | 签署付款，验证 TXCer 与输出绑定，接收后续花；跟块确认输出并更新本地状态 |
+| **担保组织** | 网关分发请求；四个成员独立验证，取得三份有效签名后交付 TXCer |
+| **后台处理** | INSTALL 保存、传播完整材料；中继提交公共交易，成员在有限延迟后备用补投 |
+| **担保委员会** | 四委员运行 CometBFT，裁决输入消费、执行资金与费用规则、处理直接责任及必要赔付 |
 
-**计时与结论范围：** 快速到账从付款钱包开始 HTTP 发送计时，到收款钱包验证 TXCer 与输出绑定、完成本地原子接收；是否耐久落盘取决于实验存储模式。完整闭环还包括公共结算观察和各成员逐事实收尾。纯共识不包含在线组织签发和钱包接收，不能用它代替整系统 TPS。上述 TPS 使用独立最终 UTXO、少量地址高复用；连续续花则使用真实前后依赖输出，不能把单链跳数/秒当系统容量。
+**快速到账与公共结算分开推进。** 钱包不等待后台 INSTALL 回执即可续花。委员会不接收本笔新输出的 TXCer；公共提交保留交易、组织消费授权，以及实际使用的未确认输入对应的 TXCer，不携带完整祖先历史。
 
-连续续花快速组的 **324/324 次后继发送早于父交易最早应用 Commit**；96 项实际缺失输出责任均由父交易正常到达解除。固定单输入/单输出下，TXCer 为 941 字节，100 跳内未观察到单跳延迟明显增长。等待组包含钱包确认观察、成员跟块及重试成本，因此对照属于本实现的两种付款方式，不代表纯共识加速或相对其他协议的性能优势。
+**状态由各参与方自行跟块更新。** 委员会正常出块，不生成逐笔收款通知或成员核销回执。成员只恢复自己确实占用、且已满足解除条件的额度；实际赔付本金与实际费用仍是支出。
 
-每份报告保留参数、独立重复、审计与复现入口。目标速率不是实际吞吐；2400 的完整系统测试触及在途上限，不列为稳定工作点。当前结果不外推至广域网、大规模地址轮换、无限链长或无限期运行。
+**本金与费用分工。** CAL 用于支付本金、备付及赔付；FUEL 用于 Gas、节点报酬和担保服务费。
 
-## Current runtime
+实现细节见[按块处理规范](docs/implementation-block-following-v4.md)与[公共提交修订](docs/implementation-public-submission-v4.md)。
 
-Normal settlement emits no per-payment output or member credit proofs. A shared
-block follower verifies committed execution results once per height and applies
-local changes atomically. Existing three-vote fast delivery, background
-INSTALL, direct issuer liability and real historical input repair remain.
+## 性能结果
 
-Member processes now open their bbolt database with **NoSync** by default for
-fresh-start experiments. Transactions still apply atomically during normal
-operation and votes follow the committed update, but member state is not guaranteed
-durable or crash-consistent. Restart the whole experiment with fresh state after
-failure. Gateway, wallet and committee application stores default to synchronous
-writes unless their explicit experimental memory/NoSync modes are selected.
-The startup log reports `storage_no_sync=true`. See
-[the change and validation](docs/experiments/member-nosync-default-2026-09-21/README.md).
+下表是**已完成实验的工作点**，不是理论上限。原始数据、对照条件与复现脚本均在对应报告中。
 
-For the experimental in-memory member mode, set
-`UTXO_EXPERIMENT_MEMBER_MEMORY=1`. It uses an ordered B-tree under the same
-transaction boundary and signing order. A clean shutdown exports an **audit-only**
-`member.db`; startup refuses audit snapshots and incomplete `.pending` files.
-There is no crash recovery or resume mode. `bench-v4 -wallet-no-sync` independently
-opts the benchmark wallet out of disk synchronization (the default is false).
-See [full-path measurements and the all-source reproduction tool](docs/experiments/full-path-opt-2026-09-22/README.md).
+### 快速到账与吞吐
 
-The same fresh-start storage mode is available to gateways with
-`UTXO_EXPERIMENT_GATEWAY_MEMORY=1`. It retains atomic updates, completed-block
-checks and bounded background work, but performs no runtime gateway database
-writes. Shutdown exports an audit-only `gateway.db`; failed exports are returned
-as errors and are not usable for restart. The default gateway remains synchronous
-bbolt. Public relay submission has 8 bounded slots (INSTALL remains 4), and
-member foreground admission has 256 slots (background remains 32). These limits
-absorb measured bursts; they do not remove overload or validation. See [the isolated comparisons and reproduction commands](docs/experiments/tps-opt2-2026-09-22/RESULTS.md).
+| 场景 | 测量规模 | 实际结果 | 证据 |
+| :--- | :--- | :--- | :--- |
+| 单笔快速付款 | 三次独立单笔 | 中位 **2.017 ms**；三次为 1.749 / 2.017 / 2.274 ms | [单笔与续花数据](https://github.com/19231224lhr/Next/blob/re/docs/experiments/continuous-respending-2026-09-22/README.md) |
+| 单组织完整系统，目标 2000 TPS | 每轮 15 万笔，重复两轮 | 完整闭环 **1949–1950 TPS**；到账 P50 **2.52–2.57 ms**，P95 **50.50–50.76 ms** | [整体 TPS 报告](docs/experiments/single-org-tps-2026-09-22/README.md) |
+| 单组织完整系统，目标 2200 TPS | 每轮 15 万笔，重复两轮；每轮约 71 秒 | 实际发送约 2127 TPS；完整闭环 **2104–2106 TPS**；到账 P50 **4.54–4.55 ms**，P95 **69.46–69.95 ms** | [整体 TPS 报告](docs/experiments/single-org-tps-2026-09-22/README.md) |
+| 四委员纯共识，目标 3000 TPS | 每轮 3 分钟、54 万笔，重复两轮 | 全部成功；含收尾实际吞吐约 **2986 TPS** | [共识容量报告](docs/experiments/consensus-capacity-2026-09-22/README.md) |
 
-Run `python3 third_party/cometbft/overlay.py` before building. Keep the existing
-`-tags=comet_v3` fork build switch, but use `payctl init-lab -v4`, `bench-v4` and
-`demo-v4` with a fresh genesis. Do not reuse wire-v3 databases.
+完整系统的 2400 档触及在途任务上限，不作为稳定承接 2400 TPS 的证据。纯共识 3500 档单次通过，4000 档大样本未全部成功。
 
-For paced load, `bench-v4 -rate 200 -concurrency 256 -max-pending 2048`
-releases a send permit after the receiving wallet verifies and commits
-TXCer locally (durability follows the selected wallet mode), while bounded tasks continue observing public settlement and member
-completion. Omit `-max-pending` to retain the original complete-lifecycle worker
-pool. Reports include dispatch/permit waiting, progress-query load, per-stage
-outcomes, and a 250 ms reconstruction of unfinished counts and oldest age.
-See [the benchmark admission plan and experiments](docs/experiments/dispatch-lag-2026-09-20/PLAN.md).
+### 真实连续续花 · 论文实验一
 
-### Single-organization whole-system experiments
+三个独立钱包按 A → B → C → A 转手，每次收到并验证上一笔 TXCer 后，才构造下一笔交易。链长 1、10、100，各与“等待公共确认后再付款”对照，每种设置独立重复三次。
 
-`bench-v4 -same-org` sends between two wallet identities through the issuing
-organization. The new bounded `POST /v4/progress` endpoint coalesces up to 128
-exact fact reads in one store view. `-batch-progress` is enabled by default;
-`-batch-progress=false` retains the original per-fact observer for comparisons.
-Completion still requires each member's own observed/closed state, not height
-or HTTP acceptance. Reports separate physical batch requests and time from
-logical checks and queue waiting.
+**18 个案例、666 笔付款全部完成并通过审计。** 下表为三轮中位数，终点均为最后一跳钱包快速可用。
 
-Repeated, successfully verified recipient descriptors use a bounded 1024-entry
-cache keyed by their entire signed value. Network/routing rules and every
-payment's owner authorization, quorum and mutable input/budget checks remain.
-This particularly benefits address reuse; address-churn results are reported
-separately. No new output certificate is submitted to the committee.
+| 交易链长度 | 收到即可续花 | 每跳等待公共确认 |
+| :--- | ---: | ---: |
+| 1 笔 | 2.017 ms | 2.004 ms |
+| 10 笔 | 19.878 ms | 5.655 s |
+| 100 笔 | **198.630 ms** | **64.384 s** |
 
-`UTXO_EXPERIMENT_COMMIT=250ms` optionally shortens the direct-mode height timing
-for whole-system latency experiments. The default remains 500ms, overlapping
-execution/Commit. This changes no quorum, proof, timeout-repair or durability rule.
-The complete nine-service workload, storage modes, controls and results are in
-[the single-organization TPS report](docs/experiments/single-org-tps-2026-09-22/README.md).
+- **真实未确认消费：** 快速组 324/324 次后继发送早于父交易最早应用 Commit；96 项实际缺失输出责任均随父交易正常到达而解除。
+- **后台正常收尾：** 100 跳整链收尾中位时间为 785.519 ms；委员会状态一致，资金、费用与成员额度审计通过。
+- **单笔材料不携带祖先链：** 固定单输入、单输出结构下，TXCer 始终为 941 字节；100 跳内未观察到单跳延迟明显增长。
 
-The prior wire-v3 baseline is commit `039374d`; its historical measurements are
-in [v1.2 implementation notes](docs/implementation-v1.2.md). Current short tests
-do not establish sustained high TPS or bounded long-term storage.
+[查看实验报告与图表](https://github.com/19231224lhr/Next/blob/re/docs/experiments/continuous-respending-2026-09-22/README.md) · [查看实验方案](https://github.com/19231224lhr/Next/blob/re/docs/research/continuous-respending-experiment-design-2026-09-22.md)
 
-The sections below document the **v1.1 baseline**, not the current runtime path.
+### 如何理解这些数字
 
-## Legacy v1.1 implementation
+| 指标 | 起点与终点 |
+| :--- | :--- |
+| **快速到账** | 付款钱包开始 HTTP 发送 → 收款钱包验证 TXCer 与输出绑定、完成本地原子接收 |
+| **完整闭环** | 包含快速到账、公共结算观察，以及各成员按确切交易事实完成本地收尾 |
+| **纯共识 TPS** | 仅测委员会接纳和成功上链，不包含在线组织签发及钱包接收 |
+| **整链耗时** | 第一笔发送 → 最后一跳对应终点；包含中间交易的构造、签名与等待 |
 
-- Canonical binary transaction/certificate envelopes, Ed25519 owner/recipient/quorum signatures.
-- Checked amounts, per-grant rounding, cumulative accounting and bounded fee lifecycle rules.
-- Atomic memory/bbolt stores with independent identities and normal same-database restart.
-- Durable member approval, three-vote certificates, background INSTALL, direct-parent import.
-- Same/cross-organization pre-settlement spending, persistent conflict locks and local budgets.
-- CometBFT 0.38 with typed Merkle facts, next-height authenticated proofs and real four-node tests.
-- On-demand blocks: idle consensus waits for transactions; necessary proof/maintenance blocks finish before it becomes idle again.
-- Ordinary CAL payment settlement, deferred child registration, finite FUEL reserves and idempotent fee stages.
-- Proof-driven FUEL/policy/E member credits and finalized-output import.
-- Retail direct transfers with atomic CAL/FUEL consumption and deterministic fee change.
+所有结果来自 **Mac Studio M4 Max（16 核、64 GB）同机多进程**环境。上述性能轮采用组织及委员会应用内存状态、Comet MemDB 和钱包 bbolt NoSync，保留既有 Comet WAL/FilePV 同步。每轮重新创世，不提供崩溃恢复保证；钱包在同一压测进程内运行，不包含独立远端收款设备的网络交付时间。
 
-This is an implementation in progress, **not a completed payment system**.
-The core ordinary-payment path is tested through real consensus and proof-driven FUEL
-credit. Independent member/committee/gateway processes, durable wallets, background relays and
-public-custody replacement are available for the ordinary-payment laboratory.
-Root fulfilment, real refill/reward claims, physical archive, full benchmark telemetry
-and sustained experiments remain in progress.
-No public service or benchmark TPS is claimed.
+TPS 实验使用独立最终 UTXO、少量地址高复用；续花实验使用真实依赖输出。等待确认组还包含钱包确认观察、成员跟块及重试成本，因此表中差距属于本实现的两种付款方式对比。单笔延迟、单链速度和系统吞吐不能相互替代，也不外推为广域网、大规模地址轮换或无限期运行表现。
 
-## Development
+## 快速开始
 
-Use Go 1.27.1. On this Mac the binary is `/usr/local/go/bin/go`.
-If the default module proxy is unreachable, use a per-command
-`GOPROXY=https://goproxy.cn,https://proxy.golang.org,direct`; checksum verification stays enabled.
+需要 **Go 1.27.1** 与 **Python 3**。以下命令适用于 macOS / Linux shell，在仓库根目录执行。
+
+### 1. 构建
 
 ```sh
-go test ./...
-go test -race ./...
-go test -race -tags=integration ./internal/testkit -count=1
-go vet ./...
-go build ./...
-go test ./protocol -run='^$' -fuzz=FuzzTransaction -fuzztime=10s -parallel=2
+python3 third_party/cometbft/overlay.py
+mkdir -p bin experiments
+go build -tags=comet_v3 -o bin/ ./cmd/committee ./cmd/member ./cmd/gateway ./cmd/payctl
 ```
 
-Tests use temporary independent node databases with synchronous persistence and real signatures.
-Genesis fixtures are finite trusted laboratory allocations; they are not incoming-deposit credit.
-Current executable paths reject unsupported transaction features rather than simulating success.
+`comet_v3` 是沿用的编译开关名称，用于启用受限 CometBFT 补丁；当前运行协议仍为 **wire 4**。
 
-The governing documents are in [docs/design](docs/design).
-Actual module status and limitations are maintained in [docs/progress.md](docs/progress.md).
-
-## Local multiprocess laboratory
-
-Build and initialize once; initialization refuses to overwrite an existing lab:
+### 2. 初始化并启动实验网
 
 ```sh
-go build -o bin/ ./cmd/member ./cmd/committee ./cmd/gateway ./cmd/payctl
-mkdir -p experiments
-bin/payctl init-lab -dir experiments/lab -outputs 1024 -port 18000
-bin/payctl lab-run -dir "$PWD/experiments/lab" -bin "$PWD/bin"
+bin/payctl init-lab -v4 -dir experiments/local-v4 -port 25000 -outputs 1024
+
+UTXO_EXPERIMENT_FLUSH=10ms \
+UTXO_EXPERIMENT_GOSSIP=10ms \
+bin/payctl lab-run -dir "$PWD/experiments/local-v4" -bin "$PWD/bin"
 ```
 
-Run `bin/payctl demo -dir experiments/lab -hops 8 -input 0` from another terminal.
-Use a fresh unused input index for each independent demo. The laboratory starts two
-four-member organizations, four committee members and two gateways (14 independent
-processes). Loopback is the default; non-loopback HTTP listeners require mutual TLS.
-The demo persists wallet requests before submission and received certificates before
-the next spend. Final proof sampling currently happens after building the fast chain,
-so those timestamps include observation delay and must not be called settlement latency.
+初始化拒绝覆盖已有实验目录。默认实验网包含两个组织、八个成员、两个网关和四个委员，共 14 个服务进程；上面的单组织性能实验使用九个服务，部署条件不同。此快速开始沿用默认存储配置，不等同于性能报告中的内存模式。
 
-Stop the lab-run supervisor with Ctrl-C to gracefully stop its children, then run
-`bin/payctl audit -dir experiments/lab`. Audit opens stopped databases read-only and
-checks CAL/FUEL supply, fee escrow conservation, and member slices against original
-debits. It reports remaining outboxes instead of silently treating them as completed.
+### 3. 在另一终端发送一笔付款
 
-On the installed macOS screen 4.00 use `screen -L -dmS utxo-lab /absolute/bin/payctl lab-run ...`;
-the newer `-Logfile` option is unavailable. Reports and all laboratory keys/databases
-stay under gitignored `experiments/`. Keys are randomly generated, not the deterministic
-identities used by unit test fixtures.
+```sh
+bin/payctl bench-v4 -dir experiments/local-v4 -start 1 -count 1 -concurrency 1
+```
 
-## Measurement timing
+每次独立测试应选用未消费的初始输入。需要阶段诊断、连续续花或 TPS 复现时，使用对应[实验报告](#文档导航)中的参数和脚本。
 
-New demo and bench reports use timing origin `wallet_http_submit_v2`: the instant
-before the paying wallet calls HTTP Client.Do, after saving the signed request
-and encoding it. Wallet-ready latency ends after recipient verification and
-synchronous certificate persistence. HTTP connection setup and transport waiting
-are included; sender preparation, signing and request persistence are excluded.
-Final-proof and credit observations use the same start. The generation window and
-whole-run wall time still include workload preparation and waiting. Both wallets
-are simulated in one process; there is no separate device-to-device delivery hop.
-Older reports without this marker start before sender request persistence and
-retain their original meaning; do not mix their latency samples with v2 reports.
+### 4. 停止并审计
 
-### Single-payment stage trace
+在启动实验网的终端按 `Ctrl+C`，等待所有子进程完成停机和审计快照导出，再执行：
 
-Run `bin/payctl demo -dir experiments/lab -hops 1 -input UNUSED -trace`.
-Tracing is off by default. With tracing enabled, request-local timestamps are
-returned in bounded diagnostic HTTP headers and stored in the demo JSON report.
-Stages include gateway/member handler entry, decoding, validation, entry into
-storage, atomic state checks, successful commit return, vote signing, quorum
-collection, certificate persistence and recipient-wallet persistence.
-The collector still returns at three valid votes; the fourth member may be absent
-from the returned snapshot. These are observations, not signed protocol evidence.
+```sh
+bin/payctl audit -dir experiments/local-v4
+```
 
-`unix_ns` permits a joint timeline only on the same host (without a clock step).
-`local_ns` uses a monotonic clock relative to that process's request recorder;
-it must not be subtracted across different nodes. Handler entry follows HTTP
-parsing, and response-ready precedes the actual socket write. Storage timing
-includes scheduling, group-commit waiting and database work; it is not pure
-fsync duration. Request bodies, signatures and keys are not included in the trace.
-Enabling tracing adds timestamp/serialization and response-byte overhead, so
-use it to locate costs and repeat final latency comparisons with tracing disabled.
+审计核对 CAL/FUEL、费用、成员原始占用及待办状态。内存模式导出的数据库仅供审计，不用于恢复运行；下一轮使用新的实验目录。
 
-### Response before gateway persistence
+## 文档导航
 
-For the current wire4 path, complete payment bytes enter an optional bounded
-memory inbox after the response flush. Public submission and member INSTALL may
-run concurrently with gateway persistence, using the existing four slots per
-action. The inbox holds at most 128 payments / 32 MiB; overflow falls back to
-durable outbox scanning. Gateway retry cooldowns stay in bounded memory (8192
-entries, two seconds after completion); restart may resend the same bytes early.
-Outbox creation and verified completion remain durable. Member first-fallback
-deadlines remain persisted and are not extended by retries or HTTP acceptance.
-See [the isolated comparisons](docs/experiments/parallel-relay-2026-09-19/README.md).
+### 设计与实现
 
-After three verified votes the gateway sends the full Content-Length response
-and flushes it, then hands the certificate and outbox save to a background task.
-At most 128 such tasks may run; when full, the handler performs the save itself.
-Concurrent saves still use the existing Group store batching. The normal handler
-returns without waiting for disk, allowing the next request on its HTTP/1
-connection to proceed. Shutdown closes admission and joins handlers and saves
-before closing storage. Save failures retain the payment identity in error logs.
-The handoff is volatile, not a durable receipt; a crash before persistence still
-requires an existing full-payment holder to resubmit. This removes a connection
-dependency, not disk work.
+| 文档 | 内容 |
+| :--- | :--- |
+| [系统设计](docs/design/utxo-fast-payment-system-design-final.md) | 整体协议与设计基础 |
+| [Go 工程架构](docs/design/utxo-go-engineering-architecture-v1.0.md) | 模块、数据结构与工程组织 |
+| [开发执行计划](docs/design/utxo-development-execution-plan-v1.0.md) | 功能模块及开发验证流程 |
+| [直接责任修订](docs/design/utxo-direct-liability-amendment-v1.2.md) | 当前输入责任、赔付与受限历史输入修订 |
+| [按块处理实现](docs/implementation-block-following-v4.md) | 钱包与成员跟块、执行结果验证及本地状态应用 |
+| [公共提交修订](docs/implementation-public-submission-v4.md) | 组织消费授权与本笔新输出 TXCer 的分离 |
 
-Member state commits before signing and recipient-wallet state updates before READY
-remain ordered; durability follows the explicitly selected experiment mode. Demo and bench now run the existing relay over each wallet
-outbox. To resume an offline wallet's pending certificates without making a new
-payment, run `bin/payctl wallet-relay -dir experiments/lab -owner 0` (or owner 1).
-Do not open the same wallet database in another process simultaneously.
-The wallet relay contacts issuer members and the committee directly. If all full
-certificate holders are offline, progress may pause; unresolved locks are retained.
+设计文档保留版本演进；涉及当前行为时，应结合后续修订及对应实验报告阅读。
 
-### Single-payment block observation
+### 实验与复现
 
-Add `-observe-block` to a one-hop demo to poll committee 0's committed SETTLED
-state every 10 ms before obtaining the final output proof. CommitObservedMicros
-measures the first successful committed-state observation from wallet HTTP
-submission, including query/polling delay; it is not the exact consensus instant.
-SettlementHeight and ProofHeaderHeight come from the subsequently verified proof.
-With the present proof scheme the latter equals the former plus one.
-This separates observed transaction-block commitment from next-height proof
-availability without changing consensus or settlement behavior.
+| 文档 | 主要问题 |
+| :--- | :--- |
+| [真实连续续花](https://github.com/19231224lhr/Next/blob/re/docs/experiments/continuous-respending-2026-09-22/README.md) | 收到 TXCer 后能否继续付款，链长是否增加单跳负担 |
+| [单组织整体 TPS](docs/experiments/single-org-tps-2026-09-22/README.md) | 快速签发、公共结算与成员收尾的完整系统吞吐 |
+| [四委员共识容量](docs/experiments/consensus-capacity-2026-09-22/README.md) | 独立测量委员会工作点、过载边界及资源开销 |
+| [完整路径优化](docs/experiments/full-path-opt-2026-09-22/README.md) | 成员内存模式、钱包保存及全流程阶段测量 |
+| [第二轮 TPS 优化](docs/experiments/tps-opt2-2026-09-22/RESULTS.md) | 网关内存模式、有界并发及独立变量对照 |
+| [数据库交互优化](docs/experiments/database-optimization-2026-09-20/README.md) | 跟块预处理、原子状态更新及存储开销 |
+| [网关并行投递](docs/experiments/parallel-relay-2026-09-19/README.md) | 公共提交、INSTALL 与保存的并行关系 |
+| [压测器发送与观察分离](docs/experiments/dispatch-lag-2026-09-20/PLAN.md) | 发送名额、后台未完成任务及测量口径 |
 
-### Optional backend settlement timing
+`main` 的连续续花链接指向 `re` 实验分支；切换到 `re` 后可直接访问实验代码、图表和原始数据。
 
-Start the lab supervisor and demo with `UTXO_SETTLEMENT_TRACE=1`, then run a
-one-hop `demo -trace -observe-block`. The in-memory recorder retains at most
-2048 delivery attempts per process, keyed by the SHA-256 of the actual submitted
-command (including its delivery nonce). It changes no signed bytes or ledger
-state and is disabled by default. Delivery HTTP headers carry client submission
-time; committee HTTP entry/acceptance, rule execution and application Commit
-are recorded separately. Committee `/debug/settlement/{spend}` exists only while
-enabled. Demo embeds committee 0's snapshot after verifying the final proof.
+## 实验配置
 
-Correlate execution with the authenticated SettlementHeight, not merely the
-earliest retry. These are unauthenticated same-host observations; use calibrated
-clocks before comparing machines. Commit marks successful application database
-commit, not completion by all committee members. The acceptance-to-execution
-interval includes consensus scheduling; it does not identify individual Comet
-round stages. Duplicate delivery attempts do not represent separate payments.
+仅按需要启用以下选项。同条件对照应保持其他参数不变，完整组合以具体实验报告为准。
 
-### Optional consensus phase diagnostics
+| 配置 | 用途 |
+| :--- | :--- |
+| `UTXO_EXPERIMENT_MEMBER_MEMORY=1` | 成员使用内存状态，保留原子更新与签票顺序 |
+| `UTXO_EXPERIMENT_GATEWAY_MEMORY=1` | 网关使用内存状态，保留已完成状态检查与有界后台任务 |
+| `UTXO_EXPERIMENT_COMMITTEE_MEMORY=1` | 委员会应用使用内存状态；需搭配 Comet 内存存储 |
+| `UTXO_EXPERIMENT_MEM_BLOCKSTORE=1` | Comet 区块及相关状态使用实验 MemDB |
+| `bench-v4 -wallet-no-sync` | 钱包不等待同步刷盘，仍执行验证与原子接收 |
+| `UTXO_EXPERIMENT_COMMIT=250ms` | 显式调整高度推进时序；默认 500 ms，与执行过程重叠 |
+| `UTXO_EXPERIMENT_FLUSH=10ms` | 调整发送刷新间隔 |
+| `UTXO_EXPERIMENT_GOSSIP=10ms` | 调整交易传播间隔 |
 
-With `UTXO_SETTLEMENT_TRACE=1`, `/debug/consensus` exposes a bounded 4096-event
-in-memory history of selected Comet stages and ABCI boundaries. Per-attempt
-settlement records also include proposal selection and receipt times. These are
-local observations, not finality proofs.
+成员默认 bbolt 模式已启用 NoSync，启动日志会显示 `storage_no_sync=true`。网关、钱包及委员会应用默认同步写入，除非显式选择相应实验选项。内存模式正常停机导出审计快照，拒绝将快照作为可恢复数据库重新打开。
 
-`UTXO_EXPERIMENT_FLUSH=10ms` and `UTXO_EXPERIMENT_GOSSIP=10ms` override the
-corresponding Comet propagation intervals for controlled experiments. Without
-these variables the defaults remain 100 ms; no consensus timeout or durability
-setting is changed. See [the phase diagnosis](docs/experiments/latency-phase-2026-09-18/README.md)
-for measured results, limitations and the separate delivery-retry repair plan.
+### 压测与诊断
 
-### Durable relay retry pacing
+- **发送和观察分别限流：** `bench-v4 -concurrency 256 -max-pending 2048` 在钱包快速接收后释放发送名额；后台继续观察，总未完成任务受独立上限约束。报告保留发送滞后、未完成数量及最老等待时间。
+- **单组织负载：** `bench-v4 -same-org` 在同一组织服务的两个钱包之间付款；成员进度默认批量查询，仍按各成员自己的逐笔状态判断完成。
+- **缓存边界：** 已验证的完整收款描述符使用 1024 项有界缓存。逐笔付款授权、法定票数、输入消费与额度检查仍保留；热地址收益不能直接推广到大量新地址。
+- **阶段诊断：** `UTXO_SETTLEMENT_TRACE=1` 启用委员会阶段记录。诊断会增加开销，应与正式性能轮分开；应用 Commit、钱包跟块观察和成员完成观察是不同时间点。
 
-The following describes the retained legacy wire3 path. Current wire4 gateway
-pacing is described above and uses no retry-only database update.
+## 开发与验证
 
-Relays keep the delivery envelope and retry timing in the existing outbox. Proof
-polling does not itself resubmit a payment. Retries are spaced by one second;
-only five seconds without verified completion permit a new delivery nonce. An
-identical certificate uses the same initial envelope across its holders. The
-immutable payment identity and accounting remain unchanged. A verified terminal
-work receipt stops resubmission while remaining proofs continue to be fetched;
-the original custody/credit requirements still govern queue retirement.
+先应用 CometBFT 补丁，再执行测试和静态检查：
 
-Proof requests have their own timeout, so an unavailable proof endpoint does not
-consume the entire delivery deadline. HTTP acceptance and cache hits never release
-budget or permanently retire a pending payment. See the [fresh-genesis comparison](docs/experiments/relay-retry-2026-09-18/README.md)
-for measured latency, command amplification, and restart verification.
+```sh
+python3 third_party/cometbft/overlay.py
 
+go test -tags=comet_v3 ./cmd/... ./crypto/... ./finality/... ./internal/... ./protocol/...
+go vet -tags=comet_v3 ./cmd/... ./crypto/... ./finality/... ./internal/... ./protocol/...
+go test -race -tags=comet_v3 ./cmd/payctl ./protocol ./internal/member ./internal/gateway ./internal/committee ./internal/store
+```
 
-### Backend work reduction
+这些命令明确限定源码目录，避免旧实验源码快照被当作业务包编译。实验私钥、数据库和构建产物不提交 Git；报告、公开配置、审计结果与复现脚本按实验目录保存。
 
-Member relays authenticate receipt batches once and apply all resource credits,
-public custody, and outbox completion in one synchronous transaction. INSTALL
-acknowledgements only suppress redundant transport; original proof and retry
-requirements remain. Each relay handles at most four distinct tasks at a time.
+<details>
+<summary><strong>历史版本与早期实验</strong></summary>
 
-`bench -transactions-per-lane 16 -lanes 8` generates exactly 128 payments;
-zero retains the duration-based workload. Proof and credit observers have
-separate bounded workers. Their queue delays are reported separately and remain
-included in the observed completion latencies. `generation_elapsed_seconds`
-records actual generation time, while generation-window TPS uses the configured
-window; fixed-count window rates are not saturation-throughput measurements.
+以下材料保留用于追踪设计和性能演进，不应当作当前 wire 4 的运行说明。
 
-The [paired measurements and raw evidence](docs/performance/backend-reduction-2026-09-18/README.md)
-show reduced backend drain time, with a foreground-latency tradeoff under four-way
-parallelism on this single host. Continuous input still uses final anchors and
-bounded queues; it does not establish a maximum sustainable TPS.
+- [v1.2 实现记录](docs/implementation-v1.2.md)：包含旧 wire 3 基线；对应提交 `039374d`。
+- [早期共识阶段诊断](docs/experiments/latency-phase-2026-09-18/README.md)：传播间隔与提交阶段测量。
+- [旧版中继重试实验](docs/experiments/relay-retry-2026-09-18/README.md)：保留 wire 3 的投递与证明处理对照。
+- [早期后台减负实验](docs/performance/backend-reduction-2026-09-18/README.md)：逐笔证明路径下的批量处理结果。
+- [成员 NoSync 修订](docs/experiments/member-nosync-default-2026-09-21/README.md)：实验存储默认值的变更与验证。
+
+旧报告的计时起点、完成门槛、存储方式和工作负载可能不同，比较前需先对齐条件。
+
+</details>
