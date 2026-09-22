@@ -5,10 +5,10 @@ import (
 	"utxo/protocol"
 )
 
-// Cover the 5,000-entry mempool plus recently committed and propagating work.
+// Cover the 10,000-entry mempool plus proposals and recent propagation.
 // This caches immutable verification only, never spendability or balances.
-const verificationCacheEntries = 8192
-const verificationCacheBytes = 32 << 20
+const verificationCacheEntries = 32768
+const verificationCacheBytes = 128 << 20
 
 type cacheEntry[T any] struct {
 	value T

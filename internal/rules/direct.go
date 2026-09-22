@@ -215,16 +215,32 @@ func VerifyDirectPayment(payment DirectPayment, p DirectPolicy) (VerifiedDirectP
 	return VerifyDirectSubmission(payment.Submission(), p)
 }
 
+// cloneDirectTx owns every slice; descriptors, claims and signatures otherwise
+// contain only value fields. This is a copy, never a verification shortcut.
+func cloneDirectTx(tx protocol.FastTx) protocol.FastTx {
+	tx.Body.Inputs = append([]protocol.Input(nil), tx.Body.Inputs...)
+	tx.Body.Outputs = append([]protocol.Output(nil), tx.Body.Outputs...)
+	tx.Body.Admission = append([]protocol.AdmissionRef(nil), tx.Body.Admission...)
+	tx.Body.Fee.Inputs = append([]protocol.Input(nil), tx.Body.Fee.Inputs...)
+	tx.Claims = append([]protocol.InputClaim(nil), tx.Claims...)
+	tx.Commitments = append([]chameleon.Commitment(nil), tx.Commitments...)
+	tx.Funding = append([]protocol.Funding(nil), tx.Funding...)
+	tx.Auth = append([]protocol.OwnerAuth(nil), tx.Auth...)
+	return tx
+}
+
 func VerifyDirectSubmission(payment protocol.DirectSubmission, p DirectPolicy) (VerifiedDirectPayment, error) {
-	// Freeze canonical objects once at the verification boundary.
-	raw, err := payment.Tx.MarshalBinary()
-	if err != nil {
-		return VerifiedDirectPayment{}, err
+	// Freeze mutable slices without serializing and re-verifying the same
+	// signatures twice. PrepareDirectVector below still validates the complete
+	// transaction, its initial funding openings and its encoded size.
+	source := payment.Tx
+	if len(source.Body.Inputs) > protocol.MaxInputs || len(source.Body.Outputs) > protocol.MaxOutputs ||
+		len(source.Body.Fee.Inputs) > protocol.MaxInputs || len(source.Body.Admission) > protocol.MaxAdmission ||
+		len(source.Claims) > protocol.MaxInputs || len(source.Commitments) > protocol.MaxInputs ||
+		len(source.Funding) > protocol.MaxInputs || len(source.Auth) > protocol.MaxInputs {
+		return VerifiedDirectPayment{}, protocol.ErrRule
 	}
-	tx, err := protocol.DecodeFastTx(raw)
-	if err != nil {
-		return VerifiedDirectPayment{}, err
-	}
+	tx := cloneDirectTx(source)
 	payment.Tx = tx
 	freeze := func(c protocol.OutputCertificate) (protocol.OutputCertificate, error) {
 		b, err := c.MarshalBinary()

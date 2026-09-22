@@ -12,6 +12,7 @@ import (
 	cmtstore "github.com/cometbft/cometbft/store"
 	"github.com/cometbft/cometbft/types"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -50,8 +51,19 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	}
 	defer disk.Close()
 	blocks := cmtstore.NewBlockStore(disk)
-	newApp := func() (appstore.Store, *apppkg.App, *apppkg.Engine) {
-		db := appstore.NewMemory()
+	newApp := func(memory bool) (appstore.Store, *apppkg.App, *apppkg.Engine) {
+		path := filepath.Join(t.TempDir(), "committee.db")
+		id := appstore.Identity{Network: cfg.Network.String(), Role: "committee", Node: "test", Schema: 4}
+		var db appstore.Store
+		var err error
+		if memory {
+			db, err = appstore.OpenEphemeral(path, id)
+		} else {
+			db, err = appstore.Open(path, id)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
 		engine, err := apppkg.NewEngine(cfg, db)
 		if err != nil {
 			t.Fatal(err)
@@ -65,7 +77,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		}
 		return db, app, engine
 	}
-	db, app, warmEngine := newApp()
+	db, app, warmEngine := newApp(false)
 	defer db.Close()
 	ctx := context.Background()
 	parent, err := f.FastTransaction(0, 1, policy)
@@ -94,6 +106,22 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	var roots [][]byte
+	var ledgers [][]state.Entry
+	snapshot := func(db appstore.Store) []state.Entry {
+		var rows []state.Entry
+		var after []byte
+		for {
+			page, err := appstore.Scan(db, nil, after, 1024)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(page) == 0 {
+				return rows
+			}
+			rows = append(rows, page...)
+			after = page[len(page)-1].Key
+		}
+	}
 	last := &types.Commit{}
 	execute := func(app *apppkg.App, b *types.Block) []byte {
 		txs := make([][]byte, len(b.Data.Txs))
@@ -134,6 +162,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		last = commit(t, height, id, vals, keys)
 		blocks.SaveBlock(b, parts, last)
 		roots = append(roots, execute(app, b))
+		ledgers = append(ledgers, snapshot(db))
 		return b
 	}
 	first := appendBlock(1, 1700000001, childRaw)
@@ -300,8 +329,9 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	}
 	appendBlock(5, 1700000035, lateRaw)
 	// Start the application from genesis with an already-redacted block store.
-	// Every historical state hash and the single debit must reproduce exactly.
-	replayDB, replay, _ := newApp()
+	// Replay into the experimental backend: every historical state hash,
+	// ledger row and the single debit must reproduce exactly.
+	replayDB, replay, _ := newApp(true)
 	defer replayDB.Close()
 	for i := int64(1); i <= 5; i++ {
 		original, err := blocks.LoadOriginalBlock(i)
@@ -310,6 +340,9 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		}
 		if !bytes.Equal(execute(replay, original), roots[i-1]) {
 			t.Fatalf("state hash differs on replay at %d", i)
+		}
+		if !reflect.DeepEqual(ledgers[i-1], snapshot(replayDB)) {
+			t.Fatalf("storage backend changed ledger at height %d", i)
 		}
 	}
 	for _, storage := range []appstore.Store{db, replayDB} {
@@ -327,4 +360,10 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	for _, storage := range []appstore.Store{db, replayDB} {
+		if err := storage.Close(); err != nil {
+			t.Fatal("final audit export", err)
+		}
+	}
+
 }

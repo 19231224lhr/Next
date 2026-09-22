@@ -120,3 +120,14 @@ func TestV3TransactionStableIdentity(t *testing.T) {
 		t.Fatal("input description not bound")
 	}
 }
+
+// Every variable-length field is bounded; copying a checked shape must not lose
+// the nested core/body length constraints formerly enforced by re-decoding.
+func TestFastTxMaximumShapeFitsDecodeBounds(t *testing.T) {
+	tx := FastTx{Body: TxBody{Kind: FastTransfer, Inputs: make([]Input, MaxInputs), Outputs: make([]Output, MaxOutputs), Admission: make([]AdmissionRef, MaxAdmission), Fee: FeeTerms{Source: OwnerFinalUTXO, Inputs: make([]Input, MaxInputs)}}, Claims: make([]InputClaim, MaxInputs)}
+	body, core := tx.Body.encode(), tx.core()
+	if len(body) > MaxTxBytes || len(core) > MaxTxBytes {
+		t.Fatalf("nested encoding exceeds decoder limits: body=%d core=%d limit=%d", len(body), len(core), MaxTxBytes)
+	}
+	t.Logf("maximum body=%d core=%d decoder limit=%d", len(body), len(core), MaxTxBytes)
+}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -54,7 +55,7 @@ func configureBandwidth(p2p *cmtcfg.P2PConfig, c configuration) error {
 	return nil
 }
 
-func run() error {
+func run() (result error) {
 	path := flag.String("config", "", "committee config JSON")
 	flag.Parse()
 	var c configuration
@@ -78,11 +79,11 @@ func run() error {
 	if _, e = network.Trust(); e != nil {
 		return e
 	}
-	db, e := store.Open(filepath.Join(c.DataDir, "committee.db"), store.Identity{Network: network.Genesis.Network.String(), Role: "committee", Node: fmt.Sprint(c.Index), Schema: network.Schema()})
+	db, e := openCommitteeStore(filepath.Join(c.DataDir, "committee.db"), store.Identity{Network: network.Genesis.Network.String(), Role: "committee", Node: fmt.Sprint(c.Index), Schema: network.Schema()}, network.Direct != nil)
 	if e != nil {
 		return e
 	}
-	defer db.Close()
+	defer func() { result = errors.Join(result, db.Close()) }()
 	engine, e := committee.NewEngine(network.Engine(), db)
 	if e != nil {
 		return e

@@ -334,3 +334,22 @@ func TestDirectVerificationCacheReusesOnlyIdenticalBytes(t *testing.T) {
 		t.Fatalf("invalid results cached: full=%d entries=%d", misses, entries)
 	}
 }
+
+// Keep the complete wire parsing and all signature checks; bypass only reuse.
+func BenchmarkDirectColdVerification(b *testing.B) {
+	cfg, _, _, txs := cacheFixture(b, 32)
+	db := store.NewMemory()
+	defer db.Close()
+	engine, err := NewEngine(cfg, db)
+	if err != nil {
+		b.Fatal(err)
+	}
+	engine.directCache.disabled = true
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := engine.Check(txs[i%len(txs)]); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
