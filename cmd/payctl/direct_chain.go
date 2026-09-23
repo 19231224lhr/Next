@@ -195,7 +195,9 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 	for i := range n.Genesis.Outputs {
 		if n.Genesis.Outputs[i].Output.Asset == protocol.AssetCAL && n.Genesis.Outputs[i].Output.Recipient.Owner == descriptors[0].Owner {
 			origin = &n.Genesis.Outputs[i]
-			break
+			if !e5 {
+				break
+			} // E5's last CAL is separate from its first 100 warmup inputs.
 		}
 	}
 	if origin == nil {
@@ -257,6 +259,9 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 	id := origin.ID
 	var fuels [3][]state.OriginOutput
 	var fuelIndex [3]int
+	if e5 {
+		fuelIndex[0] = 100
+	} // The independent warmup pays with the first 100 user FUEL inputs.
 	if e5 {
 		for _, o := range n.Genesis.Outputs {
 			if o.Output.Asset == protocol.AssetFUEL {

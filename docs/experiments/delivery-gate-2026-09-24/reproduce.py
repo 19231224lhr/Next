@@ -139,7 +139,7 @@ if __name__=='__main__':
             for mode in (['direct','A'] if i%2 else ['A','direct']):run_case(a.prefix+f'cal-{mode}-{i}',mode,200,100,seed)
     elif a.suite=='chain':
         for i,seed in enumerate([23,37,59],1):
-            for mode in (['A','B'] if i%2 else ['B','A']):run_case(a.prefix+f'chain-{mode}-{i}',mode,200,100,seed,warm=0,chain=True)
+            for mode in (['A','B'] if i%2 else ['B','A']):run_case(a.prefix+f'chain-{mode}-{i}',mode,200,100,seed,warm=100,chain=True)
     else:
         for rate in [200,1000]:
             for i,seed in enumerate([23,37,59],1):

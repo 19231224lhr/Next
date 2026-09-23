@@ -137,7 +137,11 @@ func faultRequests(lab cfg.Lab, n cfg.Network, count int) ([]protocol.DirectRequ
 		return nil, err
 	}
 	var cal, fuel []state.OriginOutput
+	owner := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: org.Org}, key).Owner
 	for _, o := range n.Genesis.Outputs {
+		if o.Output.Recipient.Owner != owner {
+			continue
+		}
 		if o.Output.Asset == protocol.AssetCAL {
 			cal = append(cal, o)
 		} else {

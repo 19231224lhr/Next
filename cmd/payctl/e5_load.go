@@ -23,9 +23,19 @@ func prepareE5Chain(dir string, lab cfg.Lab, count int) error {
 			return e
 		}
 		d := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: n.Organizations[0].Org}, key)
-		for i := 0; i < count; i++ {
+		fuelCount := count
+		if user == 0 {
+			fuelCount += 100
+		}
+		for i := 0; i < fuelCount; i++ {
 			id := protocol.OutputID(protocol.Digest("E5_FUEL", []byte(fmt.Sprintf("%d/%d", user, i))))
 			n.Genesis.Outputs = append(n.Genesis.Outputs, state.OriginOutput{ID: id, Fact: protocol.Digest("E5_FINAL", id[:]), Output: protocol.Output{Asset: protocol.AssetFUEL, Amount: 10000, Recipient: d}})
+		}
+		if user == 0 {
+			for i := 0; i < 100; i++ {
+				id := protocol.OutputID(protocol.Digest("E5_WARM_CAL", []byte(fmt.Sprint(i))))
+				n.Genesis.Outputs = append(n.Genesis.Outputs, state.OriginOutput{ID: id, Fact: protocol.Digest("E5_FINAL", id[:]), Output: protocol.Output{Asset: protocol.AssetCAL, Amount: 100, Recipient: d}})
+			}
 		}
 	}
 	gs := n.Genesis.Grants[:0]
