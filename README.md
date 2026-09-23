@@ -7,7 +7,8 @@
 [性能结果](#性能结果) · [快速开始](#快速开始) · [文档导航](#文档导航) · [实验配置](#实验配置) · [开发与验证](#开发与验证)
 
 > 当前运行协议为 **wire 4**，项目定位为可复现的研究原型。
-> `main` 保留性能基线，`re` 增加连续续花实验；`e2-budget` 保留组织代付版 E2，`e2-owner-fuel` 补齐用户自付，`e2-adaptive-reserve` 增加有上限的 CAL 动态补资与对照实验。
+> `main` 保留性能基线，`re` 汇总已完成的 E1 连续续花与 E2 资金周转实验，包含用户自付 FUEL、CAL 动态补资、报告及原始数据。E3 目前仅有实验方案，尚未实施。
+> `e2-budget`、`e2-owner-fuel`、`e2-adaptive-reserve` 保留各阶段记录，其成果已合并到 `re`。
 
 ## 系统概览
 
@@ -186,6 +187,7 @@ bin/payctl audit -dir experiments/local-v4
 | [原 E2：组织代付](docs/experiments/finite-budget-2026-09-23/README.md) | 原代付配置的预算阻塞与费用审计，保留历史数据 |
 | [E2：用户自付 FUEL](docs/experiments/owner-fuel-2026-09-23/README.md) | 用户费用充足、无组织代付时，CAL 与工作权限的周转 |
 | [E2：CAL 动态补资](docs/experiments/adaptive-reserve-2026-09-23/README.md) | 有限补资能否支持恒定、阶跃及责任延迟下的并行周转 |
+| [E3：赔付与历史修订方案](docs/research/e3-liability-repair-experiment-design-2026-09-23.md) | 待执行：直接责任归属、异常赔付、历史输入修订及混合负载成本 |
 | [单组织整体 TPS](docs/experiments/single-org-tps-2026-09-22/README.md) | 快速签发、公共结算与成员收尾的完整系统吞吐 |
 | [四委员共识容量](docs/experiments/consensus-capacity-2026-09-22/README.md) | 独立测量委员会工作点、过载边界及资源开销 |
 | [完整路径优化](docs/experiments/full-path-opt-2026-09-22/README.md) | 成员内存模式、钱包保存及全流程阶段测量 |
