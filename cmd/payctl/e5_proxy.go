@@ -37,6 +37,7 @@ type e5Timing struct {
 	Tx                            protocol.TxID
 	RegisteredNS, QCNS, ReleaseNS int64
 	Attempts                      int
+	InstallCalls, AlreadyObserved [4]int
 }
 type e5Proxy struct {
 	gate    *e5Gate
@@ -63,13 +64,14 @@ func (p *e5Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			e5Timing
 			Install3NS, PublicNS int64
 			Stored               uint8
+			StoredNS             [4]int64
 			Reason               string
 		}
 		rows := make([]row, 0, len(p.times))
 		for k, t := range p.times {
 			e := p.gate.entries[k]
 			_, reason := e.ready()
-			v := row{e5Timing: *t, Stored: e.stored, Reason: reason}
+			v := row{e5Timing: *t, Stored: e.stored, StoredNS: e.storedAt, Reason: reason}
 			if !e.install3At.IsZero() {
 				v.Install3NS = e.install3At.UnixNano()
 			}
@@ -145,6 +147,15 @@ func (p *e5Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	out.ContentLength = int64(len(raw))
 	if index >= 0 && path == "/v3/certificates" {
 		out.Header.Set("X-E5-Observe-Install", "1")
+		payment, e := protocol.DecodeDirectPayment(raw)
+		if e == nil {
+			k := e5RequestKey{p.network.Genesis.Network, payment.Tx.ID()}
+			p.mu.Lock()
+			if t := p.times[k]; t != nil {
+				t.InstallCalls[index]++
+			}
+			p.mu.Unlock()
+		}
 	}
 	resp, err := p.client.Do(out)
 	if err != nil {
@@ -156,6 +167,17 @@ func (p *e5Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), 502)
 		return
+	}
+	if index >= 0 && path == "/v3/certificates" && resp.StatusCode == 200 && resp.Header.Get("X-E5-Install-State") == "already_observed" {
+		payment, e := protocol.DecodeDirectPayment(raw)
+		if e == nil {
+			k := e5RequestKey{p.network.Genesis.Network, payment.Tx.ID()}
+			p.mu.Lock()
+			if t := p.times[k]; t != nil {
+				t.AlreadyObserved[index]++
+			}
+			p.mu.Unlock()
+		}
 	}
 	if index >= 0 && path == "/v3/certificates" && resp.StatusCode == 200 && resp.Header.Get("X-E5-Install-State") == "stored" {
 		payment, e := protocol.DecodeDirectPayment(raw)

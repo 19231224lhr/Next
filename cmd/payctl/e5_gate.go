@@ -22,6 +22,7 @@ type e5GateEntry struct {
 	fact       protocol.SpendFactID
 	hasFact    bool
 	stored     uint8
+	storedAt   [4]int64
 	install3At time.Time
 	publicAt   time.Time
 	changed    chan struct{}
@@ -72,6 +73,7 @@ func (g *e5Gate) Stored(key e5RequestKey, digest [32]byte, fact protocol.SpendFa
 		return nil
 	}
 	e.stored |= bit
+	e.storedAt[member] = time.Now().UnixNano()
 	if bits.OnesCount8(e.stored) >= 3 && e.install3At.IsZero() {
 		e.install3At = time.Now()
 	}

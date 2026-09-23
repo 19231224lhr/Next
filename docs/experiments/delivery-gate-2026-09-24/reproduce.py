@@ -20,7 +20,7 @@ ENV.update(UTXO_EXPERIMENT_COMMIT='250ms', UTXO_EXPERIMENT_FLUSH='10ms',
            UTXO_EXPERIMENT_GOSSIP='10ms', UTXO_EXPERIMENT_MEM_BLOCKSTORE='1',
            UTXO_EXPERIMENT_COMMITTEE_MEMORY='1', UTXO_EXPERIMENT_MEMBER_MEMORY='1',
            UTXO_EXPERIMENT_GATEWAY_MEMORY='1', UTXO_EXPERIMENT_BUDGET='1',
-           GOMAXPROCS='16', GOGC='200')
+           UTXO_E5_OBSERVE='1',GOMAXPROCS='16', GOGC='200')
 for key in ['UTXO_TRACE_ALL','UTXO_RUNTIME_TRACE','UTXO_EXPERIMENT_SERIAL_DIRECT','UTXO_SETTLEMENT_TRACE']:
     ENV.pop(key,None)
 
@@ -96,6 +96,8 @@ def run_case(label,mode,rate,count,seed=23,warm=100,window=0,chain=False):
                 if time.monotonic()>deadline:raise TimeoutError('load exceeded deadline')
                 time.sleep(1)
         if mode!='direct':write(dest/'gate.json',get('http://127.0.0.1:29000/stats'))
+        for node in lab['Nodes']:
+            if node['Binary'] in ['gateway','member']:write(dest/(node['Name']+'-timing.json'),get(node['URL']+'/debug/e5'))
         if p.returncode:raise RuntimeError('load incomplete; inspect retained evidence')
         time.sleep(1)
     finally:
