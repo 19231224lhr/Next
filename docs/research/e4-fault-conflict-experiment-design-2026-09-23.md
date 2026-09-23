@@ -1,6 +1,6 @@
 # E4：故障可用性与冲突安全实验方案
 
-状态：已完成方案评审并进入实验实施。代码基线为 re 分支 fb95f5e；采用 wire 4，延续用户自付 FUEL。目标是检验故障时的实际可用范围，不测最高 TPS、不增加恢复协议。见[方案评审](e4-fault-conflict-review-2026-09-23.json)与[实施复核](e4-implementation-review-2026-09-24.json)。最终结果以实验报告为准。
+状态：已完成实验，限定范围内的既定检查通过。代码基线为 re 分支 fb95f5e；采用 wire 4，延续用户自付 FUEL。目标是检验故障时的实际可用范围，不测最高 TPS、不增加恢复协议。见[方案评审](e4-fault-conflict-review-2026-09-23.json)、[实施复核](e4-implementation-review-2026-09-24.json)与[完整实验报告](../experiments/fault-conflict-2026-09-23/README.md)。下文保留原方案，最终测量与边界以报告为准。
 
 ## 1. 要回答的问题
 

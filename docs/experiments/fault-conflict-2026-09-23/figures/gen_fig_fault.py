@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Data-only E4 figures: fixed repeat 1 timeline, every formal repeat in dots."""
 import csv
+import argparse
 import json
 from pathlib import Path
 import matplotlib
@@ -20,8 +21,9 @@ def save(fig,name):
     fig.savefig(OUT/(name+'.pdf'),bbox_inches='tight');plt.close(fig)
 
 def main():
+    p=argparse.ArgumentParser();p.add_argument('--prefix',default='v5-');args=p.parse_args()
     data=json.loads((ROOT/'summary.json').read_text())
-    formal=[r for r in data['runs'] if r['label'].startswith('v5-A') and '-pilot' not in r['label']]
+    formal=[r for r in data['runs'] if r['label'].startswith(args.prefix+'A') and '-pilot' not in r['label']]
     assert len(formal)==9, 'Do not publish a partial formal matrix'
     with (ROOT/'curves.csv').open() as f:curves=list(csv.DictReader(f))
     fig,axes=plt.subplots(3,3,figsize=(11,7.8))
@@ -41,7 +43,8 @@ def main():
             ax.set_xlim(0,max(xs));ax.set_xlabel('Elapsed time (s)')
             if kind!='A0':ax.axvspan(run['fault_start_s'],run['fault_end_s'],color='#E9C46A',alpha=.23,zorder=0)
         axes[0,col].legend(loc='lower right')
-        axes[1,col].legend(loc='upper left')
+        axes[1,col].legend(loc='upper left' if kind=='A2' else 'lower left')
+        axes[2,col].set_ylim(3.5,5.0)
     for i,label in enumerate(['Events/s (trailing 5 s)','Outstanding payments','READY P95 (ms, 10 s cohort)']):axes[i,0].set_ylabel(label)
     fig.suptitle('E4 fault timeline — fixed first repeat, 200 planned payments/s',fontsize=13,y=1.01)
     fig.tight_layout(h_pad=1.7,w_pad=1.4);save(fig,'fault-timeline')
@@ -55,7 +58,7 @@ def main():
                     axes[col].scatter(k+offset+(j-1)*.055,p[metric],color=COLORS[k],marker=mark,s=28,alpha=.85,
                         label={'before':'Before','fault':'Fault window','after':'After'}[phase] if k==0 and j==0 else None)
         axes[col].set_xticks(range(3),['A0 normal','A1 response','A2 pause']);axes[col].set_title(title);axes[col].set_ylabel('ms')
-        axes[col].set_ylim(bottom=0)
+        axes[col].set_ylim(0,max(p[metric] for r in formal for p in r['phases'])*1.13)
     axes[0].legend(loc='best');fig.suptitle('Each dot is one run and one send-time cohort; no averaged percentiles',y=1.04,fontsize=11)
     fig.tight_layout();save(fig,'phase-comparison')
 

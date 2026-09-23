@@ -9,6 +9,7 @@
 > 当前运行协议为 **wire 4**，项目定位为可复现的研究原型。
 > `main` 保留性能基线，`re` 统一汇总已完成的 E1 连续续花、E2 资金周转与 E3 直接责任赔付实验，包括代码、报告、图表和原始证据。`e3-liability-repair` 保留 E3 独立实验记录，其成果已合并到 `re`。
 > `e2-budget`、`e2-owner-fuel`、`e2-adaptive-reserve` 保留各阶段记录，其成果已合并到 `re`。
+> `e4-fault-conflict` 保存已完成的 E4 故障可用性与冲突安全实验，尚未合并到 `re`。
 
 ## 系统概览
 
@@ -118,6 +119,19 @@
 
 [E3 完整报告、图表与原始证据](docs/experiments/liability-repair-2026-09-23/README.md) · [实验设计](docs/research/e3-liability-repair-experiment-design-2026-09-23.md)
 
+### 故障可用性与冲突安全 · 论文实验四
+
+正常、单成员批准响应延迟、单成员暂停三种场景，各以 200 TPS 输入两分钟并重复三轮。正式 **216,000 笔付款全部完成**；另完成十五轮网关交付边界及双成员暂停控制、六类各二十组冲突测试。
+
+- **单成员故障仍可服务：** 故障窗口实际发送约 200 TPS，凭证全部由另外三成员签发；全程 READY P50 为 **1.048～1.059 ms**，故障期 P95 为 **4.343～4.557 ms**。
+- **暂停债务如实保留：** 暂停成员积累约六千笔收尾债务；恢复后约 **5.48～5.71 秒**观察到恢复时刻前已发送事实全部补齐。这包含查询等待，不是纯执行追赶时间。
+- **备用投递有明确边界：** 完整材料已 INSTALL 至一个成员时，网关暂停期间仍可结算；若尚未扩散，十秒停顿窗口内没有自主结算。
+- **指定安全用例通过：** 未产生两份有效冲突 QC，未重复公共消费或收费；并发冲突仍留下 **79 条局部批准**，不能据此宣称恶意冲突下永不耗尽权限。
+
+本轮采用同机内存实验模式、充分预算和用户自付 FUEL；进程暂停后保留原状态，不是崩溃恢复或最高 TPS 测试。
+
+[E4 完整报告、图表与原始证据](docs/experiments/fault-conflict-2026-09-23/README.md) · [实验设计](docs/research/e4-fault-conflict-experiment-design-2026-09-23.md)
+
 ### 如何理解这些数字
 
 | 指标 | 起点与终点 |
@@ -201,7 +215,7 @@ bin/payctl audit -dir experiments/local-v4
 | [E2：用户自付 FUEL](docs/experiments/owner-fuel-2026-09-23/README.md) | 用户费用充足、无组织代付时，CAL 与工作权限的周转 |
 | [E2：CAL 动态补资](docs/experiments/adaptive-reserve-2026-09-23/README.md) | 有限补资能否支持恒定、阶跃及责任延迟下的并行周转 |
 | [E3：赔付与历史修订](docs/experiments/liability-repair-2026-09-23/README.md) | 十二轮网络控制与九轮混合负载通过；直接责任兑现、真实历史修订及费用核对 |
-| [E4：故障与冲突实验方案](docs/research/e4-fault-conflict-experiment-design-2026-09-23.md) | 已评审、待实施：单成员停顿、网关交付边界、冲突与重复请求 |
+| [E4：故障可用性与冲突安全](docs/experiments/fault-conflict-2026-09-23/README.md) | 九轮共 216,000 笔全部完成；单成员故障服务、网关备用投递边界及冲突审计 |
 | [单组织整体 TPS](docs/experiments/single-org-tps-2026-09-22/README.md) | 快速签发、公共结算与成员收尾的完整系统吞吐 |
 | [四委员共识容量](docs/experiments/consensus-capacity-2026-09-22/README.md) | 独立测量委员会工作点、过载边界及资源开销 |
 | [完整路径优化](docs/experiments/full-path-opt-2026-09-22/README.md) | 成员内存模式、钱包保存及全流程阶段测量 |

@@ -27,6 +27,7 @@ def summarize(dest):
             'dispatch_p95_ms':quantile(lag,.95),'public_p50_ms':quantile([(s['PublicNS']-s['SentNS'])/1e6 for s in public],.5),
             'progress_errors':report['ProgressErrors'],'wallet_error':report['WalletError'],'phases':[]}
     result['fault_start_s']=(begin-start)/1e9;result['fault_end_s']=(end-start)/1e9
+    result['forced_stop_events']=[e for e in events if e['Event']=='forced_stop']
     last_send=max((s['SentNS'] for s in sent),default=start)
     result['send_span_s']=(last_send-min((s['SentNS'] for s in sent),default=start))/1e9
     result['drain_after_last_send_s']=(finish-last_send)/1e9
@@ -38,6 +39,7 @@ def summarize(dest):
                                  'window_s':(high-low)/1e9,'actual_send_tps':len(ss)/((high-low)/1e9),
                                  'ready_events':sum(low<=s['ReadyNS']<high for s in ready),'public_events':sum(low<=s['PublicNS']<high for s in public),
                                  'active_member_events':sum(low<=t<high for t in active_done),
+                                 'target_in_qc':sum(any(v['Member']==config['seed']%4 for v in s['Certificate']['QC']['Votes']) for s in ss if s.get('Certificate')),
                                  'dispatch_p95_ms':quantile([(s['SentNS']-s['ScheduledNS'])/1e6 for s in ss],.95),
                                  'ready_p50_ms':quantile(xs,.5),'ready_p95_ms':quantile(xs,.95),
                                  'public_p50_ms':quantile([(s['PublicNS']-s['SentNS'])/1e6 for s in ss if s['PublicNS']],.5)})
@@ -73,6 +75,16 @@ def summarize(dest):
         audit=json.loads((dest/'reports/fault-audit.json').read_text())
         result['fuel_paid']=sum(r['Fee']['Rewards']+r['Fee']['Burned'] for r in audit)
         result['fuel_refund']=sum(r['Fee']['Refunded'] for r in audit)
+    if (dest/'samples.jsonl').exists():
+        minima={};limits={}
+        for line in (dest/'samples.jsonl').read_text().splitlines():
+            for node in json.loads(line)['Nodes']:
+                status=node.get('Status',{})
+                if 'Limited' in status:limits[node['Node']]=max(limits.get(node['Node'],0),sum(status['Limited']))
+                for resource in status.get('Resources',[]):
+                    k=str(resource['Key']['Kind'])
+                    for slot in resource['Slices']:minima[k]=min(minima.get(k,slot['Available']),slot['Available'])
+        result['min_worker_available_by_resource']=minima;result['budget_denials_peak_by_member']=limits
     return result,curve
 
 def main():
@@ -96,10 +108,18 @@ def main():
                                  'partial_member_approvals':sum(len(r.get('Partial') or []) for r in aa),
                                  'partial_resources_overlap':{str(k):sum(d['Cap'] for r in aa for a in (r.get('Partial') or []) for d in a['Remaining'] if d['Key']['Kind']==k) for k in [1,2,3,4,5]},
                                  'invalid_auth_http_responses':sum('HTTP 400: INVALID_AUTH' in e for r in rr for e in (r['Errors'] or [])),
+                                 'valid_install_controls':sum(r.get('ValidInstallChecks',0) for r in rr),
                                  'fuel_paid':sum(f['Rewards']+f['Burned'] for r in aa for f in (r['Fees'] or []))})
     (ROOT/'summary.json').write_text(json.dumps({'runs':runs,'conflicts':controls,'excluded':excluded},indent=2)+'\n')
     if curves:
         with (ROOT/'curves.csv').open('w',newline='') as f:w=csv.DictWriter(f,fieldnames=list(curves[0]));w.writeheader();w.writerows(curves)
+    formal=[r for r in runs if r['planned']==24000 and r['kind'] in ['A0','A1','A2']]
+    if formal:
+        fields=['label','kind','seed','planned','sent','ready','public','all_members','errors','attempts','elapsed_s','ready_p50_ms','ready_p95_ms','ready_p99_ms','ready_max_ms','dispatch_p95_ms','public_p50_ms','peak_public_pending','peak_active_member_pending','peak_all_member_pending','paused_member_catchup_observed_s','fuel_paid','fuel_refund']
+        with (ROOT/'matrix.csv').open('w',newline='') as f:
+            w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows({k:r.get(k) for k in fields} for r in formal)
+        phases=[dict(label=r['label'],kind=r['kind'],**p) for r in formal for p in r['phases']]
+        with (ROOT/'phase-matrix.csv').open('w',newline='') as f:w=csv.DictWriter(f,fieldnames=list(phases[0]));w.writeheader();w.writerows(phases)
     print(json.dumps({'runs':len(runs),'controls':controls},indent=2))
 
 if __name__=='__main__':main()

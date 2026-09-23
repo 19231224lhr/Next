@@ -23,14 +23,15 @@ import (
 )
 
 type faultConflictRow struct {
-	Kind              string
-	Index             int
-	Requests          []protocol.DirectRequest
-	Certificates      []*protocol.OutputCertificate
-	Errors            []string
-	ExpectedPublicMax int
-	RejectedChecks    int
-	TamperedWire      [][]byte `json:",omitempty"`
+	Kind               string
+	Index              int
+	Requests           []protocol.DirectRequest
+	Certificates       []*protocol.OutputCertificate
+	Errors             []string
+	ExpectedPublicMax  int
+	RejectedChecks     int
+	ValidInstallChecks int
+	TamperedWire       [][]byte `json:",omitempty"`
 }
 
 type partialApproval struct {
@@ -170,6 +171,12 @@ func faultConflicts(dir string, lab cfg.Lab, n cfg.Network, count int) error {
 				row.Certificates = []*protocol.OutputCertificate{c}
 				if err := receiver.ReceiveDirect(a.Tx.Body.Outputs[0], *c, 0); err != nil {
 					return err
+				}
+				for _, url := range n.Members[n.Organizations[0].Org] {
+					if e := (&transport.MemberClient{BaseURL: url, HTTP: client}).InstallDirect(ctx, protocol.DirectPayment{Tx: a.Tx, Certificate: *c}); e != nil {
+						return fmt.Errorf("valid INSTALL control: %w", e)
+					}
+					row.ValidInstallChecks++
 				}
 				for variant := 0; variant < 2; variant++ {
 					body := a.Tx.Body
