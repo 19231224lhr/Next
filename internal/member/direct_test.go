@@ -143,6 +143,23 @@ func TestDirectDurableApprovalAndBackgroundInstall(t *testing.T) {
 		if err = m.InstallDirect(protocol.DirectPayment{Tx: tx, Certificate: cert}); err != nil {
 			t.Fatal(err)
 		}
+		stored, err := m.InstallDirectClassified(protocol.DirectPayment{Tx: tx, Certificate: cert})
+		if err != nil || !stored {
+			t.Fatalf("real INSTALL persistence was not reported: stored=%v err=%v", stored, err)
+		}
+		if err = dbs[i].Update(func(v state.ReadView) ([]state.Change, error) {
+			o := state.NewOverlay(v)
+			if err := state.Put(o, state.Key(state.KeyObserved, cert.QC.Fact[:]), true); err != nil {
+				return nil, err
+			}
+			return o.Changes(), nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		stored, err = m.InstallDirectClassified(protocol.DirectPayment{Tx: tx, Certificate: cert})
+		if err != nil || stored {
+			t.Fatalf("already observed payment counted as an INSTALL copy: stored=%v err=%v", stored, err)
+		}
 		pending := func() state.Outbox {
 			t.Helper()
 			var value state.Outbox

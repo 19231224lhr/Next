@@ -64,12 +64,20 @@ func addDirectHandlers(mux *http.ServeMux, m *member.Member, fg, bg chan struct{
 			return
 		}
 		payment, err := protocol.DecodeDirectPayment(raw)
+		stored := false
 		if err == nil {
-			err = m.InstallDirect(payment)
+			stored, err = m.InstallDirectClassified(payment)
 		}
 		if err != nil {
 			fail(w, err)
 			return
+		}
+		if r.Header.Get("X-E5-Observe-Install") == "1" {
+			result := "already_observed"
+			if stored {
+				result = "stored"
+			}
+			w.Header().Set("X-E5-Install-State", result)
 		}
 		binaryResponse(w, []byte("installed"))
 	}))

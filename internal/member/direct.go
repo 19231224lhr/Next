@@ -199,25 +199,34 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 // InstallDirect saves a full relay command in the background. It does not
 // reserve a second budget or make an unvoted local output spendable.
 func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
+	_, err := m.InstallDirectClassified(payment)
+	return err
+}
+
+// InstallDirectClassified reports whether this call saved the full payment
+// material. The result is intended for the E5 experiment observer only.
+func (m *Member) InstallDirectClassified(payment protocol.DirectPayment) (bool, error) {
 	requesttrace.Payment("install_enter", payment.Certificate.QC.Fact)
 	if m.direct == nil || payment.Tx.Body.Config != m.cfg.Organization.Hash() {
-		return protocol.ErrAuth
+		return false, protocol.ErrAuth
 	}
 	if _, err := rules.VerifyDirectPayment(payment, *m.direct); err != nil {
-		return err
+		return false, err
 	}
 	raw, err := payment.MarshalBinary()
 	if err != nil {
-		return err
+		return false, err
 	}
 	fact := payment.Certificate.QC.Fact
 	requesttrace.Payment("install_store_start", fact)
+	alreadyObserved := false
 	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
 		key := state.Key(state.KeyInstall, fact[:])
 		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
 			return nil, err
 		} else if found {
+			alreadyObserved = true
 			return nil, nil
 		}
 		for i, in := range payment.Tx.Body.Inputs {
@@ -273,5 +282,5 @@ func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
 	if err == nil {
 		requesttrace.Payment("install_store_done", fact)
 	}
-	return err
+	return err == nil && !alreadyObserved, err
 }

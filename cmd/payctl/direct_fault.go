@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -185,10 +186,24 @@ func faultSend(ctx context.Context, client *http.Client, url string, raw []byte,
 	}
 }
 
-func runFaultLoad(dir string, lab cfg.Lab, n cfg.Network, count int, rate float64, drain, timeout time.Duration) (err error) {
-	requests, err := faultRequests(lab, n, count)
+type e5LoadOptions struct {
+	Offset int
+	Window time.Duration
+	Seed   int64
+}
+
+func runFaultLoad(dir string, lab cfg.Lab, n cfg.Network, count int, rate float64, drain, timeout time.Duration, options ...e5LoadOptions) (err error) {
+	var option e5LoadOptions
+	if len(options) > 0 {
+		option = options[0]
+	}
+	requests, err := faultRequests(lab, n, count+option.Offset)
 	if err != nil {
 		return err
+	}
+	requests = requests[option.Offset:]
+	if option.Seed != 0 {
+		rand.New(rand.NewSource(option.Seed)).Shuffle(len(requests), func(i, j int) { requests[i], requests[j] = requests[j], requests[i] })
 	}
 	db, err := store.OpenNoSync(filepath.Join(dir, "fault-wallet.db"), store.Identity{Network: n.ChainID, Role: "e4-wallet", Node: "pair", Schema: 4})
 	if err != nil {
@@ -354,15 +369,21 @@ func runFaultLoad(dir string, lab cfg.Lab, n cfg.Network, count int, rate float6
 			}
 		}()
 	}
+	sendCtx := ctx
+	if option.Window > 0 {
+		var stop context.CancelFunc
+		sendCtx, stop = context.WithDeadline(ctx, start.Add(option.Window))
+		defer stop()
+	}
 	for i := 0; i < count; i++ {
 		due := start.Add(time.Duration(float64(i) / rate * float64(time.Second)))
-		if err = budgetPause(ctx, time.Until(due)); err != nil {
+		if err = budgetPause(sendCtx, time.Until(due)); err != nil {
 			break
 		}
 		select {
 		case jobs <- i:
-		case <-ctx.Done():
-			err = ctx.Err()
+		case <-sendCtx.Done():
+			err = sendCtx.Err()
 		}
 		if err != nil {
 			break
