@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Reconstruct per-payment timing and backlog from E5 observations, never fill missing with zero."""
 import csv
+import argparse
 import gzip
 import json
 import math
@@ -14,7 +15,7 @@ def quantile(values,q):
     if not values:return None
     a=sorted(values);i=(len(a)-1)*q;lo=int(i);hi=math.ceil(i)
     return a[lo]+(a[hi]-a[lo])*(i-lo)
-def dist(values):return {name:quantile(values,q) for name,q in [('p50',.5),('p95',.95),('p99',.99),('max',1)]}
+def dist(values):return {**{name:quantile(values,q) for name,q in [('p50',.5),('p95',.95),('p99',.99),('max',1)]},'mean':statistics.mean(values) if values else None}
 def write_csv(path,rows):
     if not rows:return
     fields=list(dict.fromkeys(k for row in rows for k in row))
@@ -78,9 +79,13 @@ def analyze_case(path):
     summary['gate_install3']=sum(r.get('gate_reason')=='install3' for r in rows)
     summary['gate_public']=sum(r.get('gate_reason')=='public' for r in rows)
     summary['window_nonzero']=sum(r.get('window_ms',0)>0 for r in rows)
+    summary['no_first_member_copy_observed_at_ready']=sum(bool(r['ready_ns']) and ('first_copy_ns' not in r or r['first_copy_ns']>r['ready_ns']) for r in rows) if gate else None
+    summary['sent_rate_per_window']=len(sent)/config['window'] if config['window'] else None
     resources=[]
     for line in (path/'resources.jsonl').read_text().splitlines():
-        pids=[line.split() for line in json.loads(line)['ps'].splitlines()]
+        sample=json.loads(line)
+        if not start<=sample['NS']<=finish:continue
+        pids=[line.split() for line in sample['ps'].splitlines()]
         resources.append((sum(float(p[1]) for p in pids),sum(int(p[2]) for p in pids)/1024))
     if resources:
         summary['cpu_percent_sample_p50']=statistics.median(r[0] for r in resources)
@@ -104,8 +109,9 @@ def analyze_case(path):
     return summary,curves
 
 if __name__=='__main__':
+    parser=argparse.ArgumentParser();parser.add_argument('--prefix',default='v3-');args=parser.parse_args()
     summaries=[];curves=[]
-    for path in sorted(OUT.glob('v3-*')):
+    for path in sorted(OUT.glob(args.prefix+'*')):
         if not (path/'passed.json').exists():continue
         summary,curve=analyze_case(path);summaries.append(summary);curves+=curve
         print(json.dumps(summary),flush=True)

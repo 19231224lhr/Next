@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Archive E5 public experiment evidence only; never runtime databases or keys."""
 import gzip
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -10,7 +11,8 @@ import tarfile
 OUT=Path(__file__).resolve().parent
 DEST=OUT/'evidence';DEST.mkdir(exist_ok=True)
 manifest={}
-for case in sorted(OUT.glob('v3-*')):
+parser=argparse.ArgumentParser();parser.add_argument('--prefix',default='v3-');args=parser.parse_args()
+for case in sorted(OUT.glob(args.prefix+'*')):
     if not (case/'passed.json').exists():continue
     target=DEST/(case.name+'.tar.gz')
     with tarfile.open(target,'w:gz',compresslevel=6) as archive:
