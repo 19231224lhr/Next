@@ -132,6 +132,14 @@
 
 [E4 完整报告、图表与原始证据](docs/experiments/fault-conflict-2026-09-23/README.md) · [实验设计](docs/research/e4-fault-conflict-experiment-design-2026-09-23.md)
 
+### E5 计划 · 快速交付门槛消融
+
+比较“三票成证后立即交付”和“等待三成员实际保存完整材料或公共成功后交付”，两组使用相同测试代理与后台流程。计划在 200/1000 TPS 下各运行 30 秒、重复三次，并做 100 跳真实续花对照；费用由用户支付。
+
+本项用于量化到账等待、连续续花和后台工作量的取舍，**目前仅完成方案，尚无 E5 实验结果**；不等同于完整旧版两阶段协议比较。
+
+[E5 详细方案](docs/research/e5-delivery-gate-ablation-design-2026-09-24.md) · [两轮讨论摘要](docs/research/e5-delivery-gate-review-2026-09-24.md)
+
 ### 如何理解这些数字
 
 | 指标 | 起点与终点 |
