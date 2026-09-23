@@ -126,6 +126,7 @@ def run_case(label,mode,rate,count,seed=23,warm=100,window=0,chain=False):
     assert all(a['Pending']==0 for a in audit)
     report=json.loads((dest/'reports/fault-v4.json').read_text())
     sent=sum(s['SentNS']>0 for s in report['Samples'])
+    assert all(a['Payments']==sent+warm for a in audit if a['Name'].startswith('committee')), 'untracked or missing public payment'
     write(dest/'passed.json',{'all_sent_audited':True,'planned':count,'sent':sent,'unsent':count-sent,'warm':warm})
     print(json.dumps({'case':label,'passed':True}),flush=True)
 
