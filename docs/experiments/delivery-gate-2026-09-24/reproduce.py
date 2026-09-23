@@ -55,12 +55,13 @@ def wait_health(nodes):
                 if time.monotonic()>deadline:raise
                 time.sleep(.1)
 
-def run_case(label,mode,rate,count,seed=23,warm=100,window=0):
+def run_case(label,mode,rate,count,seed=23,warm=100,window=0,chain=False):
     dest=OUT/label;dest.mkdir()
     labdir=ROOT/'.run'/('e5-'+label)
     with (dest/'setup.log').open('w') as log:
         command([BIN/'payctl','init-lab','-dir',labdir,'-outputs','1','-port','26000','-v4'],log)
-        command([BIN/'payctl','e5-load','-dir',labdir,'-prepare','-count',count,'-offset',warm],log)
+        if chain:command([BIN/'payctl','chain-v4','-dir',labdir,'-prepare','-length',count,'-e5-owner-fuel'],log)
+        else:command([BIN/'payctl','e5-load','-dir',labdir,'-prepare','-count',count,'-offset',warm],log)
         lab=json.loads((labdir/'lab.json').read_text())
         lab['Nodes']=[n for n in lab['Nodes'] if n['Binary']=='committee' or n['Name']=='gateway0' or n['Name'].startswith('org0-member')]
         write(labdir/'lab.json',lab)
@@ -69,7 +70,7 @@ def run_case(label,mode,rate,count,seed=23,warm=100,window=0):
         write(Path(lab['Network']),network)
         if mode!='direct':command([BIN/'payctl','e5-proxy','-dir',labdir,'-setup'],log)
     lab=json.loads((labdir/'lab.json').read_text())
-    write(dest/'configuration.json',dict(mode=mode,rate=rate,count=count,seed=seed,warm=warm,window=window))
+    write(dest/'configuration.json',dict(mode=mode,rate=rate,count=count,seed=seed,warm=warm,window=window,chain=chain))
     shutil.copyfile(OUT/'build.json',dest/'build.json')
     procs={};logs=[]
     def spawn(name,args):
@@ -84,6 +85,7 @@ def run_case(label,mode,rate,count,seed=23,warm=100,window=0):
             if p.returncode:raise RuntimeError('warmup failed')
             shutil.copyfile(labdir/'reports/fault-v4.json',dest/'warm.json')
         args=[BIN/'payctl','e5-load','-dir',labdir,'-count',count,'-offset',warm,'-rate',rate,'-seed',seed]
+        if chain:args=[BIN/'payctl','chain-v4','-dir',labdir,'-length',count,'-e5-owner-fuel']
         if window:args+=['-window',str(window)+'s']
         p=spawn('load',args);deadline=time.monotonic()+max(count/rate,window)+110
         with (dest/'resources.jsonl').open('w') as samples:
@@ -108,6 +110,7 @@ def run_case(label,mode,rate,count,seed=23,warm=100,window=0):
     with (dest/'audit.log').open('w') as log:
         command([BIN/'payctl','audit','-dir',labdir],log)
         command([BIN/'payctl','fault-v4','-dir',labdir,'-audit'],log)
+        if chain:command([BIN/'payctl','chain-v4','-dir',labdir,'-audit'],log)
         if warm:
             shutil.copyfile(labdir/'reports/fault-v4.json',dest/'main.json')
             shutil.copyfile(dest/'warm.json',labdir/'reports/fault-v4.json')
@@ -123,13 +126,16 @@ def run_case(label,mode,rate,count,seed=23,warm=100,window=0):
     print(json.dumps({'case':label,'passed':True}),flush=True)
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--suite',choices=['smoke','calibration','formal'],default='smoke');p.add_argument('--skip-build',action='store_true');p.add_argument('--prefix',default='v1-');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--suite',choices=['smoke','calibration','formal','chain'],default='smoke');p.add_argument('--skip-build',action='store_true');p.add_argument('--prefix',default='v1-');a=p.parse_args()
     if not a.skip_build:build()
     if a.suite=='smoke':
         for mode in ['A','B']:run_case(a.prefix+'smoke-'+mode,mode,20,20,warm=5)
     elif a.suite=='calibration':
         for i,seed in enumerate([23,37,59],1):
             for mode in (['direct','A'] if i%2 else ['A','direct']):run_case(a.prefix+f'cal-{mode}-{i}',mode,200,100,seed)
+    elif a.suite=='chain':
+        for i,seed in enumerate([23,37,59],1):
+            for mode in (['A','B'] if i%2 else ['B','A']):run_case(a.prefix+f'chain-{mode}-{i}',mode,200,100,seed,warm=0,chain=True)
     else:
         for rate in [200,1000]:
             for i,seed in enumerate([23,37,59],1):

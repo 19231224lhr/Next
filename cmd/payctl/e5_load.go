@@ -1,12 +1,53 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 	cfg "utxo/cmd/internal/config"
+	"utxo/internal/state"
 	"utxo/protocol"
 )
+
+func prepareE5Chain(dir string, lab cfg.Lab, count int) error {
+	var n cfg.Network
+	if e := cfg.Read(lab.Network, &n); e != nil {
+		return e
+	}
+	for user, path := range []string{lab.Owners[0], lab.Owners[1], filepath.Join(dir, "keys", "chain-c.key")} {
+		key, e := cfg.PrivateKey(path)
+		if e != nil {
+			return e
+		}
+		d := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: n.Organizations[0].Org}, key)
+		for i := 0; i < count; i++ {
+			id := protocol.OutputID(protocol.Digest("E5_FUEL", []byte(fmt.Sprintf("%d/%d", user, i))))
+			n.Genesis.Outputs = append(n.Genesis.Outputs, state.OriginOutput{ID: id, Fact: protocol.Digest("E5_FINAL", id[:]), Output: protocol.Output{Asset: protocol.AssetFUEL, Amount: 10000, Recipient: d}})
+		}
+	}
+	gs := n.Genesis.Grants[:0]
+	for _, g := range n.Genesis.Grants {
+		if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+			gs = append(gs, g)
+		}
+	}
+	n.Genesis.Grants = gs
+	as := n.Accounts[:0]
+	for _, a := range n.Accounts {
+		if a.Asset != protocol.AssetFUEL {
+			as = append(as, a)
+		}
+	}
+	n.Accounts = as
+	raw, e := json.Marshal(n)
+	if e != nil {
+		return e
+	}
+	return os.WriteFile(lab.Network, raw, 0600)
+}
 
 func e5LoadCommand(args []string) error {
 	f := flag.NewFlagSet("e5-load", flag.ContinueOnError)

@@ -160,6 +160,12 @@ func TestDirectDurableApprovalAndBackgroundInstall(t *testing.T) {
 		if err != nil || stored {
 			t.Fatalf("already observed payment counted as an INSTALL copy: stored=%v err=%v", stored, err)
 		}
+		// Restore the fixture before exercising the original restart/fallback path.
+		if err = dbs[i].Update(func(state.ReadView) ([]state.Change, error) {
+			return []state.Change{{Key: state.Key(state.KeyObserved, cert.QC.Fact[:]), Delete: true}}, nil
+		}); err != nil {
+			t.Fatal(err)
+		}
 		pending := func() state.Outbox {
 			t.Helper()
 			var value state.Outbox

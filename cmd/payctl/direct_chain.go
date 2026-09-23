@@ -105,6 +105,7 @@ func chainDirect(args []string) error {
 	trace := f.Bool("trace", false, "foreground diagnostic trace")
 	prepare := f.Bool("prepare", false, "authorize three wallets before starting the laboratory")
 	auditOnly := f.Bool("audit", false, "audit the completed chain against stopped committee stores")
+	e5 := f.Bool("e5-owner-fuel", false, "E5: each wallet pays with its own final FUEL")
 	if err := f.Parse(args); err != nil {
 		return err
 	}
@@ -123,15 +124,38 @@ func chainDirect(args []string) error {
 		return protocol.ErrRule
 	}
 	if *prepare {
-		return prepareChain(*dir, lab, n)
+		if err := prepareChain(*dir, lab, n); err != nil {
+			return err
+		}
+		if *e5 {
+			return prepareE5Chain(*dir, lab, *length)
+		}
+		return nil
 	}
 	if *auditOnly {
 		return auditChain(*dir, lab)
 	}
-	return runChain(*dir, lab, n, *length, *waitFinal, *trace)
+	return runChain(*dir, lab, n, *length, *waitFinal, *trace, *e5)
 }
 
-func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, trace bool) (err error) {
+func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, trace bool, ownerFuel ...bool) (err error) {
+	e5 := len(ownerFuel) > 0 && ownerFuel[0]
+	var e5Samples []faultSample
+	if e5 {
+		defer func() {
+			f, e := os.Create(filepath.Join(dir, "reports", "fault-v4.json"))
+			if e != nil {
+				if err == nil {
+					err = e
+				}
+				return
+			}
+			defer f.Close()
+			if e = json.NewEncoder(f).Encode(faultReport{Samples: e5Samples}); err == nil {
+				err = e
+			}
+		}()
+	}
 	p, err := n.Direct.Policy(n.Schedule, n.Organizations)
 	if err != nil {
 		return err
@@ -169,7 +193,7 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 	}
 	var origin *state.OriginOutput
 	for i := range n.Genesis.Outputs {
-		if n.Genesis.Outputs[i].Output.Recipient.Owner == descriptors[0].Owner {
+		if n.Genesis.Outputs[i].Output.Asset == protocol.AssetCAL && n.Genesis.Outputs[i].Output.Recipient.Owner == descriptors[0].Owner {
 			origin = &n.Genesis.Outputs[i]
 			break
 		}
@@ -180,6 +204,9 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	client := transport.NewHTTPClient(10 * time.Second)
+	if e5 {
+		client = transport.NewHTTPClient(2 * time.Second)
+	}
 	for i := range wallets {
 		defer blockfollow.Start(ctx, cancel, dbs[i], transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, wallets[i].PrepareBlock)()
 	}
@@ -228,6 +255,19 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		fmt.Printf("chain mode=%s hops=%d/%d fast=%.3fms public=%.3fms closed=%.3fms error=%q\n", report.Mode, len(report.Hops), length, report.FastChainMS, report.PublicChainMS, report.ClosedChainMS, report.Error)
 	}()
 	id := origin.ID
+	var fuels [3][]state.OriginOutput
+	var fuelIndex [3]int
+	if e5 {
+		for _, o := range n.Genesis.Outputs {
+			if o.Output.Asset == protocol.AssetFUEL {
+				for j, d := range descriptors {
+					if o.Output.Recipient.Owner == d.Owner {
+						fuels[j] = append(fuels[j], o)
+					}
+				}
+			}
+		}
+	}
 	for i := 0; i < length; i++ {
 		h := &chainHop{Hop: i + 1, Sender: i % 3, Receiver: (i + 1) % 3, Input: id, BuildStartUnixNS: time.Now().UnixNano()}
 		buildStart := time.Now()
@@ -276,6 +316,19 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		}
 		tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), keys[h.Sender])}
 		request := protocol.DirectRequest{Tx: tx, InputCertificates: proofs}
+		if e5 {
+			j := h.Sender
+			if fuelIndex[j] >= len(fuels[j]) {
+				return fmt.Errorf("E5 wallet FUEL fixture exhausted")
+			}
+			request, e = budgetRequest(n, p, org, keys[j], in, coin.Output, descriptors[h.Receiver], proofs, fuels[j][fuelIndex[j]])
+			if e != nil {
+				return e
+			}
+			fuelIndex[j]++
+			tx = request.Tx
+			body = tx.Body
+		}
 		if e = wallets[h.Sender].SaveDirectRequest(request); e != nil {
 			return e
 		}
@@ -296,7 +349,20 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		h.SentUnixNS = sent.UnixNano()
 		h.SentOffsetMS = float64(sent.Sub(start)) / 1e6
 		report.Hops = append(report.Hops, h)
-		b, header, attempts, e := submitChain(ctx, client, lab.Gateways[0]+"/v3/transactions", raw, trace)
+		var b []byte
+		var header http.Header
+		var attempts int
+		if e5 {
+			call, stop := context.WithTimeout(ctx, 30*time.Second)
+			var c *protocol.OutputCertificate
+			c, attempts, e = faultSend(call, client, lab.Gateways[0]+"/v3/transactions", raw, true)
+			stop()
+			if e == nil {
+				b, e = c.MarshalBinary()
+			}
+		} else {
+			b, header, attempts, e = submitChain(ctx, client, lab.Gateways[0]+"/v3/transactions", raw, trace)
+		}
 		h.Attempts = attempts
 		if e != nil {
 			return fmt.Errorf("hop %d: %w", i+1, e)
@@ -318,6 +384,9 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		h.FastMS = float64(ready.Sub(sent)) / 1e6
 		h.ReadyOffsetMS = float64(ready.Sub(start)) / 1e6
 		h.Fact = cert.QC.Fact
+		if e5 {
+			e5Samples = append(e5Samples, faultSample{Index: i, Request: request, Certificate: &cert, SentNS: h.SentUnixNS, ReadyNS: h.ReadyUnixNS})
+		}
 		h.Output = cert.Summary.OutputID(0)
 		h.CertificateBytes = len(b)
 		id = h.Output
