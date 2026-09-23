@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"utxo/internal/blockfollow"
 	"utxo/internal/gateway"
 	"utxo/internal/member"
+	"utxo/internal/reservecontrol"
 	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/internal/store"
@@ -104,9 +106,13 @@ func budgetDirect(args []string) error {
 	dir := f.String("dir", "", "fresh E2 lab")
 	ownerFuel := f.Bool("owner-fuel", false, "pay from independent user final FUEL inputs")
 	prepareFuel := f.Bool("prepare-owner-fuel", false, "prepare fresh user FUEL genesis and remove organization sponsorship before boot")
+	reserveMax := f.Uint64("reserve-max", 0, "adaptive CAL authorization cap; zero disables")
+	prepareFunding := f.Bool("prepare-reserve", false, "seed finite external funding account before boot")
+	reserveLead := f.Duration("reserve-lead", 800*time.Millisecond, "planned sample-to-member refill lead time")
 	duration := f.Duration("duration", 300*time.Second, "fixed admission window")
 	delay := f.Duration("parent-delay", time.Second, "fixed READY to parent publication delay")
 	drain := f.Duration("drain", 60*time.Second, "bounded drain without topping up")
+	nextRate := f.Int("rate-next", 0, "optional second-half offered units/s")
 	rate := f.Int("rate", 20, "independent two-payment units per second")
 	count := f.Int("count", 0, "optional single-probe unit limit")
 	pending := f.Int("pending", 64, "maximum admitted unfinished units")
@@ -116,7 +122,7 @@ func budgetDirect(args []string) error {
 	if e := f.Parse(args); e != nil {
 		return e
 	}
-	if *dir == "" || *duration <= 0 || *delay < 0 || *drain <= 0 || *rate < 1 || *rate > 100 || *pending < 1 || *pending > 256 || *count < 0 {
+	if *dir == "" || *duration <= 0 || *delay < 0 || *drain <= 0 || *rate < 1 || *rate > 100 || *pending < 1 || *pending > 256 || *count < 0 || *nextRate < 0 || *nextRate > 100 {
 		return protocol.ErrRule
 	}
 	var lab cfg.Lab
@@ -147,6 +153,9 @@ func budgetDirect(args []string) error {
 		}
 		desc[i] = protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: org.Org}, keys[i])
 	}
+	if *prepareFunding {
+		return prepareReserve(lab, n, *reserveMax)
+	}
 	if *prepareFuel {
 		return prepareBudgetOwnerFuel(lab, n, desc)
 	}
@@ -174,6 +183,11 @@ func budgetDirect(args []string) error {
 		}
 	}
 	total := int(duration.Seconds() * float64(*rate))
+	firstCount := total
+	if *nextRate > 0 {
+		firstCount = int(duration.Seconds() / 2 * float64(*rate))
+		total = firstCount + int(duration.Seconds()/2*float64(*nextRate))
+	}
 	if *count > 0 {
 		total = min(total, *count)
 	}
@@ -229,10 +243,36 @@ func budgetDirect(args []string) error {
 	if *late {
 		report.ParentFinalInstance = 1
 	}
+	monitor := new(reserveMonitor)
+	if *reserveMax > 0 {
+		controlCtx, stopControl := context.WithCancel(ctx)
+		done := make(chan error, 1)
+		go func() {
+			done <- monitor.run(controlCtx, *dir, n, keys[0], reservecontrol.Policy{DemandPerSecond: uint64(*rate) * 200, LeadMillis: uint64(reserveLead.Milliseconds()), Burst: 200, Unit: 100, Maximum: *reserveMax}, func() uint64 {
+				if time.Since(start) >= *duration {
+					return 0
+				}
+				r := *rate
+				if *nextRate > 0 && time.Since(start) >= *duration/2 {
+					r = *nextRate
+				}
+				return uint64(r) * 200
+			})
+		}()
+		defer func() {
+			stopControl()
+			if err := <-done; err != nil {
+				fmt.Fprintln(os.Stderr, "reserve controller:", err)
+			}
+		}()
+	}
 	var wg sync.WaitGroup
 	slots := make(chan struct{}, *pending)
 	for index := 0; index < total; index++ {
 		planned := start.Add(time.Duration(index) * time.Second / time.Duration(*rate))
+		if *nextRate > 0 && index >= firstCount {
+			planned = start.Add(*duration/2 + time.Duration(index-firstCount)*time.Second/time.Duration(*nextRate))
+		}
 		if e = budgetPause(ctx, time.Until(planned)); e != nil {
 			break
 		}
@@ -273,6 +313,7 @@ func budgetDirect(args []string) error {
 				u.ParentError = err.Error()
 				return
 			}
+			monitor.begin(parent.Tx.ID())
 			var pc protocol.OutputCertificate
 			for {
 				u.Parent.Attempts++
@@ -298,6 +339,7 @@ func budgetDirect(args []string) error {
 				u.ParentError = err.Error()
 				return
 			}
+			monitor.ready(parent.Tx.ID())
 			ready := time.Now()
 			u.Parent.ReadyUnixNS = ready.UnixNano()
 			u.Parent.Fact = pc.QC.Fact
@@ -392,6 +434,7 @@ func budgetDirect(args []string) error {
 				return
 			}
 			u.Child.Fact = protocol.SummaryFor(child.Tx, vector).Fact()
+			monitor.begin(child.Tx.ID())
 			var cc protocol.OutputCertificate
 			for {
 				u.Child.Attempts++
@@ -409,6 +452,7 @@ func budgetDirect(args []string) error {
 				u.ChildError = err.Error()
 				return
 			}
+			monitor.ready(child.Tx.ID())
 			u.Child.ReadyUnixNS = time.Now().UnixNano()
 			u.Child.Fact = cc.QC.Fact
 			u.Child.Output = cc.Summary.OutputID(0)

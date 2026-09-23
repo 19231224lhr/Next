@@ -7,7 +7,7 @@
 [性能结果](#性能结果) · [快速开始](#快速开始) · [文档导航](#文档导航) · [实验配置](#实验配置) · [开发与验证](#开发与验证)
 
 > 当前运行协议为 **wire 4**，项目定位为可复现的研究原型。
-> `main` 保留性能基线，`re` 增加连续续花实验；`e2-budget` 保留组织代付版 E2，`e2-owner-fuel` 补齐用户自付并重新验证权限周转。
+> `main` 保留性能基线，`re` 增加连续续花实验；`e2-budget` 保留组织代付版 E2，`e2-owner-fuel` 补齐用户自付，`e2-adaptive-reserve` 增加有上限的 CAL 动态补资与对照实验。
 
 ## 系统概览
 
@@ -84,6 +84,24 @@
 
 [用户自付 E2 完整报告、图表与数据](docs/experiments/owner-fuel-2026-09-23/README.md) · [实现说明](docs/implementation-owner-fuel-v4.md)
 
+### E2 扩展 · 按签署水位动态补资
+
+根据成员实际可用权限、声明的输入需求和未成证请求量计算预警水位；低于水位时，从有限外部账户真实转入 CAL，再通过公共区块增加原授权。保留正常并行取证、原批准与输入锁，不开启串行取证。
+
+三个动态场景均从 **3,600 CAL** 启动，各输入五分钟并完成 **6,000 个两跳单位、12,000 笔付款**：
+
+| 动态场景 | 最终组织 CAL | 完成单位 | 最终部分批准残余 |
+| :--- | ---: | ---: | ---: |
+| 恒定 20 两跳/秒 | 14,400 | 6,000 / 6,000 | 0 |
+| 10 → 30 两跳/秒 | 21,600 | 6,000 / 6,000 | 0 |
+| 父公共提交延迟 3 秒 | 23,300 | 6,000 / 6,000 | 0 |
+
+固定低额对照仅完成 46 个单位；三个固定足额对照均完成全部单位。全部完整组通过四委员一致性、原始扣账和资金审计，费用由用户支付。阶跃动态组发生 12 次成员额度不足调用，原请求重试后全部完成，因此不宣称零瞬时拒绝。
+
+**验证通过的是所测条件下的 CAL 动态调节。** 补资源预先备有真实资金，组织余额降低不等于总资本节省；需求采用已知实验输入轨迹，每配置运行一次。这不改变低工作权限的原有边界，也不是最高 TPS 测试。
+
+[动态补资完整报告、图表与原始数据](docs/experiments/adaptive-reserve-2026-09-23/README.md) · [实现规范](docs/implementation-adaptive-reserve-v4.md)
+
 ### 如何理解这些数字
 
 | 指标 | 起点与终点 |
@@ -154,6 +172,7 @@ bin/payctl audit -dir experiments/local-v4
 | [按块处理实现](docs/implementation-block-following-v4.md) | 钱包与成员跟块、执行结果验证及本地状态应用 |
 | [公共提交修订](docs/implementation-public-submission-v4.md) | 组织消费授权与本笔新输出 TXCer 的分离 |
 | [用户自付 FUEL](docs/implementation-owner-fuel-v4.md) | 最终费用输入、用户找零/退款、无需组织费用授权 |
+| [CAL 动态补资](docs/implementation-adaptive-reserve-v4.md) | 有限资金转入、原授权增量、成员水位控制与审计边界 |
 
 设计文档保留版本演进；涉及当前行为时，应结合后续修订及对应实验报告阅读。
 
@@ -164,6 +183,7 @@ bin/payctl audit -dir experiments/local-v4
 | [真实连续续花](docs/experiments/continuous-respending-2026-09-22/README.md) | 收到 TXCer 后能否继续付款，链长是否增加单跳负担 |
 | [原 E2：组织代付](docs/experiments/finite-budget-2026-09-23/README.md) | 原代付配置的预算阻塞与费用审计，保留历史数据 |
 | [E2：用户自付 FUEL](docs/experiments/owner-fuel-2026-09-23/README.md) | 用户费用充足、无组织代付时，CAL 与工作权限的周转 |
+| [E2：CAL 动态补资](docs/experiments/adaptive-reserve-2026-09-23/README.md) | 有限补资能否支持恒定、阶跃及责任延迟下的并行周转 |
 | [单组织整体 TPS](docs/experiments/single-org-tps-2026-09-22/README.md) | 快速签发、公共结算与成员收尾的完整系统吞吐 |
 | [四委员共识容量](docs/experiments/consensus-capacity-2026-09-22/README.md) | 独立测量委员会工作点、过载边界及资源开销 |
 | [完整路径优化](docs/experiments/full-path-opt-2026-09-22/README.md) | 成员内存模式、钱包保存及全流程阶段测量 |

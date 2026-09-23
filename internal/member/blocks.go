@@ -169,6 +169,19 @@ func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
 	}
 	var updates []blockfollow.Apply
 	for _, entry := range b.Transactions() {
+		if entry.Code == 0 && protocol.IsReserveIncrease(entry.Bytes) {
+			c, err := protocol.DecodeReserveIncrease(entry.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			if c.Network != m.cfg.Organization.Network {
+				return nil, protocol.ErrAuth
+			}
+			updates = append(updates, func(o *state.Overlay) error {
+				return rules.ApplyReserveIncrease(o, c, m.cfg.Organization.Hash(), m.cfg.Workers)
+			})
+			continue
+		}
 		if entry.Code != 0 || len(entry.Data) == 0 {
 			continue
 		}

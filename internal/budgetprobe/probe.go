@@ -53,7 +53,14 @@ func Read(db store.Store, grants []state.Grant, org protocol.Hash, workers uint3
 			return e
 		}
 		for _, g := range grants {
-			r := Resource{Key: g.Key, Grant: g.Amount}
+			current, found, err := state.Load[state.Grant](v, state.Key(state.KeyGrant, g.Key.Encode()))
+			if err != nil {
+				return err
+			}
+			if !found {
+				return rules.ErrMissing
+			}
+			r := Resource{Key: g.Key, Grant: current.Amount}
 			r.Usage, _, e = state.Load[rules.PublicUsage](v, state.Key(state.KeyUsage, g.Key.Encode()))
 			if e != nil {
 				return e

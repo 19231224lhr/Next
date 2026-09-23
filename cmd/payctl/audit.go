@@ -99,7 +99,8 @@ func audit(args []string) error {
 				}
 				for _, g := range network.Genesis.Grants {
 					// Only the member's own grants are present.
-					if _, found, e := state.Load[state.Grant](v, state.Key(state.KeyGrant, g.Key.Encode())); e != nil {
+					current, found, e := state.Load[state.Grant](v, state.Key(state.KeyGrant, g.Key.Encode()))
+					if e != nil {
 						return e
 					} else if !found {
 						continue
@@ -122,7 +123,7 @@ func audit(args []string) error {
 							return e
 						}
 					}
-					share, _ := protocol.GrantShare(g.Amount)
+					share, _ := protocol.GrantShare(current.Amount)
 					total, e := protocol.Add(available, reserved)
 					if e != nil {
 						return e

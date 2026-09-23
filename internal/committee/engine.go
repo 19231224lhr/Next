@@ -194,6 +194,16 @@ func (e *Engine) unwrap(raw []byte) ([]byte, error) {
 }
 func (e *Engine) Check(raw []byte) error {
 	if e.direct != nil {
+		if protocol.IsReserveIncrease(raw) {
+			c, err := protocol.DecodeReserveIncrease(raw)
+			if err != nil {
+				return err
+			}
+			if c.Network != e.cfg.Network {
+				return protocol.ErrAuth
+			}
+			return nil
+		}
 		if protocol.IsClockTick(raw, e.cfg.Network) {
 			return nil
 		}

@@ -23,6 +23,7 @@ func TestSnapshotSeparatesSpentFromRecyclableReservation(t *testing.T) {
 		}{
 			{state.Key(state.KeyApproval, fact[:]), state.Approval{Fact: fact, Direct: &protocol.FastTx{}, Debits: []state.Debit{{Key: key, Cap: 1000}}}},
 			{member.ProgressKey(fact), member.LocalProgress{Settled: true, Fee: rules.Escrow{Maximum: 1000, Rewards: 84, Burned: 10, Refunded: 906, Closed: true}, Applied: []uint64{906}}},
+			{state.Key(state.KeyGrant, key.Encode()), g},
 			{state.SliceKey(key, 0), state.Slice{Available: 906, Reserved: 94}},
 		} {
 			if e := state.Put(o, x.k, x.v); e != nil {
@@ -54,6 +55,9 @@ func TestSnapshotUnsettledApprovalRetainsFullDebit(t *testing.T) {
 	fact := protocol.SpendFactID{2}
 	if e := db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
+		if e := state.Put(o, state.Key(state.KeyGrant, key.Encode()), state.Grant{Key: key, Amount: 300}); e != nil {
+			return nil, e
+		}
 		e := state.Put(o, state.Key(state.KeyApproval, fact[:]), state.Approval{Fact: fact, Direct: &protocol.FastTx{}, Debits: []state.Debit{{Key: key, Cap: 100}}})
 		return o.Changes(), e
 	}); e != nil {
@@ -62,6 +66,9 @@ func TestSnapshotUnsettledApprovalRetainsFullDebit(t *testing.T) {
 	s, e := Read(db, []state.Grant{{Key: key}}, protocol.Hash{}, 1, true)
 	if e != nil {
 		t.Fatal(e)
+	}
+	if s.Resources[0].Grant != 300 {
+		t.Fatal("snapshot used genesis rather than effective grant")
 	}
 	d := s.Detail.Debits[0]
 	if d.Charged != 100 || d.Released != 0 || d.NetSpent != 0 || s.Detail.Settled != 0 {
