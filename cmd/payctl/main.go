@@ -34,6 +34,10 @@ func main() {
 		err = auditBudget(os.Args[2:])
 	case "bench-v4":
 		err = benchDirect(os.Args[2:])
+	case "fault-proxy":
+		err = faultProxy(os.Args[2:])
+	case "fault-v4":
+		err = faultDirect(os.Args[2:])
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}

@@ -201,6 +201,7 @@ bin/payctl audit -dir experiments/local-v4
 | [E2：用户自付 FUEL](docs/experiments/owner-fuel-2026-09-23/README.md) | 用户费用充足、无组织代付时，CAL 与工作权限的周转 |
 | [E2：CAL 动态补资](docs/experiments/adaptive-reserve-2026-09-23/README.md) | 有限补资能否支持恒定、阶跃及责任延迟下的并行周转 |
 | [E3：赔付与历史修订](docs/experiments/liability-repair-2026-09-23/README.md) | 十二轮网络控制与九轮混合负载通过；直接责任兑现、真实历史修订及费用核对 |
+| [E4：故障与冲突实验方案](docs/research/e4-fault-conflict-experiment-design-2026-09-23.md) | 已评审、待实施：单成员停顿、网关交付边界、冲突与重复请求 |
 | [单组织整体 TPS](docs/experiments/single-org-tps-2026-09-22/README.md) | 快速签发、公共结算与成员收尾的完整系统吞吐 |
 | [四委员共识容量](docs/experiments/consensus-capacity-2026-09-22/README.md) | 独立测量委员会工作点、过载边界及资源开销 |
 | [完整路径优化](docs/experiments/full-path-opt-2026-09-22/README.md) | 成员内存模式、钱包保存及全流程阶段测量 |
