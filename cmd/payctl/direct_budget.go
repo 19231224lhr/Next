@@ -24,6 +24,7 @@ import (
 )
 
 type budgetUnit struct {
+	ParentFee, ChildFee                  protocol.OutputID
 	Index                                int
 	PlannedUnixNS, StartedUnixNS         int64
 	Parent, Child                        chainHop
@@ -35,6 +36,7 @@ type budgetUnit struct {
 	ParentFailures, ChildFailures        map[string]int
 }
 type budgetReport struct {
+	OwnerFuel                                 bool
 	StartedUnixNS, StoppedUnixNS              int64
 	DurationSeconds, DelaySeconds             float64
 	Offered, Admitted, NotStarted, MaxPending int
@@ -72,10 +74,13 @@ func budgetRelease(ctx context.Context, at time.Time, submit func(context.Contex
 	}
 }
 
-func budgetRequest(n cfg.Network, p rules.DirectPolicy, org protocol.OrgConfig, key ed25519.PrivateKey, in protocol.Input, coin protocol.Output, to protocol.ReceiveDescriptor, proofs []protocol.InputCertificate) (protocol.DirectRequest, error) {
+func budgetRequest(n cfg.Network, p rules.DirectPolicy, org protocol.OrgConfig, key ed25519.PrivateKey, in protocol.Input, coin protocol.Output, to protocol.ReceiveDescriptor, proofs []protocol.InputCertificate, fee ...state.OriginOutput) (protocol.DirectRequest, error) {
 	body := protocol.TxBody{Wire: 4, Version: 4, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: coin.Recipient.Owner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: p.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: coin.Amount, Recipient: to}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
+	if len(fee) > 0 {
+		body.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: 1000, Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: fee[0].ID, Evidence: fee[0].Fact}}, Refund: coin.Recipient}
+	}
 	for _, g := range n.Genesis.Grants {
-		if g.Organization != org.Hash() || (g.Key.Kind == protocol.ResourcePolicy && g.Subject != body.Subject) {
+		if g.Organization != org.Hash() || (g.Key.Kind == protocol.ResourcePolicy && g.Subject != body.Subject) || (len(fee) > 0 && (g.Key.Kind == protocol.ResourceFUEL || g.Key.Kind == protocol.ResourcePolicy)) {
 			continue
 		}
 		body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
@@ -97,6 +102,8 @@ func budgetRequest(n cfg.Network, p rules.DirectPolicy, org protocol.OrgConfig, 
 func budgetDirect(args []string) error {
 	f := flag.NewFlagSet("budget-v4", flag.ContinueOnError)
 	dir := f.String("dir", "", "fresh E2 lab")
+	ownerFuel := f.Bool("owner-fuel", false, "pay from independent user final FUEL inputs")
+	prepareFuel := f.Bool("prepare-owner-fuel", false, "prepare fresh user FUEL genesis and remove organization sponsorship before boot")
 	duration := f.Duration("duration", 300*time.Second, "fixed admission window")
 	delay := f.Duration("parent-delay", time.Second, "fixed READY to parent publication delay")
 	drain := f.Duration("drain", 60*time.Second, "bounded drain without topping up")
@@ -139,6 +146,11 @@ func budgetDirect(args []string) error {
 			return e
 		}
 		desc[i] = protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: org.Org}, keys[i])
+	}
+	if *prepareFuel {
+		return prepareBudgetOwnerFuel(lab, n, desc)
+	}
+	for i := range wallets {
 		db, err := store.OpenNoSync(filepath.Join(*dir, fmt.Sprintf("budget-wallet-%d.db", i)), store.Identity{Network: n.ChainID, Role: "budget-wallet", Node: fmt.Sprint(i), Schema: 4})
 		if err != nil {
 			return err
@@ -157,7 +169,7 @@ func budgetDirect(args []string) error {
 	}
 	var origins []state.OriginOutput
 	for _, o := range n.Genesis.Outputs {
-		if o.Output.Recipient.Owner == desc[0].Owner {
+		if o.Output.Asset == protocol.AssetCAL && o.Output.Recipient.Owner == desc[0].Owner {
 			origins = append(origins, o)
 		}
 	}
@@ -167,6 +179,24 @@ func budgetDirect(args []string) error {
 	}
 	if total < 1 || total > len(origins) {
 		return fmt.Errorf("need %d independent origins, have %d", total, len(origins))
+	}
+	var fees [2][]state.OriginOutput
+	if *ownerFuel {
+		for _, o := range n.Genesis.Outputs {
+			if o.Output.Asset != protocol.AssetFUEL {
+				continue
+			}
+			for i := range fees {
+				if o.Output.Recipient.Owner == desc[i].Owner && o.Output.Amount >= 1000 {
+					fees[i] = append(fees[i], o)
+				}
+			}
+		}
+		for i := range fees {
+			if len(fees[i]) < total {
+				return fmt.Errorf("user %d needs %d independent fee inputs, has %d", i, total, len(fees[i]))
+			}
+		}
 	}
 	start := time.Now()
 	ctx, cancel := context.WithDeadline(context.Background(), start.Add(*duration+*drain))
@@ -195,7 +225,7 @@ func budgetDirect(args []string) error {
 	if e != nil {
 		return e
 	}
-	report := budgetReport{StartedUnixNS: start.UnixNano(), DurationSeconds: duration.Seconds(), DelaySeconds: delay.Seconds(), Offered: total, MaxPending: *pending}
+	report := budgetReport{OwnerFuel: *ownerFuel, StartedUnixNS: start.UnixNano(), DurationSeconds: duration.Seconds(), DelaySeconds: delay.Seconds(), Offered: total, MaxPending: *pending}
 	if *late {
 		report.ParentFinalInstance = 1
 	}
@@ -220,7 +250,14 @@ func budgetDirect(args []string) error {
 		go func(origin state.OriginOutput, u *budgetUnit) {
 			defer wg.Done()
 			defer func() { <-slots }()
-			parent, err := budgetRequest(n, p, org, keys[0], protocol.Input{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}, origin.Output, desc[1], nil)
+			var parentFee, childFee []state.OriginOutput
+			if *ownerFuel {
+				parentFee = fees[0][u.Index : u.Index+1]
+				childFee = fees[1][u.Index : u.Index+1]
+				u.ParentFee = parentFee[0].ID
+				u.ChildFee = childFee[0].ID
+			}
+			parent, err := budgetRequest(n, p, org, keys[0], protocol.Input{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}, origin.Output, desc[1], nil, parentFee...)
 			if err != nil {
 				u.ParentError = err.Error()
 				return
@@ -334,7 +371,7 @@ func budgetDirect(args []string) error {
 				u.ChildError = err.Error()
 				return
 			}
-			child, err := budgetRequest(n, p, org, keys[1], in, coin.Output, desc[2], proofs)
+			child, err := budgetRequest(n, p, org, keys[1], in, coin.Output, desc[2], proofs, childFee...)
 			if err != nil {
 				u.ChildError = err.Error()
 				return
@@ -434,4 +471,43 @@ func budgetSend(ctx context.Context, client *http.Client, url string, raw []byte
 		return protocol.OutputCertificate{}, fmt.Errorf("HTTP %d %s", resp.StatusCode, bytes.TrimSpace(b))
 	}
 	return protocol.DecodeOutputCertificate(b)
+}
+
+// Called only before starting a fresh E2 laboratory. It does not top up a run.
+func prepareBudgetOwnerFuel(lab cfg.Lab, n cfg.Network, desc [3]protocol.ReceiveDescriptor) error {
+	for _, o := range n.Genesis.Outputs {
+		if o.Output.Asset == protocol.AssetFUEL {
+			return fmt.Errorf("owner FUEL genesis already prepared")
+		}
+	}
+	count := 0
+	for _, o := range n.Genesis.Outputs {
+		if o.Output.Asset == protocol.AssetCAL && o.Output.Recipient.Owner == desc[0].Owner {
+			count++
+		}
+	}
+	for user := 0; user < 2; user++ {
+		for i := 0; i < count; i++ {
+			e := new(protocol.Encoder)
+			e.U32(uint32(user))
+			e.U32(uint32(i))
+			id := protocol.OutputID(protocol.Digest("E2_OWNER_FUEL", n.Genesis.Network[:], e.Data()))
+			n.Genesis.Outputs = append(n.Genesis.Outputs, state.OriginOutput{ID: id, Fact: protocol.Digest("E2_OWNER_FUEL_ORIGIN", id[:]), Output: protocol.Output{Asset: protocol.AssetFUEL, Amount: 10000, Recipient: desc[user]}})
+		}
+	}
+	grants := n.Genesis.Grants[:0]
+	for _, g := range n.Genesis.Grants {
+		if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+			grants = append(grants, g)
+		}
+	}
+	n.Genesis.Grants = grants
+	accounts := n.Accounts[:0]
+	for _, a := range n.Accounts {
+		if a.Asset != protocol.AssetFUEL {
+			accounts = append(accounts, a)
+		}
+	}
+	n.Accounts = accounts
+	return cfg.Write(lab.Network, n)
 }

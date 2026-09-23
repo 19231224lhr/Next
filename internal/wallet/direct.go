@@ -56,6 +56,19 @@ func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
 				return nil, err
 			}
 		}
+		for _, in := range req.Tx.Body.Fee.Inputs {
+			k := state.Key(state.KeyWalletSpend, in.Output[:], []byte{0})
+			prior, found, err := state.Load[protocol.TxID](o, k)
+			if err != nil {
+				return nil, err
+			}
+			if found && prior != id {
+				return nil, protocol.ErrAuth
+			}
+			if err = state.Put(o, k, id); err != nil {
+				return nil, err
+			}
+		}
 		o.Set(key, raw)
 		return o.Changes(), nil
 	})

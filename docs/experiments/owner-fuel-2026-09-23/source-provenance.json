@@ -1,0 +1,30 @@
+{
+  "base_commit": "5d8ff3fb7ea9a9496d16acee0080bf603491ac84",
+  "runtime_candidate_files": {
+    "cmd/payctl/direct_audit.go": "5f7fdbbe61edd025b9927e77673864f549ed0c18fab108d1f9a52ca4502a3dc3",
+    "cmd/payctl/direct_budget.go": "70d8d9a0aa39e30825c6ac431f6c059b6ae8c5ccf84e836b48d5ddb331297a8f",
+    "cmd/payctl/direct_budget_audit.go": "91501247ea020cce6880df5f4adc53313492bc2e6f340e556da324319a648e46",
+    "internal/member/blocks.go": "4aa8841b4d816f7b941629df09b2cef8515def18a51ce8f4e8e7705e21cea8f4",
+    "internal/member/blocks_test.go": "a4c09ecb81528f64af120feaa0dbf75c3f38a8a150bc4a8efa087e6c1e668afc",
+    "internal/member/direct.go": "5a1f6ebe818a4c4757b430551f37a675052468d37d3cdaca8dcb71de7736bf3d",
+    "internal/rules/direct.go": "fd2c2a1cdf2aa2b4f428543f99baa8542075f059c1476aac5e81f6be9fbe9cc0",
+    "internal/wallet/blocks.go": "3960fdabc6b12672e8bc776fb6d533f2bd22a05e86f4155e01a4b3f72f40cfab",
+    "internal/wallet/direct.go": "c9c74f20485ea4238b75da275d71b8070923def92a39ed31ac0bf0836983f4b9",
+    "protocol/execution.go": "502830f8ebe8645ec759ff156b5de1081b780847397df984bb9cea3b99ef8a44",
+    "internal/rules/direct_fee.go": "227d44787c54b350743b509e1e0b107adf0029d780d1d20088b972ad47c714ff",
+    "internal/rules/direct_owner_fee_test.go": "e6a69f0bda312718afabbacd8707c5fc44946bddfcfc9f854b6ebf357b11e0b0",
+    "protocol/execution_fee_test.go": "8d2c208ab9d92f6f261202af59b1ded86c22ed03f0a30ec7eaf54722ef0c9cbf",
+    "docs/research/e2-owner-fuel-plan-2026-09-23.md": "ac3db41c88d973bb79fe7d3bf0c84d0ed17a91f50a4ffba456ab7d79a97dcb19",
+    "docs/experiments/owner-fuel-2026-09-23/reproduce.py": "c730b41f8646061e0b87ab3ed408ef3499d5979df9c8205d6ac9353c6c6ebcd5"
+  },
+  "runtime_binaries": {
+    "committee": "eb9d311635d92b8fac40ec121bfd1780aabbcccec4fe202e4d4090fd324699f7",
+    "payctl": "3031f08e8fe3afa81905b4510a75a2ceacc1ffd65606806e940856aa9d37ea00",
+    "member": "fe748c17207502e111765510f3bda7cf81f80c2119941914fa740cf8337810d0",
+    "member-real": "1fb3aa03d7ffd16f6406eb0515523bb07794e28dbc84604a657469fed24b3ab7",
+    "gateway": "66cdb10edd8d5d8ee98ddf8694390a724c2e0d586d7350c64e1dd447f3f67900"
+  },
+  "offline_auditor_sha256": "97d2056d859eb0f8474c20b69b307c4f7da03d5d8909dd648f896a99cbbeec5f",
+  "offline_audit_source_sha256": "396bb0b280420c636854c5aea015c612ee7e23cf41273ede729473088e506052",
+  "note": "Runtime binaries were frozen for all cases. The later offline auditor only adds fee-input lock measurements; multi-child refund tests were added without changing the payment path."
+}

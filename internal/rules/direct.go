@@ -1,7 +1,9 @@
 package rules
 
 import (
+	"bytes"
 	"math"
+	"sort"
 
 	"utxo/crypto/chameleon"
 	"utxo/internal/state"
@@ -23,7 +25,7 @@ func (p DirectPolicy) Rules() protocol.RuleIDs {
 	e.Fixed(r.Accounting[:])
 	e.U64(uint64(p.TimeoutSeconds))
 	e.U64(p.RepairCost)
-	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V4_INPUT_GUARANTEES", e.Data())
+	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V4_OWNER_FUEL", e.Data())
 	return r
 }
 
@@ -97,6 +99,8 @@ type directCoverage struct {
 type directPayment struct {
 	Summary    protocol.OutputSummary
 	FeeAccount protocol.Hash
+	FeeSource  protocol.FeeSource
+	FeeRefund  protocol.ReceiveDescriptor
 	Fee        Escrow
 	Pending    uint32
 	Settled    bool
@@ -105,7 +109,7 @@ type DirectPaymentState = directPayment
 
 func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.AdmissionVector, error) {
 	t := tx.Body
-	if p.Key == nil || p.TimeoutSeconds <= 0 || p.RepairCost == 0 || p.Base.Validate() != nil || t.Rules != p.Rules() || t.Kind != protocol.FastTransfer || t.Fee.Source != protocol.OrgReserve {
+	if p.Key == nil || p.TimeoutSeconds <= 0 || p.RepairCost == 0 || p.Base.Validate() != nil || t.Rules != p.Rules() || t.Kind != protocol.FastTransfer || (t.Fee.Source != protocol.OrgReserve && t.Fee.Source != protocol.OwnerFinalUTXO) {
 		return nil, protocol.ErrRule
 	}
 	if err := tx.VerifyInitial(p.Key); err != nil {
@@ -148,11 +152,15 @@ func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.Admission
 	if err != nil || minimum > escrow.Maximum {
 		return nil, ErrLimited
 	}
-	inputCost, err := protocol.MulDiv(uint64(len(t.Inputs)), p.Base.InputExecution, 1)
+	inputCost, err := protocol.MulDiv(uint64(len(t.Inputs)+len(t.Fee.Inputs)), p.Base.InputExecution, 1)
 	if err != nil {
 		return nil, err
 	}
-	outputCost, err := protocol.MulDiv(uint64(len(t.Outputs)), p.Base.OutputExecution, 1)
+	outputCount := len(t.Outputs)
+	if t.Fee.Source == protocol.OwnerFinalUTXO {
+		outputCount += 2
+	}
+	outputCost, err := protocol.MulDiv(uint64(outputCount), p.Base.OutputExecution, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -181,10 +189,20 @@ func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.Admission
 	if err != nil {
 		return nil, err
 	}
+	if t.Fee.Source == protocol.OwnerFinalUTXO {
+		retained, err = protocol.Add(retained, 4+2*protocol.FeeOutputBytes)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if exec > uint64(t.Work.Execution) || retained > uint64(t.Work.Bytes) {
 		return nil, ErrLimited
 	}
 	amounts := map[protocol.ResourceKind]uint64{protocol.ResourceCAL: cal, protocol.ResourceFUEL: t.Fee.Maximum, protocol.ResourceExecution: exec, protocol.ResourceBytes: retained, protocol.ResourcePolicy: t.Fee.Maximum}
+	if t.Fee.Source == protocol.OwnerFinalUTXO {
+		delete(amounts, protocol.ResourceFUEL)
+		delete(amounts, protocol.ResourcePolicy)
+	}
 	if len(t.Admission) != len(amounts) {
 		return nil, protocol.ErrRule
 	}
@@ -199,7 +217,7 @@ func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.Admission
 		if ref.Key.Kind == protocol.ResourcePolicy {
 			account = t.Fee.Policy
 		}
-		if !ok || seen[ref.Key.Kind] || ref.Key.Account != account || ref.Key.Version != t.Fee.Version {
+		if !ok || seen[ref.Key.Kind] || ref.Key.Account != account || (t.Fee.Source == protocol.OrgReserve && ref.Key.Version != t.Fee.Version) {
 			return nil, protocol.ErrRule
 		}
 		seen[ref.Key.Kind] = true
@@ -305,9 +323,17 @@ type directEval struct {
 func newDirectEval(v state.ReadView, p DirectPolicy, network protocol.Hash) *directEval {
 	return &directEval{o: state.NewOverlay(v), policy: p, network: network}
 }
-func (e *directEval) result() state.Transition {
-	raw, _ := e.resultData.MarshalBinary()
-	return state.Transition{Changes: e.o.Changes(), Data: raw}
+func (e *directEval) result() (state.Transition, error) {
+	sort.Slice(e.resultData.FeeOutputs, func(i, j int) bool {
+		a, b := e.resultData.FeeOutputs[i], e.resultData.FeeOutputs[j]
+		c := bytes.Compare(a.Transaction[:], b.Transaction[:])
+		return c < 0 || (c == 0 && a.Index < b.Index)
+	})
+	raw, err := e.resultData.MarshalBinary()
+	if err != nil {
+		return state.Transition{}, err
+	}
+	return state.Transition{Changes: e.o.Changes(), Data: raw}, nil
 }
 
 func (e *directEval) grant(s protocol.OutputSummary, index int) (state.Grant, error) {
@@ -441,7 +467,12 @@ func (e *directEval) feeStage(p *directPayment, action FeeAction) error {
 	if err = changeAmount(e.o, state.Key(state.KeyBurned), next.Burned-old.Burned, false); err != nil {
 		return err
 	}
-	if err = changeAmount(e.o, AccountKey(p.FeeAccount, protocol.AssetFUEL), next.Refunded-old.Refunded, false); err != nil {
+	if p.FeeSource == protocol.OwnerFinalUTXO {
+		err = e.feeOutput(p, protocol.FeeRefundIndex, next.Refunded-old.Refunded)
+	} else {
+		err = changeAmount(e.o, AccountKey(p.FeeAccount, protocol.AssetFUEL), next.Refunded-old.Refunded, false)
+	}
+	if err != nil {
 		return err
 	}
 	p.Fee = next
@@ -553,7 +584,7 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 	} else if found && prior != tx.ID() {
 		return state.Transition{}, ErrConflict
 	}
-	p := directPayment{Summary: summary, FeeAccount: t.Fee.Account}
+	p := directPayment{Summary: summary, FeeAccount: t.Fee.Account, FeeSource: t.Fee.Source, FeeRefund: t.Fee.Refund}
 	e.resultData.Applied = true
 	for i, a := range summary.Admission {
 		g, err := e.grant(summary, i)
@@ -573,7 +604,28 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 			return state.Transition{}, err
 		}
 	}
-	if err = changeAmount(e.o, AccountKey(t.Fee.Account, protocol.AssetFUEL), t.Fee.Maximum, true); err != nil {
+	if t.Fee.Source == protocol.OwnerFinalUTXO {
+		total, err := ValidateDirectFee(e.o, tx)
+		if err != nil {
+			return state.Transition{}, err
+		}
+		for _, in := range t.Fee.Inputs {
+			key := DirectSpendKey(in.Output, 0)
+			spent, _, err := state.Load[state.Spend](e.o, key)
+			if err != nil {
+				return state.Transition{}, err
+			}
+			if spent.Consumed != (protocol.SpendFactID{}) {
+				return state.Transition{}, ErrConflict
+			}
+			if err = state.Put(e.o, key, state.Spend{Consumed: fact}); err != nil {
+				return state.Transition{}, err
+			}
+		}
+		if err = e.feeOutput(&p, protocol.FeeChangeIndex, total-t.Fee.Maximum); err != nil {
+			return state.Transition{}, err
+		}
+	} else if err = changeAmount(e.o, AccountKey(t.Fee.Account, protocol.AssetFUEL), t.Fee.Maximum, true); err != nil {
 		return state.Transition{}, err
 	}
 	p.Fee, err = NewEscrow(t.Fee.Maximum, policy.Base.Fee)
@@ -702,7 +754,7 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 	if err = state.Put(e.o, state.Key(state.KeyIntent, t.Intent[:]), tx.ID()); err != nil {
 		return state.Transition{}, err
 	}
-	return e.result(), nil
+	return e.result()
 }
 
 // EvaluateDirectCompensation is the accounting substep of an authenticated
@@ -739,5 +791,5 @@ func EvaluateDirectCompensation(v state.ReadView, id protocol.OutputID, policy D
 	if err = state.Put(e.o, DirectRepairKey(id), todo); err != nil {
 		return state.Transition{}, err
 	}
-	return e.result(), nil
+	return e.result()
 }

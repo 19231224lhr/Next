@@ -9,7 +9,7 @@ import (
 	"utxo/protocol"
 )
 
-// ApproveDirect retains the one-round contract: input locks and all five
+// ApproveDirect retains the one-round contract: input locks and applicable
 // resource debits commit atomically before the vote is returned. Crash durability
 // depends on the configured store; the fresh-start member experiment uses NoSync.
 func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest) (protocol.DirectApproval, error) {
@@ -131,6 +131,24 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 				return nil, err
 			}
 		}
+
+		if _, err := rules.ValidateDirectFee(o, tx); err != nil {
+			return nil, err
+		}
+		for _, in := range t.Fee.Inputs {
+			key := rules.DirectSpendKey(in.Output, 0)
+			spent, _, err := state.Load[state.Spend](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if spent.Consumed != (protocol.SpendFactID{}) || (spent.Candidate != (protocol.SpendFactID{}) && spent.Candidate != fact) {
+				return nil, rules.ErrConflict
+			}
+			spent.Candidate = fact
+			if err = state.Put(o, key, spent); err != nil {
+				return nil, err
+			}
+		}
 		a := state.Approval{Fact: fact, Direct: &tx, Admission: vector}
 		for i, allocation := range vector {
 			ref := t.Admission[i]
@@ -213,6 +231,24 @@ func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
 			}
 			s.Consumed = fact
 			if err = state.Put(o, key, s); err != nil {
+				return nil, err
+			}
+		}
+
+		if _, err := rules.ValidateDirectFee(o, payment.Tx); err != nil {
+			return nil, err
+		}
+		for _, in := range payment.Tx.Body.Fee.Inputs {
+			k := rules.DirectSpendKey(in.Output, 0)
+			spent, _, err := state.Load[state.Spend](o, k)
+			if err != nil {
+				return nil, err
+			}
+			if spent.Consumed != (protocol.SpendFactID{}) && spent.Consumed != fact {
+				return nil, rules.ErrConflict
+			}
+			spent.Consumed = fact
+			if err = state.Put(o, k, spent); err != nil {
 				return nil, err
 			}
 		}

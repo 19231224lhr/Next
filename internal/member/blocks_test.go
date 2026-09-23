@@ -67,9 +67,9 @@ func TestInvalidPaymentRejectedBeforeMemberWrite(t *testing.T) {
 
 func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 	for _, scenario := range []struct {
-		name                     string
-		repair, split, sameBlock bool
-	}{{"source_arrives", false, false, false}, {"repair_then_late", true, false, false}, {"partial_repair_then_late", true, true, false}, {"child_parent_same_block", false, false, true}} {
+		name                                   string
+		repair, split, sameBlock, owner, multi bool
+	}{{"source_arrives", false, false, false, false, false}, {"repair_then_late", true, false, false, false, false}, {"partial_repair_then_late", true, true, false, false, false}, {"child_parent_same_block", false, false, true, false, false}, {"owner_source", false, false, false, true, false}, {"owner_repair", true, false, false, true, false}, {"owner_same_block", false, false, true, true, false}, {"owner_multiple_refunds", false, true, false, true, true}} {
 		t.Run(scenario.name, func(t *testing.T) {
 			repair := scenario.repair
 			f := testkit.NewFixture("follow", "org", 1)
@@ -88,11 +88,32 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			var feeOrigins [3]state.OriginOutput
+			if scenario.owner {
+				for i := range feeOrigins {
+					id := protocol.OutputID(protocol.Digest("owner-fee", []byte{byte(i)}))
+					out := f.Genesis.Outputs[0].Output
+					out.Asset = protocol.AssetFUEL
+					out.Amount = 1500
+					feeOrigins[i] = state.OriginOutput{ID: id, Fact: protocol.Digest("fee-genesis", id[:]), Output: out}
+					f.Genesis.Outputs = append(f.Genesis.Outputs, feeOrigins[i])
+				}
+			}
 			db := store.NewMemory()
 			defer db.Close()
 			m, err := member.New(member.Config{Organization: f.Org, Index: 0, Key: f.Keys[0], Peers: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Workers: 1, Direct: &settings}, db, f.Genesis)
 			if err != nil {
 				t.Fatal(err)
+			}
+			var observer *member.Member
+			var observerDB store.Store
+			if scenario.owner {
+				observerDB = store.NewMemory()
+				defer observerDB.Close()
+				observer, err = member.New(member.Config{Organization: f.Org, Index: 1, Key: f.Keys[1], Peers: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Workers: 1, Direct: &settings}, observerDB, f.Genesis)
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 			wdb := store.NewMemory()
 			defer wdb.Close()
@@ -121,6 +142,22 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				}
 				parent.Auth = []protocol.OwnerAuth{protocol.SignOwner(parent.ID(), f.Owner)}
 			}
+			if scenario.owner {
+				body := parent.Body
+				body.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: 1000, Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: feeOrigins[0].ID, Evidence: feeOrigins[0].Fact}}, Refund: feeOrigins[0].Output.Recipient}
+				body.Admission = nil
+				for _, g := range f.Genesis.Grants {
+					if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+						body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
+					}
+				}
+				body.Intent = body.IntentID()
+				parent, err = protocol.NewFastTx(body, parent.Claims, policy.Key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				parent.Auth = []protocol.OwnerAuth{protocol.SignOwner(parent.ID(), f.Owner)}
+			}
 			pc, err := f.DirectCertificate(parent, policy)
 			if err != nil {
 				t.Fatal(err)
@@ -128,6 +165,9 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 			body := parent.Body
 			body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(0), Evidence: protocol.Hash(pc.QC.Fact)}}
 			body.Outputs = []protocol.Output{parent.Body.Outputs[0]}
+			if scenario.owner {
+				body.Fee.Inputs = []protocol.Input{{Kind: protocol.FinalInput, Output: feeOrigins[1].ID, Evidence: feeOrigins[1].Fact}}
+			}
 			body.Nonce[0] = 42
 			body.Intent = body.IntentID()
 			child, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: parent.Body.Outputs[0]}}, policy.Key)
@@ -141,8 +181,46 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 			}
 			pp := protocol.DirectPayment{Tx: parent, Certificate: pc}
 			cp := protocol.DirectPayment{Tx: child, Certificate: cc, InputCertificates: []protocol.InputCertificate{{Certificate: pc}}}
+			var other protocol.DirectPayment
+			if scenario.multi {
+				b := child.Body
+				b.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(1), Evidence: protocol.Hash(pc.QC.Fact)}}
+				b.Outputs = []protocol.Output{parent.Body.Outputs[1]}
+				b.Nonce[0] = 43
+				b.Fee.Inputs = []protocol.Input{{Kind: protocol.FinalInput, Output: feeOrigins[2].ID, Evidence: feeOrigins[2].Fact}}
+				b.Intent = b.IntentID()
+				tx, e := protocol.NewFastTx(b, []protocol.InputClaim{{Output: b.Outputs[0]}}, policy.Key)
+				if e != nil {
+					t.Fatal(e)
+				}
+				tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.Owner)}
+				cert, e := f.DirectCertificate(tx, policy)
+				if e != nil {
+					t.Fatal(e)
+				}
+				other = protocol.DirectPayment{Tx: tx, Certificate: cert, InputCertificates: []protocol.InputCertificate{{Certificate: pc, Index: 1}}}
+			}
 			approved := make(map[protocol.SpendFactID][]byte)
-			for _, p := range []protocol.DirectPayment{pp, cp} {
+			payments := []protocol.DirectPayment{pp, cp}
+			if scenario.multi {
+				payments = append(payments, other)
+			}
+			for _, p := range payments {
+				if scenario.owner && p.Tx.ID() == child.ID() {
+					bad := child
+					bad.Body.Fee.Inputs = append([]protocol.Input(nil), parent.Body.Fee.Inputs...)
+					bad.Body.Intent = bad.Body.IntentID()
+					bad, err = protocol.NewFastTx(bad.Body, bad.Claims, policy.Key)
+					if err != nil {
+						t.Fatal(err)
+					}
+					bad.Auth = []protocol.OwnerAuth{protocol.SignOwner(bad.ID(), f.Owner)}
+					if _, err = m.ApproveDirect(context.Background(), protocol.DirectRequest{Tx: bad, InputCertificates: cp.InputCertificates}); err == nil {
+						t.Fatal("shared fee input accepted")
+					}
+					// The valid child immediately afterward proves no CAL lock escaped the failed transaction.
+				}
+
 				if _, err = m.ApproveDirect(context.Background(), protocol.DirectRequest{Tx: p.Tx, InputCertificates: p.InputCertificates}); err != nil {
 					t.Fatal(err)
 				}
@@ -175,6 +253,11 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				if err = blockfollow.Commit(db, b, m.PrepareBlock); err != nil {
 					t.Fatal(err)
 				}
+				if observer != nil {
+					if err = blockfollow.Commit(observerDB, b, observer.PrepareBlock); err != nil {
+						t.Fatal(err)
+					}
+				}
 				if err = blockfollow.Commit(wdb, b, w.PrepareBlock); err != nil {
 					t.Fatal(err)
 				}
@@ -203,7 +286,16 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				if scenario.multi && p.Tx.ID() == parent.ID() {
+					r, e := protocol.DecodeExecution(tr.Data)
+					if e != nil || len(r.FeeOutputs) != 4 {
+						t.Fatalf("multiple child refunds lost: %d %v", len(r.FeeOutputs), e)
+					}
+				}
 				apply(raw, tr)
+			}
+			if scenario.multi {
+				settle(other, 100)
 			}
 			settle(cp, 100)
 			if !scenario.sameBlock {
@@ -234,6 +326,45 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				}
 			}
 			settle(pp, 132)
+			if scenario.owner {
+				refund := protocol.OutputIdentity(f.Org.Network, child.ID(), protocol.FeeRefundIndex)
+				if ok, err := w.DirectFinal(refund, 0); err != nil || !ok {
+					t.Fatal("wallet missed final FUEL refund", err)
+				}
+				expected := uint64(906)
+				if repair {
+					expected = 901
+				}
+				for _, db := range []store.Store{db, ledger, observerDB} {
+					if err := db.View(func(v state.ReadView) error {
+						c, ok, e := state.Load[state.Creation](v, rules.DirectCreationKey(refund, 0))
+						if !ok || c.Output.Asset != protocol.AssetFUEL || c.Output.Amount != expected {
+							t.Fatalf("refund missing in ledger/member: %+v", c)
+						}
+						return e
+					}); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+
+			if scenario.multi {
+				id := protocol.OutputIdentity(f.Org.Network, other.Tx.ID(), protocol.FeeRefundIndex)
+				if ok, e := w.DirectFinal(id, 0); e != nil || !ok {
+					t.Fatal("other child wallet refund missing", e)
+				}
+				for _, target := range []store.Store{db, observerDB, ledger} {
+					if e := target.View(func(v state.ReadView) error {
+						c, ok, e := state.Load[state.Creation](v, rules.DirectCreationKey(id, 0))
+						if !ok || c.Output.Amount != 906 {
+							t.Fatal("other child refund identity lost")
+						}
+						return e
+					}); e != nil {
+						t.Fatal(e)
+					}
+				}
+			}
 			status, err := m.DirectStatus(cc.QC.Fact)
 			if err != nil || !status.Closed {
 				t.Fatal("child fee not closed", status, err)

@@ -21,7 +21,21 @@ func (w *Wallet) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
 		if err != nil {
 			return nil, err
 		}
-		if !result.Applied || protocol.IsRepairInput(entry.Bytes) {
+		if !result.Applied {
+			continue
+		}
+		for _, fee := range result.FeeOutputs {
+			if fee.Output.Recipient.Verify(w.network) != nil {
+				return nil, protocol.ErrAuth
+			}
+			if fee.Output.Recipient.Owner != w.owner {
+				continue
+			}
+			id := protocol.OutputIdentity(w.network, fee.Transaction, fee.Index)
+			coin := DirectCoin{Output: fee.Output, Index: fee.Index, Final: protocol.CreationIdentity(w.network, fee.Transaction, fee.Index, 0)}
+			coins = append(coins, received{DirectCoinKey(id, 0), coin})
+		}
+		if protocol.IsRepairInput(entry.Bytes) {
 			continue
 		}
 		pay, err := protocol.DecodeDirectSubmission(entry.Bytes)

@@ -1,0 +1,28 @@
+{
+  "base_commit": "5d8ff3fb7ea9a9496d16acee0080bf603491ac84",
+  "binaries": {
+    "committee": "eb9d311635d92b8fac40ec121bfd1780aabbcccec4fe202e4d4090fd324699f7",
+    "payctl": "3031f08e8fe3afa81905b4510a75a2ceacc1ffd65606806e940856aa9d37ea00",
+    "member": "fe748c17207502e111765510f3bda7cf81f80c2119941914fa740cf8337810d0",
+    "member-real": "1fb3aa03d7ffd16f6406eb0515523bb07794e28dbc84604a657469fed24b3ab7",
+    "gateway": "66cdb10edd8d5d8ee98ddf8694390a724c2e0d586d7350c64e1dd447f3f67900"
+  },
+  "source_sha256": {
+    "cmd/payctl/main.go": "d762da720d481161496d8afe554af0683440c1c1ca923269c64d84de948735ab",
+    "cmd/payctl/direct_chain.go": "c91cfb4a91e5dd36ec69c649afc3db4001425d69288be56fb27009f43e8afe3e",
+    "cmd/payctl/direct_chain_test.go": "b06e6fca614abfddd5ab29956f336d1ca55be2c7550fbb70b8dad28b9052af9c"
+  },
+  "experiment_env": {
+    "UTXO_EXPERIMENT_COMMIT": "250ms",
+    "UTXO_EXPERIMENT_FLUSH": "10ms",
+    "UTXO_EXPERIMENT_GOSSIP": "10ms",
+    "UTXO_EXPERIMENT_MEM_BLOCKSTORE": "1",
+    "UTXO_EXPERIMENT_COMMITTEE_MEMORY": "1",
+    "UTXO_EXPERIMENT_MEMBER_MEMORY": "1",
+    "UTXO_EXPERIMENT_GATEWAY_MEMORY": "1",
+    "UTXO_SETTLEMENT_TRACE": "1",
+    "UTXO_EXPERIMENT_BUDGET": "1"
+  },
+  "wallet": "three separate bbolt NoSync stores; authentic ReceiveDirect and block following",
+  "poll_ms": 5
+}

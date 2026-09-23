@@ -22,7 +22,11 @@ func auditDirectLedger(v state.ReadView, n cfg.Network) (result directLedgerAudi
 	add := func(sum *uint64, x uint64) error { var err error; *sum, err = protocol.Add(*sum, x); return err }
 	var initialCAL, initialFUEL uint64
 	for _, o := range n.Genesis.Outputs {
-		if err = add(&initialCAL, o.Output.Amount); err != nil {
+		target := &initialCAL
+		if o.Output.Asset == protocol.AssetFUEL {
+			target = &initialFUEL
+		}
+		if err = add(target, o.Output.Amount); err != nil {
 			return result, err
 		}
 	}
@@ -76,7 +80,11 @@ func auditDirectLedger(v state.ReadView, n cfg.Network) (result directLedgerAudi
 					return result, err
 				}
 				if spent.Consumed == (protocol.SpendFactID{}) {
-					if err = add(&result.CAL, creation.Output.Amount); err != nil {
+					target := &result.CAL
+					if creation.Output.Asset == protocol.AssetFUEL {
+						target = &result.FUEL
+					}
+					if err = add(target, creation.Output.Amount); err != nil {
 						return result, err
 					}
 				}

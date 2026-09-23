@@ -1,5 +1,7 @@
 # 按块处理实现规范与验证记录
 
+> **用户自付修订（2026-09-23）：** 快速路径现支持最终用户 FUEL 输入。自付不占用组织 FUEL/Policy，费用找零和退款作为公开最终输出自行跟块；规则域与结果 tag 更新见[实现说明](implementation-owner-fuel-v4.md)。以下历史说明中的组织代付只适用于 `OrgReserve` 分支。
+
 > **数据库修订（2026-09-20）：** 跟块先在事务外 `PrepareBlock` 解码认证，再在同一写事务中读取最新状态、顺序应用并推进游标。direct 成员的批准证据保持不变，累计核销量存于 `LocalProgress.Applied`，状态查询和离线审计统一读取该记录。成员本地数据库 schema 为 **5**，委员会、网关及钱包仍为 **4**，线协议仍为 wire 4。旧成员 schema 4 拒绝直接打开，不提供自动迁移；不得手改 schema 或以旧二进制打开新库。Comet 搜索索引关闭，按高度的区块、执行结果和提交认证完整保留。实现与对照结果见[数据库优化实验](experiments/database-optimization-2026-09-20/README.md)。
 
 > **当前公共提交修订：** [公共提交与新输出 TXCer 分离](implementation-public-submission-v4.md) 将内部 INSTALL 与公共提交明确拆开，并取消正常新输出的预先担保登记。组织批准仍须验证。

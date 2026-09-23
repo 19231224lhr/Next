@@ -179,6 +179,19 @@ func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
 		if !result.Applied {
 			continue
 		}
+		for _, fee := range result.FeeOutputs {
+			if fee.Output.Recipient.Verify(m.cfg.Organization.Network) != nil {
+				return nil, protocol.ErrAuth
+			}
+			if fee.Output.Recipient.Route.Org != m.cfg.Organization.Org {
+				continue
+			}
+			updates = append(updates, func(o *state.Overlay) error {
+				id := protocol.OutputIdentity(m.cfg.Organization.Network, fee.Transaction, fee.Index)
+				c := state.Creation{Output: fee.Output, Final: true, Fact: protocol.CreationIdentity(m.cfg.Organization.Network, fee.Transaction, fee.Index, 0)}
+				return state.Put(o, rules.DirectCreationKey(id, 0), c)
+			})
+		}
 		if protocol.IsRepairInput(entry.Bytes) {
 			repair, err := protocol.DecodeRepairInput(entry.Bytes)
 			if err != nil {
@@ -286,6 +299,13 @@ func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, r
 		o.Apply([]state.Change{{Key: state.Key(state.KeyOutbox, fact[:]), Delete: true}})
 		for i, in := range tx.Body.Inputs {
 			if err = state.Put(o, rules.DirectSpendKey(in.Output, tx.Claims[i].Instance), state.Spend{Consumed: fact}); err != nil {
+				return err
+			}
+		}
+	}
+	if tx.Body.Config == m.cfg.Organization.Hash() {
+		for _, in := range tx.Body.Fee.Inputs {
+			if err = state.Put(o, rules.DirectSpendKey(in.Output, 0), state.Spend{Consumed: fact}); err != nil {
 				return err
 			}
 		}
