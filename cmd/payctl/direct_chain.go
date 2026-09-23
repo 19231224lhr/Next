@@ -310,12 +310,8 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		nonce := protocol.Digest("CHAIN_V4", id[:])
 		copy(body.Nonce[:], nonce[:])
 		body.Intent = body.IntentID()
-		tx, e := protocol.NewFastTx(body, []protocol.InputClaim{{Output: coin.Output}}, p.Key)
-		if e != nil {
-			return e
-		}
-		tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), keys[h.Sender])}
-		request := protocol.DirectRequest{Tx: tx, InputCertificates: proofs}
+		var tx protocol.FastTx
+		var request protocol.DirectRequest
 		if e5 {
 			j := h.Sender
 			if fuelIndex[j] >= len(fuels[j]) {
@@ -328,6 +324,13 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 			fuelIndex[j]++
 			tx = request.Tx
 			body = tx.Body
+		} else {
+			tx, e = protocol.NewFastTx(body, []protocol.InputClaim{{Output: coin.Output}}, p.Key)
+			if e != nil {
+				return e
+			}
+			tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), keys[h.Sender])}
+			request = protocol.DirectRequest{Tx: tx, InputCertificates: proofs}
 		}
 		if e = wallets[h.Sender].SaveDirectRequest(request); e != nil {
 			return e
