@@ -111,20 +111,22 @@ def run_case(label,mode,rate,count,seed=23,warm=100,window=0,chain=False):
         shutil.copytree(labdir/'logs',dest/'node-logs',dirs_exist_ok=True)
     with (dest/'audit.log').open('w') as log:
         command([BIN/'payctl','audit','-dir',labdir],log)
-        command([BIN/'payctl','fault-v4','-dir',labdir,'-audit'],log)
+        command([BIN/'payctl','e5-load','-dir',labdir,'-audit'],log)
         if chain:command([BIN/'payctl','chain-v4','-dir',labdir,'-audit'],log)
         if warm:
             shutil.copyfile(labdir/'reports/fault-v4.json',dest/'main.json')
             shutil.copyfile(dest/'warm.json',labdir/'reports/fault-v4.json')
-            command([BIN/'payctl','fault-v4','-dir',labdir,'-audit'],log)
+            command([BIN/'payctl','e5-load','-dir',labdir,'-audit'],log)
             shutil.copyfile(labdir/'reports/fault-audit.json',dest/'warm-audit.json')
             shutil.copyfile(dest/'main.json',labdir/'reports/fault-v4.json')
-            command([BIN/'payctl','fault-v4','-dir',labdir,'-audit'],log)
+            command([BIN/'payctl','e5-load','-dir',labdir,'-audit'],log)
     shutil.copytree(labdir/'reports',dest/'reports',dirs_exist_ok=True)
     audit=json.loads((dest/'reports/audit.json').read_text())
     assert len({a['StateHash'] for a in audit if a['Name'].startswith('committee')})==1
     assert all(a['Pending']==0 for a in audit)
-    write(dest/'passed.json',{'passed':True,'count':count,'warm':warm})
+    report=json.loads((dest/'reports/fault-v4.json').read_text())
+    sent=sum(s['SentNS']>0 for s in report['Samples'])
+    write(dest/'passed.json',{'all_sent_audited':True,'planned':count,'sent':sent,'unsent':count-sent,'warm':warm})
     print(json.dumps({'case':label,'passed':True}),flush=True)
 
 if __name__=='__main__':
@@ -141,6 +143,6 @@ if __name__=='__main__':
         for i,seed in enumerate([23,37,59],1):
             for mode in (['A','B'] if i%2 else ['B','A']):run_case(a.prefix+f'chain-{mode}-{i}',mode,200,100,seed,warm=100,chain=True)
     else:
-        for rate in [200,1000]:
-            for i,seed in enumerate([23,37,59],1):
+        for i,seed in enumerate([23,37,59],1):
+            for rate in ([200,1000] if i%2 else [1000,200]):
                 for mode in (['A','B'] if i%2 else ['B','A']):run_case(a.prefix+f'{rate}-{mode}-{i}',mode,rate,rate*30,seed,window=30)

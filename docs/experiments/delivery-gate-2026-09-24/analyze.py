@@ -50,7 +50,7 @@ def analyze_case(path):
                 if r[stage+'_ns']:r[stage+'_ms']=(r[stage+'_ns']-r['sent_ns'])/1e6
         g=gate.get(r['tx'])
         if g:
-            r.update(upstream_ns=g['QCNS'],release_ns=g['ReleaseNS'],install3_ns=g['Install3NS'],gate_public_ns=g['PublicNS'],gate_reason=g['Reason'],install_calls=sum(g.get('InstallCalls',[])),observed_noops=sum(g.get('AlreadyObserved',[])))
+            r.update(upstream_ns=g['QCNS'],eligible_ns=g.get('EligibleNS',0),release_ns=g['ReleaseNS'],install3_ns=g['Install3NS'],gate_public_ns=g['PublicNS'],gate_reason=g['Reason'],install_calls=sum(g.get('InstallCalls',[])),observed_noops=sum(g.get('AlreadyObserved',[])))
             copies=[v for v in g.get('StoredNS',[]) if v]
             if copies:r['first_copy_ns']=min(copies)
             due=[v for v in [g['Install3NS'],g['PublicNS']] if v]
@@ -78,6 +78,13 @@ def analyze_case(path):
     summary['gate_install3']=sum(r.get('gate_reason')=='install3' for r in rows)
     summary['gate_public']=sum(r.get('gate_reason')=='public' for r in rows)
     summary['window_nonzero']=sum(r.get('window_ms',0)>0 for r in rows)
+    resources=[]
+    for line in (path/'resources.jsonl').read_text().splitlines():
+        pids=[line.split() for line in json.loads(line)['ps'].splitlines()]
+        resources.append((sum(float(p[1]) for p in pids),sum(int(p[2]) for p in pids)/1024))
+    if resources:
+        summary['cpu_percent_sample_p50']=statistics.median(r[0] for r in resources)
+        summary['rss_mib_sample_peak']=max(r[1] for r in resources)
     audit=json.loads((path/'reports/fault-audit.json').read_text())
     for field in ['Maximum','Held','Rewards','Burned','Refunded']:
         summary['fee_'+field.lower()]=sum(a['Fee'][field] for a in audit)
@@ -91,14 +98,14 @@ def analyze_case(path):
         inflight=[r for r in sent if r['sent_ns']<=now]
         public=[r for r in inflight if not r['public_ns'] or r['public_ns']>now]
         members=[r for r in inflight if not r['members_ns'] or r['members_ns']>now]
-        curves.append(dict(case=path.name,second=sec,sent=len(inflight),public_pending=len(public),members_pending=len(members),oldest_members_s=(now-min(r['sent_ns'] for r in members))/1e9 if members else 0))
+        curves.append(dict(case=path.name,second=sec,sent=len(inflight),ready_pending=sum(not r['ready_ns'] or r['ready_ns']>now for r in inflight),gate_waiting=sum(bool(r.get('eligible_ns')) and r['eligible_ns']<=now and (not r['release_ns'] or r['release_ns']>now) for r in rows),public_pending=len(public),members_pending=len(members),oldest_members_s=(now-min(r['sent_ns'] for r in members))/1e9 if members else 0))
     with gzip.open(path/'payments.jsonl.gz','wt') as f:
         for r in rows:f.write(json.dumps(r,separators=(',',':'))+'\n')
     return summary,curves
 
 if __name__=='__main__':
     summaries=[];curves=[]
-    for path in sorted(OUT.glob('v2-*')):
+    for path in sorted(OUT.glob('v3-*')):
         if not (path/'passed.json').exists():continue
         summary,curve=analyze_case(path);summaries.append(summary);curves+=curve
         print(json.dumps(summary),flush=True)

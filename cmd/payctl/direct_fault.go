@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -406,6 +407,9 @@ func runFaultLoad(dir string, lab cfg.Lab, n cfg.Network, count int, rate float6
 		complete := true
 		mu.Lock()
 		for _, s := range report.Samples {
+			if option.Window > 0 && s.SentNS == 0 {
+				continue
+			}
 			if s.ReadyNS == 0 || s.PublicNS == 0 {
 				complete = false
 				break
@@ -436,19 +440,44 @@ func runFaultLoad(dir string, lab cfg.Lab, n cfg.Network, count int, rate float6
 		return e
 	}
 	completed := 0
+	sentCount := 0
 	for _, s := range report.Samples {
+		if s.SentNS > 0 {
+			sentCount++
+		}
 		if s.PublicNS > 0 && s.MemberNS[0] > 0 && s.MemberNS[1] > 0 && s.MemberNS[2] > 0 && s.MemberNS[3] > 0 {
 			completed++
 		}
 	}
 	fmt.Printf("E4 completed %d/%d in %.3fs\n", completed, count, float64(report.FinishedNS-report.StartedNS)/1e9)
-	if completed != count {
+	expected := count
+	if option.Window > 0 {
+		expected = sentCount
+	}
+	if completed != expected {
 		return fmt.Errorf("E4 incomplete: %d/%d", completed, count)
+	}
+	if option.Window > 0 && errors.Is(err, context.DeadlineExceeded) {
+		err = nil
 	}
 	return err
 }
 
-func auditFault(dir string, lab cfg.Lab, n cfg.Network) error {
+func faultAuditSamples(samples []faultSample, allowUnsent bool) ([]faultSample, error) {
+	out := make([]faultSample, 0, len(samples))
+	for i, s := range samples {
+		if s.Certificate == nil {
+			if allowUnsent && s.SentNS == 0 && s.ReadyNS == 0 && s.PublicNS == 0 && s.MemberNS == ([4]int64{}) && s.Error == "not sent" {
+				continue
+			}
+			return nil, fmt.Errorf("sample %d has no QC and is not explicitly unsent", i)
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+func auditFault(dir string, lab cfg.Lab, n cfg.Network, allowUnsent ...bool) error {
 	var report faultReport
 	file, err := os.Open(filepath.Join(dir, "reports", "fault-v4.json"))
 	if err != nil {
@@ -456,6 +485,10 @@ func auditFault(dir string, lab cfg.Lab, n cfg.Network) error {
 	}
 	defer file.Close()
 	if err = json.NewDecoder(file).Decode(&report); err != nil {
+		return err
+	}
+	report.Samples, err = faultAuditSamples(report.Samples, len(allowUnsent) > 0 && allowUnsent[0])
+	if err != nil {
 		return err
 	}
 	type check struct {

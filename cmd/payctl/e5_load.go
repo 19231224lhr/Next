@@ -68,6 +68,7 @@ func e5LoadCommand(args []string) error {
 	window := f.Duration("window", 0, "fixed sending window")
 	seed := f.Int64("seed", 23, "input permutation")
 	prepare := f.Bool("prepare", false, "prepare user-paid genesis")
+	audit := f.Bool("audit", false, "audit actual payments; explicitly unsent requests remain reported")
 	if e := f.Parse(args); e != nil {
 		return e
 	}
@@ -84,6 +85,9 @@ func e5LoadCommand(args []string) error {
 	}
 	if *prepare {
 		return prepareFault(lab, n, *count+*offset)
+	}
+	if *audit {
+		return auditFault(*dir, lab, n, true)
 	}
 	return runFaultLoad(*dir, lab, n, *count, *rate, 60*time.Second, 30*time.Second, e5LoadOptions{*offset, *window, *seed})
 }
