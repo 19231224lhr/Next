@@ -343,6 +343,9 @@ func runFaultLoad(dir string, lab cfg.Lab, n cfg.Network, count int, rate float6
 			defer workers.Done()
 			for i := range jobs {
 				sent := time.Now()
+				if option.Window > 0 && !sent.Before(start.Add(option.Window)) {
+					continue
+				}
 				mu.Lock()
 				s := &report.Samples[i]
 				s.ScheduledNS = start.Add(time.Duration(float64(i) / rate * float64(time.Second))).UnixNano()

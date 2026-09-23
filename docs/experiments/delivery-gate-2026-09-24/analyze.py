@@ -78,6 +78,10 @@ def analyze_case(path):
     summary['gate_install3']=sum(r.get('gate_reason')=='install3' for r in rows)
     summary['gate_public']=sum(r.get('gate_reason')=='public' for r in rows)
     summary['window_nonzero']=sum(r.get('window_ms',0)>0 for r in rows)
+    audit=json.loads((path/'reports/fault-audit.json').read_text())
+    for field in ['Maximum','Held','Rewards','Burned','Refunded']:
+        summary['fee_'+field.lower()]=sum(a['Fee'][field] for a in audit)
+    assert summary['fee_maximum']==sum(summary['fee_'+f] for f in ['held','rewards','burned','refunded'])
     if is_chain:
         summary['certificate_inputs']=sum(r['certificate_input'] for r in rows)
         summary['chain_ready_ms']=report['FastChainMS']
