@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from summarize import peak_pending
 
 spec = importlib.util.spec_from_file_location('analysis', Path(__file__).with_name('analyze.py'))
 analysis = importlib.util.module_from_spec(spec)
@@ -11,6 +12,13 @@ spec.loader.exec_module(analysis)
 
 
 class AnalysisTest(unittest.TestCase):
+    def test_pending_counts_unfinished_and_both_hops(self):
+        def unit(start, parent, child):
+            return {'StartedUnixNS': start, 'Parent': {'MemberClosedUnixNS': parent},
+                    'Child': {'MemberClosedUnixNS': child}}
+        self.assertEqual(peak_pending([unit(10, 15, 25), unit(20, 21, 22), unit(30, 0, 31)], 50), 2)
+        self.assertEqual(peak_pending([unit(10, 0, 11), unit(30, 31, 32), unit(0, 0, 0)], 50), 2)
+
     def fixture(self, path):
         unit = {'Index': 0, 'RepairExpected': True, 'FirstSubmitUnixNS': 40_000_000_000,
                 'Parent': {'MemberClosedUnixNS': 42_000_000_000, 'FinalUnixNS': 41_000_000_000, 'ReadyUnixNS': 1, 'FastMS': 1},

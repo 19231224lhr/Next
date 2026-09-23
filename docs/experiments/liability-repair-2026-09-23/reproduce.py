@@ -6,6 +6,8 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import threading
+import time
 
 OUT = Path(__file__).resolve().parent
 ROOT = OUT.parents[2]
@@ -19,6 +21,7 @@ e2.labutil.OUT, e2.labutil.BIN = OUT, e2.BIN
 e2.ENV.update(UTXO_EXPERIMENT_MEM_BLOCKSTORE='0', UTXO_EXPERIMENT_COMMITTEE_MEMORY='0',
               UTXO_EXPERIMENT_SERIAL_DIRECT='0')
 base_configure, base_command = e2.configure, e2.command
+base_sample = e2.sample
 PERCENT, SEED = 0, 23
 # Calibration candidates; identical for all anomaly ratios. No live top-ups.
 CAL_GRANT = 60000
@@ -36,6 +39,7 @@ def configure(label, count, kind=None, grant=None):
         'cal_grant': CAL_GRANT, 'automatic_refill': False,
         'parent_release': 'after observed committed repair AND all four physical stores',
         'normal_delay_s': 1, 'poll_ms': 250, 'deadlines': 'consensus anchored, 30 seconds',
+        'process_sample_s': 2,
         'user_fuel': True, 'code_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         'source_sha256': {p: hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in [
             'cmd/payctl/direct_budget.go', 'cmd/payctl/direct_repair_probe.go',
@@ -50,6 +54,43 @@ def command(args, log):
 
 
 e2.configure, e2.command = configure, command
+
+
+def cpu_seconds(value):
+    total = 0.0
+    for part in value.split(':'):
+        total = total*60+float(part)
+    return total
+
+
+def sample(lab, dest, stop, probe=False):
+    def processes():
+        with (dest/'processes.jsonl').open('w') as log:
+            while not stop.is_set():
+                stamp = time.time_ns()
+                try:
+                    text = subprocess.check_output(['ps', '-axo', 'pid=,time=,rss=,command='], text=True)
+                    for line in text.splitlines():
+                        fields = line.strip().split(None, 3)
+                        if len(fields) != 4:
+                            continue
+                        for node in lab['Nodes']:
+                            if '-config' in fields[3] and node['Config'] in fields[3]:
+                                log.write(json.dumps({'unix_ns':stamp, 'node':node['Name'], 'pid':int(fields[0]),
+                                    'cpu_s':cpu_seconds(fields[1]), 'rss_kib':int(fields[2])})+'\n')
+                except (OSError, ValueError, subprocess.CalledProcessError) as error:
+                    log.write(json.dumps({'unix_ns':stamp, 'error':str(error)})+'\n')
+                log.flush()
+                stop.wait(2)
+    worker = threading.Thread(target=processes)
+    worker.start()
+    try:
+        base_sample(lab, dest, stop, probe)
+    finally:
+        worker.join()
+
+
+e2.sample = sample
 
 
 def run(label, percent, seed, duration=300, count=0):

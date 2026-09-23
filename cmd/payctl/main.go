@@ -28,6 +28,8 @@ func main() {
 		err = chainDirect(os.Args[2:])
 	case "budget-v4":
 		err = budgetDirect(os.Args[2:])
+	case "liability-v4":
+		err = liabilityDirect(os.Args[2:])
 	case "budget-audit":
 		err = auditBudget(os.Args[2:])
 	case "bench-v4":

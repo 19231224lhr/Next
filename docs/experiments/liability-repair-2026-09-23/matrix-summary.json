@@ -1,0 +1,3269 @@
+[
+  {
+    "case": "r1-s23-p0",
+    "passed": true,
+    "checks": {
+      "all_offered_started": true,
+      "all_units_closed": true,
+      "no_driver_errors": true,
+      "all_selected_admitted": true,
+      "repair_count_matches_selected": true,
+      "physical_before_parent_and_child_already_final": true,
+      "committee_state_equal": true,
+      "gap_closed": true,
+      "all_public": true,
+      "cal_loss": true,
+      "no_organization_fuel": true,
+      "fee_conservation": true,
+      "owner_conservation": true,
+      "all_fees_closed": true,
+      "full_fee_formula": true
+    },
+    "offered_units": 6000,
+    "admitted_units": 6000,
+    "not_started": 0,
+    "closed_units": 6000,
+    "selected_exceptions": 0,
+    "actual_repairs": 0,
+    "actual_obligations": 6000,
+    "physical_complete": 0,
+    "cal_net_loss": 0,
+    "fee": {
+      "Maximum": 12000000,
+      "Held": 0,
+      "Rewards": 1008000,
+      "Burned": 120000,
+      "Refunded": 10872000
+    },
+    "timing": {
+      "normal_parent_fast_ms": {
+        "n": 6000,
+        "p50": 1.218,
+        "p95": 1.627,
+        "max": 534.98
+      },
+      "normal_child_fast_ms": {
+        "n": 6000,
+        "p50": 1.203,
+        "p95": 1.841,
+        "max": 16.336
+      },
+      "exceptional_parent_fast_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "exceptional_child_fast_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "deadline_to_first_commit_observed_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "deadline_to_all_physical_observed_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      }
+    },
+    "errors": [],
+    "unfinished_exceptions": [],
+    "probe_requests": 0,
+    "probe_errors": 0,
+    "elapsed_s": 301.816681,
+    "timing_note": "Local observation times include 250 ms polling, RPC and scheduling; no exact remote Commit latency claim.",
+    "extra": {
+      "case": "r1-s23-p0",
+      "additional_checks": {
+        "no_partial_approvals": true,
+        "each_payment_fee_matches_its_own_repair": true,
+        "each_selected_parent_has_repaired_obligation": true,
+        "no_member_transient_residual": true,
+        "all_wallet_refunds_final": true,
+        "no_committee_transient_residual": true,
+        "no_pending_public_outbox": true
+      },
+      "member_accounting": {
+        "org0-member0": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        },
+        "org0-member1": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        },
+        "org0-member2": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        },
+        "org0-member3": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        }
+      },
+      "different_revised_blocks_by_node": {
+        "committee0": 0,
+        "committee1": 0,
+        "committee2": 0,
+        "committee3": 0
+      },
+      "minimum_sampled_member_available_cal": 33100,
+      "member_limit_counters": {
+        "org0-member0": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member2": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member3": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "repair_delay_by_arrival_window": [
+        {
+          "arrival_from_s": 0,
+          "arrival_to_s": 60,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 60,
+          "arrival_to_s": 120,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 120,
+          "arrival_to_s": 180,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 180,
+          "arrival_to_s": 240,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 240,
+          "arrival_to_s": 300,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        }
+      ],
+      "peak_pending_units_reconstructed": 46,
+      "start_lag_ms": {
+        "n": 6000,
+        "p50": 0.909,
+        "p95": 1.587,
+        "max": 2.345
+      },
+      "peak_committee_reserved_cal": 2700,
+      "peak_open_sampled": 21,
+      "cpu": {
+        "org0-member0": {
+          "cpu_s": 29.12,
+          "sample_span_s": 306.249529,
+          "peak_rss_mib": 901.171875,
+          "samples": 152
+        },
+        "org0-member1": {
+          "cpu_s": 29.06,
+          "sample_span_s": 306.249529,
+          "peak_rss_mib": 901.546875,
+          "samples": 152
+        },
+        "org0-member2": {
+          "cpu_s": 29.14,
+          "sample_span_s": 306.249529,
+          "peak_rss_mib": 931.734375,
+          "samples": 152
+        },
+        "org0-member3": {
+          "cpu_s": 28.9,
+          "sample_span_s": 306.249529,
+          "peak_rss_mib": 931.140625,
+          "samples": 152
+        },
+        "gateway0": {
+          "cpu_s": 27.16,
+          "sample_span_s": 306.249529,
+          "peak_rss_mib": 115.25,
+          "samples": 152
+        },
+        "committee0": {
+          "cpu_s": 60.62,
+          "sample_span_s": 306.249529,
+          "peak_rss_mib": 482.8125,
+          "samples": 152
+        },
+        "committee1": {
+          "cpu_s": 51.87,
+          "sample_span_s": 306.249529,
+          "peak_rss_mib": 456.265625,
+          "samples": 152
+        },
+        "committee2": {
+          "cpu_s": 50.51,
+          "sample_span_s": 306.249529,
+          "peak_rss_mib": 450.75,
+          "samples": 152
+        },
+        "committee3": {
+          "cpu_s": 50.4,
+          "sample_span_s": 306.249529,
+          "peak_rss_mib": 433.890625,
+          "samples": 152
+        }
+      },
+      "cpu_total_s": 356.78,
+      "process_probe_errors": 0,
+      "repair_stages": {
+        "input_shares": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "part_shares": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "submit": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "command_bytes_once_per_repair": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "command_bytes_total_unique": 0,
+          "command_bytes_all_attempts": 0,
+          "cached_duplicate_calls": 0,
+          "deadline_to_first_accepted_call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "materialize": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        }
+      },
+      "timing": {
+        "normal_parent_ready_to_final_observed_ms": {
+          "n": 6000,
+          "p50": 1595.573,
+          "p95": 1740.637,
+          "max": 1795.713
+        },
+        "normal_child_ready_to_final_observed_ms": {
+          "n": 6000,
+          "p50": 600.01,
+          "p95": 735.103,
+          "max": 780.106
+        },
+        "exceptional_parent_ready_to_final_observed_ms": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "max": null
+        },
+        "exceptional_child_ready_to_final_observed_ms": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "max": null
+        }
+      },
+      "notes": [
+        "Stage durations are individual calls, including retries, not additive end-to-end latency.",
+        "CPU is whole-node sampled CPU, not isolated repair cryptography.",
+        "Open responsibility is sampled every 10 seconds; CAL usage every 0.5 seconds."
+      ]
+    }
+  },
+  {
+    "case": "r1-s23-p1",
+    "passed": true,
+    "checks": {
+      "all_offered_started": true,
+      "all_units_closed": true,
+      "no_driver_errors": true,
+      "all_selected_admitted": true,
+      "repair_count_matches_selected": true,
+      "physical_before_parent_and_child_already_final": true,
+      "committee_state_equal": true,
+      "gap_closed": true,
+      "all_public": true,
+      "cal_loss": true,
+      "no_organization_fuel": true,
+      "fee_conservation": true,
+      "owner_conservation": true,
+      "all_fees_closed": true,
+      "full_fee_formula": true
+    },
+    "offered_units": 6000,
+    "admitted_units": 6000,
+    "not_started": 0,
+    "closed_units": 6000,
+    "selected_exceptions": 60,
+    "actual_repairs": 60,
+    "actual_obligations": 6000,
+    "physical_complete": 60,
+    "cal_net_loss": 6000,
+    "fee": {
+      "Maximum": 12000000,
+      "Held": 0,
+      "Rewards": 1008300,
+      "Burned": 120000,
+      "Refunded": 10871700
+    },
+    "timing": {
+      "normal_parent_fast_ms": {
+        "n": 5940,
+        "p50": 1.217,
+        "p95": 1.629,
+        "max": 531.428
+      },
+      "normal_child_fast_ms": {
+        "n": 5940,
+        "p50": 1.197,
+        "p95": 1.663,
+        "max": 21.49
+      },
+      "exceptional_parent_fast_ms": {
+        "n": 60,
+        "p50": 1.237,
+        "p95": 1.454,
+        "max": 162.153
+      },
+      "exceptional_child_fast_ms": {
+        "n": 60,
+        "p50": 1.19,
+        "p95": 1.476,
+        "max": 2.55
+      },
+      "deadline_to_first_commit_observed_ms": {
+        "n": 60,
+        "p50": 1253.146112,
+        "p95": 1505.072128,
+        "max": 1506.09408
+      },
+      "deadline_to_all_physical_observed_ms": {
+        "n": 60,
+        "p50": 1507.301888,
+        "p95": 2011.443968,
+        "max": 2015.776
+      }
+    },
+    "errors": [],
+    "unfinished_exceptions": [],
+    "probe_requests": 1948,
+    "probe_errors": 96,
+    "elapsed_s": 332.436821,
+    "timing_note": "Local observation times include 250 ms polling, RPC and scheduling; no exact remote Commit latency claim.",
+    "extra": {
+      "case": "r1-s23-p1",
+      "additional_checks": {
+        "no_partial_approvals": true,
+        "each_payment_fee_matches_its_own_repair": true,
+        "each_selected_parent_has_repaired_obligation": true,
+        "no_member_transient_residual": true,
+        "all_wallet_refunds_final": true,
+        "no_committee_transient_residual": true,
+        "no_pending_public_outbox": true
+      },
+      "member_accounting": {
+        "org0-member0": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        },
+        "org0-member1": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        },
+        "org0-member2": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        },
+        "org0-member3": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        }
+      },
+      "different_revised_blocks_by_node": {
+        "committee0": 60,
+        "committee1": 60,
+        "committee2": 60,
+        "committee3": 60
+      },
+      "minimum_sampled_member_available_cal": 28000,
+      "member_limit_counters": {
+        "org0-member0": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member2": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member3": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "repair_delay_by_arrival_window": [
+        {
+          "arrival_from_s": 0,
+          "arrival_to_s": 60,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1507.145,
+            "p95": 1508.481,
+            "max": 1508.68
+          }
+        },
+        {
+          "arrival_from_s": 60,
+          "arrival_to_s": 120,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1507.302,
+            "p95": 1509.778,
+            "max": 1509.868
+          }
+        },
+        {
+          "arrival_from_s": 120,
+          "arrival_to_s": 180,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1507.233,
+            "p95": 1507.729,
+            "max": 1509.174
+          }
+        },
+        {
+          "arrival_from_s": 180,
+          "arrival_to_s": 240,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1507.24,
+            "p95": 1509.045,
+            "max": 1509.256
+          }
+        },
+        {
+          "arrival_from_s": 240,
+          "arrival_to_s": 300,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1509.712,
+            "p95": 2013.829,
+            "max": 2015.776
+          }
+        }
+      ],
+      "peak_pending_units_reconstructed": 52,
+      "start_lag_ms": {
+        "n": 6000,
+        "p50": 0.873,
+        "p95": 1.54,
+        "max": 2.24
+      },
+      "peak_committee_reserved_cal": 3200,
+      "peak_open_sampled": 27,
+      "cpu": {
+        "org0-member0": {
+          "cpu_s": 32.099999999999994,
+          "sample_span_s": 336.891471,
+          "peak_rss_mib": 930.171875,
+          "samples": 167
+        },
+        "org0-member1": {
+          "cpu_s": 31.87,
+          "sample_span_s": 336.891471,
+          "peak_rss_mib": 1008.421875,
+          "samples": 167
+        },
+        "org0-member2": {
+          "cpu_s": 32.019999999999996,
+          "sample_span_s": 336.891471,
+          "peak_rss_mib": 932.359375,
+          "samples": 167
+        },
+        "org0-member3": {
+          "cpu_s": 31.76,
+          "sample_span_s": 336.891471,
+          "peak_rss_mib": 962.8125,
+          "samples": 167
+        },
+        "gateway0": {
+          "cpu_s": 27.22,
+          "sample_span_s": 336.891471,
+          "peak_rss_mib": 113.59375,
+          "samples": 167
+        },
+        "committee0": {
+          "cpu_s": 69.47,
+          "sample_span_s": 336.891471,
+          "peak_rss_mib": 536.46875,
+          "samples": 167
+        },
+        "committee1": {
+          "cpu_s": 57.03,
+          "sample_span_s": 336.891471,
+          "peak_rss_mib": 463.203125,
+          "samples": 167
+        },
+        "committee2": {
+          "cpu_s": 55.52,
+          "sample_span_s": 336.891471,
+          "peak_rss_mib": 449.984375,
+          "samples": 167
+        },
+        "committee3": {
+          "cpu_s": 56.89,
+          "sample_span_s": 336.891471,
+          "peak_rss_mib": 446.921875,
+          "samples": 167
+        }
+      },
+      "cpu_total_s": 393.88,
+      "process_probe_errors": 0,
+      "repair_stages": {
+        "input_shares": {
+          "calls": 64,
+          "errors": 0,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 64,
+            "p50": 2.544167,
+            "p95": 3.429917,
+            "max": 5.742209
+          }
+        },
+        "part_shares": {
+          "calls": 64,
+          "errors": 0,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 64,
+            "p50": 2.958,
+            "p95": 3.979875,
+            "max": 19.37175
+          }
+        },
+        "submit": {
+          "calls": 64,
+          "errors": 4,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 64,
+            "p50": 0.019584,
+            "p95": 0.026042,
+            "max": 17.3585
+          },
+          "command_bytes_once_per_repair": {
+            "n": 60,
+            "p50": 3579,
+            "p95": 3579,
+            "max": 3579
+          },
+          "command_bytes_total_unique": 214740,
+          "command_bytes_all_attempts": 229056,
+          "cached_duplicate_calls": 4,
+          "deadline_to_first_accepted_call_ms": {
+            "n": 60,
+            "p50": 794.256,
+            "p95": 1294.954,
+            "max": 1295.565
+          }
+        },
+        "materialize": {
+          "calls": 240,
+          "errors": 0,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 240,
+            "p50": 7.074083,
+            "p95": 26.617917,
+            "max": 42.385083
+          }
+        }
+      },
+      "timing": {
+        "normal_parent_ready_to_final_observed_ms": {
+          "n": 5940,
+          "p50": 1590.594,
+          "p95": 1740.584,
+          "max": 1815.753
+        },
+        "normal_child_ready_to_final_observed_ms": {
+          "n": 5940,
+          "p50": 585.056,
+          "p95": 735.056,
+          "max": 790.04
+        },
+        "exceptional_parent_ready_to_final_observed_ms": {
+          "n": 60,
+          "p50": 31781.635,
+          "p95": 32380.248,
+          "max": 32756.933
+        },
+        "exceptional_child_ready_to_final_observed_ms": {
+          "n": 60,
+          "p50": 580.018,
+          "p95": 725.061,
+          "max": 740.037
+        }
+      },
+      "notes": [
+        "Stage durations are individual calls, including retries, not additive end-to-end latency.",
+        "CPU is whole-node sampled CPU, not isolated repair cryptography.",
+        "Open responsibility is sampled every 10 seconds; CAL usage every 0.5 seconds."
+      ]
+    }
+  },
+  {
+    "case": "r1-s23-p5",
+    "passed": true,
+    "checks": {
+      "all_offered_started": true,
+      "all_units_closed": true,
+      "no_driver_errors": true,
+      "all_selected_admitted": true,
+      "repair_count_matches_selected": true,
+      "physical_before_parent_and_child_already_final": true,
+      "committee_state_equal": true,
+      "gap_closed": true,
+      "all_public": true,
+      "cal_loss": true,
+      "no_organization_fuel": true,
+      "fee_conservation": true,
+      "owner_conservation": true,
+      "all_fees_closed": true,
+      "full_fee_formula": true
+    },
+    "offered_units": 6000,
+    "admitted_units": 6000,
+    "not_started": 0,
+    "closed_units": 6000,
+    "selected_exceptions": 300,
+    "actual_repairs": 300,
+    "actual_obligations": 6000,
+    "physical_complete": 300,
+    "cal_net_loss": 30000,
+    "fee": {
+      "Maximum": 12000000,
+      "Held": 0,
+      "Rewards": 1009500,
+      "Burned": 120000,
+      "Refunded": 10870500
+    },
+    "timing": {
+      "normal_parent_fast_ms": {
+        "n": 5700,
+        "p50": 1.213,
+        "p95": 1.693,
+        "max": 527.518
+      },
+      "normal_child_fast_ms": {
+        "n": 5700,
+        "p50": 1.198,
+        "p95": 1.742,
+        "max": 507.5
+      },
+      "exceptional_parent_fast_ms": {
+        "n": 300,
+        "p50": 1.211,
+        "p95": 1.583,
+        "max": 159.861
+      },
+      "exceptional_child_fast_ms": {
+        "n": 300,
+        "p50": 1.195,
+        "p95": 1.492,
+        "max": 13.167
+      },
+      "deadline_to_first_commit_observed_ms": {
+        "n": 300,
+        "p50": 1255.411968,
+        "p95": 2004.815872,
+        "max": 2507.478016
+      },
+      "deadline_to_all_physical_observed_ms": {
+        "n": 300,
+        "p50": 1758.179072,
+        "p95": 2261.117952,
+        "max": 2762.668032
+      }
+    },
+    "errors": [],
+    "unfinished_exceptions": [],
+    "probe_requests": 10145,
+    "probe_errors": 485,
+    "elapsed_s": 331.842874,
+    "timing_note": "Local observation times include 250 ms polling, RPC and scheduling; no exact remote Commit latency claim.",
+    "extra": {
+      "case": "r1-s23-p5",
+      "additional_checks": {
+        "no_partial_approvals": true,
+        "each_payment_fee_matches_its_own_repair": true,
+        "each_selected_parent_has_repaired_obligation": true,
+        "no_member_transient_residual": true,
+        "all_wallet_refunds_final": true,
+        "no_committee_transient_residual": true,
+        "no_pending_public_outbox": true
+      },
+      "member_accounting": {
+        "org0-member0": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        },
+        "org0-member1": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        },
+        "org0-member2": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        },
+        "org0-member3": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        }
+      },
+      "different_revised_blocks_by_node": {
+        "committee0": 260,
+        "committee1": 260,
+        "committee2": 260,
+        "committee3": 260
+      },
+      "minimum_sampled_member_available_cal": 5200,
+      "member_limit_counters": {
+        "org0-member0": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member2": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member3": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "repair_delay_by_arrival_window": [
+        {
+          "arrival_from_s": 0,
+          "arrival_to_s": 60,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1761.131,
+            "p95": 1779.571,
+            "max": 2265.154
+          }
+        },
+        {
+          "arrival_from_s": 60,
+          "arrival_to_s": 120,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1758.179,
+            "p95": 1772.125,
+            "max": 2261.368
+          }
+        },
+        {
+          "arrival_from_s": 120,
+          "arrival_to_s": 180,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1757.124,
+            "p95": 2260.368,
+            "max": 2761.98
+          }
+        },
+        {
+          "arrival_from_s": 180,
+          "arrival_to_s": 240,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1757.101,
+            "p95": 2258.393,
+            "max": 2271.394
+          }
+        },
+        {
+          "arrival_from_s": 240,
+          "arrival_to_s": 300,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1758.642,
+            "p95": 2261.972,
+            "max": 2762.668
+          }
+        }
+      ],
+      "peak_pending_units_reconstructed": 75,
+      "start_lag_ms": {
+        "n": 6000,
+        "p50": 11.594,
+        "p95": 12.465,
+        "max": 12.931
+      },
+      "peak_committee_reserved_cal": 5700,
+      "peak_open_sampled": 51,
+      "cpu": {
+        "org0-member0": {
+          "cpu_s": 33.36,
+          "sample_span_s": 334.851084,
+          "peak_rss_mib": 890.375,
+          "samples": 166
+        },
+        "org0-member1": {
+          "cpu_s": 33.49,
+          "sample_span_s": 334.851084,
+          "peak_rss_mib": 985.140625,
+          "samples": 166
+        },
+        "org0-member2": {
+          "cpu_s": 32.94,
+          "sample_span_s": 334.851084,
+          "peak_rss_mib": 909.671875,
+          "samples": 166
+        },
+        "org0-member3": {
+          "cpu_s": 32.59,
+          "sample_span_s": 334.851084,
+          "peak_rss_mib": 963.484375,
+          "samples": 166
+        },
+        "gateway0": {
+          "cpu_s": 27.099999999999998,
+          "sample_span_s": 334.851084,
+          "peak_rss_mib": 116.3125,
+          "samples": 166
+        },
+        "committee0": {
+          "cpu_s": 75.47999999999999,
+          "sample_span_s": 334.851084,
+          "peak_rss_mib": 562.078125,
+          "samples": 166
+        },
+        "committee1": {
+          "cpu_s": 59.089999999999996,
+          "sample_span_s": 334.851084,
+          "peak_rss_mib": 483.875,
+          "samples": 166
+        },
+        "committee2": {
+          "cpu_s": 61.09,
+          "sample_span_s": 334.851084,
+          "peak_rss_mib": 474.0,
+          "samples": 166
+        },
+        "committee3": {
+          "cpu_s": 60.95,
+          "sample_span_s": 334.851084,
+          "peak_rss_mib": 472.53125,
+          "samples": 166
+        }
+      },
+      "cpu_total_s": 416.09,
+      "process_probe_errors": 0,
+      "repair_stages": {
+        "input_shares": {
+          "calls": 588,
+          "errors": 0,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 588,
+            "p50": 2.496125,
+            "p95": 14.183875,
+            "max": 38.832208
+          }
+        },
+        "part_shares": {
+          "calls": 588,
+          "errors": 0,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 588,
+            "p50": 2.954208,
+            "p95": 5.413292,
+            "max": 40.265584
+          }
+        },
+        "submit": {
+          "calls": 588,
+          "errors": 233,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 588,
+            "p50": 0.017375,
+            "p95": 0.023958,
+            "max": 19.761959
+          },
+          "command_bytes_once_per_repair": {
+            "n": 300,
+            "p50": 3579,
+            "p95": 3579,
+            "max": 3835
+          },
+          "command_bytes_total_unique": 1074212,
+          "command_bytes_all_attempts": 2105988,
+          "cached_duplicate_calls": 233,
+          "deadline_to_first_accepted_call_ms": {
+            "n": 300,
+            "p50": 998.96,
+            "p95": 1053.107,
+            "max": 1513.489
+          }
+        },
+        "materialize": {
+          "calls": 1200,
+          "errors": 0,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 1200,
+            "p50": 7.492,
+            "p95": 23.957417,
+            "max": 47.302167
+          }
+        }
+      },
+      "timing": {
+        "normal_parent_ready_to_final_observed_ms": {
+          "n": 5700,
+          "p50": 1600.591,
+          "p95": 1750.652,
+          "max": 1811.128
+        },
+        "normal_child_ready_to_final_observed_ms": {
+          "n": 5700,
+          "p50": 600.029,
+          "p95": 750.02,
+          "max": 805.114
+        },
+        "exceptional_parent_ready_to_final_observed_ms": {
+          "n": 300,
+          "p50": 31970.49,
+          "p95": 32851.873,
+          "max": 33450.098
+        },
+        "exceptional_child_ready_to_final_observed_ms": {
+          "n": 300,
+          "p50": 585.253,
+          "p95": 735.073,
+          "max": 775.032
+        }
+      },
+      "notes": [
+        "Stage durations are individual calls, including retries, not additive end-to-end latency.",
+        "CPU is whole-node sampled CPU, not isolated repair cryptography.",
+        "Open responsibility is sampled every 10 seconds; CAL usage every 0.5 seconds."
+      ]
+    }
+  },
+  {
+    "case": "r1-s37-p0",
+    "passed": true,
+    "checks": {
+      "all_offered_started": true,
+      "all_units_closed": true,
+      "no_driver_errors": true,
+      "all_selected_admitted": true,
+      "repair_count_matches_selected": true,
+      "physical_before_parent_and_child_already_final": true,
+      "committee_state_equal": true,
+      "gap_closed": true,
+      "all_public": true,
+      "cal_loss": true,
+      "no_organization_fuel": true,
+      "fee_conservation": true,
+      "owner_conservation": true,
+      "all_fees_closed": true,
+      "full_fee_formula": true
+    },
+    "offered_units": 6000,
+    "admitted_units": 6000,
+    "not_started": 0,
+    "closed_units": 6000,
+    "selected_exceptions": 0,
+    "actual_repairs": 0,
+    "actual_obligations": 5999,
+    "physical_complete": 0,
+    "cal_net_loss": 0,
+    "fee": {
+      "Maximum": 12000000,
+      "Held": 0,
+      "Rewards": 1008000,
+      "Burned": 120000,
+      "Refunded": 10872000
+    },
+    "timing": {
+      "normal_parent_fast_ms": {
+        "n": 6000,
+        "p50": 1.217,
+        "p95": 1.682,
+        "max": 558.126
+      },
+      "normal_child_fast_ms": {
+        "n": 6000,
+        "p50": 1.201,
+        "p95": 2.064,
+        "max": 550.241
+      },
+      "exceptional_parent_fast_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "exceptional_child_fast_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "deadline_to_first_commit_observed_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "deadline_to_all_physical_observed_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      }
+    },
+    "errors": [],
+    "unfinished_exceptions": [],
+    "probe_requests": 0,
+    "probe_errors": 0,
+    "elapsed_s": 302.018433,
+    "timing_note": "Local observation times include 250 ms polling, RPC and scheduling; no exact remote Commit latency claim.",
+    "extra": {
+      "case": "r1-s37-p0",
+      "additional_checks": {
+        "no_partial_approvals": true,
+        "each_payment_fee_matches_its_own_repair": true,
+        "each_selected_parent_has_repaired_obligation": true,
+        "no_member_transient_residual": true,
+        "all_wallet_refunds_final": true,
+        "no_committee_transient_residual": true,
+        "no_pending_public_outbox": true
+      },
+      "member_accounting": {
+        "org0-member0": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        },
+        "org0-member1": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        },
+        "org0-member2": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        },
+        "org0-member3": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        }
+      },
+      "different_revised_blocks_by_node": {
+        "committee0": 0,
+        "committee1": 0,
+        "committee2": 0,
+        "committee3": 0
+      },
+      "minimum_sampled_member_available_cal": 33400,
+      "member_limit_counters": {
+        "org0-member0": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member2": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member3": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "repair_delay_by_arrival_window": [
+        {
+          "arrival_from_s": 0,
+          "arrival_to_s": 60,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 60,
+          "arrival_to_s": 120,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 120,
+          "arrival_to_s": 180,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 180,
+          "arrival_to_s": 240,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 240,
+          "arrival_to_s": 300,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        }
+      ],
+      "peak_pending_units_reconstructed": 46,
+      "start_lag_ms": {
+        "n": 6000,
+        "p50": 1.157,
+        "p95": 2.059,
+        "max": 2.556
+      },
+      "peak_committee_reserved_cal": 2800,
+      "peak_open_sampled": 21,
+      "cpu": {
+        "org0-member0": {
+          "cpu_s": 29.130000000000003,
+          "sample_span_s": 306.453553,
+          "peak_rss_mib": 895.828125,
+          "samples": 152
+        },
+        "org0-member1": {
+          "cpu_s": 29.28,
+          "sample_span_s": 306.453553,
+          "peak_rss_mib": 931.609375,
+          "samples": 152
+        },
+        "org0-member2": {
+          "cpu_s": 29.21,
+          "sample_span_s": 306.453553,
+          "peak_rss_mib": 962.046875,
+          "samples": 152
+        },
+        "org0-member3": {
+          "cpu_s": 29.029999999999998,
+          "sample_span_s": 306.453553,
+          "peak_rss_mib": 879.03125,
+          "samples": 152
+        },
+        "gateway0": {
+          "cpu_s": 27.05,
+          "sample_span_s": 306.453553,
+          "peak_rss_mib": 114.953125,
+          "samples": 152
+        },
+        "committee0": {
+          "cpu_s": 62.57,
+          "sample_span_s": 306.453553,
+          "peak_rss_mib": 492.765625,
+          "samples": 152
+        },
+        "committee1": {
+          "cpu_s": 51.67,
+          "sample_span_s": 306.453553,
+          "peak_rss_mib": 454.3125,
+          "samples": 152
+        },
+        "committee2": {
+          "cpu_s": 51.59,
+          "sample_span_s": 306.453553,
+          "peak_rss_mib": 455.796875,
+          "samples": 152
+        },
+        "committee3": {
+          "cpu_s": 51.19,
+          "sample_span_s": 306.453553,
+          "peak_rss_mib": 432.84375,
+          "samples": 152
+        }
+      },
+      "cpu_total_s": 360.71999999999997,
+      "process_probe_errors": 0,
+      "repair_stages": {
+        "input_shares": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "part_shares": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "submit": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "command_bytes_once_per_repair": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "command_bytes_total_unique": 0,
+          "command_bytes_all_attempts": 0,
+          "cached_duplicate_calls": 0,
+          "deadline_to_first_accepted_call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "materialize": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        }
+      },
+      "timing": {
+        "normal_parent_ready_to_final_observed_ms": {
+          "n": 6000,
+          "p50": 1595.807,
+          "p95": 1735.775,
+          "max": 1800.732
+        },
+        "normal_child_ready_to_final_observed_ms": {
+          "n": 6000,
+          "p50": 595.035,
+          "p95": 735.02,
+          "max": 2745.221
+        },
+        "exceptional_parent_ready_to_final_observed_ms": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "max": null
+        },
+        "exceptional_child_ready_to_final_observed_ms": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "max": null
+        }
+      },
+      "notes": [
+        "Stage durations are individual calls, including retries, not additive end-to-end latency.",
+        "CPU is whole-node sampled CPU, not isolated repair cryptography.",
+        "Open responsibility is sampled every 10 seconds; CAL usage every 0.5 seconds."
+      ]
+    }
+  },
+  {
+    "case": "r1-s37-p1",
+    "passed": true,
+    "checks": {
+      "all_offered_started": true,
+      "all_units_closed": true,
+      "no_driver_errors": true,
+      "all_selected_admitted": true,
+      "repair_count_matches_selected": true,
+      "physical_before_parent_and_child_already_final": true,
+      "committee_state_equal": true,
+      "gap_closed": true,
+      "all_public": true,
+      "cal_loss": true,
+      "no_organization_fuel": true,
+      "fee_conservation": true,
+      "owner_conservation": true,
+      "all_fees_closed": true,
+      "full_fee_formula": true
+    },
+    "offered_units": 6000,
+    "admitted_units": 6000,
+    "not_started": 0,
+    "closed_units": 6000,
+    "selected_exceptions": 60,
+    "actual_repairs": 60,
+    "actual_obligations": 6000,
+    "physical_complete": 60,
+    "cal_net_loss": 6000,
+    "fee": {
+      "Maximum": 12000000,
+      "Held": 0,
+      "Rewards": 1008300,
+      "Burned": 120000,
+      "Refunded": 10871700
+    },
+    "timing": {
+      "normal_parent_fast_ms": {
+        "n": 5940,
+        "p50": 1.21,
+        "p95": 1.661,
+        "max": 523.39
+      },
+      "normal_child_fast_ms": {
+        "n": 5940,
+        "p50": 1.196,
+        "p95": 1.665,
+        "max": 413.13
+      },
+      "exceptional_parent_fast_ms": {
+        "n": 60,
+        "p50": 1.203,
+        "p95": 1.432,
+        "max": 216.073
+      },
+      "exceptional_child_fast_ms": {
+        "n": 60,
+        "p50": 1.193,
+        "p95": 1.556,
+        "max": 2.439
+      },
+      "deadline_to_first_commit_observed_ms": {
+        "n": 60,
+        "p50": 1253.34912,
+        "p95": 1755.744,
+        "max": 1756.22912
+      },
+      "deadline_to_all_physical_observed_ms": {
+        "n": 60,
+        "p50": 1507.22304,
+        "p95": 2009.787904,
+        "max": 2010.550016
+      }
+    },
+    "errors": [],
+    "unfinished_exceptions": [],
+    "probe_requests": 1958,
+    "probe_errors": 98,
+    "elapsed_s": 329.857303,
+    "timing_note": "Local observation times include 250 ms polling, RPC and scheduling; no exact remote Commit latency claim.",
+    "extra": {
+      "case": "r1-s37-p1",
+      "additional_checks": {
+        "no_partial_approvals": true,
+        "each_payment_fee_matches_its_own_repair": true,
+        "each_selected_parent_has_repaired_obligation": true,
+        "no_member_transient_residual": true,
+        "all_wallet_refunds_final": true,
+        "no_committee_transient_residual": true,
+        "no_pending_public_outbox": true
+      },
+      "member_accounting": {
+        "org0-member0": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        },
+        "org0-member1": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        },
+        "org0-member2": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        },
+        "org0-member3": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        }
+      },
+      "different_revised_blocks_by_node": {
+        "committee0": 60,
+        "committee1": 60,
+        "committee2": 60,
+        "committee3": 60
+      },
+      "minimum_sampled_member_available_cal": 27400,
+      "member_limit_counters": {
+        "org0-member0": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member2": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member3": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "repair_delay_by_arrival_window": [
+        {
+          "arrival_from_s": 0,
+          "arrival_to_s": 60,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1507.235,
+            "p95": 1518.912,
+            "max": 1523.275
+          }
+        },
+        {
+          "arrival_from_s": 60,
+          "arrival_to_s": 120,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1506.888,
+            "p95": 1519.628,
+            "max": 1523.587
+          }
+        },
+        {
+          "arrival_from_s": 120,
+          "arrival_to_s": 180,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1507.095,
+            "p95": 1516.977,
+            "max": 1526.437
+          }
+        },
+        {
+          "arrival_from_s": 180,
+          "arrival_to_s": 240,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1506.891,
+            "p95": 1518.446,
+            "max": 1535.693
+          }
+        },
+        {
+          "arrival_from_s": 240,
+          "arrival_to_s": 300,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1519.119,
+            "p95": 2009.987,
+            "max": 2010.55
+          }
+        }
+      ],
+      "peak_pending_units_reconstructed": 52,
+      "start_lag_ms": {
+        "n": 6000,
+        "p50": 1.133,
+        "p95": 2.03,
+        "max": 2.78
+      },
+      "peak_committee_reserved_cal": 3300,
+      "peak_open_sampled": 27,
+      "cpu": {
+        "org0-member0": {
+          "cpu_s": 31.780000000000005,
+          "sample_span_s": 332.863165,
+          "peak_rss_mib": 965.140625,
+          "samples": 165
+        },
+        "org0-member1": {
+          "cpu_s": 31.69,
+          "sample_span_s": 332.863165,
+          "peak_rss_mib": 921.578125,
+          "samples": 165
+        },
+        "org0-member2": {
+          "cpu_s": 31.5,
+          "sample_span_s": 332.863165,
+          "peak_rss_mib": 966.9375,
+          "samples": 165
+        },
+        "org0-member3": {
+          "cpu_s": 31.02,
+          "sample_span_s": 332.863165,
+          "peak_rss_mib": 799.828125,
+          "samples": 165
+        },
+        "gateway0": {
+          "cpu_s": 27.28,
+          "sample_span_s": 332.863165,
+          "peak_rss_mib": 115.671875,
+          "samples": 165
+        },
+        "committee0": {
+          "cpu_s": 68.35,
+          "sample_span_s": 332.863165,
+          "peak_rss_mib": 544.546875,
+          "samples": 165
+        },
+        "committee1": {
+          "cpu_s": 56.33,
+          "sample_span_s": 332.863165,
+          "peak_rss_mib": 446.359375,
+          "samples": 165
+        },
+        "committee2": {
+          "cpu_s": 53.919999999999995,
+          "sample_span_s": 332.863165,
+          "peak_rss_mib": 443.4375,
+          "samples": 165
+        },
+        "committee3": {
+          "cpu_s": 55.15,
+          "sample_span_s": 332.863165,
+          "peak_rss_mib": 447.390625,
+          "samples": 165
+        }
+      },
+      "cpu_total_s": 387.02,
+      "process_probe_errors": 0,
+      "repair_stages": {
+        "input_shares": {
+          "calls": 64,
+          "errors": 0,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 64,
+            "p50": 3.25425,
+            "p95": 11.702,
+            "max": 26.14525
+          }
+        },
+        "part_shares": {
+          "calls": 64,
+          "errors": 0,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 64,
+            "p50": 2.937584,
+            "p95": 4.481791,
+            "max": 25.753666
+          }
+        },
+        "submit": {
+          "calls": 64,
+          "errors": 4,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 64,
+            "p50": 0.019875,
+            "p95": 0.025458,
+            "max": 0.033292
+          },
+          "command_bytes_once_per_repair": {
+            "n": 60,
+            "p50": 3579,
+            "p95": 3579,
+            "max": 3579
+          },
+          "command_bytes_total_unique": 214740,
+          "command_bytes_all_attempts": 229056,
+          "cached_duplicate_calls": 4,
+          "deadline_to_first_accepted_call_ms": {
+            "n": 60,
+            "p50": 893.839,
+            "p95": 1393.944,
+            "max": 1394.764
+          }
+        },
+        "materialize": {
+          "calls": 240,
+          "errors": 0,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 240,
+            "p50": 6.241334,
+            "p95": 24.040042,
+            "max": 46.42925
+          }
+        }
+      },
+      "timing": {
+        "normal_parent_ready_to_final_observed_ms": {
+          "n": 5940,
+          "p50": 1590.687,
+          "p95": 1735.946,
+          "max": 1805.623
+        },
+        "normal_child_ready_to_final_observed_ms": {
+          "n": 5940,
+          "p50": 585.052,
+          "p95": 730.106,
+          "max": 800.035
+        },
+        "exceptional_parent_ready_to_final_observed_ms": {
+          "n": 60,
+          "p50": 31875.948,
+          "p95": 32549.617,
+          "max": 32775.28
+        },
+        "exceptional_child_ready_to_final_observed_ms": {
+          "n": 60,
+          "p50": 600.043,
+          "p95": 730.032,
+          "max": 755.045
+        }
+      },
+      "notes": [
+        "Stage durations are individual calls, including retries, not additive end-to-end latency.",
+        "CPU is whole-node sampled CPU, not isolated repair cryptography.",
+        "Open responsibility is sampled every 10 seconds; CAL usage every 0.5 seconds."
+      ]
+    }
+  },
+  {
+    "case": "r1-s37-p5",
+    "passed": true,
+    "checks": {
+      "all_offered_started": true,
+      "all_units_closed": true,
+      "no_driver_errors": true,
+      "all_selected_admitted": true,
+      "repair_count_matches_selected": true,
+      "physical_before_parent_and_child_already_final": true,
+      "committee_state_equal": true,
+      "gap_closed": true,
+      "all_public": true,
+      "cal_loss": true,
+      "no_organization_fuel": true,
+      "fee_conservation": true,
+      "owner_conservation": true,
+      "all_fees_closed": true,
+      "full_fee_formula": true
+    },
+    "offered_units": 6000,
+    "admitted_units": 6000,
+    "not_started": 0,
+    "closed_units": 6000,
+    "selected_exceptions": 300,
+    "actual_repairs": 300,
+    "actual_obligations": 5999,
+    "physical_complete": 300,
+    "cal_net_loss": 30000,
+    "fee": {
+      "Maximum": 12000000,
+      "Held": 0,
+      "Rewards": 1009500,
+      "Burned": 120000,
+      "Refunded": 10870500
+    },
+    "timing": {
+      "normal_parent_fast_ms": {
+        "n": 5700,
+        "p50": 1.218,
+        "p95": 1.639,
+        "max": 575.839
+      },
+      "normal_child_fast_ms": {
+        "n": 5700,
+        "p50": 1.196,
+        "p95": 1.639,
+        "max": 25.88
+      },
+      "exceptional_parent_fast_ms": {
+        "n": 300,
+        "p50": 1.208,
+        "p95": 1.985,
+        "max": 491.614
+      },
+      "exceptional_child_fast_ms": {
+        "n": 300,
+        "p50": 1.194,
+        "p95": 2.102,
+        "max": 16.741
+      },
+      "deadline_to_first_commit_observed_ms": {
+        "n": 300,
+        "p50": 1253.241088,
+        "p95": 1755.49312,
+        "max": 2258.987008
+      },
+      "deadline_to_all_physical_observed_ms": {
+        "n": 300,
+        "p50": 1507.448064,
+        "p95": 2010.032896,
+        "max": 2513.953024
+      }
+    },
+    "errors": [],
+    "unfinished_exceptions": [],
+    "probe_requests": 10021,
+    "probe_errors": 511,
+    "elapsed_s": 332.313321,
+    "timing_note": "Local observation times include 250 ms polling, RPC and scheduling; no exact remote Commit latency claim.",
+    "extra": {
+      "case": "r1-s37-p5",
+      "additional_checks": {
+        "no_partial_approvals": true,
+        "each_payment_fee_matches_its_own_repair": true,
+        "each_selected_parent_has_repaired_obligation": true,
+        "no_member_transient_residual": true,
+        "all_wallet_refunds_final": true,
+        "no_committee_transient_residual": true,
+        "no_pending_public_outbox": true
+      },
+      "member_accounting": {
+        "org0-member0": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        },
+        "org0-member1": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        },
+        "org0-member2": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        },
+        "org0-member3": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        }
+      },
+      "different_revised_blocks_by_node": {
+        "committee0": 260,
+        "committee1": 260,
+        "committee2": 260,
+        "committee3": 260
+      },
+      "minimum_sampled_member_available_cal": 5000,
+      "member_limit_counters": {
+        "org0-member0": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member2": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member3": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "repair_delay_by_arrival_window": [
+        {
+          "arrival_from_s": 0,
+          "arrival_to_s": 60,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1507.191,
+            "p95": 2008.904,
+            "max": 2510.871
+          }
+        },
+        {
+          "arrival_from_s": 60,
+          "arrival_to_s": 120,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1507.158,
+            "p95": 2006.418,
+            "max": 2010.018
+          }
+        },
+        {
+          "arrival_from_s": 120,
+          "arrival_to_s": 180,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1507.287,
+            "p95": 2008.761,
+            "max": 2509.452
+          }
+        },
+        {
+          "arrival_from_s": 180,
+          "arrival_to_s": 240,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1507.414,
+            "p95": 2008.099,
+            "max": 2010.033
+          }
+        },
+        {
+          "arrival_from_s": 240,
+          "arrival_to_s": 300,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1509.156,
+            "p95": 2508.704,
+            "max": 2513.953
+          }
+        }
+      ],
+      "peak_pending_units_reconstructed": 77,
+      "start_lag_ms": {
+        "n": 6000,
+        "p50": 1.137,
+        "p95": 2.072,
+        "max": 3.706
+      },
+      "peak_committee_reserved_cal": 5800,
+      "peak_open_sampled": 52,
+      "cpu": {
+        "org0-member0": {
+          "cpu_s": 33.58,
+          "sample_span_s": 336.884358,
+          "peak_rss_mib": 918.578125,
+          "samples": 167
+        },
+        "org0-member1": {
+          "cpu_s": 33.54,
+          "sample_span_s": 336.884358,
+          "peak_rss_mib": 962.75,
+          "samples": 167
+        },
+        "org0-member2": {
+          "cpu_s": 33.75,
+          "sample_span_s": 336.884358,
+          "peak_rss_mib": 906.828125,
+          "samples": 167
+        },
+        "org0-member3": {
+          "cpu_s": 33.41,
+          "sample_span_s": 336.884358,
+          "peak_rss_mib": 999.90625,
+          "samples": 167
+        },
+        "gateway0": {
+          "cpu_s": 27.549999999999997,
+          "sample_span_s": 336.884358,
+          "peak_rss_mib": 115.328125,
+          "samples": 167
+        },
+        "committee0": {
+          "cpu_s": 76.87,
+          "sample_span_s": 336.884358,
+          "peak_rss_mib": 561.9375,
+          "samples": 167
+        },
+        "committee1": {
+          "cpu_s": 62.93,
+          "sample_span_s": 336.884358,
+          "peak_rss_mib": 485.765625,
+          "samples": 167
+        },
+        "committee2": {
+          "cpu_s": 63.0,
+          "sample_span_s": 336.884358,
+          "peak_rss_mib": 493.515625,
+          "samples": 167
+        },
+        "committee3": {
+          "cpu_s": 61.02,
+          "sample_span_s": 336.884358,
+          "peak_rss_mib": 470.171875,
+          "samples": 167
+        }
+      },
+      "cpu_total_s": 425.65,
+      "process_probe_errors": 0,
+      "repair_stages": {
+        "input_shares": {
+          "calls": 397,
+          "errors": 0,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 397,
+            "p50": 2.513917,
+            "p95": 13.955,
+            "max": 29.248208
+          }
+        },
+        "part_shares": {
+          "calls": 397,
+          "errors": 1,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 397,
+            "p50": 2.963667,
+            "p95": 14.468041,
+            "max": 57.356708
+          }
+        },
+        "submit": {
+          "calls": 396,
+          "errors": 52,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 396,
+            "p50": 0.019333,
+            "p95": 0.025917,
+            "max": 24.879
+          },
+          "command_bytes_once_per_repair": {
+            "n": 300,
+            "p50": 3579,
+            "p95": 3579,
+            "max": 3835
+          },
+          "command_bytes_total_unique": 1074468,
+          "command_bytes_all_attempts": 1418564,
+          "cached_duplicate_calls": 52,
+          "deadline_to_first_accepted_call_ms": {
+            "n": 300,
+            "p50": 811.372,
+            "p95": 865.16,
+            "max": 1321.957
+          }
+        },
+        "materialize": {
+          "calls": 1200,
+          "errors": 0,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 1200,
+            "p50": 7.26475,
+            "p95": 24.222666,
+            "max": 40.969958
+          }
+        }
+      },
+      "timing": {
+        "normal_parent_ready_to_final_observed_ms": {
+          "n": 5700,
+          "p50": 1605.521,
+          "p95": 1755.557,
+          "max": 1835.544
+        },
+        "normal_child_ready_to_final_observed_ms": {
+          "n": 5700,
+          "p50": 600.031,
+          "p95": 750.028,
+          "max": 2605.062
+        },
+        "exceptional_parent_ready_to_final_observed_ms": {
+          "n": 300,
+          "p50": 31932.588,
+          "p95": 32797.318,
+          "max": 33762.53
+        },
+        "exceptional_child_ready_to_final_observed_ms": {
+          "n": 300,
+          "p50": 605.038,
+          "p95": 750.011,
+          "max": 2605.105
+        }
+      },
+      "notes": [
+        "Stage durations are individual calls, including retries, not additive end-to-end latency.",
+        "CPU is whole-node sampled CPU, not isolated repair cryptography.",
+        "Open responsibility is sampled every 10 seconds; CAL usage every 0.5 seconds."
+      ]
+    }
+  },
+  {
+    "case": "r1-s59-p0",
+    "passed": true,
+    "checks": {
+      "all_offered_started": true,
+      "all_units_closed": true,
+      "no_driver_errors": true,
+      "all_selected_admitted": true,
+      "repair_count_matches_selected": true,
+      "physical_before_parent_and_child_already_final": true,
+      "committee_state_equal": true,
+      "gap_closed": true,
+      "all_public": true,
+      "cal_loss": true,
+      "no_organization_fuel": true,
+      "fee_conservation": true,
+      "owner_conservation": true,
+      "all_fees_closed": true,
+      "full_fee_formula": true
+    },
+    "offered_units": 6000,
+    "admitted_units": 6000,
+    "not_started": 0,
+    "closed_units": 6000,
+    "selected_exceptions": 0,
+    "actual_repairs": 0,
+    "actual_obligations": 6000,
+    "physical_complete": 0,
+    "cal_net_loss": 0,
+    "fee": {
+      "Maximum": 12000000,
+      "Held": 0,
+      "Rewards": 1008000,
+      "Burned": 120000,
+      "Refunded": 10872000
+    },
+    "timing": {
+      "normal_parent_fast_ms": {
+        "n": 6000,
+        "p50": 1.214,
+        "p95": 1.691,
+        "max": 561.265
+      },
+      "normal_child_fast_ms": {
+        "n": 6000,
+        "p50": 1.198,
+        "p95": 1.678,
+        "max": 546.121
+      },
+      "exceptional_parent_fast_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "exceptional_child_fast_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "deadline_to_first_commit_observed_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "deadline_to_all_physical_observed_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      }
+    },
+    "errors": [],
+    "unfinished_exceptions": [],
+    "probe_requests": 0,
+    "probe_errors": 0,
+    "elapsed_s": 301.949951,
+    "timing_note": "Local observation times include 250 ms polling, RPC and scheduling; no exact remote Commit latency claim.",
+    "extra": {
+      "case": "r1-s59-p0",
+      "additional_checks": {
+        "no_partial_approvals": true,
+        "each_payment_fee_matches_its_own_repair": true,
+        "each_selected_parent_has_repaired_obligation": true,
+        "no_member_transient_residual": true,
+        "all_wallet_refunds_final": true,
+        "no_committee_transient_residual": true,
+        "no_pending_public_outbox": true
+      },
+      "member_accounting": {
+        "org0-member0": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        },
+        "org0-member1": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        },
+        "org0-member2": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        },
+        "org0-member3": {
+          "temporary": 0,
+          "net_spent_cal": 0
+        }
+      },
+      "different_revised_blocks_by_node": {
+        "committee0": 0,
+        "committee1": 0,
+        "committee2": 0,
+        "committee3": 0
+      },
+      "minimum_sampled_member_available_cal": 33600,
+      "member_limit_counters": {
+        "org0-member0": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member2": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member3": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "repair_delay_by_arrival_window": [
+        {
+          "arrival_from_s": 0,
+          "arrival_to_s": 60,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 60,
+          "arrival_to_s": 120,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 120,
+          "arrival_to_s": 180,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 180,
+          "arrival_to_s": 240,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        {
+          "arrival_from_s": 240,
+          "arrival_to_s": 300,
+          "physical_delay_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        }
+      ],
+      "peak_pending_units_reconstructed": 46,
+      "start_lag_ms": {
+        "n": 6000,
+        "p50": 1.184,
+        "p95": 4.551,
+        "max": 5.066
+      },
+      "peak_committee_reserved_cal": 2800,
+      "peak_open_sampled": 20,
+      "cpu": {
+        "org0-member0": {
+          "cpu_s": 28.900000000000002,
+          "sample_span_s": 306.361088,
+          "peak_rss_mib": 902.609375,
+          "samples": 152
+        },
+        "org0-member1": {
+          "cpu_s": 28.89,
+          "sample_span_s": 306.361088,
+          "peak_rss_mib": 922.75,
+          "samples": 152
+        },
+        "org0-member2": {
+          "cpu_s": 28.87,
+          "sample_span_s": 306.361088,
+          "peak_rss_mib": 894.59375,
+          "samples": 152
+        },
+        "org0-member3": {
+          "cpu_s": 28.93,
+          "sample_span_s": 306.361088,
+          "peak_rss_mib": 902.0625,
+          "samples": 152
+        },
+        "gateway0": {
+          "cpu_s": 27.02,
+          "sample_span_s": 306.361088,
+          "peak_rss_mib": 115.328125,
+          "samples": 152
+        },
+        "committee0": {
+          "cpu_s": 61.16,
+          "sample_span_s": 306.361088,
+          "peak_rss_mib": 491.28125,
+          "samples": 152
+        },
+        "committee1": {
+          "cpu_s": 51.51,
+          "sample_span_s": 306.361088,
+          "peak_rss_mib": 422.65625,
+          "samples": 152
+        },
+        "committee2": {
+          "cpu_s": 51.05,
+          "sample_span_s": 306.361088,
+          "peak_rss_mib": 451.71875,
+          "samples": 152
+        },
+        "committee3": {
+          "cpu_s": 51.26,
+          "sample_span_s": 306.361088,
+          "peak_rss_mib": 432.125,
+          "samples": 152
+        }
+      },
+      "cpu_total_s": 357.59,
+      "process_probe_errors": 0,
+      "repair_stages": {
+        "input_shares": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "part_shares": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "submit": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "command_bytes_once_per_repair": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "command_bytes_total_unique": 0,
+          "command_bytes_all_attempts": 0,
+          "cached_duplicate_calls": 0,
+          "deadline_to_first_accepted_call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "materialize": {
+          "calls": 0,
+          "errors": 0,
+          "unique_repairs": 0,
+          "call_ms": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        }
+      },
+      "timing": {
+        "normal_parent_ready_to_final_observed_ms": {
+          "n": 6000,
+          "p50": 1585.71,
+          "p95": 1735.745,
+          "max": 1790.884
+        },
+        "normal_child_ready_to_final_observed_ms": {
+          "n": 6000,
+          "p50": 585.011,
+          "p95": 730.131,
+          "max": 800.076
+        },
+        "exceptional_parent_ready_to_final_observed_ms": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "max": null
+        },
+        "exceptional_child_ready_to_final_observed_ms": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "max": null
+        }
+      },
+      "notes": [
+        "Stage durations are individual calls, including retries, not additive end-to-end latency.",
+        "CPU is whole-node sampled CPU, not isolated repair cryptography.",
+        "Open responsibility is sampled every 10 seconds; CAL usage every 0.5 seconds."
+      ]
+    }
+  },
+  {
+    "case": "r1-s59-p1",
+    "passed": true,
+    "checks": {
+      "all_offered_started": true,
+      "all_units_closed": true,
+      "no_driver_errors": true,
+      "all_selected_admitted": true,
+      "repair_count_matches_selected": true,
+      "physical_before_parent_and_child_already_final": true,
+      "committee_state_equal": true,
+      "gap_closed": true,
+      "all_public": true,
+      "cal_loss": true,
+      "no_organization_fuel": true,
+      "fee_conservation": true,
+      "owner_conservation": true,
+      "all_fees_closed": true,
+      "full_fee_formula": true
+    },
+    "offered_units": 6000,
+    "admitted_units": 6000,
+    "not_started": 0,
+    "closed_units": 6000,
+    "selected_exceptions": 60,
+    "actual_repairs": 60,
+    "actual_obligations": 6000,
+    "physical_complete": 60,
+    "cal_net_loss": 6000,
+    "fee": {
+      "Maximum": 12000000,
+      "Held": 0,
+      "Rewards": 1008300,
+      "Burned": 120000,
+      "Refunded": 10871700
+    },
+    "timing": {
+      "normal_parent_fast_ms": {
+        "n": 5940,
+        "p50": 1.218,
+        "p95": 1.637,
+        "max": 543.535
+      },
+      "normal_child_fast_ms": {
+        "n": 5940,
+        "p50": 1.198,
+        "p95": 1.77,
+        "max": 257.015
+      },
+      "exceptional_parent_fast_ms": {
+        "n": 60,
+        "p50": 1.22,
+        "p95": 1.632,
+        "max": 319.971
+      },
+      "exceptional_child_fast_ms": {
+        "n": 60,
+        "p50": 1.199,
+        "p95": 1.989,
+        "max": 5.004
+      },
+      "deadline_to_first_commit_observed_ms": {
+        "n": 60,
+        "p50": 1253.253888,
+        "p95": 1504.544,
+        "max": 1506.178048
+      },
+      "deadline_to_all_physical_observed_ms": {
+        "n": 60,
+        "p50": 1507.619072,
+        "p95": 2010.90688,
+        "max": 2026.164992
+      }
+    },
+    "errors": [],
+    "unfinished_exceptions": [],
+    "probe_requests": 1959,
+    "probe_errors": 99,
+    "elapsed_s": 331.627679,
+    "timing_note": "Local observation times include 250 ms polling, RPC and scheduling; no exact remote Commit latency claim.",
+    "extra": {
+      "case": "r1-s59-p1",
+      "additional_checks": {
+        "no_partial_approvals": true,
+        "each_payment_fee_matches_its_own_repair": true,
+        "each_selected_parent_has_repaired_obligation": true,
+        "no_member_transient_residual": true,
+        "all_wallet_refunds_final": true,
+        "no_committee_transient_residual": true,
+        "no_pending_public_outbox": true
+      },
+      "member_accounting": {
+        "org0-member0": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        },
+        "org0-member1": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        },
+        "org0-member2": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        },
+        "org0-member3": {
+          "temporary": 0,
+          "net_spent_cal": 6000
+        }
+      },
+      "different_revised_blocks_by_node": {
+        "committee0": 60,
+        "committee1": 60,
+        "committee2": 60,
+        "committee3": 60
+      },
+      "minimum_sampled_member_available_cal": 28900,
+      "member_limit_counters": {
+        "org0-member0": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member2": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member3": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "repair_delay_by_arrival_window": [
+        {
+          "arrival_from_s": 0,
+          "arrival_to_s": 60,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1507.342,
+            "p95": 1508.858,
+            "max": 1509.663
+          }
+        },
+        {
+          "arrival_from_s": 60,
+          "arrival_to_s": 120,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1507.318,
+            "p95": 2006.615,
+            "max": 2007.967
+          }
+        },
+        {
+          "arrival_from_s": 120,
+          "arrival_to_s": 180,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1507.663,
+            "p95": 2006.625,
+            "max": 2007.799
+          }
+        },
+        {
+          "arrival_from_s": 180,
+          "arrival_to_s": 240,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1507.619,
+            "p95": 1507.917,
+            "max": 1508.156
+          }
+        },
+        {
+          "arrival_from_s": 240,
+          "arrival_to_s": 300,
+          "physical_delay_ms": {
+            "n": 12,
+            "p50": 1507.728,
+            "p95": 2012.661,
+            "max": 2026.165
+          }
+        }
+      ],
+      "peak_pending_units_reconstructed": 53,
+      "start_lag_ms": {
+        "n": 6000,
+        "p50": 1.227,
+        "p95": 2.195,
+        "max": 2.992
+      },
+      "peak_committee_reserved_cal": 3300,
+      "peak_open_sampled": 27,
+      "cpu": {
+        "org0-member0": {
+          "cpu_s": 31.740000000000002,
+          "sample_span_s": 334.8452,
+          "peak_rss_mib": 955.5,
+          "samples": 166
+        },
+        "org0-member1": {
+          "cpu_s": 31.450000000000003,
+          "sample_span_s": 334.8452,
+          "peak_rss_mib": 992.15625,
+          "samples": 166
+        },
+        "org0-member2": {
+          "cpu_s": 31.32,
+          "sample_span_s": 334.8452,
+          "peak_rss_mib": 961.03125,
+          "samples": 166
+        },
+        "org0-member3": {
+          "cpu_s": 31.060000000000002,
+          "sample_span_s": 334.8452,
+          "peak_rss_mib": 904.34375,
+          "samples": 166
+        },
+        "gateway0": {
+          "cpu_s": 27.34,
+          "sample_span_s": 334.8452,
+          "peak_rss_mib": 114.28125,
+          "samples": 166
+        },
+        "committee0": {
+          "cpu_s": 66.88,
+          "sample_span_s": 334.8452,
+          "peak_rss_mib": 562.875,
+          "samples": 166
+        },
+        "committee1": {
+          "cpu_s": 57.14,
+          "sample_span_s": 334.8452,
+          "peak_rss_mib": 452.515625,
+          "samples": 166
+        },
+        "committee2": {
+          "cpu_s": 56.989999999999995,
+          "sample_span_s": 334.8452,
+          "peak_rss_mib": 444.6875,
+          "samples": 166
+        },
+        "committee3": {
+          "cpu_s": 57.339999999999996,
+          "sample_span_s": 334.8452,
+          "peak_rss_mib": 450.015625,
+          "samples": 166
+        }
+      },
+      "cpu_total_s": 391.26,
+      "process_probe_errors": 0,
+      "repair_stages": {
+        "input_shares": {
+          "calls": 65,
+          "errors": 0,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 65,
+            "p50": 2.839208,
+            "p95": 3.740541,
+            "max": 15.945666
+          }
+        },
+        "part_shares": {
+          "calls": 65,
+          "errors": 0,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 65,
+            "p50": 2.954792,
+            "p95": 4.235041,
+            "max": 26.323375
+          }
+        },
+        "submit": {
+          "calls": 65,
+          "errors": 5,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 65,
+            "p50": 0.020459,
+            "p95": 0.0265,
+            "max": 4.94475
+          },
+          "command_bytes_once_per_repair": {
+            "n": 60,
+            "p50": 3579,
+            "p95": 3579,
+            "max": 3579
+          },
+          "command_bytes_total_unique": 214740,
+          "command_bytes_all_attempts": 232635,
+          "cached_duplicate_calls": 5,
+          "deadline_to_first_accepted_call_ms": {
+            "n": 60,
+            "p50": 840.708,
+            "p95": 1341.199,
+            "max": 1341.616
+          }
+        },
+        "materialize": {
+          "calls": 240,
+          "errors": 0,
+          "unique_repairs": 60,
+          "call_ms": {
+            "n": 240,
+            "p50": 4.643583,
+            "p95": 22.726125,
+            "max": 35.181166
+          }
+        }
+      },
+      "timing": {
+        "normal_parent_ready_to_final_observed_ms": {
+          "n": 5940,
+          "p50": 1590.627,
+          "p95": 1735.857,
+          "max": 1805.607
+        },
+        "normal_child_ready_to_final_observed_ms": {
+          "n": 5940,
+          "p50": 595.169,
+          "p95": 730.21,
+          "max": 785.034
+        },
+        "exceptional_parent_ready_to_final_observed_ms": {
+          "n": 60,
+          "p50": 31907.859,
+          "p95": 32385.06,
+          "max": 32557.71
+        },
+        "exceptional_child_ready_to_final_observed_ms": {
+          "n": 60,
+          "p50": 605.066,
+          "p95": 725.083,
+          "max": 755.198
+        }
+      },
+      "notes": [
+        "Stage durations are individual calls, including retries, not additive end-to-end latency.",
+        "CPU is whole-node sampled CPU, not isolated repair cryptography.",
+        "Open responsibility is sampled every 10 seconds; CAL usage every 0.5 seconds."
+      ]
+    }
+  },
+  {
+    "case": "r1-s59-p5",
+    "passed": true,
+    "checks": {
+      "all_offered_started": true,
+      "all_units_closed": true,
+      "no_driver_errors": true,
+      "all_selected_admitted": true,
+      "repair_count_matches_selected": true,
+      "physical_before_parent_and_child_already_final": true,
+      "committee_state_equal": true,
+      "gap_closed": true,
+      "all_public": true,
+      "cal_loss": true,
+      "no_organization_fuel": true,
+      "fee_conservation": true,
+      "owner_conservation": true,
+      "all_fees_closed": true,
+      "full_fee_formula": true
+    },
+    "offered_units": 6000,
+    "admitted_units": 6000,
+    "not_started": 0,
+    "closed_units": 6000,
+    "selected_exceptions": 300,
+    "actual_repairs": 300,
+    "actual_obligations": 6000,
+    "physical_complete": 300,
+    "cal_net_loss": 30000,
+    "fee": {
+      "Maximum": 12000000,
+      "Held": 0,
+      "Rewards": 1009500,
+      "Burned": 120000,
+      "Refunded": 10870500
+    },
+    "timing": {
+      "normal_parent_fast_ms": {
+        "n": 5700,
+        "p50": 1.212,
+        "p95": 1.647,
+        "max": 563.366
+      },
+      "normal_child_fast_ms": {
+        "n": 5700,
+        "p50": 1.201,
+        "p95": 1.685,
+        "max": 24.521
+      },
+      "exceptional_parent_fast_ms": {
+        "n": 300,
+        "p50": 1.209,
+        "p95": 1.614,
+        "max": 513.844
+      },
+      "exceptional_child_fast_ms": {
+        "n": 300,
+        "p50": 1.203,
+        "p95": 1.546,
+        "max": 17.434
+      },
+      "deadline_to_first_commit_observed_ms": {
+        "n": 300,
+        "p50": 1253.017088,
+        "p95": 1754.418944,
+        "max": 2255.817984
+      },
+      "deadline_to_all_physical_observed_ms": {
+        "n": 300,
+        "p50": 1507.877888,
+        "p95": 2009.893888,
+        "max": 2519.275008
+      }
+    },
+    "errors": [],
+    "unfinished_exceptions": [],
+    "probe_requests": 9528,
+    "probe_errors": 472,
+    "elapsed_s": 332.312391,
+    "timing_note": "Local observation times include 250 ms polling, RPC and scheduling; no exact remote Commit latency claim.",
+    "extra": {
+      "case": "r1-s59-p5",
+      "additional_checks": {
+        "no_partial_approvals": true,
+        "each_payment_fee_matches_its_own_repair": true,
+        "each_selected_parent_has_repaired_obligation": true,
+        "no_member_transient_residual": true,
+        "all_wallet_refunds_final": true,
+        "no_committee_transient_residual": true,
+        "no_pending_public_outbox": true
+      },
+      "member_accounting": {
+        "org0-member0": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        },
+        "org0-member1": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        },
+        "org0-member2": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        },
+        "org0-member3": {
+          "temporary": 0,
+          "net_spent_cal": 30000
+        }
+      },
+      "different_revised_blocks_by_node": {
+        "committee0": 258,
+        "committee1": 258,
+        "committee2": 258,
+        "committee3": 258
+      },
+      "minimum_sampled_member_available_cal": 5400,
+      "member_limit_counters": {
+        "org0-member0": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member2": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "org0-member3": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "repair_delay_by_arrival_window": [
+        {
+          "arrival_from_s": 0,
+          "arrival_to_s": 60,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1507.532,
+            "p95": 2009.233,
+            "max": 2508.897
+          }
+        },
+        {
+          "arrival_from_s": 60,
+          "arrival_to_s": 120,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1507.742,
+            "p95": 2009.489,
+            "max": 2510.502
+          }
+        },
+        {
+          "arrival_from_s": 120,
+          "arrival_to_s": 180,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1507.606,
+            "p95": 2009.183,
+            "max": 2510.606
+          }
+        },
+        {
+          "arrival_from_s": 180,
+          "arrival_to_s": 240,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1507.945,
+            "p95": 2011.309,
+            "max": 2508.422
+          }
+        },
+        {
+          "arrival_from_s": 240,
+          "arrival_to_s": 300,
+          "physical_delay_ms": {
+            "n": 60,
+            "p50": 1508.655,
+            "p95": 2010.036,
+            "max": 2519.275
+          }
+        }
+      ],
+      "peak_pending_units_reconstructed": 77,
+      "start_lag_ms": {
+        "n": 6000,
+        "p50": 1.156,
+        "p95": 2.086,
+        "max": 3.073
+      },
+      "peak_committee_reserved_cal": 5800,
+      "peak_open_sampled": 52,
+      "cpu": {
+        "org0-member0": {
+          "cpu_s": 33.53,
+          "sample_span_s": 336.886129,
+          "peak_rss_mib": 984.609375,
+          "samples": 167
+        },
+        "org0-member1": {
+          "cpu_s": 33.7,
+          "sample_span_s": 336.886129,
+          "peak_rss_mib": 853.484375,
+          "samples": 167
+        },
+        "org0-member2": {
+          "cpu_s": 33.72,
+          "sample_span_s": 336.886129,
+          "peak_rss_mib": 988.5,
+          "samples": 167
+        },
+        "org0-member3": {
+          "cpu_s": 33.65,
+          "sample_span_s": 336.886129,
+          "peak_rss_mib": 934.8125,
+          "samples": 167
+        },
+        "gateway0": {
+          "cpu_s": 27.6,
+          "sample_span_s": 336.886129,
+          "peak_rss_mib": 114.625,
+          "samples": 167
+        },
+        "committee0": {
+          "cpu_s": 74.0,
+          "sample_span_s": 336.886129,
+          "peak_rss_mib": 565.40625,
+          "samples": 167
+        },
+        "committee1": {
+          "cpu_s": 57.43,
+          "sample_span_s": 336.886129,
+          "peak_rss_mib": 486.90625,
+          "samples": 167
+        },
+        "committee2": {
+          "cpu_s": 59.57,
+          "sample_span_s": 336.886129,
+          "peak_rss_mib": 482.5,
+          "samples": 167
+        },
+        "committee3": {
+          "cpu_s": 61.1,
+          "sample_span_s": 336.886129,
+          "peak_rss_mib": 495.421875,
+          "samples": 167
+        }
+      },
+      "cpu_total_s": 414.3,
+      "process_probe_errors": 0,
+      "repair_stages": {
+        "input_shares": {
+          "calls": 415,
+          "errors": 2,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 415,
+            "p50": 2.51875,
+            "p95": 8.75925,
+            "max": 29.435208
+          }
+        },
+        "part_shares": {
+          "calls": 413,
+          "errors": 1,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 413,
+            "p50": 2.9605,
+            "p95": 4.153458,
+            "max": 25.170708
+          }
+        },
+        "submit": {
+          "calls": 412,
+          "errors": 68,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 412,
+            "p50": 0.01925,
+            "p95": 0.025625,
+            "max": 18.045416
+          },
+          "command_bytes_once_per_repair": {
+            "n": 300,
+            "p50": 3579,
+            "p95": 3579,
+            "max": 3835
+          },
+          "command_bytes_total_unique": 1074468,
+          "command_bytes_all_attempts": 1476084,
+          "cached_duplicate_calls": 68,
+          "deadline_to_first_accepted_call_ms": {
+            "n": 300,
+            "p50": 714.111,
+            "p95": 1171.186,
+            "max": 1192.0
+          }
+        },
+        "materialize": {
+          "calls": 1200,
+          "errors": 0,
+          "unique_repairs": 300,
+          "call_ms": {
+            "n": 1200,
+            "p50": 6.985958,
+            "p95": 23.168917,
+            "max": 39.729708
+          }
+        }
+      },
+      "timing": {
+        "normal_parent_ready_to_final_observed_ms": {
+          "n": 5700,
+          "p50": 1605.531,
+          "p95": 1755.564,
+          "max": 1815.598
+        },
+        "normal_child_ready_to_final_observed_ms": {
+          "n": 5700,
+          "p50": 600.033,
+          "p95": 750.03,
+          "max": 810.031
+        },
+        "exceptional_parent_ready_to_final_observed_ms": {
+          "n": 300,
+          "p50": 31928.413,
+          "p95": 32666.416,
+          "max": 33358.424
+        },
+        "exceptional_child_ready_to_final_observed_ms": {
+          "n": 300,
+          "p50": 575.051,
+          "p95": 735.048,
+          "max": 775.048
+        }
+      },
+      "notes": [
+        "Stage durations are individual calls, including retries, not additive end-to-end latency.",
+        "CPU is whole-node sampled CPU, not isolated repair cryptography.",
+        "Open responsibility is sampled every 10 seconds; CAL usage every 0.5 seconds."
+      ]
+    }
+  }
+]
