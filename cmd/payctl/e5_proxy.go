@@ -164,6 +164,7 @@ func (p *e5Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
 	resp.Body.Close()
+	upstreamComplete := time.Now().UnixNano()
 	if err != nil {
 		http.Error(w, err.Error(), 502)
 		return
@@ -215,7 +216,7 @@ func (p *e5Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		p.mu.Lock()
 		if p.times[key].QCNS == 0 {
-			p.times[key].QCNS = time.Now().UnixNano()
+			p.times[key].QCNS = upstreamComplete
 		}
 		p.mu.Unlock()
 		if p.mode == "B" {

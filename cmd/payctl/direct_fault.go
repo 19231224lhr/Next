@@ -257,6 +257,9 @@ func runFaultLoad(dir string, lab cfg.Lab, n cfg.Network, count int, rate float6
 	}
 	start := time.Now()
 	report.StartedNS = start.UnixNano()
+	for i := range report.Samples {
+		report.Samples[i].ScheduledNS = start.Add(time.Duration(float64(i) / rate * float64(time.Second))).UnixNano()
+	}
 	if err = cfg.Write(filepath.Join(dir, "reports", "fault-start.json"), map[string]any{"StartedNS": report.StartedNS, "Count": count, "Rate": rate}); err != nil {
 		return err
 	}
