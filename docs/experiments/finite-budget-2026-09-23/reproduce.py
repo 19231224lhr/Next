@@ -78,16 +78,17 @@ def sample(lab, dest, stop, probe=False):
             log.flush();stop.wait(max(0,interval-(time.monotonic()-now)))
 
 
-def run_case(label, duration=300, delay=1, kind=None, grant=None, count=0, late=False, replay=False, gateway_parent=False, serial=False):
+def run_case(label, duration=300, delay=1, kind=None, grant=None, count=0, late=False, replay=False, gateway_parent=False, serial=False, drain=60, disk=False):
     dest,runtime,lab,network=configure(label,count,kind,grant)
     node_env=dict(ENV)
     node_env['UTXO_EXPERIMENT_SERIAL_DIRECT']='1' if serial else '0'
-    if replay:
+    disk = disk or replay
+    if disk:
         # Two-payment correctness controls retain actual revised blocks for the
         # existing stopped-history audit. The turnover matrix stays in memory.
         node_env['UTXO_EXPERIMENT_MEM_BLOCKSTORE']='0'
         node_env['UTXO_EXPERIMENT_COMMITTEE_MEMORY']='0'
-    write(dest/'configuration.json',{'duration_s':duration,'delay_s':delay,'kind':kind,'grant':grant,'rate_units_s':20,'count':count,'pending_units':128,'workers_per_member':1,'drain_s':60,'blockstore_memory':not replay,'gateway_parent':gateway_parent,'serial_signing':serial,'binaries':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in BIN.iterdir()}})
+    write(dest/'configuration.json',{'duration_s':duration,'delay_s':delay,'kind':kind,'grant':grant,'rate_units_s':20,'count':count,'pending_units':128,'workers_per_member':1,'drain_s':drain,'blockstore_memory':not disk,'gateway_parent':gateway_parent,'serial_signing':serial,'binaries':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in BIN.iterdir()}})
     stop=threading.Event();sampler=None
     with (dest/'nodes.log').open('w') as log:
         process=subprocess.Popen([str(BIN/'payctl'),'lab-run','-dir',str(runtime),'-bin',str(BIN)],cwd=ROOT,env=node_env,stdout=log,stderr=subprocess.STDOUT)
@@ -105,7 +106,7 @@ def run_case(label, duration=300, delay=1, kind=None, grant=None, count=0, late=
             sampler=threading.Thread(target=sample,args=(lab,dest,stop,count==1));sampler.start()
             time.sleep(.2)
             with (dest/'driver.log').open('w') as driver:
-                args=[BIN/'payctl','budget-v4','-dir',runtime,'-duration',str(duration)+'s','-parent-delay',str(delay)+'s','-count',count,'-pending',128]
+                args=[BIN/'payctl','budget-v4','-dir',runtime,'-duration',str(duration)+'s','-parent-delay',str(delay)+'s','-count',count,'-pending',128,'-drain',str(drain)+'s']
                 if gateway_parent:args+=['-gateway-parent']
                 if late:args+=['-late-parent']
                 if replay:args+=['-replay']
@@ -138,6 +139,7 @@ def run_case(label, duration=300, delay=1, kind=None, grant=None, count=0, late=
     # a false early-publication assertion.
     assert all(u['FirstSubmitUnixNS']==0 or u['FirstSubmitDelayNS']>=int(delay*1e9) for u in report['Units'])
     if count==1:
+        late = late or report['Units'][0].get('RepairExpected', False)
         samples=[json.loads(line) for line in (dest/'samples.jsonl').read_text().splitlines()]
         public=[r['snapshot'] for r in samples if r['node']=='committee0' and 'snapshot' in r]
         assert max(r['Usage']['Reserved'] for s in public for r in s['Resources'] if r['Key']['Kind']==1)==100,'no real CAL registration'

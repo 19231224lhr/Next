@@ -52,6 +52,16 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 	}
 	blocks := node.BlockStore()
 	client := local.New(node)
+	trace := func(stage string, id protocol.Hash, started time.Time, err error, extra ...any) {
+		if os.Getenv("UTXO_SETTLEMENT_TRACE") != "1" {
+			return
+		}
+		fields := []any{"node", c.Index, "repair", id.String(), "stage", stage, "unix_ns", time.Now().UnixNano(), "duration_ns", time.Since(started).Nanoseconds()}
+		if err != nil {
+			fields = append(fields, "error", err.Error())
+		}
+		slog.Info("repair_trace", append(fields, extra...)...)
+	}
 	head := func() (int64, int64) {
 		info, err := app.Info(context.Background(), &abci.RequestInfo{})
 		if err != nil || info.LastBlockHeight == 0 {
@@ -116,6 +126,25 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 	}
 	mux.HandleFunc("POST /v3/repair/input-share", handler(false))
 	mux.HandleFunc("POST /v3/repair/part-shares", handler(true))
+	mux.HandleFunc("GET /v3/repairs/{output}/status", func(w http.ResponseWriter, r *http.Request) {
+		var id protocol.Hash
+		if id.UnmarshalText([]byte(r.PathValue("output"))) != nil {
+			http.Error(w, "INVALID_OUTPUT", 400)
+			return
+		}
+		var status redaction.Observation
+		err := db.View(func(v state.ReadView) error {
+			var err error
+			status, err = redaction.Observe(v, blocks, protocol.RepairIdentity(n.Genesis.Network, protocol.OutputID(id)))
+			return err
+		})
+		if err != nil {
+			http.Error(w, "OBSERVATION_FAILED", 500)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(status)
+	})
 	mux.HandleFunc("GET /v3/obligations/{output}", func(w http.ResponseWriter, r *http.Request) {
 		var id protocol.Hash
 		if id.UnmarshalText([]byte(r.PathValue("output"))) != nil {
@@ -243,7 +272,9 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 					if json.Unmarshal(entry.Value, &id) != nil {
 						break
 					}
+					started := time.Now()
 					err = db.View(func(v state.ReadView) error { return redaction.Materialize(v, blocks, id) })
+					trace("materialize", id, started, err)
 					if err != nil {
 						slog.Error("repair materialization", "error", err)
 						break
@@ -284,7 +315,10 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 					if err != nil {
 						continue
 					}
+					id := protocol.RepairIdentity(n.Genesis.Network, ob.Output)
+					started := time.Now()
 					inputVotes, err := collect(ctx, "/v3/repair/input-share", command)
+					trace("input_shares", id, started, err, "output", protocol.Hash(ob.Output).String(), "deadline", ob.Deadline)
 					if err != nil {
 						continue
 					}
@@ -298,7 +332,9 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 					if err != nil {
 						continue
 					}
+					started = time.Now()
 					partVotes, err := collect(ctx, "/v3/repair/part-shares", command)
+					trace("part_shares", id, started, err)
 					if err != nil {
 						continue
 					}
@@ -314,7 +350,13 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 					if err != nil {
 						continue
 					}
-					_, _ = client.BroadcastTxSync(ctx, types.Tx(raw))
+					started = time.Now()
+					response, err := client.BroadcastTxSync(ctx, types.Tx(raw))
+					code := uint32(0)
+					if response != nil {
+						code = response.Code
+					}
+					trace("submit", id, started, err, "code", code, "bytes", len(raw), "target_height", command.Height, "base_revision", command.Base)
 				}
 			}
 		}

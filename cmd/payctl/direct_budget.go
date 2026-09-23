@@ -26,6 +26,9 @@ import (
 )
 
 type budgetUnit struct {
+	RepairExpected                       bool
+	ParentFinalInstance                  uint8
+	Repair                               *repairTrial `json:",omitempty"`
 	ParentFee, ChildFee                  protocol.OutputID
 	Index                                int
 	PlannedUnixNS, StartedUnixNS         int64
@@ -38,6 +41,9 @@ type budgetUnit struct {
 	ParentFailures, ChildFailures        map[string]int
 }
 type budgetReport struct {
+	RepairPercent                             int
+	RepairSeed                                int64
+	RepairSelected                            []int `json:",omitempty"`
 	OwnerFuel                                 bool
 	StartedUnixNS, StoppedUnixNS              int64
 	DurationSeconds, DelaySeconds             float64
@@ -119,11 +125,16 @@ func budgetDirect(args []string) error {
 	gatewayParent := f.Bool("gateway-parent", false, "obtain parent QC through the same gateway without public delivery")
 	late := f.Bool("late-parent", false, "fee audit: observe late parent output instance one")
 	replay := f.Bool("replay", false, "fee audit: replay the identical completed child three times")
+	repairPercent := f.Int("repair-percent", -1, "E3: percent withheld until all four physical repairs; -1 disables")
+	repairSeed := f.Int64("repair-seed", 23, "E3: deterministic nested anomaly selection")
 	if e := f.Parse(args); e != nil {
 		return e
 	}
 	if *dir == "" || *duration <= 0 || *delay < 0 || *drain <= 0 || *rate < 1 || *rate > 100 || *pending < 1 || *pending > 256 || *count < 0 || *nextRate < 0 || *nextRate > 100 {
 		return protocol.ErrRule
+	}
+	if *repairPercent < -1 || *repairPercent > 100 || (*repairPercent >= 0 && (*late || !*ownerFuel || !*gatewayParent || *reserveMax != 0)) {
+		return fmt.Errorf("E3 requires user FUEL, gateway-parent, fixed budget and no late-parent timer")
 	}
 	var lab cfg.Lab
 	var n cfg.Network
@@ -240,8 +251,24 @@ func budgetDirect(args []string) error {
 		return e
 	}
 	report := budgetReport{OwnerFuel: *ownerFuel, StartedUnixNS: start.UnixNano(), DurationSeconds: duration.Seconds(), DelaySeconds: delay.Seconds(), Offered: total, MaxPending: *pending}
+	report.RepairPercent, report.RepairSeed = *repairPercent, *repairSeed
+	selected := repairSelection(total, max(0, *repairPercent), *repairSeed)
+	for i, yes := range selected {
+		if yes {
+			report.RepairSelected = append(report.RepairSelected, i)
+		}
+	}
 	if *late {
 		report.ParentFinalInstance = 1
+	}
+	if *repairPercent >= 0 {
+		if err := cfg.Write(filepath.Join(*dir, "reports", "repair-selection.json"), struct {
+			Offered, Percent int
+			Seed             int64
+			Selected         []int
+		}{total, *repairPercent, *repairSeed, report.RepairSelected}); err != nil {
+			return err
+		}
 	}
 	monitor := new(reserveMonitor)
 	if *reserveMax > 0 {
@@ -285,6 +312,12 @@ func budgetDirect(args []string) error {
 			continue
 		}
 		u := &budgetUnit{Index: index, PlannedUnixNS: planned.UnixNano(), StartedUnixNS: time.Now().UnixNano(), ParentFailures: map[string]int{}, ChildFailures: map[string]int{}}
+		u.ParentFinalInstance = report.ParentFinalInstance
+		if selected[index] {
+			u.RepairExpected = true
+			u.ParentFinalInstance = 1
+			u.Repair = new(repairTrial)
+		}
 		report.Units = append(report.Units, u)
 		wg.Add(1)
 		go func(origin state.OriginOutput, u *budgetUnit) {
@@ -355,6 +388,13 @@ func budgetDirect(args []string) error {
 			background.Add(1)
 			go func() {
 				defer background.Done()
+				if u.RepairExpected {
+					if err := waitRepair(ctx, client, n.CommitteeURLs[:], u.Parent.Output, u.Repair); err != nil {
+						u.SubmitError = "parent withheld: " + err.Error()
+						return
+					}
+					u.ReleaseAtUnixNS = time.Now().UnixNano()
+				}
 				err := budgetRelease(ctx, ready.Add(*delay), func(ctx context.Context) error { return public.Submit(ctx, raw) }, func() {
 					u.SubmitAttempts++
 					if u.FirstSubmitUnixNS == 0 {
@@ -374,7 +414,7 @@ func budgetDirect(args []string) error {
 				go func() {
 					defer close(retryDone)
 					for budgetPause(retryCtx, 2*time.Second) == nil {
-						final, _ := wallets[1].DirectFinal(u.Parent.Output, report.ParentFinalInstance)
+						final, _ := wallets[1].DirectFinal(u.Parent.Output, u.ParentFinalInstance)
 						if final {
 							return
 						}
@@ -382,7 +422,7 @@ func budgetDirect(args []string) error {
 						_ = public.Submit(retryCtx, raw)
 					}
 				}()
-				if err = observeChainHop(ctx, batches, wallets[1], &u.Parent, start, make(chan struct{}), report.ParentFinalInstance); err != nil {
+				if err = observeChainHop(ctx, batches, wallets[1], &u.Parent, start, make(chan struct{}), u.ParentFinalInstance); err != nil {
 					u.ParentError = err.Error()
 				}
 				stopRetry()

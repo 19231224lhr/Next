@@ -252,11 +252,81 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	parentRaw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).Submission().MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, repairFirst := range []bool{false, true} {
+		name := "same-block-parent-first"
+		if repairFirst {
+			name = "same-block-repair-first"
+		}
+		t.Run(name, func(t *testing.T) {
+			forkDB, fork, _ := newApp(true)
+			defer forkDB.Close()
+			for height := int64(1); height <= 2; height++ {
+				original, err := blocks.LoadOriginalBlock(height)
+				if err != nil {
+					t.Fatal(err)
+				}
+				execute(fork, original)
+			}
+			txs := [][]byte{parentRaw, repairRaw}
+			if repairFirst {
+				txs = [][]byte{repairRaw, parentRaw}
+			}
+			hash := protocol.Digest("E3-ORDER", []byte(name))
+			result, err := fork.FinalizeBlock(ctx, &abci.RequestFinalizeBlock{Height: 3, Hash: hash[:], Time: time.Unix(1700000033, 0), Txs: txs})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.TxResults[0].Code != 0 || (result.TxResults[1].Code == 0) != repairFirst {
+				t.Fatalf("wrong order result: %+v", result.TxResults)
+			}
+			if _, err := fork.Commit(ctx, &abci.RequestCommit{}); err != nil {
+				t.Fatal(err)
+			}
+			if err := forkDB.View(func(v state.ReadView) error {
+				ob, _, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(output))
+				if err != nil {
+					return err
+				}
+				balance, _, err := state.Load[uint64](v, rules.AccountKey(f.Org.Org, protocol.AssetCAL))
+				wantStatus, wantBalance := uint8(rules.DirectFulfilled), uint64(1000000000)
+				if repairFirst {
+					wantStatus, wantBalance = rules.DirectRepaired, 999999900
+				}
+				if ob.Status != wantStatus || balance != wantBalance {
+					t.Fatalf("order changed accounting: status=%d balance=%d", ob.Status, balance)
+				}
+				return err
+			}); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 	appendBlock(3, 1700000033, repairRaw)
+	checkObserved := func(materialized bool) {
+		t.Helper()
+		if err := db.View(func(v state.ReadView) error {
+			s, err := redaction.Observe(v, blocks, repairID)
+			if err != nil {
+				return err
+			}
+			if !s.Committed || s.Materialized != materialized || !s.IdentityStable || s.BytesChanged != materialized || s.CommitHeight != 3 || s.TargetHeight != 1 {
+				t.Fatalf("incorrect repair observation: %+v", s)
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	checkObserved(false)
 	for i := 0; i < 2; i++ {
 		if err = db.View(func(v state.ReadView) error { return redaction.Materialize(v, blocks, repairID) }); err != nil {
 			t.Fatal(err)
 		}
+		checkObserved(true)
 	}
 	revised := blocks.LoadBlock(1)
 	if bytes.Equal(revised.Data.Txs[0], first.Data.Txs[0]) || !bytes.Equal(revised.Hash(), first.Hash()) {
@@ -297,10 +367,6 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 			}
 		}
 	})
-	parentRaw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).Submission().MarshalBinary()
-	if err != nil {
-		t.Fatal(err)
-	}
 	appendBlock(4, 1700000034, parentRaw)
 	var late state.Creation
 	err = db.View(func(v state.ReadView) error {

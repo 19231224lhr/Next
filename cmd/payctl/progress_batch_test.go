@@ -96,6 +96,9 @@ func TestProgressBatchIndividualCancellation(t *testing.T) {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
+		// Give the simulated HTTP operation a measurable duration on platforms
+		// whose clock can report zero for an immediately returning mock.
+		time.Sleep(time.Millisecond)
 		out := make([]member.DirectStatus, len(fs))
 		for i, f := range fs {
 			out[i].Height = int64(f[0])
@@ -123,6 +126,6 @@ func TestProgressBatchIndividualCancellation(t *testing.T) {
 		t.Fatal("canceled observer blocked batcher")
 	}
 	if b.httpNS.Load() == 0 || b.queueNS.Load() == 0 {
-		t.Fatal("missing separate timing")
+		t.Fatalf("missing separate timing: http=%d queue=%d", b.httpNS.Load(), b.queueNS.Load())
 	}
 }

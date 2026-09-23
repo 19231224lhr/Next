@@ -187,7 +187,7 @@ bin/payctl audit -dir experiments/local-v4
 | [原 E2：组织代付](docs/experiments/finite-budget-2026-09-23/README.md) | 原代付配置的预算阻塞与费用审计，保留历史数据 |
 | [E2：用户自付 FUEL](docs/experiments/owner-fuel-2026-09-23/README.md) | 用户费用充足、无组织代付时，CAL 与工作权限的周转 |
 | [E2：CAL 动态补资](docs/experiments/adaptive-reserve-2026-09-23/README.md) | 有限补资能否支持恒定、阶跃及责任延迟下的并行周转 |
-| [E3：赔付与历史修订方案](docs/research/e3-liability-repair-experiment-design-2026-09-23.md) | 待执行：直接责任归属、异常赔付、历史输入修订及混合负载成本 |
+| [E3：赔付与历史修订](docs/experiments/liability-repair-2026-09-23/README.md) | 核心驱动与本地验证已完成；Mac 网络实验待运行，尚无正式结论 |
 | [单组织整体 TPS](docs/experiments/single-org-tps-2026-09-22/README.md) | 快速签发、公共结算与成员收尾的完整系统吞吐 |
 | [四委员共识容量](docs/experiments/consensus-capacity-2026-09-22/README.md) | 独立测量委员会工作点、过载边界及资源开销 |
 | [完整路径优化](docs/experiments/full-path-opt-2026-09-22/README.md) | 成员内存模式、钱包保存及全流程阶段测量 |
