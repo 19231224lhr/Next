@@ -34,10 +34,10 @@ type e5ProxyConfig struct {
 	Members [4]string
 }
 type e5Timing struct {
-	Tx                            protocol.TxID
-	RegisteredNS, QCNS, ReleaseNS int64
-	Attempts                      int
-	InstallCalls, AlreadyObserved [4]int
+	Tx                                        protocol.TxID
+	RegisteredNS, QCNS, EligibleNS, ReleaseNS int64
+	Attempts                                  int
+	InstallCalls, AlreadyObserved             [4]int
 }
 type e5Proxy struct {
 	gate    *e5Gate
@@ -217,6 +217,9 @@ func (p *e5Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.mu.Lock()
 		if p.times[key].QCNS == 0 {
 			p.times[key].QCNS = upstreamComplete
+		}
+		if p.times[key].EligibleNS == 0 {
+			p.times[key].EligibleNS = time.Now().UnixNano()
 		}
 		p.mu.Unlock()
 		if p.mode == "B" {

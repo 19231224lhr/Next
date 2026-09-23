@@ -129,7 +129,9 @@ def run_case(label,mode,rate,count,seed=23,warm=100,window=0,chain=False):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--suite',choices=['smoke','calibration','formal','chain'],default='smoke');p.add_argument('--skip-build',action='store_true');p.add_argument('--prefix',default='v1-');a=p.parse_args()
-    if not a.skip_build:build()
+    current=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+    built=json.loads((OUT/'build.json').read_text()).get('commit') if (OUT/'build.json').exists() else None
+    if not a.skip_build or built!=current:build()
     if a.suite=='smoke':
         for mode in ['A','B']:run_case(a.prefix+'smoke-'+mode,mode,20,20,warm=5)
     elif a.suite=='calibration':
