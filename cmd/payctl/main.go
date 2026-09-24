@@ -12,6 +12,12 @@ func main() {
 	}
 	var err error
 	switch os.Args[1] {
+	case "e7":
+		err = e7Command(os.Args[2:])
+	case "e7-wallet":
+		err = e7WalletCommand(os.Args[2:])
+	case "e7-proxy":
+		err = e7ProxyCommand(os.Args[2:])
 	case "e8":
 		err = e8Command(os.Args[2:])
 	case "init-lab":
