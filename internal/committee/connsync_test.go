@@ -1,3 +1,5 @@
+//go:build comet_v3
+
 package committee
 
 import (
