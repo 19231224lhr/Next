@@ -30,6 +30,11 @@ type e8Options struct {
 	Seed                                    int
 }
 type e8Fixture struct{ Wallets, Capacity, Seed int }
+
+type e8Durations struct {
+	BuildNS, ScheduleLagNS, ResponseNS, WalletNS, FastNS, PublicNS int64
+	MemberNS                                                       [4]int64
+}
 type e8Sample struct {
 	Index, Lane, Hop, Sender, Receiver, Parent                          int
 	Input, Fee, Output                                                  protocol.OutputID
@@ -41,7 +46,20 @@ type e8Sample struct {
 	Missing                                                             int
 	RequestBytes, CertificateBytes, Attempts                            int
 	Error                                                               string `json:",omitempty"`
+	Monotonic                                                           e8Durations
+	sentAt                                                              time.Time
 }
+
+func (s *e8Sample) observePublic(now time.Time) {
+	s.PublicNS = now.UnixNano()
+	s.Monotonic.PublicNS = int64(now.Sub(s.sentAt))
+}
+
+func (s *e8Sample) observeMember(replica int, now time.Time) {
+	s.MemberNS[replica] = now.UnixNano()
+	s.Monotonic.MemberNS[replica] = int64(now.Sub(s.sentAt))
+}
+
 type e8Report struct {
 	Options                                                    e8Options
 	StartedNS, EndSendNS, FinishedNS                           int64
@@ -49,6 +67,7 @@ type e8Report struct {
 	Samples                                                    []*e8Sample
 	Descriptor                                                 protocol.DescriptorCounters
 	ProgressErrors                                             int
+	TimingVersion                                              int
 }
 
 func e8NextSlot(due, now time.Time, interval time.Duration) (time.Time, int) {
@@ -185,10 +204,11 @@ func e8RootOwner(chain bool, lane e8Lane, recipient, wallets int) int {
 }
 
 type e8Job struct {
-	s      *e8Sample
-	lane   e8Lane
-	fee    state.OriginOutput
-	origin *state.OriginOutput
+	s         *e8Sample
+	lane      e8Lane
+	fee       state.OriginOutput
+	origin    *state.OriginOutput
+	scheduled time.Time
 }
 
 func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
@@ -326,7 +346,7 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 					} else {
 						for i, s := range batch {
 							if statuses[i].Observed && (!statuses[i].Signed || statuses[i].Closed) {
-								s.MemberNS[replica] = time.Now().UnixNano()
+								s.observeMember(replica, time.Now())
 							}
 						}
 					}
@@ -339,7 +359,8 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 		}(replica)
 	}
 	defer func() { cancel(); observers.Wait() }()
-	report := e8Report{Options: o}
+	report := e8Report{Options: o, TimingVersion: 2}
+	var endTime time.Time // Assigned before the first job is published.
 	jobs := make(chan e8Job, o.Lanes)
 	done := make(chan *e8Sample, o.Lanes)
 	var workers sync.WaitGroup
@@ -350,7 +371,8 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 			client := transport.NewHTTPClient(3 * time.Second)
 			for j := range jobs {
 				s := j.s
-				s.BuildNS = time.Now().UnixNano()
+				buildAt := time.Now()
+				s.BuildNS = buildAt.UnixNano()
 				var coin wallet.DirectCoin
 				if j.origin != nil {
 					coin = wallet.DirectCoin{Output: j.origin.Output, Final: j.origin.Fact}
@@ -386,17 +408,22 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 					s.Tx = req.Tx.ID()
 					s.Output = protocol.OutputIdentity(n.Genesis.Network, s.Tx, 0)
 					s.RequestBytes = len(raw)
-					if time.Now().UnixNano() >= report.EndSendNS && report.EndSendNS != 0 {
+					if !time.Now().Before(endTime) {
 						s.Error = "not sent: window ended"
 						done <- s
 						continue
 					}
-					s.SentNS = time.Now().UnixNano()
+					s.sentAt = time.Now()
+					s.SentNS = s.sentAt.UnixNano()
+					s.Monotonic.BuildNS = int64(s.sentAt.Sub(buildAt))
+					s.Monotonic.ScheduleLagNS = int64(s.sentAt.Sub(j.scheduled))
 					call, stop := context.WithTimeout(ctx, 10*time.Second)
 					encoded, _, attempts, sendErr := submitChain(call, client, lab.Gateways[0]+"/v3/transactions", raw, false)
 					stop()
 					s.Attempts = attempts
-					s.ReceivedNS = time.Now().UnixNano()
+					receivedAt := time.Now()
+					s.ReceivedNS = receivedAt.UnixNano()
+					s.Monotonic.ResponseNS = int64(receivedAt.Sub(s.sentAt))
 					e = sendErr
 					if e == nil {
 						var cert protocol.OutputCertificate
@@ -411,7 +438,10 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 				if e != nil {
 					s.Error = e.Error()
 				} else {
-					s.ReadyNS = time.Now().UnixNano()
+					readyAt := time.Now()
+					s.ReadyNS = readyAt.UnixNano()
+					s.Monotonic.FastNS = int64(readyAt.Sub(s.sentAt))
+					s.Monotonic.WalletNS = s.Monotonic.FastNS - s.Monotonic.ResponseNS
 				}
 				mu.Lock()
 				pending[s.Index] = s
@@ -440,7 +470,7 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 		defer mu.Unlock()
 		for i, s := range pending {
 			if loc, ok := locations[s.Tx]; ok && s.PublicNS == 0 {
-				s.PublicNS = time.Now().UnixNano()
+				s.observePublic(time.Now())
 				s.Height = loc.Height
 				s.Missing = loc.Missing
 			}
@@ -472,6 +502,7 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 	report.StartedNS = start.UnixNano()
 	warmDuration := time.Duration(float64(o.Warm) / 200 * float64(time.Second))
 	end := start.Add(warmDuration + o.Duration)
+	endTime = end
 	report.EndSendNS = end.UnixNano()
 	if e = cfg.Write(filepath.Join(dir, "reports", "e8-start.json"), map[string]any{"StartedNS": report.StartedNS, "FormalNS": start.Add(warmDuration).UnixNano(), "EndSendNS": report.EndSendNS, "Options": o}); e != nil {
 		return e
@@ -576,7 +607,7 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 		lanes[chosen] = l
 		lanes[chosen].Busy = true
 		inflight++
-		jobs <- e8Job{s, l, fee, origin}
+		jobs <- e8Job{s, l, fee, origin, scheduled}
 	}
 	close(jobs)
 	for inflight > 0 {

@@ -15,6 +15,16 @@ func TestE8SlotsDoNotCatchUpInBursts(t *testing.T) {
 	}
 }
 
+func TestE8ObservationDurationDoesNotUseRecordedWallTime(t *testing.T) {
+	start := time.Now()
+	s := e8Sample{sentAt: start, SentNS: start.Add(40 * time.Millisecond).UnixNano()}
+	s.observePublic(start.Add(5 * time.Millisecond))
+	s.observeMember(2, start.Add(7*time.Millisecond))
+	if s.Monotonic.PublicNS != int64(5*time.Millisecond) || s.Monotonic.MemberNS[2] != int64(7*time.Millisecond) {
+		t.Fatalf("duration followed wall-time fields: %+v", s.Monotonic)
+	}
+}
+
 func TestE8ChainFeeInputsStayBalanced(t *testing.T) {
 	for _, seed := range []int64{0, 124, 225, 326} {
 		t.Run(fmt.Sprint(seed), func(t *testing.T) {
