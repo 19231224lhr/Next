@@ -1,4 +1,47 @@
-# Selected laboratory observations
+# 六组实验总览
+
+本页汇总 E1–E6 的问题、证据和结论范围。E2 的组织代付、用户自付与动态补资属于同一组实验的演进，不重复计为多组。吞吐优化记录是基础性能证据，独立于这六组编号。
+
+当前 `ln-comparison` 包含 E1–E6 的报告与证据；`re` 已包含 E1–E5，E6 尚未合并到 `re`。本次整理不修改支付协议或实验数据。
+
+## 论文实验索引
+
+| 编号与问题 | 主要证据 | 能支持的结论与范围 |
+| :--- | :--- | :--- |
+| **E1：到账后能否真实续花？** [报告](continuous-respending-2026-09-22/README.md) | 18 个案例、666 笔全部完成；324/324 次后继发送早于父交易提交；100 跳快速可用中位 198.630 ms | 所测最长 100 跳链可消费未确认输出并完成公共收尾；固定输入结构的凭证不携带增长的祖先链 |
+| **E2：有限资金与权限如何周转？** [原矩阵](finite-budget-2026-09-23/README.md) · [用户自付](owner-fuel-2026-09-23/README.md) · [动态补资](adaptive-reserve-2026-09-23/README.md) | 三个动态 CAL 场景从 3,600 CAL 启动，各完成 6,000 个两跳单位、12,000 笔，最终局部批准残余为零 | 所测负载下真实外部补资与核销可维持周转；不是固定 3,600 CAL 永久支撑付款，低预算和低工作权限边界仍保留 |
+| **E3：前置交易缺失时能否兑现担保？** [报告](liability-repair-2026-09-23/README.md) | 12 轮网络控制、9 轮缺失率对照；正式 108,000 笔、1,080 项唯一赔付完成 | 直接责任扣款、受限历史输入修订及账务审计在所测异常下有效；不是无限赔付或通用安全证明 |
+| **E4：故障与冲突时能否正确服务？** [报告](fault-conflict-2026-09-23/README.md) | 216,000 笔正式付款完成；网关边界控制及六类冲突测试；未形成有效冲突 QC | 单成员响应延迟/暂停下继续签发，所测冲突未重复消费或收费；暂停保留状态，不代表掉电恢复，局部批准残留仍需计入 |
+| **E5：快速交付门槛贡献了什么？** [报告](delivery-gate-2026-09-24/README.md) | 200 TPS 下 A/B P50 为 1.298–1.304 / 2.160–2.168 ms；100 跳整链中位 200.36 / 287.98 ms | 提前交付减少当前实现的到账等待与串行依赖延迟；后台工作继续进行，未发任务明确保留，不称为最大 TPS 对比 |
+| **E6：与外部快速支付实现相比如何？** [报告](lightning-2026-09-24/README.md) | 同机 LND 三轮 300 笔成功，收款 P50/P95 为 282.12/320.17 ms；Next 100 TPS、3 秒、300 笔成功，快速 P50/P95 为 0.963/1.208 ms | 展示指定配置下的实现级观测延迟；负载、存储和确认终点不同，不计算同等保障下的协议加速比，不测 LN 容量 |
+
+## 如何组合这些证据
+
+E1 验证核心功能“未最终到账也能继续付款”；E2 检查支撑该功能的资金和权限约束；E3 检查承诺不能自然履行时的赔付；E4 观察故障及冲突边界；E5 用内部对照解释提前交付的收益；E6 提供成熟外部实现的延迟参考。六组共同构成当前研究原型的实验证据，不等同于完整安全证明或生产部署认证。
+
+| 补充性能证据 | 已测结果 |
+| :--- | :--- |
+| [单组织完整系统](single-org-tps-2026-09-22/README.md) | 目标 2000 TPS，两轮完整闭环约 1949–1950 TPS，快速 P50 2.52–2.57 ms |
+| [四委员纯共识](consensus-capacity-2026-09-22/README.md) | 目标 3000 TPS，三分钟、54 万笔，重复两轮全部完成，含收尾约 2986 TPS |
+
+## 统一阅读口径
+
+- **快速到账**通常从付款钱包实际发送开始，到收款钱包验证 TXCer 并完成本地接收；E2/E3 的驱动标记包含少量发送前准备，以各报告为准。
+- **公共确认观察**与**成员完成观察**包含跟块、验证及查询等待，不能当作共识内部 Commit 时间；完整闭环包括全部必要收尾。
+- **单位、付款、责任项**不混算：一个两跳单位含两笔付款，一项赔付也不等于一笔新增用户付款；不同实验数据不累加成一个统一样本量。
+- 每组采用自身固定的负载和配置。内存/NoSync 是显式实验选择，E3 保留委员会磁盘区块存储，LND 保留默认持久化；保留原始成功、失败、未发及残余记录。
+- 实验均在 Mac Studio M4 Max 同机环境进行。三次重复与同一运行内的多笔付款不是同一种统计独立性；短时完成不外推为无限持续能力。
+
+各报告链接原始记录、审计、配置和复现工具。README 只摘录关键结果，引用论文时应回到对应报告的计时定义与样本范围。
+
+2026-09-24 与 [GPT 评审对话](https://chatgpt.com/c/6aa8b2d7-b6f8-83ec-8e23-ea9f3b634e90) 核对后，采用上述叙事顺序：E1–E4 为机制及适用边界的核心证据，E5 解释交付取舍，E6 单列外部参考。尤其保留 E2 低预算受阻、E4 局部批准残留和 E5 未发送任务；“完成实验”不等于所有配置承接全部计划请求。E6 两边同为 300 笔，也不代表相同负载或独立重复次数。
+
+## 历史定位与优化记录
+
+以下为较早阶段的工程诊断，保留原始记录，不作为当前六组正式实验的替代。
+
+<details>
+<summary>展开历史记录（保留原文）</summary>
 
 - [Full fast-payment path at 500 and 600 TPS](full-path-opt-2026-09-22/FINAL.md): fresh all-source 90,000-payment runs at499.93/599.15 TPS, zero payment failures, equal committee states and drained outboxes; explicit member memory and wallet NoSync. 800 target not sustained. Reproduction tool and phase distributions included.
 
@@ -56,3 +99,5 @@ individual Comet consensus phases had not yet been instrumented.
 - [35-payment phase diagnosis](latency-phase-2026-09-18/README.md): reversible propagation-parameter experiments, raw four-node traces and scripts. Defaults and delivery logic remain unchanged.
 
 - [Fresh-genesis retry repair](relay-retry-2026-09-18/README.md): tracing-off paired runs, stable retry envelopes, offline financial audit, and wallet restart/drain.
+
+</details>
