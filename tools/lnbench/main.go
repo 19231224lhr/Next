@@ -60,9 +60,14 @@ func main() {
 	duration := flag.Duration("duration", 0, "fixed open-loop send window; count=rate*duration")
 	amount := flag.Int64("amount", 10000, "satoshis per payment")
 	chain := flag.Bool("chain", false, "verify receiver lacks q before each serial payment")
+	direction := flag.String("direction", "balanced", "balanced or forward (node 0 to node 1)")
+	diagnostic := flag.Bool("diagnostic", false, "retain every payment status update for retry inspection")
 	limit := flag.Int("concurrency", 1024, "maximum outstanding payment RPCs")
 	timeout := flag.Duration("timeout", 30*time.Second, "per payment deadline")
 	flag.Parse()
+	if *direction != "balanced" && *direction != "forward" {
+		panic("invalid direction")
+	}
 	if *chain && *rate != 0 {
 		panic("chain requires serial rate=0")
 	}
@@ -106,11 +111,15 @@ func main() {
 	}
 	audit("before.json")
 	rows := make([]sample, *count)
+	updates := make([][]*lnrpc.Payment, *count)
 	requests := make([]string, *count)
 	byHash := make(map[string]int, *count)
 	// Invoice preparation is outside the measured interval, just like funded input preparation.
 	for i := range rows {
 		sender := i % 2
+		if *direction == "forward" {
+			sender = 0
+		}
 		ctx, cancel := context.WithTimeout(nodes[1-sender].ctx, 10*time.Second)
 		inv, e := nodes[1-sender].rpc.AddInvoice(ctx, &lnrpc.Invoice{Value: *amount, Expiry: 86400, Memo: fmt.Sprintf("lnbench-%d", i)})
 		cancel()
@@ -206,10 +215,15 @@ func main() {
 		ctx, cancel := context.WithTimeout(n.ctx, *timeout)
 		defer cancel()
 		mu.Lock()
-		rows[i].Sent = time.Since(origin).Nanoseconds()
+		now := time.Now()
+		if *duration > 0 && !now.Before(start.Add(*duration)) {
+			mu.Unlock()
+			return
+		}
+		rows[i].Sent = now.Sub(origin).Nanoseconds()
 		rows[i].Status = "IN_FLIGHT"
 		mu.Unlock()
-		stream, e := n.router.SendPaymentV2(ctx, &routerrpc.SendPaymentRequest{PaymentRequest: requests[i], TimeoutSeconds: int32(timeout.Seconds()), FeeLimitSat: 100, MaxParts: 1, NoInflightUpdates: true})
+		stream, e := n.router.SendPaymentV2(ctx, &routerrpc.SendPaymentRequest{PaymentRequest: requests[i], TimeoutSeconds: int32(timeout.Seconds()), FeeLimitSat: 100, MaxParts: 1, NoInflightUpdates: !*diagnostic})
 		var terminal *lnrpc.Payment
 		if e == nil {
 			for {
@@ -218,6 +232,7 @@ func main() {
 					e = err
 					break
 				}
+				updates[i] = append(updates[i], p)
 				if p.Status == lnrpc.Payment_SUCCEEDED || p.Status == lnrpc.Payment_FAILED {
 					terminal = p
 					break
@@ -336,6 +351,7 @@ func main() {
 	}
 	observers.Wait()
 	save(filepath.Join(*out, "payments.json"), rows)
+	save(filepath.Join(*out, "payment-updates.json"), updates)
 	save(filepath.Join(*out, "progress.json"), progress)
 	save(filepath.Join(*out, "chain-checks.json"), chainChecks)
 	s := summarize(rows, elapsed)
@@ -360,7 +376,7 @@ func main() {
 		reconciliation = append(reconciliation, entry)
 	}
 	save(filepath.Join(*out, "reconciliation.json"), reconciliation)
-	save(filepath.Join(*out, "parameters.json"), map[string]any{"rate": *rate, "count": *count, "amount_sat": *amount, "concurrency": *limit, "duration_seconds": duration.Seconds(), "timeout_seconds": timeout.Seconds(), "start_offset_ns": offset, "clock": "one Go monotonic clock", "mode": "balanced alternating directions; single path"})
+	save(filepath.Join(*out, "parameters.json"), map[string]any{"rate": *rate, "count": *count, "amount_sat": *amount, "concurrency": *limit, "duration_seconds": duration.Seconds(), "timeout_seconds": timeout.Seconds(), "start_offset_ns": offset, "clock": "one Go monotonic clock", "direction": *direction, "diagnostic": *diagnostic, "chain": *chain, "max_parts": 1})
 	audit("after.json")
 	b, _ = json.Marshal(s)
 	fmt.Println(string(b))

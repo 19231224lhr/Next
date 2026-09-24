@@ -4,7 +4,7 @@
 
 ## 当前验证状态
 
-已验证官方 ARM64 二进制下载、SHA256 清单校验和版本运行；Go 工具通过单元测试、`go vet` 与 Darwin ARM64 交叉编译。**真实通道部署与测量仍待运行确认，当前没有正式性能结果。** SHA256 清单经官方 HTTPS 获取，尚未做发布者 PGP 签名验证。
+已完成官方 ARM64 二进制校验、双节点真实付款预扫与一轮资金依赖续花；Go 工具通过单元测试、`go vet` 与 Darwin ARM64 交叉编译。**正式持续负载重复与路由拓扑仍待完成，当前结果属于预实验。** 见[实验记录](../../docs/experiments/lightning-2026-09-24/README.md)。SHA256 清单经官方 HTTPS 获取，尚未做发布者 PGP 签名验证。
 
 ## 部署与烟测
 
@@ -41,4 +41,4 @@ python3 tools/lnbench/lab.py stop pilot
 
 下一笔等上一笔发送端成功后再发；余额查询与静止等待计入整链时间，另存 `chain-checks.json`。这不是“SETTLED 瞬间最快续花”，也不是 LN 中逐笔追踪同一 UTXO。
 
-正式矩阵和对照边界见 [实验方案](../../docs/research/lightning-comparison-plan-2026-09-24.md)。正式测试前还要补齐资源采样、超时后排空核对与三轮 fresh 重复。
+`run.py` 记录各进程 CPU/RSS 样本，并在每组前后等待通道 HTLC 清空。`suite.py` 为每次重复创建 fresh 通道并在结束后关闭节点；正式矩阵和对照边界见 [实验方案](../../docs/research/lightning-comparison-plan-2026-09-24.md)。Mac 长批次应在整个驱动外层使用 `caffeinate -i`，不要只覆盖部署过程。

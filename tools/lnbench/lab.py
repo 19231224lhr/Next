@@ -46,6 +46,7 @@ def main():
     ap.add_argument('--routed', action='store_true')
     ap.add_argument('--capacity', type=int, default=16000000)
     ap.add_argument('--push', type=int, default=8000000)
+    ap.add_argument('--commit-interval', choices=['50ms','10ms'], default='50ms')
     args = ap.parse_args()
     if not args.name.replace('-', '').isalnum():
         raise ValueError('case name must be alphanumeric/hyphen')
@@ -111,6 +112,7 @@ listen=127.0.0.1:{19735+i}
 rpclisten=127.0.0.1:{19009+i}
 restlisten=127.0.0.1:{18080+i}
 debuglevel=info
+channel-commit-interval={args.commit_interval}
 [Bitcoin]
 bitcoin.regtest=1
 bitcoin.node=bitcoind
@@ -147,7 +149,7 @@ bitcoind.zmqpubrawtx=tcp://127.0.0.1:19333
     write_json(run / 'endpoints.json', [{'Address': f'127.0.0.1:{19009+i}', 'Directory': str(run / f'node{i}')} for i in [0,n-1]])
     write_json(evidence / 'deployment.json', {'nodes': n, 'capacity_sat': args.capacity, 'push_sat': args.push,
                  'pids': procs, 'bitcoin_version': command([BTC, '--version']), 'lnd_version': command([LND, '--version']),
-                 'channel_commit_interval': '50ms (default)', 'channel_commit_batch_size': '10 (default)',
+                 'channel_commit_interval': args.commit_interval, 'channel_commit_batch_size': '10 (default)',
                  'persistence': 'LND defaults; no NoSync', 'topology': 'routed' if args.routed else 'direct'})
     for i in range(n):
         write_json(evidence / f'channels-{i}.json', ln(i, 'listchannels'))
