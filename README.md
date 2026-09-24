@@ -1,10 +1,20 @@
-# UTXO FastPay
+<div align="center">
 
-**基于担保组织的 UTXO 快速支付实验系统**
+# Next
+
+**基于担保组织的 UTXO 快速转账实验系统**
+
+[![Go verification](https://github.com/19231224lhr/Next/actions/workflows/ci.yml/badge.svg?branch=re)](https://github.com/19231224lhr/Next/actions/workflows/ci.yml?query=branch%3Are)
+
+**可续花预确认 · 直接担保责任 · 公共结算 · 可复现实验**
+
+[实验总览](#实验总览) · [性能基准](#性能基准) · [实验结果](#实验结果) · [快速开始](#快速开始) · [文档导航](#文档导航)
+
+</div>
+
+---
 
 收款钱包验证 **TXCer** 后即可继续付款，无需等待前置交易完成公共结算。担保组织负责快速认证与直接担保，委员会负责公共账本、资金结算和异常赔付，钱包与组织成员自行跟块更新状态。
-
-**[实验总览](#实验总览) · [性能结果](#性能结果) · [实验解读](#实验结果详解) · [系统概览](#系统概览) · [快速开始](#快速开始) · [文档导航](#文档导航)**
 
 > **研究原型 · wire 4 · Go / CometBFT**
 >
@@ -26,11 +36,11 @@
 
 **阅读提示：** 各组的负载、存储模式和测量终点不同，不能直接拼成同一组性能结论。下文保留关键条件与边界，完整参数见各报告。
 
-[全部实验索引](docs/experiments/README.md) · [关键性能](#性能结果) · [逐项实验解读](#实验结果详解)
+[全部实验索引](docs/experiments/README.md) · [关键性能](#性能基准) · [逐项实验解读](#实验结果)
 
 ---
 
-## 性能结果
+## 性能基准
 
 下表是**已完成实验的工作点**，不是理论上限。原始数据、对照条件与复现脚本均在对应报告中。
 
@@ -45,12 +55,16 @@
 
 完整系统的 2400 档触及在途任务上限，不作为稳定承接 2400 TPS 的证据。纯共识 3500 档单次通过，4000 档大样本未全部成功。
 
-## 实验结果详解
+## 实验结果
 
-展开 E1–E6 查看关键结果与适用范围；最新 E8 结果单独列出。
+每组实验列出核心问题；展开详情可查看结果、对照条件与适用范围。E7 尚未实施，沿用原实验编号。
+
+### E1 · 真实连续续花
+
+收到 TXCer 后，能否连续使用上一笔输出付款？
 
 <details>
-<summary><strong>E1 · 真实连续续花</strong></summary>
+<summary>查看实验结果与适用范围</summary>
 
 三个独立钱包按 A → B → C → A 转手，每次收到并验证上一笔 TXCer 后，才构造下一笔交易。链长 1、10、100，各与“等待公共确认后再付款”对照，每种设置独立重复三次。
 
@@ -70,8 +84,14 @@
 
 </details>
 
+### E2 · 有限资金与权限周转
+
+预算有限时，签署权限能否周转，动态补资能否缓解阻塞？
+
 <details>
-<summary><strong>E2 · 有限资金与权限周转（含用户自付与动态补资）</strong></summary>
+<summary>查看实验结果与适用范围</summary>
+
+#### 固定预算：识别周转与阻塞边界
 
 原 E2 报告采用组织代付配置，固定 20 个独立两跳单位/秒，每笔 100 CAL，分别测试 CAL、组织代付 FUEL 和工作权限的低、中、高三档，每组输入五分钟；通过父延迟公共提交建立真实的未确认输入责任场景，并记录实际触发比例。每成员使用一个 Worker，隔离额度周转与 Worker 分配。
 
@@ -84,7 +104,7 @@
 
 [查看 E2 完整报告、图表与数据](docs/experiments/finite-budget-2026-09-23/README.md) · [查看 E2 方案](docs/research/finite-budget-experiment-design-2026-09-23.md)
 
-### E2 复测 · 用户自付 FUEL
+#### 用户自付 FUEL：排除组织代付影响
 
 按实际业务补齐用户最终 FUEL UTXO 支付，组织不持有代付资金或 FUEL/Policy 授权，用户费用输入、找零和退款均做真实账本核对。
 
@@ -94,7 +114,7 @@
 
 [用户自付 E2 完整报告、图表与数据](docs/experiments/owner-fuel-2026-09-23/README.md) · [实现说明](docs/implementation-owner-fuel-v4.md)
 
-### E2 扩展 · 按签署水位动态补资
+#### 动态补资：按签署水位调节 CAL 额度
 
 根据成员实际可用权限、声明的输入需求和未成证请求量计算预警水位；低于水位时，从有限外部账户真实转入 CAL，再通过公共区块增加原授权。保留正常并行取证、原批准与输入锁，不开启串行取证。
 
@@ -116,8 +136,12 @@
 
 </details>
 
+### E3 · 直接责任赔付与历史输入修订
+
+前置交易缺失时，能否兑现担保并完成账务修复？
+
 <details>
-<summary><strong>E3 · 直接责任、赔付与历史修订</strong></summary>
+<summary>查看实验结果与适用范围</summary>
 
 故意延迟父交易的公共提交，让后继付款先上链；到期后由当前输入 TXCer 的直接发行组织赔付，并通过授权历史输入修订补齐资金来源。异常父必须等四委员实际改写后才释放，避免原交易迟到掩盖修复失败。
 
@@ -132,8 +156,12 @@
 
 </details>
 
+### E4 · 故障可用性与冲突安全
+
+成员暂停或响应变慢时，系统能否继续服务并阻止冲突消费？
+
 <details>
-<summary><strong>E4 · 故障可用性与冲突安全</strong></summary>
+<summary>查看实验结果与适用范围</summary>
 
 正常、单成员批准响应延迟、单成员暂停三种场景，各以 200 TPS 输入两分钟并重复三轮。正式 **216,000 笔付款全部完成**；另完成十五轮网关交付边界及双成员暂停控制、六类各二十组冲突测试。
 
@@ -148,8 +176,12 @@
 
 </details>
 
+### E5 · 快速交付门槛消融
+
+三票成证即交付，与等待完整材料保存后交付，有何差异？
+
 <details>
-<summary><strong>E5 · 快速交付门槛消融</strong></summary>
+<summary>查看实验结果与适用范围</summary>
 
 比较 A“三票成证后立即交付”和 B“继续等待三成员保存完整材料或公共成功后交付”。两组使用相同代理与后台流程，费用由用户支付；完成12轮独立负载、6条100跳链和6轮校准。
 
@@ -164,8 +196,12 @@
 
 </details>
 
+### E6 · Lightning 同机付款延迟参考
+
+在同一硬件上，LND 与 Next 各自配置下的付款延迟是多少？
+
 <details>
-<summary><strong>E6 · Lightning/LND 同机延迟参考</strong></summary>
+<summary>查看实验结果与适用范围</summary>
 
 在同一台 Mac 上原生部署官方 LND v0.21.3-beta 与 Bitcoin Core 31.1 regtest。两节点直接通道，每轮预热 20 笔后顺序付款 100 笔，独立重复三轮；300 笔全部成功、金额审计通过，收尾未决 HTLC 为零。
 
@@ -183,7 +219,12 @@ Next 补充轮实际发送 99.99 TPS，300 笔全部完成，含后台收尾共 
 
 </details>
 
-### E8 · 多钱包、真实续花与资源成本
+### E8 · 多钱包负载与资源成本
+
+钱包数量增加、负载改为真实续花后，性能与资源开销如何变化？
+
+<details open>
+<summary>查看实验结果与适用范围</summary>
 
 9 轮五分钟对照与 3 轮突增，共 **1,658,495 笔正式已发付款全部完成并通过审计**。主实验比较两个钱包、2048 个钱包的独立付款，以及 2048 个钱包的 10 跳真实续花。
 
@@ -198,7 +239,11 @@ Next 补充轮实际发送 99.99 TPS，300 笔全部完成，含后台收尾共 
 
 [E8 完整报告](docs/experiments/workload-resource-2026-09-24/README.md) · [统计表](docs/experiments/workload-resource-2026-09-24/TABLES.md) · [实验方案](docs/research/e8-workload-resource-plan-2026-09-24.md)
 
-## 测量口径与适用范围
+</details>
+
+---
+
+## 测量口径与实验环境
 
 | 指标 | 起点与终点 |
 | :--- | :--- |
@@ -234,7 +279,7 @@ TPS 实验使用独立最终 UTXO、少量地址高复用；续花实验使用�
 
 需要 **Go 1.27.1** 与 **Python 3**。以下命令适用于 macOS / Linux shell，在仓库根目录执行。
 
-### 1. 构建
+### 1. 构建程序
 
 ```sh
 python3 third_party/cometbft/overlay.py
@@ -264,7 +309,7 @@ bin/payctl bench-v4 -dir experiments/local-v4 -start 1 -count 1 -concurrency 1
 
 每次独立测试应选用未消费的初始输入。需要阶段诊断、连续续花或 TPS 复现时，使用对应[实验报告](#文档导航)中的参数和脚本。
 
-### 4. 停止并审计
+### 4. 停止节点并审计
 
 在启动实验网的终端按 `Ctrl+C`，等待所有子进程完成停机和审计快照导出，再执行：
 
@@ -291,16 +336,19 @@ bin/payctl audit -dir experiments/local-v4
 
 设计文档保留版本演进；涉及当前行为时，应结合后续修订及对应实验报告阅读。
 
-### 实验与复现
+### 实验报告与性能优化记录
 
 | 文档 | 主要问题 |
 | :--- | :--- |
-| [真实连续续花](docs/experiments/continuous-respending-2026-09-22/README.md) | 收到 TXCer 后能否继续付款，链长是否增加单跳负担 |
+| [E1：真实连续续花](docs/experiments/continuous-respending-2026-09-22/README.md) | 收到 TXCer 后能否继续付款，链长是否增加单跳负担 |
 | [原 E2：组织代付](docs/experiments/finite-budget-2026-09-23/README.md) | 原代付配置的预算阻塞与费用审计，保留历史数据 |
 | [E2：用户自付 FUEL](docs/experiments/owner-fuel-2026-09-23/README.md) | 用户费用充足、无组织代付时，CAL 与工作权限的周转 |
 | [E2：CAL 动态补资](docs/experiments/adaptive-reserve-2026-09-23/README.md) | 有限补资能否支持恒定、阶跃及责任延迟下的并行周转 |
 | [E3：赔付与历史修订](docs/experiments/liability-repair-2026-09-23/README.md) | 十二轮网络控制与九轮混合负载通过；直接责任兑现、真实历史修订及费用核对 |
 | [E4：故障可用性与冲突安全](docs/experiments/fault-conflict-2026-09-23/README.md) | 九轮共 216,000 笔全部完成；单成员故障服务、网关备用投递边界及冲突审计 |
+| [E5：快速交付门槛消融](docs/experiments/delivery-gate-2026-09-24/README.md) | 立即交付与等待额外保存门槛的对照 |
+| [E6：Lightning 同机延迟参考](docs/experiments/lightning-2026-09-24/README.md) | LND 与 Next 在各自配置下的实测延迟和比较边界 |
+| [E8：多钱包负载与资源成本](docs/experiments/workload-resource-2026-09-24/README.md) | 2048 钱包、真实续花、突增负载与资源审计 |
 | [单组织整体 TPS](docs/experiments/single-org-tps-2026-09-22/README.md) | 快速签发、公共结算与成员收尾的完整系统吞吐 |
 | [四委员共识容量](docs/experiments/consensus-capacity-2026-09-22/README.md) | 独立测量委员会工作点、过载边界及资源开销 |
 | [完整路径优化](docs/experiments/full-path-opt-2026-09-22/README.md) | 成员内存模式、钱包保存及全流程阶段测量 |
@@ -311,7 +359,7 @@ bin/payctl audit -dir experiments/local-v4
 
 完整 E1–E6、E8 导航见页首[实验总览](#实验总览)；以下运行与验证命令以 `re` 分支为准。
 
-## 实验配置
+## 运行配置与诊断
 
 仅按需要启用以下选项。同条件对照应保持其他参数不变，完整组合以具体实验报告为准。
 
@@ -335,13 +383,14 @@ bin/payctl audit -dir experiments/local-v4
 - **缓存边界：** 已验证的完整收款描述符使用 1024 项有界缓存。逐笔付款授权、法定票数、输入消费与额度检查仍保留；热地址收益不能直接推广到大量新地址。
 - **阶段诊断：** `UTXO_SETTLEMENT_TRACE=1` 启用委员会阶段记录。诊断会增加开销，应与正式性能轮分开；应用 Commit、钱包跟块观察和成员完成观察是不同时间点。
 
-## 开发与验证
+## 测试与构建验证
 
 先应用 CometBFT 补丁，再执行测试和静态检查：
 
 ```sh
 python3 third_party/cometbft/overlay.py
 
+go test ./cmd/... ./crypto/... ./finality/... ./internal/... ./protocol/...
 go test -tags=comet_v3 ./cmd/... ./crypto/... ./finality/... ./internal/... ./protocol/...
 go vet -tags=comet_v3 ./cmd/... ./crypto/... ./finality/... ./internal/... ./protocol/...
 go test -race -tags=comet_v3 ./cmd/payctl ./protocol ./internal/member ./internal/gateway ./internal/committee ./internal/store
