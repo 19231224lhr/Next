@@ -165,7 +165,7 @@ Next 补充轮实际发送 99.99 TPS，300 笔全部完成，含后台收尾共 
 
 本组提供**指定配置下的实现性能参考**：同机控制了硬件与外部网络差异，双方仍有负载、存储策略及确认语义差异。LND 是已开通道、预生成发票的默认持久化路径，Next 是实验内存/NoSync 的担保预确认路径。可以展示实测延迟，不将差额全部归因于协议，也不从顺序付款推导 Lightning TPS。
 
-[E6 完整报告与逐笔证据](docs/experiments/lightning-2026-09-24/README.md) · [范围修订与原方案](docs/research/lightning-comparison-plan-2026-09-24.md) · [六组实验总览](docs/experiments/README.md)
+[E6 完整报告与逐笔证据](docs/experiments/lightning-2026-09-24/README.md) · [范围修订与原方案](docs/research/lightning-comparison-plan-2026-09-24.md) · [实验总览](docs/experiments/README.md)
 
 ### 如何理解这些数字
 

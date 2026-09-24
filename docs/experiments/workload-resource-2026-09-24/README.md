@@ -70,7 +70,7 @@ C 每条 lane 完成一条链后，由末收款人使用另一笔预备最终 CA
 # 在 Mac/Linux 仓库根目录，Go 及 Python 3 可用
 python3 docs/experiments/workload-resource-2026-09-24/reproduce.py \
   --label my-preflight --mode C --rate 500 --duration 30
-# 正式套件串行运行；会使用同目录 build.json 对应的现有二进制
+# 已保存的通过案例会跳过采集、重新分析；不会覆盖历史证据
 python3 docs/experiments/workload-resource-2026-09-24/suite.py
 # 重新生成离线统计（不需启动节点）
 python3 docs/experiments/workload-resource-2026-09-24/analyze.py \
@@ -85,6 +85,8 @@ python3 docs/experiments/workload-resource-2026-09-24/figures/gen_fig_e8.py
 ```
 
 复现需足够内存和临时磁盘。准备、停机导出与离线全账本审计在支付计时窗口外。新运行不得覆盖已有同名结果。初版源代码为 `5389f43`，C 根分配修正为 `efd82cb`，格式整理与强化回归为 `d4a5edc`。节点始终使用初版二进制；只有 `payctl` 在 C 修正后重新编译。逐轮 `build.json`、根目录 `build-initial.json` / `build-balanced.json` 记录实际哈希，不把编译器记录的基础提交误称为完整实验实现。初始 `source-manifest.json` 保留初版产生时的内容，其中“全部正式轮复用原二进制”的旧注释由本段及逐轮清单更正。
+
+重新采集时，请通过 `reproduce.py --label 新名称` 逐轮运行，依照上述顺序、种子 124/225/326 和固定参数设置；C 使用 `--mode C`，突增另加 `--surge`。`analyze.py 新名称` 分析新案例。已提交九轮表格默认读取 `formal-*`，不要让新案例覆盖这些原始记录。
 
 ## 计量口径
 
