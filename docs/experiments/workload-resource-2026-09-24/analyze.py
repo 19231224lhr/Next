@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse,bisect,csv,gzip,json,statistics
+from collections import Counter
 from pathlib import Path
 OUT=Path(__file__).resolve().parent
 def read(p):
@@ -27,11 +28,23 @@ def analyze(dest):
         elif s['SentNS']<ns:unfinal+=1
     out=dict(case=dest.name,mode=cfg['mode'],rate=cfg['rate'],duration=(hi-lo)/1e9,sent=len(sent),ready=len(fast),errors=sum(bool(s.get('Error')) for s in sent),unsent_constructed=sum(not s['SentNS'] for s in ss),warm_sent=sum(s['SentNS']>0 and s['ScheduledNS']<lo for s in r['Samples']),actual_tps=len(sent)/((hi-lo)/1e9),certificate_inputs=sum(s['CertificateInput'] for s in sent),chain_edges=len(edges),before_parent_commit=unfinal,parent_commit_unknown=unknown,missing_inputs=sum(s['Missing'] for s in sent),progress_errors=r['ProgressErrors'],skipped_pacing_including_warm=r['SkippedPacing'],no_ready_including_warm=r['NoReady'],pending_full_including_warm=r['PendingFull'],extra_submit_attempts=sum(max(0,s['Attempts']-1) for s in sent),drain_s=(r['FinishedNS']-hi)/1e9)
     phases={'build':[(s['SentNS']-s['BuildNS'])/1e6 for s in sent], 'fast':[(s['ReadyNS']-s['SentNS'])/1e6 for s in fast], 'response':[(s['ReceivedNS']-s['SentNS'])/1e6 for s in fast], 'wallet':[(s['ReadyNS']-s['ReceivedNS'])/1e6 for s in fast], 'public':[(s['PublicNS']-s['SentNS'])/1e6 for s in sent if s['PublicNS']], 'member':[(max(s['MemberNS'])-s['SentNS'])/1e6 for s in sent if all(s['MemberNS'])], 'closed':[(closed(s)-s['SentNS'])/1e6 for s in sent if closed(s)], 'dispatch':[(s['SentNS']-s['ScheduledNS'])/1e6 for s in sent]}
+    wall_phases=phases
+    if r.get('TimingVersion',1)>=2:
+        keys={'build':'BuildNS','dispatch':'ScheduleLagNS','response':'ResponseNS','wallet':'WalletNS','fast':'FastNS','public':'PublicNS'}
+        phases={k:[s['Monotonic'][field]/1e6 for s in (fast if k in ['response','wallet','fast'] else sent)] for k,field in keys.items()}
+        phases['member']=[max(s['Monotonic']['MemberNS'])/1e6 for s in sent if all(s['MemberNS'])]
+        phases['closed']=[max(s['Monotonic']['PublicNS'],*s['Monotonic']['MemberNS'])/1e6 for s in sent if closed(s)]
+        out['wall_minus_monotonic_ms']={k:{'p50':q([a-b for a,b in zip(wall_phases[k],v)],.5),'max_abs':max(abs(a-b) for a,b in zip(wall_phases[k],v))} for k,v in phases.items() if v}
+    out['timing_version']=r.get('TimingVersion',1)
     for phase,xs in phases.items():
         for key,p in [('p50',.5),('p95',.95),('p99',.99)]:out[phase+'_'+key+'_ms']=q(xs,p)
+        out[phase+'_max_ms']=max(xs,default=None)
+    out['clock_checks']={'negative_intervals':{phase:sum(x<0 for x in xs) for phase,xs in wall_phases.items()},'minimum_ms':{phase:min(xs,default=None) for phase,xs in wall_phases.items()},'schedule_lag_valid':r.get('TimingVersion',1)>=2,'note':'Version 1 uses wall-time differences, including a projected ScheduledNS; no clock error bound was recorded. Version 2 uses monotonic per-process duration fields for phase summaries. Cross-process ordering, timeline and per-window values remain wall-clock observations.'}
     out['active_senders']=len({s['Sender'] for s in sent});out['active_receivers']=len({s['Receiver'] for s in sent})
     out['root_cal_inputs_used']=sum(s['Parent']<0 for s in sent)
     out['driver_descriptor_including_warm']=r['Descriptor']
+    fees=Counter(s['Sender'] for s in r['Samples'] if s['SentNS'])
+    out['fee_input_use_including_warm']={'min':min(fees.values()),'max':max(fees.values()),'available_per_wallet':cfg['origins']//2//r['Options']['Wallets']}
     if cfg['mode']=='C':
         roots={};tips={}
         for s in r['Samples']:
@@ -46,7 +59,17 @@ def analyze(dest):
         ns=lo+sec*10**9;row={'Second':sec}
         for kind,values in points:row[kind]=bisect.bisect_right(values,ns)
         row['Pending']=row['Sent']-row['Closed'];timeline.append(row)
-    out['peak_pending']=max(x['Pending'] for x in timeline)
+    out['peak_pending_1s']=max(x['Pending'] for x in timeline)
+    events=sorted([(s['SentNS'],1) for s in sent]+[(closed(s),-1) for s in sent if closed(s)])
+    active=peak=0
+    for _,delta in events:active+=delta;peak=max(peak,active)
+    out['peak_pending']=peak
+    if cfg['surge']:
+        out['burst_phases']=[]
+        for a,b,target in [(0,60,cfg['rate']),(60,75,2*cfg['rate']),(75,195,cfg['rate'])]:
+            xs=[s for s in sent if lo+a*1e9<=s['SentNS']<lo+b*1e9]
+            out['burst_phases'].append(dict(start_s=a,end_s=b,target_tps=target,sent=len(xs),actual_tps=len(xs)/(b-a),fast_p95_ms=q([(s['ReadyNS']-s['SentNS'])/1e6 for s in xs if s['ReadyNS']],.95),closed_p95_ms=q([(closed(s)-s['SentNS'])/1e6 for s in xs if closed(s)],.95)))
+        out['pre_recovery_cohort_drain_s']=max(0,(max((closed(s) for s in sent if s['SentNS']<lo+75*10**9),default=0)-lo-75*10**9)/1e9)
     out['window_60s']=[]
     for second in range(0,int((hi-lo)/1e9),60):
         stop=min(second+60,(hi-lo)/1e9);xs=[s for s in sent if lo+second*1e9<=s['SentNS']<lo+stop*1e9]
@@ -71,6 +94,7 @@ def analyze(dest):
             b,a=totals(before),totals(after);growth[name]={'initial_entries':b[0],'final_entries':a[0],'added_entries':a[0]-b[0],'added_logical_bytes':a[1]-b[1]}
         out['state_growth_including_warm']=growth
     resources=[json.loads(line) for line in (dest/'resources.jsonl').read_text().splitlines()]
+    initial_resource=resources[0] if resources else None
     resources=[x for x in resources if x['NS']>=lo]
     def proc(x):
         rows={}
@@ -81,6 +105,7 @@ def analyze(dest):
         return rows
     if len(resources)>1:
         first,last=proc(resources[0]),proc(resources[-1]);cpu={};peak={}
+        if initial_resource:out['initial_service_rss_bytes']=sum(x[1] for name,x in proc(initial_resource).items() if name!='load')
         out['first_formal_rss_bytes']={name:x[1] for name,x in first.items()}
         for name,x in first.items():
             if name in last:cpu[name]=max(0,last[name][0]-x[0])*1000
@@ -94,6 +119,12 @@ def analyze(dest):
         out['service_core_ms_per_completion']=sum(v for k,v in cpu.items() if k!='load')/max(observed_completions,1)
         out['driver_core_ms_per_completion']=cpu.get('load',0)/max(observed_completions,1)
     out['origin_outputs']=cfg['origins']
+    suite_log=OUT/'suite.log'
+    if suite_log.exists():
+        for line in suite_log.read_text().splitlines():
+            try:entry=json.loads(line)
+            except ValueError:continue
+            if entry.get('start')==dest.name:out['preparation_to_warmup_s']=r['StartedNS']/1e9-entry['time']
     (dest/'summary.json').write_text(json.dumps(out,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps({k:v for k,v in out.items() if k!='nodes'},ensure_ascii=False))
     return out

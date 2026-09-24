@@ -1,0 +1,443 @@
+{
+  "case": "formal-c3",
+  "mode": "C",
+  "rate": 500,
+  "duration": 300.0,
+  "sent": 148190,
+  "ready": 148190,
+  "errors": 0,
+  "unsent_constructed": 20,
+  "warm_sent": 2048,
+  "actual_tps": 493.96666666666664,
+  "certificate_inputs": 133406,
+  "chain_edges": 133406,
+  "before_parent_commit": 123992,
+  "parent_commit_unknown": 0,
+  "missing_inputs": 150,
+  "progress_errors": 0,
+  "skipped_pacing_including_warm": 294,
+  "no_ready_including_warm": 1496,
+  "pending_full_including_warm": 0,
+  "extra_submit_attempts": 0,
+  "drain_s": 0.544001,
+  "timing_version": 1,
+  "build_p50_ms": 0.306,
+  "build_p95_ms": 0.475,
+  "build_p99_ms": 6.608,
+  "build_max_ms": 283.606,
+  "fast_p50_ms": 1.117,
+  "fast_p95_ms": 12.135,
+  "fast_p99_ms": 21.093,
+  "fast_max_ms": 1548.15,
+  "response_p50_ms": 0.964,
+  "response_p95_ms": 10.409,
+  "response_p99_ms": 18.932,
+  "response_max_ms": 1364.018,
+  "wallet_p50_ms": 0.153,
+  "wallet_p95_ms": 0.445,
+  "wallet_p99_ms": 6.697,
+  "wallet_max_ms": 294.417,
+  "public_p50_ms": 633.95,
+  "public_p95_ms": 789.541,
+  "public_p99_ms": 1183.011,
+  "public_max_ms": 5603.599,
+  "member_p50_ms": 656.631,
+  "member_p95_ms": 813.848,
+  "member_p99_ms": 1444.15,
+  "member_max_ms": 5543.38,
+  "closed_p50_ms": 657.543,
+  "closed_p95_ms": 815.142,
+  "closed_p99_ms": 1444.15,
+  "closed_max_ms": 5603.599,
+  "dispatch_p50_ms": 40.162,
+  "dispatch_p95_ms": 40.982,
+  "dispatch_p99_ms": 46.453,
+  "dispatch_max_ms": 323.705,
+  "clock_checks": {
+    "negative_intervals": {
+      "build": 0,
+      "fast": 0,
+      "response": 0,
+      "wallet": 0,
+      "public": 0,
+      "member": 0,
+      "closed": 0,
+      "dispatch": 25787
+    },
+    "minimum_ms": {
+      "build": 0.211,
+      "fast": 0.806,
+      "response": 0.672,
+      "wallet": 0.115,
+      "public": 424.554,
+      "member": 437.177,
+      "closed": 437.885,
+      "dispatch": -0.984
+    },
+    "schedule_lag_valid": false,
+    "note": "Version 1 uses wall-time differences, including a projected ScheduledNS; no clock error bound was recorded. Version 2 uses monotonic per-process duration fields for phase summaries. Cross-process ordering, timeline and per-window values remain wall-clock observations."
+  },
+  "active_senders": 2048,
+  "active_receivers": 2048,
+  "root_cal_inputs_used": 14784,
+  "driver_descriptor_including_warm": {
+    "Queries": 3155158,
+    "Hits": 3004891,
+    "Verifications": 150267
+  },
+  "fee_input_use_including_warm": {
+    "min": 73,
+    "max": 75,
+    "available_per_wallet": 82
+  },
+  "chains_including_warm": {
+    "started": 15040,
+    "ten_hops_completed": 14979,
+    "cutoff_prefixes": 61,
+    "unstarted_remaining_hops": 162
+  },
+  "peak_pending_1s": 804,
+  "peak_pending": 922,
+  "window_60s": [
+    {
+      "start_s": 0,
+      "end_s": 60,
+      "sent": 29974,
+      "tps": 499.56666666666666,
+      "fast_p95_ms": 9.913,
+      "closed_p95_ms": 806.484
+    },
+    {
+      "start_s": 60,
+      "end_s": 120,
+      "sent": 29943,
+      "tps": 499.05,
+      "fast_p95_ms": 10.899,
+      "closed_p95_ms": 807.293
+    },
+    {
+      "start_s": 120,
+      "end_s": 180,
+      "sent": 29966,
+      "tps": 499.43333333333334,
+      "fast_p95_ms": 11.179,
+      "closed_p95_ms": 805.91
+    },
+    {
+      "start_s": 180,
+      "end_s": 240,
+      "sent": 29834,
+      "tps": 497.23333333333335,
+      "fast_p95_ms": 11.675,
+      "closed_p95_ms": 811.52
+    },
+    {
+      "start_s": 240,
+      "end_s": 300,
+      "sent": 28473,
+      "tps": 474.55,
+      "fast_p95_ms": 18.949,
+      "closed_p95_ms": 1560.577
+    }
+  ],
+  "max_oldest_observed_ms": 4895.718,
+  "nodes": {
+    "org0-member0": {
+      "Queries": 4999085,
+      "Hits": 4850988,
+      "Verifications": 148097,
+      "http_bytes": 1405897829,
+      "hit_rate": 0.9703751786576944,
+      "http_by_category": {
+        "/v3": {
+          "Requests": 147540,
+          "RequestBytes": 453912717,
+          "ResponseBytes": 1327860
+        },
+        "/v3/transactions": {
+          "Requests": 148084,
+          "RequestBytes": 397966123,
+          "ResponseBytes": 230642648
+        },
+        "/v4/progress": {
+          "Requests": 17324,
+          "RequestBytes": 213614768,
+          "ResponseBytes": 108433713
+        },
+        "other": {
+          "Requests": 0,
+          "RequestBytes": 0,
+          "ResponseBytes": 0
+        }
+      }
+    },
+    "org0-member1": {
+      "Queries": 4991618,
+      "Hits": 4843520,
+      "Verifications": 148098,
+      "http_bytes": 1404238001,
+      "hit_rate": 0.9703306623223171,
+      "http_by_category": {
+        "/v3": {
+          "Requests": 147055,
+          "RequestBytes": 452419531,
+          "ResponseBytes": 1323495
+        },
+        "/v3/transactions": {
+          "Requests": 148086,
+          "RequestBytes": 397970868,
+          "ResponseBytes": 230650645
+        },
+        "/v4/progress": {
+          "Requests": 17339,
+          "RequestBytes": 213498595,
+          "ResponseBytes": 108374867
+        },
+        "other": {
+          "Requests": 0,
+          "RequestBytes": 0,
+          "ResponseBytes": 0
+        }
+      }
+    },
+    "org0-member2": {
+      "Queries": 4987347,
+      "Hits": 4839250,
+      "Verifications": 148097,
+      "http_bytes": 1403646833,
+      "hit_rate": 0.9703054549843835,
+      "http_by_category": {
+        "/v3": {
+          "Requests": 146782,
+          "RequestBytes": 451579465,
+          "ResponseBytes": 1321038
+        },
+        "/v3/transactions": {
+          "Requests": 148083,
+          "RequestBytes": 397962570,
+          "ResponseBytes": 230650250
+        },
+        "/v4/progress": {
+          "Requests": 17332,
+          "RequestBytes": 213671122,
+          "ResponseBytes": 108462388
+        },
+        "other": {
+          "Requests": 0,
+          "RequestBytes": 0,
+          "ResponseBytes": 0
+        }
+      }
+    },
+    "org0-member3": {
+      "Queries": 4984778,
+      "Hits": 4836682,
+      "Verifications": 148096,
+      "http_bytes": 1402606277,
+      "hit_rate": 0.9702903519474688,
+      "http_by_category": {
+        "/v3": {
+          "Requests": 146592,
+          "RequestBytes": 450991033,
+          "ResponseBytes": 1319328
+        },
+        "/v3/transactions": {
+          "Requests": 148087,
+          "RequestBytes": 397973634,
+          "ResponseBytes": 230652927
+        },
+        "/v4/progress": {
+          "Requests": 17317,
+          "RequestBytes": 213363311,
+          "ResponseBytes": 108306044
+        },
+        "other": {
+          "Requests": 0,
+          "RequestBytes": 0,
+          "ResponseBytes": 0
+        }
+      }
+    },
+    "gateway0": {
+      "Queries": 8357839,
+      "Hits": 8209739,
+      "Verifications": 148100,
+      "http_bytes": 513340497,
+      "hit_rate": 0.9822801085304467,
+      "http_by_category": {
+        "/v3/transactions": {
+          "Requests": 148089,
+          "RequestBytes": 397979166,
+          "ResponseBytes": 115361331
+        },
+        "other": {
+          "Requests": 0,
+          "RequestBytes": 0,
+          "ResponseBytes": 0
+        }
+      }
+    },
+    "committee0": {
+      "Queries": 1762320,
+      "Hits": 1614224,
+      "Verifications": 148096,
+      "http_bytes": 4414826389,
+      "hit_rate": 0.9159653184438694,
+      "http_by_category": {
+        "/block": {
+          "Requests": 10692,
+          "RequestBytes": 0,
+          "ResponseBytes": 4282374270
+        },
+        "other": {
+          "Requests": 114893,
+          "RequestBytes": 116120143,
+          "ResponseBytes": 16331976
+        }
+      }
+    },
+    "committee1": {
+      "Queries": 1762296,
+      "Hits": 1614202,
+      "Verifications": 148094,
+      "http_bytes": 119912404,
+      "hit_rate": 0.9159653088924903,
+      "http_by_category": {
+        "other": {
+          "Requests": 37776,
+          "RequestBytes": 116194254,
+          "ResponseBytes": 3718150
+        }
+      }
+    },
+    "committee2": {
+      "Queries": 1762320,
+      "Hits": 1614224,
+      "Verifications": 148096,
+      "http_bytes": 120325682,
+      "hit_rate": 0.9159653184438694,
+      "http_by_category": {
+        "other": {
+          "Requests": 37902,
+          "RequestBytes": 116594932,
+          "ResponseBytes": 3730750
+        }
+      }
+    },
+    "committee3": {
+      "Queries": 1762296,
+      "Hits": 1614201,
+      "Verifications": 148095,
+      "http_bytes": 119216445,
+      "hit_rate": 0.9159647414509254,
+      "http_by_category": {
+        "other": {
+          "Requests": 37553,
+          "RequestBytes": 115520595,
+          "ResponseBytes": 3695850
+        }
+      }
+    }
+  },
+  "http_payload_bytes_per_ready": 73581.28319724678,
+  "state_growth_including_warm": {
+    "org0-member0": {
+      "initial_entries": 335888,
+      "final_entries": 1837682,
+      "added_entries": 1501794,
+      "added_logical_bytes": 2297302092
+    },
+    "org0-member1": {
+      "initial_entries": 335888,
+      "final_entries": 1837220,
+      "added_entries": 1501332,
+      "added_logical_bytes": 2295861322
+    },
+    "org0-member2": {
+      "initial_entries": 335888,
+      "final_entries": 1836937,
+      "added_entries": 1501049,
+      "added_logical_bytes": 2294979489
+    },
+    "org0-member3": {
+      "initial_entries": 335888,
+      "final_entries": 1836752,
+      "added_entries": 1500864,
+      "added_logical_bytes": 2294398243
+    },
+    "gateway0": {
+      "initial_entries": 0,
+      "final_entries": 300477,
+      "added_entries": 300477,
+      "added_logical_bytes": 474483997
+    },
+    "committee0": {
+      "initial_entries": 335881,
+      "final_entries": 1538243,
+      "added_entries": 1202362,
+      "added_logical_bytes": 794929779
+    },
+    "committee1": {
+      "initial_entries": 335881,
+      "final_entries": 1538243,
+      "added_entries": 1202362,
+      "added_logical_bytes": 794929779
+    },
+    "committee2": {
+      "initial_entries": 335881,
+      "final_entries": 1538243,
+      "added_entries": 1202362,
+      "added_logical_bytes": 794929779
+    },
+    "committee3": {
+      "initial_entries": 335881,
+      "final_entries": 1538243,
+      "added_entries": 1202362,
+      "added_logical_bytes": 794929779
+    }
+  },
+  "initial_service_rss_bytes": 17259069440,
+  "first_formal_rss_bytes": {
+    "org0-member0": 1954676736,
+    "org0-member1": 1955495936,
+    "org0-member2": 1954807808,
+    "org0-member3": 1955741696,
+    "gateway0": 995901440,
+    "committee0": 2574303232,
+    "committee1": 2112372736,
+    "committee2": 1960296448,
+    "committee3": 2109849600,
+    "load": 1026572288
+  },
+  "peak_service_rss_bytes": 57486196736,
+  "cpu_window_seconds": 301.462784,
+  "cpu_window_completions": 147947,
+  "cpu_core_ms": {
+    "org0-member0": 232900.0,
+    "org0-member1": 232120.0,
+    "org0-member2": 232980.0,
+    "org0-member3": 231210.0,
+    "gateway0": 594459.9999999999,
+    "committee0": 204650.0,
+    "committee1": 176560.0,
+    "committee2": 174739.99999999997,
+    "committee3": 175820.0,
+    "load": 143660.0
+  },
+  "peak_rss_bytes": {
+    "org0-member0": 8141750272,
+    "org0-member1": 8065875968,
+    "org0-member2": 7932067840,
+    "org0-member3": 7957938176,
+    "gateway0": 1587478528,
+    "committee0": 6082920448,
+    "committee1": 5898108928,
+    "committee2": 5816532992,
+    "committee3": 6003523584,
+    "load": 2773254144
+  },
+  "service_core_ms_per_completion": 15.244918788485066,
+  "driver_core_ms_per_completion": 0.9710234070308962,
+  "origin_outputs": 335872,
+  "preparation_to_warmup_s": 18.60158109664917
+}

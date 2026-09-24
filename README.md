@@ -4,14 +4,14 @@
 
 收款钱包验证 **TXCer** 后即可继续付款，无需等待前置交易完成公共结算。担保组织负责快速认证与直接担保，委员会负责公共账本、资金结算和异常赔付，钱包与组织成员自行跟块更新状态。
 
-[六组实验总览](docs/experiments/README.md) · [性能结果](#性能结果) · [快速开始](#快速开始) · [文档导航](#文档导航) · [实验配置](#实验配置) · [开发与验证](#开发与验证)
+[实验总览](docs/experiments/README.md) · [性能结果](#性能结果) · [快速开始](#快速开始) · [文档导航](#文档导航) · [实验配置](#实验配置) · [开发与验证](#开发与验证)
 
 > 当前运行协议为 **wire 4**，项目定位为可复现的研究原型。
 > `main` 保留性能基线，`re` 统一汇总已完成的 E1 连续续花、E2 资金周转、E3 直接责任赔付、E4 故障可用性及冲突安全、E5 快速交付门槛消融实验，包括代码、报告、图表和原始证据。`e3-liability-repair` 保留 E3 独立实验记录，其成果已合并到 `re`。
 > `e2-budget`、`e2-owner-fuel`、`e2-adaptive-reserve` 保留各阶段记录，其成果已合并到 `re`。
 > `e4-fault-conflict` 保留 E4 独立实验记录，其成果已合并到 `re`。
 > `e5-delivery-gate` 保留 E5 独立实验记录，其成果已合并到 `re`。
-> 当前 `ln-comparison` 在 `re` 基础上新增 **E6 Lightning/LND 同机延迟参考**及 Next 100 TPS 短测，汇总六组实验；E6 尚未合并到 `re`。
+> `ln-comparison` 在 `re` 基础上新增 **E6 Lightning/LND 同机延迟参考**及 Next 100 TPS 短测；当前 `e8-workload-resource` 在其基础上新增 **E8 多钱包、真实续花与资源成本**，共七组已完成实验。E6/E8 尚未合并到 `re`，E7 网络与多组织实验仍待实施。
 
 ## 系统概览
 
@@ -31,6 +31,8 @@
 实现细节见[按块处理规范](docs/implementation-block-following-v4.md)与[公共提交修订](docs/implementation-public-submission-v4.md)。
 
 ## 性能结果
+
+新增 [E8 多钱包与资源实验](docs/experiments/workload-resource-2026-09-24/README.md)：9 轮五分钟对照与 3 轮突增合计 **1,658,495 笔正式已发付款全部完成并通过审计**。2048 逻辑钱包的独立付款实际约 499 TPS，10 跳续花约 494–499 TPS；续花相对独立付款增加约 20% 服务 CPU、21% HTTP 载荷。部分尾段少发、历史内存增长和原计时限制均保留，不作为严格持续 500 TPS 或无限运行证明。独立单调时钟短校验中，续花快速 P50 为 **1.105 ms**。
 
 外部实现的同机延迟测量见 [Lightning/LND 实验报告](docs/experiments/lightning-2026-09-24/README.md)：三轮 300 笔全部成功，收款确认 P50 **282.12 ms**、P95 **320.17 ms**。LND 保留同步持久化，与本项目历史内存/NoSync 性能数据的存储保障不同，不能直接据此宣称协议快多少倍；本轮未测 Lightning TPS。
 

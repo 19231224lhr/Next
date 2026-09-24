@@ -23,7 +23,7 @@ def run_points(ax,rows,key,ylabel):
         ax.scatter([i-.08,i,i+.08],ys,color=COLORS[mode],s=24,zorder=3)
         ax.hlines(statistics.median(ys),i-.22,i+.22,color=COLORS[mode],lw=2)
     ax.set_xticks(range(3),['A: 2 identities','B: 2048 identities','C: 10-hop chains'],rotation=12)
-    ax.set_ylabel(ylabel);ax.set_ylim(bottom=0)
+    ax.set_ylabel(ylabel);ax.set_ylim(0,max(r[key] for r in rows)*1.12)
 
 def main():
     rows=list(csv.DictReader((OUT/'per-run.csv').open()))
@@ -34,17 +34,19 @@ def main():
     for ax,key,label in zip(axes.flat,['fast_p50_ms','fast_p95_ms','fast_p99_ms','closed_p95_ms'],['Fast receipt P50 (ms)','Fast receipt P95 (ms)','Fast receipt P99 (ms)','Closure observation P95 (ms)']):run_points(ax,rows,key,label)
     save(fig,'e8-latency')
     fig,axes=plt.subplots(1,3,figsize=(10,3),layout='constrained')
-    run_points(axes[0],rows,'service_core_ms_per_completion','9 services: core-ms / completion')
+    run_points(axes[0],rows,'service_core_ms_per_completion','9 services\ncore-ms / completion')
     for r in rows:r['payload_kib']=r['http_payload_bytes_per_ready']/1024;r['history_kib']=r['logical_service_bytes_per_payment']/1024
     run_points(axes[1],rows,'payload_kib','HTTP payload (KiB / payment)')
-    run_points(axes[2],rows,'history_kib','Retained logical KV growth (KiB / payment)')
+    run_points(axes[2],rows,'history_kib','Logical KV growth\nKiB / payment (9 services)')
     save(fig,'e8-resources')
-    fig,axes=plt.subplots(3,1,figsize=(8,6),sharex=True,layout='constrained')
+    fig,axes=plt.subplots(3,1,figsize=(8,6),sharex=True,sharey=True,layout='constrained')
     for ax,mode in zip(axes,'ABC'):
         for repeat in range(1,4):
             data=list(csv.DictReader((OUT/f'formal-{mode.lower()}{repeat}'/'timeline.csv').open()))
             ax.plot([int(x['Second']) for x in data],[int(x['Pending']) for x in data],STYLES[repeat-1],color=COLORS[mode],lw=1,label=f'Run {repeat}')
         ax.axvline(300,color='#777',ls=':',lw=.8);ax.set_ylabel(f'{mode}: pending');ax.set_ylim(bottom=0);ax.legend(ncol=3,loc='upper left')
+    peak=max(max(line.get_ydata()) for ax in axes for line in ax.lines)
+    axes[0].set_ylim(0,peak*1.12)
     axes[-1].set_xlabel('Seconds from formal-window start')
     save(fig,'e8-pending')
     bursts=[OUT/f'burst-c{i}' for i in range(1,4)]
@@ -55,7 +57,7 @@ def main():
             axes[0].plot(xs,[int(x['Pending']) for x in data],STYLES[i],color=COLORS['C'],lw=1,label=f'Run {i+1}')
             width=5
             axes[1].plot(xs[width:],[(int(data[j]['Sent'])-int(data[j-width]['Sent']))/width for j in range(width,len(data))],STYLES[i],color=COLORS['C'],lw=1)
-        for ax in axes:ax.axvspan(60,75,color='#E69F00',alpha=.18);ax.set_ylim(bottom=0)
+        for ax in axes:ax.axvspan(60,75,color='#E69F00',alpha=.18);ax.axvline(195,color='#777',ls=':',lw=.8);ax.set_ylim(bottom=0)
         axes[0].set_ylabel('Pending closure');axes[0].legend(ncol=3)
         axes[1].set_ylabel('Actual sends / s (5 s bins)');axes[1].set_xlabel('Seconds from formal-window start')
         save(fig,'e8-burst')

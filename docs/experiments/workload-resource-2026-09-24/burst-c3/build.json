@@ -1,0 +1,47 @@
+{
+  "commit": "85dabec7a84fd821404442eb0be6ece33a75d89f",
+  "binaries": {
+    "committee": "c283df865b8528a6db2738a9c0f3fda19d3d944045126d03c3b6c99e039e8f63",
+    "payctl": "d07f784d04792ac4c30bd5dd0ad06c327dba67f1991cbb8be7c5e4d03ba8da2a",
+    "member": "17b125eeb1581b75266e98100d6027584bc33f586c5f2f180a7c00d6196cc8ea",
+    "gateway": "0764e141463fae0c185a479e94d44748262f13967eff1e22fb88f1999c16dcc8"
+  },
+  "environment": {
+    "UTXO_EXPERIMENT_COMMIT": "250ms",
+    "UTXO_EXPERIMENT_FLUSH": "10ms",
+    "UTXO_EXPERIMENT_GOSSIP": "10ms",
+    "UTXO_EXPERIMENT_MEM_BLOCKSTORE": "1",
+    "UTXO_EXPERIMENT_COMMITTEE_MEMORY": "1",
+    "UTXO_EXPERIMENT_MEMBER_MEMORY": "1",
+    "UTXO_EXPERIMENT_GATEWAY_MEMORY": "1",
+    "UTXO_EXPERIMENT_BUDGET": "1",
+    "GOMAXPROCS": "16",
+    "GOGC": "200",
+    "UTXO_E8_METRICS": "1",
+    "UTXO_E8_LARGE_GENESIS": "1"
+  },
+  "source_commit": "d4a5edc63f44bc818977c98a045b4b9e768735b4",
+  "compiler_vcs": {
+    "committee": [
+      "build\tvcs.revision=85dabec7a84fd821404442eb0be6ece33a75d89f",
+      "build\tvcs.time=2026-09-24T06:06:55Z",
+      "build\tvcs.modified=true"
+    ],
+    "payctl": [
+      "build\tvcs.revision=5389f438a373fd1b93c93c172fb6a78b31c5b3e7",
+      "build\tvcs.time=2026-09-24T07:12:58Z",
+      "build\tvcs.modified=true"
+    ],
+    "member": [
+      "build\tvcs.revision=85dabec7a84fd821404442eb0be6ece33a75d89f",
+      "build\tvcs.time=2026-09-24T06:06:55Z",
+      "build\tvcs.modified=true"
+    ],
+    "gateway": [
+      "build\tvcs.revision=85dabec7a84fd821404442eb0be6ece33a75d89f",
+      "build\tvcs.time=2026-09-24T06:06:55Z",
+      "build\tvcs.modified=true"
+    ]
+  },
+  "note": "Only payctl was rebuilt for balanced C root ownership; A/B payment rules and all node binaries are unchanged. Commit field is the original build base; source_commit identifies the corrected implementation."
+}

@@ -1,0 +1,48 @@
+{
+  "source_commit": "5389f438a373fd1b93c93c172fb6a78b31c5b3e7",
+  "build": {
+    "commit": "85dabec7a84fd821404442eb0be6ece33a75d89f",
+    "binaries": {
+      "committee": "c283df865b8528a6db2738a9c0f3fda19d3d944045126d03c3b6c99e039e8f63",
+      "payctl": "1af620c63264e558becc1c66fbc67248d7dabf18b7ef35ef6a6efaa02f9feaab",
+      "member": "17b125eeb1581b75266e98100d6027584bc33f586c5f2f180a7c00d6196cc8ea",
+      "gateway": "0764e141463fae0c185a479e94d44748262f13967eff1e22fb88f1999c16dcc8"
+    },
+    "environment": {
+      "UTXO_EXPERIMENT_COMMIT": "250ms",
+      "UTXO_EXPERIMENT_FLUSH": "10ms",
+      "UTXO_EXPERIMENT_GOSSIP": "10ms",
+      "UTXO_EXPERIMENT_MEM_BLOCKSTORE": "1",
+      "UTXO_EXPERIMENT_COMMITTEE_MEMORY": "1",
+      "UTXO_EXPERIMENT_MEMBER_MEMORY": "1",
+      "UTXO_EXPERIMENT_GATEWAY_MEMORY": "1",
+      "UTXO_EXPERIMENT_BUDGET": "1",
+      "GOMAXPROCS": "16",
+      "GOGC": "200",
+      "UTXO_E8_METRICS": "1",
+      "UTXO_E8_LARGE_GENESIS": "1"
+    }
+  },
+  "source_sha256_lf": {
+    "cmd/internal/config/config.go": "dd5a5db77fb706d339ce1cb2a69858ecadc83e313456459e5c895f09b2fcd10f",
+    "cmd/internal/config/e8_metrics.go": "a27bacfddcbd781d14adb51201e0aa080ab1c91bd9dab989aa156e6f11c1130b",
+    "cmd/payctl/e8.go": "3b81c69b9b4db06acc6e851359ad855398c074f2b5f2694e7b793030be6865df",
+    "cmd/payctl/e8_audit.go": "2392c3d375a1eb718eb59e2f9eedc8733b2892d611037cd897f4934ce85387ed",
+    "cmd/payctl/e8_test.go": "66ec2202df8cfb0778d627744301013080be6f8070b2ade57d5428f38dec8be6",
+    "cmd/payctl/main.go": "265f20d91ee494ed4e267a7d9006d9463f8974b964f51427cae0cb344bb347ae",
+    "docs/experiments/workload-resource-2026-09-24/analyze.py": "31ad325526f53cc3f0c83ea894a631a4b0380d1243ca5f5924d37e2d70c5ed9f",
+    "docs/experiments/workload-resource-2026-09-24/reproduce.py": "b13ef738de45c076cc82096fa8758b1f47bb2c24a1e0433b5d3b06fccae91f54",
+    "docs/experiments/workload-resource-2026-09-24/suite.py": "a0c9a7a0fcf051d86b3cb6488cf616a6de80814ad3b6c7d45663bb05f6476649",
+    "docs/research/e8-workload-resource-plan-2026-09-24.md": "6316484da78fb8a3e2b61588409e84161e403f075da8ee81f9cc44c15b6b591f",
+    "internal/committee/app.go": "9850667302a7292dd10b56f59c0ee2e51354dbbfcd96a2fb5ddcef785e3bb523",
+    "internal/requesttrace/e8.go": "c6bd3c6ea2a620d487008b1b1b3e0336d7fc3b162e8f21e3b5c1a2579109e5cd",
+    "internal/store/e8.go": "f19cdce9f77d6fbc862be7d4cabd00c422cd590616d85cec6dc5fd808176fd7e",
+    "internal/store/ephemeral.go": "26fce57ccc7a27a41a1c2174af57f07048b25841bd93b656d21f4e5a30503297",
+    "internal/wallet/blocks.go": "1b0dfc1ad633952f5d8cd80249cf6c4bdea0e4c9d642d4386558dc930ae8d6ef",
+    "internal/wallet/multi_test.go": "dc6af43c981ceeb34f50315fab1e69050c038fe5157073d9edfafaf080c7f304",
+    "protocol/descriptor_cache.go": "9b5f02cf94604d9e82e7a98f2757bb65d63b535a63c20acc74f844114b5931e3",
+    "protocol/e8_metrics_test.go": "696a059904720bebb3dbdfbc3e66366477a97999e9dd956d32be4946ef01a76a",
+    "protocol/organization.go": "b7bd7c8e76587dd0378848e3ed424743705a8745902ce41ef230cfdf52f0f3c2"
+  },
+  "note": "Binaries were built from the uncommitted E8 patch on the recorded base commit; the same source was subsequently gofmt-normalized and committed. All formal cases reuse these exact binaries."
+}

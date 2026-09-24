@@ -15,6 +15,6 @@ for path in paths:
     hashes[path]=hashlib.sha256(disk).hexdigest()
 build=json.loads((OUT/'build.json').read_text())
 out={'source_commit':commit,'build':build,'source_sha256_lf':hashes,
-     'note':'Binaries were built from the uncommitted E8 patch on the recorded base commit; the same source was subsequently gofmt-normalized and committed. All formal cases reuse these exact binaries.'}
+     'note':'Initial binaries were built from the uncommitted E8 patch on the recorded base commit; the same source was subsequently gofmt-normalized and committed. Formal A1/B1 use this initial variant; later cases identify the balanced-driver variant in their own build manifests.'}
 (OUT/'source-manifest.json').write_text(json.dumps(out,indent=2)+'\n')
 print(commit)
