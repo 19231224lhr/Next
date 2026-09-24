@@ -1,5 +1,7 @@
 # Database work reduction (2026-09-20)
 
+> **历史材料，不是当前规范。** 保留设计来源与旧版行为，勿用于覆盖当前 wire 4 实现。当前入口：[系统设计](../../design/system.md)。
+
 Comet search indexing is disabled; followers prepare static material outside the
 writer; direct approvals retain immutable evidence with cumulative credits in
 LocalProgress; bbolt starts with a 16 MiB mapping. Sync, validation and atomic
@@ -13,7 +15,7 @@ computation for 100 payments fell from 22.045 to 6.220 ms in diagnostic rounds.
 Growing-database follow-ups showed no stable end-to-end mapping benefit, and
 intermediate patches were not uniformly faster. Real compensation, historical
 revision, late arrival, repaired-history restart, full tagged race/vet and builds
-passed. See [complete evidence and limits](experiments/database-optimization-2026-09-20/README.md).
+passed. See [complete evidence and limits](../../experiments/database-optimization-2026-09-20/README.md).
 
 # Committee verification reuse (2026-09-19)
 
@@ -29,7 +31,7 @@ time from 2.406 to 2.241 seconds (6.8%). Foreground pooled P95 increased from
 252.557 to 274.281 ms; its cause remains unresolved. Tagged full tests, focused
 race tests, vet, build and warm-cache historical-repair tests passed.
 
-See [implementation, stage comparisons and persistence findings](experiments/committee-verification-cache-2026-09-19/README.md).
+See [implementation, stage comparisons and persistence findings](../../experiments/committee-verification-cache-2026-09-19/README.md).
 These are bounded experiments, not a sustainable throughput claim.
 
 # Earlier wire4 increments (2026-09-19)
@@ -40,8 +42,8 @@ independent rolling lanes (4 submissions, 4 target INSTALL RPCs). Members persis
 a first fallback deadline of 2 seconds plus 250 ms per member index; duplicate
 INSTALL and restart preserve it. Only verified public completion ends retries.
 
-See [gateway scheduling results](experiments/gateway-relay100-2026-09-19/README.md)
-and [member fallback implementation and results](experiments/gateway-relay-fallback-2026-09-19/README.md).
+See [gateway scheduling results](../../experiments/gateway-relay100-2026-09-19/README.md)
+and [member fallback implementation and results](../../experiments/gateway-relay-fallback-2026-09-19/README.md).
 These are bounded batch experiments, not a sustained TPS claim. Retry timing
 remains durable; in-memory retry pacing is still a separate proposed optimization.
 
@@ -223,4 +225,4 @@ delays are explicit; precise consensus commit time is not inferred from these
 observations. Role-specific minimal receipt queries and committed-block proof
 reuse remain separate future experiments. Root fulfilment, archive, actual
 refills/reward claims and sustained high-TPS validation are still incomplete.
-See [implementation report and reproducible data](performance/backend-reduction-2026-09-18/README.md).
+See [implementation report and reproducible data](../../performance/backend-reduction-2026-09-18/README.md).

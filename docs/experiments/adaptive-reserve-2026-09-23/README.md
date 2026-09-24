@@ -20,7 +20,7 @@
 
 需求率使用实验预先声明的输入流，包含父、子两笔需求，重试不重复计数。不是已完成 TPS，也不是已实现的生产入口流量估计器。超过30秒未成证停止追加；补资十秒仍未在全员生效报错；无无限追加或自动清锁。
 
-见[实现规范](../../implementation-adaptive-reserve-v4.md)、[正式运行前冻结的对照条件](preregister.md)、[GPT 实现评审](gpt-implementation-review.json)。系数正式轮内不调参。
+见[实现规范](../../reference/implementation-adaptive-reserve-v4.md)、[正式运行前冻结的对照条件](preregister.md)、[GPT 实现评审](gpt-implementation-review.json)。系数正式轮内不调参。
 
 ## 运行条件
 

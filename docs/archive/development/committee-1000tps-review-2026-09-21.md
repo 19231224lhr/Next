@@ -1,5 +1,7 @@
 # 面向持续 1,000 TPS 的委员会架构评审
 
+> **历史材料，不是当前规范。** 保留设计来源与旧版行为，勿用于覆盖当前 wire 4 实现。当前入口：[系统设计](../../design/system.md)。
+
 日期：2026-09-21。状态：代码与已有实验的设计评审，尚未完成 1,000 TPS 验收；本轮未修改共识或运行参数。
 
 后续优先级更新：按用户要求，先针对单笔到 100 TPS 已暴露的延迟开展具体优化，不以 1,000 TPS 容量测试为前置条件。当前实施候选与参数依据见 [共识优化评审](committee-consensus-optimization-2026-09-21.md)。本文保留为后续目标容量验收参考。
@@ -110,10 +112,10 @@ GPT 阅读的公开代码为 `a5987b0`，当前工作树变化及运行数据由
 
 ## 证据
 
-- [实际入池与取池诊断](experiments/admission-wait-2026-09-21/README.md)
-- [单笔与 100 TPS 对照](experiments/single-vs-100tps-2026-09-21/README.md)
-- [已有传播参数对照](experiments/consensus-propagation-2026-09-20/README.md)
-- [当前 Comet 适配说明](../third_party/cometbft/README.md)
+- [实际入池与取池诊断](../../experiments/admission-wait-2026-09-21/README.md)
+- [单笔与 100 TPS 对照](../../experiments/single-vs-100tps-2026-09-21/README.md)
+- [已有传播参数对照](../../experiments/consensus-propagation-2026-09-20/README.md)
+- [当前 Comet 适配说明](../../../third_party/cometbft/README.md)
 - [Comet v0.38.26 应用契约](https://github.com/cometbft/cometbft/blob/v0.38.26/spec/abci/abci%2B%2B_app_requirements.md)：提案大小、确定性及提交契约；本报告不据官方文档推定本项目 TPS。
 - [Comet v0.38.26 mempool](https://github.com/cometbft/cometbft/blob/v0.38.26/docs/core/mempool.md)：自管交易池意味着接手存储、传播和提案责任，不能视为免费的简化。
 - [侧边栏评审](https://chatgpt.com/c/6aa8b2d7-b6f8-83ec-8e23-ea9f3b634e90)：本轮针对持续 1,000 TPS 的目标重新讨论；本文件为评审建议，不是性能达标声明。

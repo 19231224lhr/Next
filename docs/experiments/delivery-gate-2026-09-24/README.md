@@ -135,7 +135,7 @@ python3 docs/experiments/delivery-gate-2026-09-24/plot.py
 
 不能据此推出完整旧版两阶段协议的成本、等待式网关 handler 的真实容量、广域网性能、持久复制保证或相对外部系统优势。代理校准开销不能从正式分位数中直接相减。后台先公共成功而取消剩余 INSTALL 是原有规则，因此两组实际 INSTALL 工作量也不必完全相同。
 
-[预先制定的方案](../../research/e5-delivery-gate-ablation-design-2026-09-24.md) · [与 GPT 的评审记录](../../research/e5-delivery-gate-review-2026-09-24.md)
+[预先制定的方案](e5-delivery-gate-ablation-design-2026-09-24.md) · [与 GPT 的评审记录](e5-delivery-gate-review-2026-09-24.md)
 
 完整原始证据位于 [evidence](evidence/)，每份归档的大小和 SHA-256 记录在 manifest.json；归档不包含运行数据库或私钥。正式样本使用 v3 前缀，pilot 归档仅用于记录驱动问题。
 

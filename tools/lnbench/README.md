@@ -43,4 +43,4 @@ python3 tools/lnbench/lab.py stop pilot
 
 下一笔等上一笔发送端成功后再发；余额查询与静止等待计入整链时间，另存 `chain-checks.json`。这不是“SETTLED 瞬间最快续花”，也不是 LN 中逐笔追踪同一 UTXO。
 
-`run.py` 记录各进程 CPU/RSS 样本，并在每组前后等待通道 HTLC 清空。`suite.py` 为每次重复创建 fresh 通道并在结束后关闭节点；正式矩阵和对照边界见 [实验方案](../../docs/research/lightning-comparison-plan-2026-09-24.md)。Mac 长批次应在整个驱动外层使用 `caffeinate -i`，不要只覆盖部署过程。
+`run.py` 记录各进程 CPU/RSS 样本，并在每组前后等待通道 HTLC 清空。`suite.py` 为每次重复创建 fresh 通道并在结束后关闭节点；正式矩阵和对照边界见 [实验方案](../../docs/experiments/lightning-2026-09-24/lightning-comparison-plan-2026-09-24.md)。Mac 长批次应在整个驱动外层使用 `caffeinate -i`，不要只覆盖部署过程。

@@ -1,12 +1,14 @@
 # UTXO 快速转账系统开发计划
 
-> **公共提交修订（2026-09-19）：** 见[公共提交与新输出 TXCer 分离](../implementation-public-submission-v4.md)。委员会接收交易、组织消费授权及必要输入 TXCer，不接收本笔新 `OutputCertificate` 对象；保留原三票验证，普通新输出不预先登记担保。内部 INSTALL 继续保存完整 TXCer。采用新规则标识及新创世实验网。
+> **历史材料，不是当前规范。** 保留设计来源与旧版行为，勿用于覆盖当前 wire 4 实现。当前入口：[系统设计](../../design/system.md)。
+
+> **公共提交修订（2026-09-19）：** 见[公共提交与新输出 TXCer 分离](../../reference/implementation-public-submission-v4.md)。委员会接收交易、组织消费授权及必要输入 TXCer，不接收本笔新 `OutputCertificate` 对象；保留原三票验证，普通新输出不预先登记担保。内部 INSTALL 继续保存完整 TXCer。采用新规则标识及新创世实验网。
 
 
-> **当前工程修订（2026-09-19，wire 4）：** 采用[按块处理规范与验证记录](../implementation-block-following-v4.md)。委员会不生成或提供逐笔到账、核销证明；钱包与成员读取普通区块和执行结果，自行更新币和原签署额度。公共交易只保留直接输入 TXCer 及必要的组织消费与费用授权，本次新输出 TXCer 留在钱包与组织内部使用。三票持久签署、后台 INSTALL、原发行组织责任和真实历史输入替换保留。本文下方旧版的证明查询、专用核销接口及 wire 3 启动方式以此修订为准。
+> **当前工程修订（2026-09-19，wire 4）：** 采用[按块处理规范与验证记录](../../reference/implementation-block-following-v4.md)。委员会不生成或提供逐笔到账、核销证明；钱包与成员读取普通区块和执行结果，自行更新币和原签署额度。公共交易只保留直接输入 TXCer 及必要的组织消费与费用授权，本次新输出 TXCer 留在钱包与组织内部使用。三票持久签署、后台 INSTALL、原发行组织责任和真实历史输入替换保留。本文下方旧版的证明查询、专用核销接口及 wire 3 启动方式以此修订为准。
 
 
-修订日期：2026-09-19。当前分支 `implementation/direct-liability-v3` 已完成 [v1.2 直接担保与输入替换方案](./utxo-direct-liability-amendment-v1.2.md) 的核心支付与真实改写闭环；完整系统尚未验收。结果见 [实现记录](../implementation-v1.2.md)。旧 v1.1 保留为独立基线。下述旧模块计划继续作为职责参考，根资金、按依赖等待和追偿任务由本节新安排替代，不重复开发两套功能。
+修订日期：2026-09-19。当前分支 `implementation/direct-liability-v3` 已完成 [v1.2 直接担保与输入替换方案](utxo-direct-liability-amendment-v1.2.md) 的核心支付与真实改写闭环；完整系统尚未验收。结果见 [实现记录](../development/implementation-v1.2.md)。旧 v1.1 保留为独立基线。下述旧模块计划继续作为职责参考，根资金、按依赖等待和追偿任务由本节新安排替代，不重复开发两套功能。
 
 ## 0. 当前增量：三个模块阶段
 
@@ -26,7 +28,7 @@
 
 从现有设计落地一套 Go 支付系统原型，完成同组织与跨组织快速支付、散户普通转账、公共结算、担保履行、费用与额度周转，并完成持续运行测试和交付。
 
-以 [系统设计终稿](./utxo-fast-payment-system-design-final.md) 为协议依据，以 [Go 工程架构规范](./utxo-go-engineering-architecture-v1.0.md) 为代码、数据和接口依据。本计划只安排模块、开发顺序与验收，不重复架构中的字段、状态机和逐条规则。技术栈沿用 Go、bbolt、CometBFT、HTTP/TLS，初始化时验证兼容性并锁定版本。
+以 [系统设计终稿](utxo-fast-payment-system-design-final.md) 为协议依据，以 [Go 工程架构规范](utxo-go-engineering-architecture-v1.0.md) 为代码、数据和接口依据。本计划只安排模块、开发顺序与验收，不重复架构中的字段、状态机和逐条规则。技术栈沿用 Go、bbolt、CometBFT、HTTP/TLS，初始化时验证兼容性并锁定版本。
 
 首版范围沿用架构规范：统一 UTXO 账本、组织间直接互通、原担保责任不转移、散户直接提交委员会；采用一轮持久签票形成 SpendQC，钱包保存后可续花，INSTALL 与委员会登记在后台并行；保留真实资金/费用检查、累计核销和轻量归档。候选取消、授权退役释放、复杂恢复、动态成员及安全记录裁剪不纳入本轮。
 

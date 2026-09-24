@@ -4,7 +4,7 @@
 
 本实验检验双组织互操作、真实连续续花，以及完整支付路径对 HTTP 延迟的敏感性。它不是最大 TPS 测试，也不是多机 WAN 共识测试。
 
-[逐轮完整表](TABLES.md) · [实施与计时口径](METHOD.md) · [原始汇总](summary-all.json) · [评审记录](REVIEW.md) · [实验计划](../../research/e7-cross-org-network-plan-2026-09-24.md)
+[逐轮完整表](TABLES.md) · [实施与计时口径](METHOD.md) · [原始汇总](summary-all.json) · [评审记录](REVIEW.md) · [实验计划](e7-cross-org-network-plan-2026-09-24.md)
 
 ## 实验条件
 

@@ -1,14 +1,16 @@
 # UTXO 快速转账系统 Go 工程架构规范
 
-> **数据库工程修订（2026-09-20）：** 按块解析认证移到写事务外；事务内仍完成最新输入／额度裁决与游标原子更新。direct 成员采用不可变 Approval 加小型累计进度，成员本地 schema 升为 5（无自动迁移），其他节点及 wire 4 保持原版本。关闭未使用的 Comet 搜索索引，保留 BlockStore、按高度执行结果和恢复数据。详见[当前实现规范](../implementation-block-following-v4.md)及[数据库实测](../experiments/database-optimization-2026-09-20/README.md)。
+> **历史材料，不是当前规范。** 保留设计来源与旧版行为，勿用于覆盖当前 wire 4 实现。当前入口：[系统设计](../../design/system.md)。
 
-> **公共提交修订（2026-09-19）：** 见[公共提交与新输出 TXCer 分离](../implementation-public-submission-v4.md)。委员会接收交易、组织消费授权及必要输入 TXCer，不接收本笔新 `OutputCertificate` 对象；保留原三票验证，普通新输出不预先登记担保。内部 INSTALL 继续保存完整 TXCer。采用新规则标识及新创世实验网。
+> **数据库工程修订（2026-09-20）：** 按块解析认证移到写事务外；事务内仍完成最新输入／额度裁决与游标原子更新。direct 成员采用不可变 Approval 加小型累计进度，成员本地 schema 升为 5（无自动迁移），其他节点及 wire 4 保持原版本。关闭未使用的 Comet 搜索索引，保留 BlockStore、按高度执行结果和恢复数据。详见[当前实现规范](../../reference/implementation-block-following-v4.md)及[数据库实测](../../experiments/database-optimization-2026-09-20/README.md)。
+
+> **公共提交修订（2026-09-19）：** 见[公共提交与新输出 TXCer 分离](../../reference/implementation-public-submission-v4.md)。委员会接收交易、组织消费授权及必要输入 TXCer，不接收本笔新 `OutputCertificate` 对象；保留原三票验证，普通新输出不预先登记担保。内部 INSTALL 继续保存完整 TXCer。采用新规则标识及新创世实验网。
 
 
-> **当前工程修订（2026-09-19，wire 4）：** 采用[按块处理规范与验证记录](../implementation-block-following-v4.md)。委员会不生成或提供逐笔到账、核销证明；钱包与成员读取普通区块和执行结果，自行更新币和原签署额度。公共交易只保留直接输入 TXCer 及必要的组织消费与费用授权，本次新输出 TXCer 留在钱包与组织内部使用。三票持久签署、后台 INSTALL、原发行组织责任和真实历史输入替换保留。本文下方旧版的证明查询、专用核销接口及 wire 3 启动方式以此修订为准。
+> **当前工程修订（2026-09-19，wire 4）：** 采用[按块处理规范与验证记录](../../reference/implementation-block-following-v4.md)。委员会不生成或提供逐笔到账、核销证明；钱包与成员读取普通区块和执行结果，自行更新币和原签署额度。公共交易只保留直接输入 TXCer 及必要的组织消费与费用授权，本次新输出 TXCer 留在钱包与组织内部使用。三票持久签署、后台 INSTALL、原发行组织责任和真实历史输入替换保留。本文下方旧版的证明查询、专用核销接口及 wire 3 启动方式以此修订为准。
 
 
-> **2026-09-19 工程增量：** [v1.2 直接担保与输入替换方案](./utxo-direct-liability-amendment-v1.2.md) 规定新对象、身份、预算、责任、迟到及历史改写。已有 wire v3 隔离原型，直接责任、自动赔付、真实 BlockStore/Part 改写和重放已实测；包级职责、构建方式和剩余工作见 [实现记录](../implementation-v1.2.md)。沿用下述 Go 分层与 bbolt，不新增根责任服务。旧 TXCer 内嵌父交易、RootRecord、DEFERRED、零 CAL 转手和不可变交易字节定义以 v1.2 为准；以下 v1.1 正文是保留的基础架构，不代表两套资金规则在同链并用。
+> **2026-09-19 工程增量：** [v1.2 直接担保与输入替换方案](utxo-direct-liability-amendment-v1.2.md) 规定新对象、身份、预算、责任、迟到及历史改写。已有 wire v3 隔离原型，直接责任、自动赔付、真实 BlockStore/Part 改写和重放已实测；包级职责、构建方式和剩余工作见 [实现记录](../development/implementation-v1.2.md)。沿用下述 Go 分层与 bbolt，不新增根责任服务。旧 TXCer 内嵌父交易、RootRecord、DEFERRED、零 CAL 转手和不可变交易字节定义以 v1.2 为准；以下 v1.1 正文是保留的基础架构，不代表两套资金规则在同链并用。
 
 版本：工程规范 v1.1 · 一轮取证与后台 INSTALL  
 协议基线：`utxo-fast-payment-system-design-final.md`，协议 v1.1  
@@ -750,7 +752,7 @@ R 系列和未启用处罚策略明确标记“功能尚未启用、测试待实
 
 ## 17. 依据与外部资料
 
-协议依据：[UTXO 快速转账系统 v1.1 终稿](./utxo-fast-payment-system-design-final.md)。原始组织、委员会 v1.1 和费用 v0.1 文档按终稿的版本关系理解，已移入项目同级的历史归档目录。工程讨论记录见 [四轮工程评审记录](../Next-docs-archive-2026-09-17/utxo-go-engineering-review-notes.md)。后续开发流程见 [开发执行计划](./utxo-development-execution-plan-v1.0.md)。
+协议依据：[UTXO 快速转账系统 v1.1 终稿](utxo-fast-payment-system-design-final.md)。原始组织、委员会 v1.1 和费用 v0.1 文档按终稿的版本关系理解，已移入项目同级的历史归档目录。工程讨论记录见 [四轮工程评审记录](../../Next-docs-archive-2026-09-17/utxo-go-engineering-review-notes.md)。后续开发流程见 [开发执行计划](utxo-development-execution-plan-v1.0.md)。
 
 以下资料于 2026-09-17 核对；用于核实库的能力与接口，不代表本项目已完成依赖组合验证。
 

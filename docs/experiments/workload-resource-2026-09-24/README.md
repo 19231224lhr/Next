@@ -2,7 +2,7 @@
 
 > 已完成：9 轮五分钟主实验、3 轮突增实验，以及独立计时修正校验。主实验与突增共 **1,658,495 笔正式付款全部完成并通过审计**；预热、预跑及计时校验不混入这个样本数。
 
-[完整统计表](TABLES.md) · [逐轮 CSV](per-run.csv) · [聚合数据](aggregate.json) · [实验方案](../../research/e8-workload-resource-plan-2026-09-24.md) · [评审记录](../../research/e8-workload-resource-review-2026-09-24.md)
+[完整统计表](TABLES.md) · [逐轮 CSV](per-run.csv) · [聚合数据](aggregate.json) · [实验方案](e8-workload-resource-plan-2026-09-24.md) · [评审记录](e8-workload-resource-review-2026-09-24.md)
 
 ## 结果与结论
 

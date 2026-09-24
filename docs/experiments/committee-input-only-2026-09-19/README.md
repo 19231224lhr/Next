@@ -1,6 +1,6 @@
 # 公共提交与新输出 TXCer 分离：验证记录
 
-2026-09-19；基线 `0621131`。用户已澄清保留组织认证；按此边界实现公共 `DirectSubmission`（406）与内部 `DirectPayment`（405）分离，并去掉普通新输出的预先担保登记。实现说明见 [当前规范](../../implementation-public-submission-v4.md)。以下反例仅说明不能删除组织消费授权，不是对用户方案的否定。
+2026-09-19；基线 `0621131`。用户已澄清保留组织认证；按此边界实现公共 `DirectSubmission`（406）与内部 `DirectPayment`（405）分离，并去掉普通新输出的预先担保登记。实现说明见 [当前规范](../../reference/implementation-public-submission-v4.md)。以下反例仅说明不能删除组织消费授权，不是对用户方案的否定。
 
 ## 实现及验证结果
 

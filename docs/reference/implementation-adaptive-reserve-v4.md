@@ -49,6 +49,6 @@ delta_G  = round_up_100(1.5 × (H_target − A_min))
 
 先使用新创世与统一二进制。`-prepare-reserve -reserve-max N` 在节点启动前一次性预置资金源；重复初始化拒绝。正式对照脚本负责准备、启动、采样、有限排空和离线审计。
 
-见[冻结实验口径](experiments/adaptive-reserve-2026-09-23/preregister.md)和[复现脚本](experiments/adaptive-reserve-2026-09-23/reproduce.py)。不覆盖旧 E2 数据或性能基线。
+见[冻结实验口径](../experiments/adaptive-reserve-2026-09-23/preregister.md)和[复现脚本](../experiments/adaptive-reserve-2026-09-23/reproduce.py)。不覆盖旧 E2 数据或性能基线。
 
 动态组的组织备付少于固定组，不等于整个实验投入资本更少：例如 3,600 组织备付加 10,800 专用补资资金，仍是 14,400 总资本。报告分别列出组织余额时间积分、专用源资金、累计转入、完成量及部分批准。该功能验证 CAL 容量调节，不解决低工作权限、无限故障或长期不释放的全部活性问题。

@@ -2,7 +2,7 @@
 
 **实验已完成：十二轮网络控制、两轮校准和九轮正式对照全部通过。** 正式矩阵完成 **54,000 个两跳单位、108,000 笔付款、1,080 项唯一责任赔付**。结果支持所测条件下的直接责任兑现、后继支付有效性和受限历史输入修订，不是最高 TPS 或一般拜占庭安全证明。
 
-[实验设计](../../research/e3-liability-repair-experiment-design-2026-09-23.md) · [九轮明细](matrix.csv) · [完整统计](matrix-summary.json) · [网络序列](sequence-summary.json) · [证据清单](evidence/manifest.json) · [GPT 最终评审](../../research/e3-network-final-review-2026-09-23.json)
+[实验设计](e3-liability-repair-experiment-design-2026-09-23.md) · [九轮明细](matrix.csv) · [完整统计](matrix-summary.json) · [网络序列](sequence-summary.json) · [证据清单](evidence/manifest.json) · [GPT 最终评审](e3-network-final-review-2026-09-23.json)
 
 ## 1. 实验检验什么
 
@@ -159,7 +159,7 @@ python3 docs/experiments/liability-repair-2026-09-23/test_analyze.py
 
 **未覆盖：** 一般拜占庭安全、WAN、最高修复 TPS、无限持续赔付、崩溃恢复、轻客户端验证最新修订。组织内存与钱包 NoSync 不提供耐久恢复保证。三轮重复不等于 108,000 次独立实验重复；物化查询不是轻客户端证明。
 
-[GPT 最终评审](../../research/e3-network-final-review-2026-09-23.json)认可这一限定结论可作为 E3 主要实证依据；辅助评审不代替原始证据。
+[GPT 最终评审](e3-network-final-review-2026-09-23.json)认可这一限定结论可作为 E3 主要实证依据；辅助评审不代替原始证据。
 
 ## 8. 复现与证据
 

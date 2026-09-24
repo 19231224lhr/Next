@@ -92,4 +92,4 @@
 
 历史 Next 内存/NoSync 实验与这里的正常持久化 LND 不具有相同存储条件，不能直接用延迟或 TPS 比值宣称同等保障下的协议优势。对照主表还需要 Next 同步存储路径的同条件重测。
 
-复现工具：[tools/lnbench](../../../tools/lnbench/README.md)。完整边界：[实验方案](../../research/lightning-comparison-plan-2026-09-24.md)。
+复现工具：[tools/lnbench](../../../tools/lnbench/README.md)。完整边界：[实验方案](lightning-comparison-plan-2026-09-24.md)。

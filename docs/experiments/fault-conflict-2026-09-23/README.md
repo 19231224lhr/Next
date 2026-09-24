@@ -4,7 +4,7 @@
 
 同时保留两个真实限制：**完整材料尚未扩散时，网关暂停会阻断自主结算；并发冲突可能留下未决局部批准。** 实验通过不等于这两个边界消失。
 
-[实验方案](../../research/e4-fault-conflict-experiment-design-2026-09-23.md) · [九轮明细](matrix.csv) · [分阶段明细](phase-matrix.csv) · [完整统计](summary.json) · [证据清单](evidence/manifest.json) · [实施复核](../../research/e4-implementation-review-2026-09-24.json) · [最终结果复核](../../research/e4-result-review-2026-09-24.md)
+[实验方案](e4-fault-conflict-experiment-design-2026-09-23.md) · [九轮明细](matrix.csv) · [分阶段明细](phase-matrix.csv) · [完整统计](summary.json) · [证据清单](evidence/manifest.json) · [实施复核](e4-implementation-review-2026-09-24.json) · [最终结果复核](e4-result-review-2026-09-24.md)
 
 ## 实验目标
 

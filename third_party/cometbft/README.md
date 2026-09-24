@@ -17,7 +17,7 @@ Monetary changes execute at the new repair height, never retrospectively.
 
 The cryptographic package is supplied by this application's root module. This
 directory is a patch source bundle, not a standalone Comet distribution.
-See [implementation and evidence](../../docs/implementation-v1.2.md).
+See [implementation and evidence](../../docs/archive/development/implementation-v1.2.md).
 
 For local profiling, set both `UTXO_SETTLEMENT_TRACE=1` and
 `UTXO_COMET_PROFILE=1` before starting committee processes. The optional

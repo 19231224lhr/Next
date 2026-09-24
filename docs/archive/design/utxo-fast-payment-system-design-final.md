@@ -1,12 +1,14 @@
 # UTXO 快速转账系统完整设计（终稿）
 
-> **公共提交修订（2026-09-19）：** 见[公共提交与新输出 TXCer 分离](../implementation-public-submission-v4.md)。委员会接收交易、组织消费授权及必要输入 TXCer，不接收本笔新 `OutputCertificate` 对象；保留原三票验证，普通新输出不预先登记担保。内部 INSTALL 继续保存完整 TXCer。采用新规则标识及新创世实验网。
+> **历史材料，不是当前规范。** 保留设计来源与旧版行为，勿用于覆盖当前 wire 4 实现。当前入口：[系统设计](../../design/system.md)。
+
+> **公共提交修订（2026-09-19）：** 见[公共提交与新输出 TXCer 分离](../../reference/implementation-public-submission-v4.md)。委员会接收交易、组织消费授权及必要输入 TXCer，不接收本笔新 `OutputCertificate` 对象；保留原三票验证，普通新输出不预先登记担保。内部 INSTALL 继续保存完整 TXCer。采用新规则标识及新创世实验网。
 
 
-> **当前工程修订（2026-09-19，wire 4）：** 采用[按块处理规范与验证记录](../implementation-block-following-v4.md)。委员会不生成或提供逐笔到账、核销证明；钱包与成员读取普通区块和执行结果，自行更新币和原签署额度。公共交易只保留直接输入 TXCer 及必要的组织消费与费用授权，本次新输出 TXCer 留在钱包与组织内部使用。三票持久签署、后台 INSTALL、原发行组织责任和真实历史输入替换保留。本文下方旧版的证明查询、专用核销接口及 wire 3 启动方式以此修订为准。
+> **当前工程修订（2026-09-19，wire 4）：** 采用[按块处理规范与验证记录](../../reference/implementation-block-following-v4.md)。委员会不生成或提供逐笔到账、核销证明；钱包与成员读取普通区块和执行结果，自行更新币和原签署额度。公共交易只保留直接输入 TXCer 及必要的组织消费与费用授权，本次新输出 TXCer 留在钱包与组织内部使用。三票持久签署、后台 INSTALL、原发行组织责任和真实历史输入替换保留。本文下方旧版的证明查询、专用核销接口及 wire 3 启动方式以此修订为准。
 
 
-> **2026-09-19：已实现 [v1.2 直接担保与输入替换方案](./utxo-direct-liability-amendment-v1.2.md) 的隔离支付原型。** 分离 TXCer、当前输出直接责任、缺父先确认、变色龙历史输入替换、固定时间赔付及首版不追偿已进入代码；证据和未完成范围见 [实现记录](../implementation-v1.2.md)。该修订替代本文第 4.2、5、7.1、8 节相冲突的根责任、证书结构、纯转手零 CAL、依赖等待及迟到回收规则。以下 v1.1 正文保留为旧实现和旧实验基线，不是两种规则同时生效。v3 使用独立创世网络，不做旧链在线切换；高吞吐和长期容量仍待验收。
+> **2026-09-19：已实现 [v1.2 直接担保与输入替换方案](utxo-direct-liability-amendment-v1.2.md) 的隔离支付原型。** 分离 TXCer、当前输出直接责任、缺父先确认、变色龙历史输入替换、固定时间赔付及首版不追偿已进入代码；证据和未完成范围见 [实现记录](../development/implementation-v1.2.md)。该修订替代本文第 4.2、5、7.1、8 节相冲突的根责任、证书结构、纯转手零 CAL、依赖等待及迟到回收规则。以下 v1.1 正文保留为旧实现和旧实验基线，不是两种规则同时生效。v3 使用独立创世网络，不做旧链在线切换；高吞吐和长期容量仍待验收。
 
 版本：v1.1 · 一轮取证与后台 INSTALL，待原型验证  
 日期：2026-09-18  
@@ -22,9 +24,9 @@
 
 | 基础 | 保留 | 本文统一或调整 |
 |---|---|---|
-| [原组织设计](../Next-docs-archive-2026-09-17/guarantor-architecture.md) | 对等成员、Worker 私有额度、无权威收集器 | 签发改为一轮 SpendQC，INSTALL 后台化；正常额度回收沿用委员会累计核销 |
-| [原委员会设计 v1.1](../Next-docs-archive-2026-09-17/guarantor-committee-design-v1.1.md) | 长期授权、残余占用、累计核销、CometBFT、单写者 | 具体化根资金落实与后继消费，区分登记和实际完成 |
-| [原激励设计 v0.1](../Next-docs-archive-2026-09-17/cal-fuel-incentive-design-v0.1.md) | CAL/FUEL 分工、同证认证、费用托管、阶段分润 | 费用计划对应具体命令；本金、费用、未完成工作分别周转；后台安装不另设付款门槛 |
+| [原组织设计](../../Next-docs-archive-2026-09-17/guarantor-architecture.md) | 对等成员、Worker 私有额度、无权威收集器 | 签发改为一轮 SpendQC，INSTALL 后台化；正常额度回收沿用委员会累计核销 |
+| [原委员会设计 v1.1](../../Next-docs-archive-2026-09-17/guarantor-committee-design-v1.1.md) | 长期授权、残余占用、累计核销、CometBFT、单写者 | 具体化根资金落实与后继消费，区分登记和实际完成 |
+| [原激励设计 v0.1](../../Next-docs-archive-2026-09-17/cal-fuel-incentive-design-v0.1.md) | CAL/FUEL 分工、同证认证、费用托管、阶段分润 | 费用计划对应具体命令；本金、费用、未完成工作分别周转；后台安装不另设付款门槛 |
 
 本文是本轮讨论收敛的协议与架构规范。“终稿”表示首版设计边界确定，不表示安全证明、实现或性能验收已经完成。原文中的有限模型检查属于原方案记录；本文新增规则仍需要参考实现、联合模型检查和实测。
 
@@ -630,7 +632,7 @@ WorkCredit 管尚未完成的承诺；公共历史、未花 UTXO、输入消费�
 
 ## 15. 资料与版本关系
 
-三份基础文档、上一版统一设计及独立讨论记录已移入同级 `Next-docs-archive-2026-09-17` 目录，作为历史依据。Next 内以本文、[Go 工程架构规范](./utxo-go-engineering-architecture-v1.0.md) 和 [开发执行计划](./utxo-development-execution-plan-v1.0.md) 为开发主文档。与本文不同的根落实、FAST 入口及工作额度规则不能和旧规则混签，本版通过新部署固定 `ProtocolVersion=2` 及相应规则身份，线上受控迁移尚未提供。
+三份基础文档、上一版统一设计及独立讨论记录已移入同级 `Next-docs-archive-2026-09-17` 目录，作为历史依据。Next 内以本文、[Go 工程架构规范](utxo-go-engineering-architecture-v1.0.md) 和 [开发执行计划](utxo-development-execution-plan-v1.0.md) 为开发主文档。与本文不同的根落实、FAST 入口及工作额度规则不能和旧规则混签，本版通过新部署固定 `ProtocolVersion=2` 及相应规则身份，线上受控迁移尚未提供。
 
 - [R1] [Stingray: Fast Concurrent Transactions Without Consensus](https://arxiv.org/abs/2501.06531)：拜占庭有界计数器和争用恢复已有研究基础；本文不将它们列为原创。
 - [R2] [FastPay: High-Performance Byzantine Fault Tolerant Settlement](https://arxiv.org/abs/2003.11506)：预存资金和证书式快速支付的基线；其性能不能直接移植到本方案。
