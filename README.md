@@ -11,7 +11,7 @@
 > `e2-budget`、`e2-owner-fuel`、`e2-adaptive-reserve` 保留各阶段记录，其成果已合并到 `re`。
 > `e4-fault-conflict` 保留 E4 独立实验记录，其成果已合并到 `re`。
 > `e5-delivery-gate` 保留 E5 独立实验记录，其成果已合并到 `re`。
-> `ln-comparison` 在 `re` 基础上新增 **E6 Lightning/LND 同机延迟参考**及 Next 100 TPS 短测；当前 `e8-workload-resource` 在其基础上新增 **E8 多钱包、真实续花与资源成本**，共七组已完成实验。E6/E8 尚未合并到 `re`，E7 网络与多组织实验仍待实施。
+> `re` 已整合 **E1–E6 与 E8**，共七组已完成实验，包括 E6 Lightning/LND 同机延迟参考、Next 100 TPS 短测，以及 E8 多钱包、真实续花与资源成本。E7 网络与多组织实验仍待实施。
 
 ## 系统概览
 
