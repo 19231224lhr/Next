@@ -50,7 +50,9 @@ func OpenEphemeral(path string, id Identity) (*Ephemeral, error) {
 		return nil, e
 	}
 	tree := btree.NewG[state.Entry](32, func(a, b state.Entry) bool { return bytes.Compare(a.Key, b.Key) < 0 })
-	return &Ephemeral{view: orderedView{tree}, path: path, identity: id}, nil
+	db := &Ephemeral{view: orderedView{tree}, path: path, identity: id}
+	registerE8Store(db)
+	return db, nil
 }
 func (v orderedView) Get(k []byte) ([]byte, error) {
 	e, ok := v.tree.Get(state.Entry{Key: k})

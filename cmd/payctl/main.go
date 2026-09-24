@@ -12,6 +12,8 @@ func main() {
 	}
 	var err error
 	switch os.Args[1] {
+	case "e8":
+		err = e8Command(os.Args[2:])
 	case "init-lab":
 		err = initialize(os.Args[2:])
 	case "lab-run":

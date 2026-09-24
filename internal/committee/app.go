@@ -402,6 +402,7 @@ func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit
 		return nil, e
 	}
 	a.committed = *a.pending
+	requesttrace.E8Commit(a.pending.Height)
 	a.response = new(abci.ResponseFinalizeBlock)
 	if e = a.response.Unmarshal(a.pending.Response); e != nil {
 		a.halted = e

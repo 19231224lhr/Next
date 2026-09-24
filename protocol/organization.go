@@ -57,7 +57,15 @@ func (d ReceiveDescriptor) Verify(network Hash) error {
 		return ErrRule
 	}
 	if verifiedReceiveDescriptors.Contains(d) {
+		if descriptorMetricsEnabled {
+			descriptorQueries.Add(1)
+			descriptorHits.Add(1)
+		}
 		return nil
+	}
+	if descriptorMetricsEnabled {
+		descriptorQueries.Add(1)
+		descriptorVerifications.Add(1)
 	}
 	h := d.digest()
 	if !ed25519.Verify(d.Owner[:], h[:], d.Signature[:]) {
