@@ -20,8 +20,15 @@ def summarize(case):
     windows=[]
     for start in range(0,config['duration'],10):
         rows=[s for s in sent if start*1e9<=s['SentElapsedNS']<(start+10)*1e9]
-        windows.append(dict(start=start,tps=len(rows)/min(10,config['duration']-start),fast_ms=quantiles([s['Monotonic']['FastNS'] for s in rows if s['ReadyNS']>0])))
-    return dict(case=case.name,config={k:config[k] for k in ['mode','rate','duration','rtt','seed']},all=cohort(sent),first120=cohort([s for s in sent if s['SentElapsedNS']<120e9]),unsent=len(samples)-len(sent),chain_ms=quantiles([x for r in reports for x in (r['ChainNS'] or [])]),chain_count=sum(len(r['ChainNS'] or []) for r in reports),driver={k:sum(r[k] for r in reports) for k in ['Scheduled','SkippedPacing','NoReady','PendingFull','WorkerFull','ProgressErrors']},windows=windows)
+        windows.append(dict(start=start,tps=len(rows)/min(10,config['duration']-start),fast_ms=quantiles([s['Monotonic']['FastNS'] for s in rows if s['ReadyNS']>0]),public_ms=quantiles([s['Monotonic']['PublicNS'] for s in rows if s['PublicNS']>0])))
+    completed=[s['SentElapsedNS']+s['Monotonic']['PublicNS'] for s in sent if s['PublicNS']>0]
+    completion_windows=[dict(start=start,public_tps=sum(start*1e9<=t<(start+10)*1e9 for t in completed)/10) for start in range(0,config['duration']+10,10)]
+    resources=[json.loads(line) for line in (case/'resources.jsonl').read_text().splitlines()]
+    resources=[x for x in resources if x['phase']=='formal']
+    peak_pending=max((sum(s['Pending'] for s in x['status']) for x in resources),default=0)
+    oldest=max((s.get('OldestPendingNS',0) for x in resources for s in x['status']),default=0)/1e9
+    input_types={str(kind):cohort([s for s in sent if s['CertificateInput']==kind]) for kind in [False,True]}
+    return dict(case=case.name,config={k:config[k] for k in ['mode','rate','duration','rtt','seed']},all=cohort(sent),first120=cohort([s for s in sent if s['SentElapsedNS']<120e9]),per_org=[cohort([s for s in sent if s['Sender']%2==site]) for site in range(2)],input_types=input_types,planned=config['rate']*config['duration'],unsent=config['rate']*config['duration']-len(sent),unsent_samples=len(samples)-len(sent),chain_ms=quantiles([x for r in reports for x in (r['ChainNS'] or [])]),chain_count=sum(len(r['ChainNS'] or []) for r in reports),driver={k:sum(r[k] for r in reports) for k in ['Scheduled','SkippedPacing','NoReady','PendingFull','WorkerFull','ProgressErrors']},peak_pending=peak_pending,oldest_pending_s=oldest,windows=windows,completion_windows=completion_windows)
 
 if __name__=='__main__':
     root=Path(__file__).resolve().parent

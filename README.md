@@ -18,7 +18,7 @@
 
 > **研究原型 · wire 4 · Go / CometBFT**
 >
-> `re` 汇总最新代码、实验报告、图表与原始证据；`main` 保留性能基线。已完成 **E1–E6、E8 共七组实验**，[E7 跨组织与网络延迟实验](docs/research/e7-cross-org-network-plan-2026-09-24.md)已制定方案，待实施。
+> `re` 为实验集成分支，`main` 保留性能基线。本版本已完成 **E1–E8 共八组实验**，包含代码、报告、图表与原始证据。
 
 ## 实验总览
 
@@ -32,6 +32,7 @@
 | **E4 · 故障与冲突** | 单成员故障能否服务，冲突能否被阻止？ | 正式负载 **216,000 笔**全部完成；指定冲突用例通过 | [报告与图表](docs/experiments/fault-conflict-2026-09-23/README.md) |
 | **E5 · 交付门槛消融** | 后台 INSTALL 对快速交付有什么影响？ | 100 跳快速可用中位 **200.36 vs 287.98 ms** | [报告与图表](docs/experiments/delivery-gate-2026-09-24/README.md) |
 | **E6 · Lightning 参考** | 同机 LND 与本系统的实测延迟是什么？ | LND 收款 P50 **282.12 ms**；Next 补充轮 **0.963 ms**，配置与确认语义不同 | [报告与逐笔数据](docs/experiments/lightning-2026-09-24/README.md) |
+| **E7 · 跨组织与网络延迟** | 跨组织续花能否成立，通信变慢是否积压？ | **342,000 笔**正式付款全部完成；100 ms 跨站 RTT 下 ACK 约 **102 ms** | [报告与图表](docs/experiments/cross-org-network-2026-09-24/README.md) |
 | **E8 · 多钱包与资源** | 地址规模、真实续花如何影响性能和成本？ | **1,658,495 笔**正式已发付款全部完成；2048 钱包约 **494–499 TPS** | [报告与图表](docs/experiments/workload-resource-2026-09-24/README.md) |
 
 **阅读提示：** 各组的负载、存储模式和测量终点不同，不能直接拼成同一组性能结论。下文保留关键条件与边界，完整参数见各报告。
@@ -57,7 +58,7 @@
 
 ## 实验结果
 
-每组实验列出核心问题；展开详情可查看结果、对照条件与适用范围。E7 尚未实施，沿用原实验编号。
+每组实验列出核心问题；展开详情可查看结果、对照条件与适用范围。
 
 ### E1 · 真实连续续花
 
@@ -219,6 +220,26 @@ Next 补充轮实际发送 99.99 TPS，300 笔全部完成，含后台收尾共 
 
 </details>
 
+### E7 · 跨组织付款与网络延迟
+
+跨组织真实续花能否完成，HTTP 通信变慢时是否持续积压？
+
+<details>
+<summary>查看实验结果与适用范围</summary>
+
+双组织各四成员、一个网关，共享四委员；两独立钱包进程服务 64 个身份。统一实际输入 100 TPS，同/跨组织、独立最终输入/十跳续花四组，再对续花加入 20/100 ms 跨站 HTTP RTT，每条件三次重复。
+
+- **24 轮、342,000 笔正式付款全部完成并通过审计**，两组织各发送一半，没有丢弃计划机会或触发名额上限。
+- **同机路径接近：** 零注入时同/跨组织 ACK P50 均约 1.6 ms。20/100 ms 注入后，跨组织十跳负载的逐笔 ACK P50 约为 21.66/101.95 ms。
+- **五分钟持续性：** 100 ms 跨组织组每轮完成 30,000 笔；三轮待办采样峰值 106–110，最老待办约 1.2 秒，时间序列未见持续增长，最终排空。
+- **真实续花：** 共 169,677 个输入携带 TXCer，26,112 条完整十跳链；一项实际缺失来源责任正常履行。两类计数不能混为同一含义。
+
+ACK 从实际首发计到收款验证、原子接收后的确认返回，包含回程。所有进程仍在 Mac 同机，委员会 P2P 与组织内 INSTALL 不加延迟，采用内存实验模式。本实验不证明最大 TPS、多组织线性扩容或 WAN 共识能力；200 TPS 最高延迟失败预检也保留。
+
+[E7 完整报告](docs/experiments/cross-org-network-2026-09-24/README.md) · [逐轮统计表](docs/experiments/cross-org-network-2026-09-24/TABLES.md) · [实验方案](docs/research/e7-cross-org-network-plan-2026-09-24.md)
+
+</details>
+
 ### E8 · 多钱包负载与资源成本
 
 钱包数量增加、负载改为真实续花后，性能与资源开销如何变化？
@@ -348,6 +369,7 @@ bin/payctl audit -dir experiments/local-v4
 | [E4：故障可用性与冲突安全](docs/experiments/fault-conflict-2026-09-23/README.md) | 九轮共 216,000 笔全部完成；单成员故障服务、网关备用投递边界及冲突审计 |
 | [E5：快速交付门槛消融](docs/experiments/delivery-gate-2026-09-24/README.md) | 立即交付与等待额外保存门槛的对照 |
 | [E6：Lightning 同机延迟参考](docs/experiments/lightning-2026-09-24/README.md) | LND 与 Next 在各自配置下的实测延迟和比较边界 |
+| [E7：跨组织付款与网络延迟](docs/experiments/cross-org-network-2026-09-24/README.md) | 双组织真实续花、HTTP RTT 敏感性与五分钟待办曲线 |
 | [E8：多钱包负载与资源成本](docs/experiments/workload-resource-2026-09-24/README.md) | 2048 钱包、真实续花、突增负载与资源审计 |
 | [单组织整体 TPS](docs/experiments/single-org-tps-2026-09-22/README.md) | 快速签发、公共结算与成员收尾的完整系统吞吐 |
 | [四委员共识容量](docs/experiments/consensus-capacity-2026-09-22/README.md) | 独立测量委员会工作点、过载边界及资源开销 |
@@ -357,7 +379,7 @@ bin/payctl audit -dir experiments/local-v4
 | [网关并行投递](docs/experiments/parallel-relay-2026-09-19/README.md) | 公共提交、INSTALL 与保存的并行关系 |
 | [压测器发送与观察分离](docs/experiments/dispatch-lag-2026-09-20/PLAN.md) | 发送名额、后台未完成任务及测量口径 |
 
-完整 E1–E6、E8 导航见页首[实验总览](#实验总览)；以下运行与验证命令以 `re` 分支为准。
+完整 E1–E8 导航见页首[实验总览](#实验总览)；以下运行与验证命令以 `re` 分支为准。
 
 ## 运行配置与诊断
 
