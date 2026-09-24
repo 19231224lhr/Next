@@ -11,9 +11,10 @@ def main():
     p.add_argument('--topology',choices=['direct','routed','chain'],default='direct')
     p.add_argument('--rate',type=float,default=5)
     p.add_argument('--repeats',type=int,default=3)
+    p.add_argument('--latency-only',action='store_true')
     args=p.parse_args()
     for repeat in range(1,args.repeats+1):
-        name=f'{args.topology}-{args.rate:g}-r{repeat}'
+        name=f'{args.topology}-latency-r{repeat}' if args.latency_only else f'{args.topology}-{args.rate:g}-r{repeat}'
         lab=['python3','tools/lnbench/lab.py']
         setup=lab+['start',name]
         if args.topology=='routed':setup+=['--routed']
@@ -25,7 +26,8 @@ def main():
             else:
                 trial(name,'warmup',['-count','20'])
                 trial(name,'serial100',['-count','100'])
-                trial(name,'sustained',['-rate',str(args.rate),'-duration','180s'])
+                if not args.latency_only:
+                    trial(name,'sustained',['-rate',str(args.rate),'-duration','180s'])
         finally:
             if (ROOT/'.run'/('ln-'+name)/'manifest.json').exists():
                 subprocess.run(lab+['stop',name],cwd=ROOT,check=True,stdout=subprocess.DEVNULL)

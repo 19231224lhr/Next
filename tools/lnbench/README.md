@@ -4,7 +4,9 @@
 
 ## 当前验证状态
 
-已完成官方 ARM64 二进制校验、双节点真实付款预扫与一轮资金依赖续花；Go 工具通过单元测试、`go vet` 与 Darwin ARM64 交叉编译。**正式持续负载重复与路由拓扑仍待完成，当前结果属于预实验。** 见[实验记录](../../docs/experiments/lightning-2026-09-24/README.md)。SHA256 清单经官方 HTTPS 获取，尚未做发布者 PGP 签名验证。
+已完成官方 ARM64 二进制校验、双节点真实付款预扫与一轮资金依赖续花；Go 工具通过单元测试、`go vet` 与 Darwin ARM64 交叉编译。**按最新范围完成三轮同机单笔延迟实验，共 300 笔正式付款全部成功，不继续 TPS 与路由拓扑实验。** 见[实验记录](../../docs/experiments/lightning-2026-09-24/README.md)。SHA256 清单经官方 HTTPS 获取，尚未做发布者 PGP 签名验证。
+
+本轮复现：`python3 tools/lnbench/suite.py --latency-only --repeats 3`。每轮新建通道，预热 20 笔、正式顺序付款 100 笔，最后停止节点；默认不加此选项的旧模式仍包含负载测试。
 
 ## 部署与烟测
 
