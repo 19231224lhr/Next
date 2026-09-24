@@ -23,6 +23,31 @@
 
 ## 环境与口径
 
+### Next 补充负载测量：100 TPS，3 秒
+
+2026-09-24 在同一 Mac 上，从 `re` 对应代码 `b2f823e` 的独立工作树构建并运行现有完整闭环脚本；单组织 9 个服务进程，300 个独立最终输入，组织代付 FUEL，保留实验内存/钱包 NoSync 配置，commit=250ms，关闭细粒度埋点。该轮为固定速率输入，**与上方 LND 顺序付款的负载不同**，作为额外实现性能参考，不据此计算同负载加速倍数。
+
+| 指标 | 本轮结果 |
+| --- | ---: |
+| 计划 / 实际发送 / 快速成功 / 后台完成 | 300 / 300 / 300 / 300 |
+| 首次到末次发送跨度 | 2.990213 秒 |
+| 实际发送速率（299 个间隔） | 99.9929 TPS |
+| 快速到账 P50 / P95 / P99 | **0.9625 / 1.2075 / 2.9298 ms** |
+| 快速到账最大值 | 3.8655 ms |
+| 钱包观察公共确认 P50 | 600.9362 ms |
+| 全部成员完成观察 P50 | 619.6568 ms |
+| 全部 300 笔完整闭环总耗时 | 3.6764 秒 |
+| 采样未完成峰值 / 最终未完成 | 76 / 0 |
+| 发送名额 / 总未完成上限阻塞 | 0 / 0 |
+
+快速到账从钱包实际 HTTP 提交前，到收款钱包验签并完成本地接收；公共确认与成员完成均包含观察等待。四委员业务状态一致，成功执行 300、失败 0、待投递 0，账务审计通过。本轮说明短时 100 TPS 输入下能及时快速交付并排空后台，不证明长期稳态或最大容量。0.9625 ms 相比历史三次单笔 2.017 ms 的变化不能直接归为新优化：本轮没有修改业务代码，负载、连接复用与测量批次不同。
+
+证据：[汇总](ln-reference100/summary.json)、[逐笔数据](ln-reference100/reports/bench-v4-0.json)、[审计](ln-reference100/reports/audit.json)、[环境指纹](ln-reference100/metadata.json)。旧分析器 `windows` 固定按 30 秒计算，因此其中 10 TPS 是不完整窗口的摊薄值；本轮实际发送速率采用上述首末发送时间计算。
+
+复现：`python3 docs/experiments/single-org-tps-2026-09-22/reproduce.py ln-reference100 --count 300 --rate 100 --max-pending 4096 --member-memory --gateway-memory --wallet-no-sync --committee-memory --no-trace --commit-ms 250`，需使用未占用的新标签。
+
+### LND 配置
+
 - Mac Studio M4 Max，16 核 CPU、64 GB，macOS 26.6.2；原生 ARM64、节点与驱动均在 Mac 上通过 loopback 通信。
 - Bitcoin Core 31.1 regtest、官方 LND v0.21.3-beta（官方二进制 Go 1.26.6）；安装包按官方 HTTPS SHA256 清单校验。
 - 测量驱动 Go 1.25.13，常驻 TLS gRPC 与 macaroon 认证。Windows 仅远程控制，不在付款路径上。
