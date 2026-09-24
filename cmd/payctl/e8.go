@@ -174,6 +174,13 @@ type e8Lane struct {
 	Owner, Hop, Parent int
 	Busy               bool
 }
+
+func e8RootOwner(chain bool, lane e8Lane, recipient, wallets int) int {
+	// A new independent root belongs to the preceding chain's last recipient.
+	// This balances owner-paid fee inputs without spending the old chain tip.
+	if chain && lane.Owner >= 0 { return lane.Owner }
+	return (recipient+wallets-1)%wallets
+}
 type e8Job struct {
 	s      *e8Sample
 	lane   e8Lane
@@ -414,6 +421,7 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 	lanes := make([]e8Lane, o.Lanes)
 	for i := range lanes {
 		lanes[i].Parent = -1
+		lanes[i].Owner = -1
 	}
 	rotating := o.Seed % o.Wallets
 	cursor := 0
@@ -451,6 +459,8 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 			l.ID = protocol.OutputID{}
 			l.Hop = 0
 			l.Parent = -1
+			l.Owner = -1
+			if s.ReadyNS > 0 { l.Owner = s.Receiver }
 		}
 	}
 	start := time.Now()
@@ -537,7 +547,7 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 		to := rotating
 		rotating = (rotating + 1) % o.Wallets
 		if !o.Chain || l.ID == (protocol.OutputID{}) {
-			owner := (to + o.Wallets - 1) % o.Wallets
+			owner := e8RootOwner(o.Chain,l,to,o.Wallets)
 			if ci[owner] >= len(cal[owner]) {
 				err = fmt.Errorf("CAL pool exhausted owner %d", owner)
 				break
