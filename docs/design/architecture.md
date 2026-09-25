@@ -1,6 +1,6 @@
 # Next 工程架构与协议实现映射
 
-> **wire 4 · 代码审读基线 `1a2eed0a9df303585c086a76851670b6fe6ed8cc` · 2026-09-25**
+> **wire 4 · 可执行源码基线 `918acd3d56617cf0517466d8330784f4973bf9f2` · 复核于 2026-09-26**
 >
 > [系统设计](system.md)定义业务状态与转移；本文说明它们落在哪些进程、函数、存储和并发边界。本轮只重构文档，不增加新协议、不修改运行代码。旧名称 `v3.go`、构建标记 `comet_v3` 仍可能承载 wire 4，不可按文件名猜测协议版本。
 
@@ -36,6 +36,8 @@
 
 `protocol/v3.go` 中的 `FastTx` 把不可变 core 与可替换 Funding 分开；`SummaryFor` 将交易、输出、资源和 Grant 绑定成签署事实。业务层不能信任调用方预解析后的可变切片。
 
+普通网关 `POST /v3/transactions` 的响应体只有 `OutputCertificate.MarshalBinary()`，不包含独立输出正文，也没有向收款钱包主动推送。调用方从原付款请求取得输出正文，再调用 `ReceiveDirect(output, certificate, index)`。多数同机实验在负载器中完成这一调用；[E7 钱包](../../cmd/payctl/e7_wallet.go) 则通过 `e7Delivery` 和 `receive` 显式传递正文与证书。实验计时必须区分网关响应与收款接收完成。
+
 当前 Worker 由交易哈希首字节取模选择，成员份额均分给 Worker；没有旧方案中的自动调配公共池。所有 Worker 的状态仍经同一成员 Store 原子更新，不应把“预算分区”画成无共享状态的独立资金节点。
 
 同组织复用已验证配置与静态材料；跨组织同样校验原发行组织证据。支付路径没有省略所有者签名、输入冲突或三票检查的“可信组织内转账”特例。
@@ -47,6 +49,8 @@
 `DirectRequest` 供成员取证；`DirectPayment`（405）保存本次完整 TXCer 并向成员 INSTALL；`DirectSubmission`（406）提交委员会，保留组织消费授权、准入和直接输入证书，不再附本次新输出证书对象。
 
 新 TXCer 的交付与公共提交共用同一批准事实。分离封装不意味着取消组织认证，也不意味着任何带用户签名的快速请求都能直接通过公共规则。
+
+这里区分的是对象用途，并非 405 额外传输一份完整摘要、406 才删除它。[direct_payment.go](../../protocol/direct_payment.go) 中两者复用 `marshal(kind)`：编码交易、Admission、QC 和直接输入证书；405 解码时用交易与 Admission 重建 `OutputSummary`，恢复完整 `DirectPayment` 对象。不能据两个 Go 结构体的字段差异直接宣称减少了多少网络字节。
 
 ### 3.2 网关路径与成员路径尚不完全相同
 
@@ -66,6 +70,8 @@
 
 可信公共成功结果优先于迟到更新。执行前重读状态，INSTALL 和保存事务内检查 Observed；已删 outbox 不由旧副本恢复。HTTP 202 不能替代公共终态，也不能无限延后成员备用期限。
 
+`Member.InstallDirectClassified` 不只是存证：它验证完整付款，在同一事务中设置 CAL／FUEL 输入的本地 Consumed、保存完整材料并建立首次备用期限。未签票成员也会获得这项冲突约束，但不会因此新增 Approval／Debits 或取得可恢复额度；已 Observed 则直接无变化返回。
+
 快速响应已经发出之后，后台保存失败不会把已交付凭证撤回。因此安全依赖批准锁仍有效，活性另依赖完整材料可得和诚实重投；这正是提前交付与等待复制回执的取舍。
 
 ## 4. 委员会：静态预检与最新状态裁决分离
@@ -76,7 +82,9 @@
 
 `CheckTx／PrepareProposal／ProcessProposal → FinalizeBlock → Commit`
 
-静态检查可复用已验证的完整报文；提案选择受实际块字节等配置限制，不以祖先已到达为排序前提。按块执行由单写者顺序处理，交易 Overlay 成功后合并到块状态，块末统一生成状态修改并提交。
+静态检查可复用已验证的完整报文；提案选择受实际块字节等配置限制，不以祖先已到达为排序前提。规则函数生成单笔 Transition，`Engine.ExecuteAt` 在其成功变化上追加付款位置，`FinalizeBlock` 将成功项顺序合并到块级 Overlay，`Commit` 用一次 Store.Update 应用修改及提交元数据。拒绝项只记录错误执行结果，不合并其修改。
+
+`Engine.NewEngine` 在首次创世加载中按真实 CAL／FUEL 账户聚合 Grant 总额并检查不超过余额；形式模型须保留这个已实现约束，而把运行期偿付作为另一个证明问题。
 
 `CheckTx` 接受不等于已消费输入，也不承诺以后执行成功。`FinalizeBlock` 对当前余额、输入、Grant 和责任状态继续检查；业务拒绝或幂等空执行不能被跟块方当成新增成功付款。
 
@@ -118,11 +126,11 @@ Store 后端可选内存或 bbolt，`Group` 合并已经排队的更新：每个
 
 回调只使用传入 ReadView，不在事务里重新进入同一 Store、调用网络或等待其他任务。停止接入后等待后台保存、relay、follower 退出，再关闭共享 Store，避免关闭期间丢任务或持锁等待。
 
-内存模式仍有状态和原子事务；NoSync 仍写数据库，只是不等待同步耐久落盘。应用 DB、Comet BlockStore、WAL、FilePV 各有配置，不能把应用内存模式写成整个系统完全无磁盘操作。停机审计快照不等于可恢复数据库。
+内存模式仍有状态和原子事务；NoSync 仍写数据库，只是不等待同步耐久落盘。当前 `cmd/member/main.go` 默认调用 OpenNoSync，设置 `UTXO_EXPERIMENT_MEMBER_MEMORY=1` 才调用 OpenEphemeral；二者都不提供掉电耐久恢复保证。网关默认调用 Open，不能把成员默认配置套到所有角色。应用 DB、Comet BlockStore、WAL、FilePV 各有配置，不能把应用内存模式写成整个系统完全无磁盘操作。停机审计快照不等于可恢复数据库。
 
 ## 6. 跟块、权限与钱包同步
 
-[finality/block.go](../../finality/block.go) 的 `VerifyBlock` 验证 H 区块与 H+1 签名头的网络、高度、验证者集合、LastBlockID、交易数据哈希和 LastResultsHash。普通 `/block`、`/block_results`、`/commit` 提供材料；必要后继结果块仍需产生。
+[finality/block.go](../../finality/block.go) 的 `VerifyBlock` 验证 H 区块与 H+1 签名头的网络、高度、验证者集合、后继 `LastBlockID.Hash` 与 H 块哈希的关联、交易 DataHash、LastResultsHash 及后继 commit。此函数不重新验证 H 的完整 PartSetHeader；不能把普通跟块说成完整修订分片证明。普通 `/block`、`/block_results`、`/commit` 提供材料；必要后继结果块仍需产生。
 
 [blockfollow/follow.go](../../internal/blockfollow/follow.go) 的 `Commit` 先准备可应用内容，再在 Store 事务内核对连续 Cursor、应用变化并推进游标。重复同块不重复应用；准备阶段不能以旧快照绕过事务内进度校验。
 
@@ -134,7 +142,7 @@ Store 后端可选内存或 bbolt，`Group` 合并已经排队的更新：每个
 
 这三个函数是形式模型连接公共账本与本地重叠授权的关键。成员无需事先收到 INSTALL 才能处理自己已有批准的公共结果；未实际批准的成员也不能借跟块凭空恢复额度。
 
-钱包按成功结果收集本金及费用输出，将已有币标记最终并保留消费标记；赔付没有新增用户收款。迟到实例 1 与正常实例 0 分开，晚到 TXCer 不能覆盖已确认的迟到实例。
+钱包按成功结果收集本金及费用输出。正常来源最终化实例 0；赔付没有新增用户收款；赔付后迟到来源单独写实例 1，不删除既有实例 0。`KeyWalletSpend` 独立保存本钱包发送请求形成的消费标记，跟块写币不会清掉它；此处不等于实现了多设备钱包的全部支出同步。晚到 TXCer 不能覆盖已确认的迟到实例。
 
 ## 7. 真实历史修订与共识适配
 
@@ -153,13 +161,15 @@ Store 后端可选内存或 bbolt，`Group` 合并已经排队的更新：每个
 | `Execute` | 新块原子应用赔付与授权，保存修订正文和物化待办 |
 | `Materialize` | 按已提交授权改写真实 BlockStore，旧版本或重复任务不二次扣款 |
 
-输入承诺与分片承诺分别约束交易和区块传播表示，三份修订材料也不替代公共 BFT 对修复命令的确认。密码学模块使用 RSA 门限适配及上下文绑定；不提供 DKG 或 Go 大整数恒时保证。
+输入承诺与分片承诺分别约束交易和区块传播表示。`ReplaceInput` 与 `CompleteParts` 用门限贡献构造新 opening；上链的 `RepairInput` 保存适配后的交易字节、分片 opening 及 Base／Previous／Next，公共执行验证最终适配结果与精确授权关系，不重新验证三份成员贡献。这些构造步骤不替代公共 BFT 对修复命令的确认。密码学模块使用 RSA 门限适配及上下文绑定；不提供 DKG 或 Go 大整数恒时保证。
 
 ### 7.2 Comet 的边界
 
-[types/redaction.go](../../third_party/cometbft/types/redaction.go) 处理稳定交易／分片承诺；[store/redaction.go](../../third_party/cometbft/store/redaction.go) 的 `ReviseBlock` 需要应用授权回调、版本与正文摘要匹配，并验证 BlockID／PartSetHeader 不变。
+[types/redaction.go](../../third_party/cometbft/types/redaction.go) 处理稳定交易／分片承诺；[store/redaction.go](../../third_party/cometbft/store/redaction.go) 的 `ReviseBlock` 检查本地修订版本次序、BlockID／PartSetHeader 不变，并调用应用授权回调精确核对新正文。Base／Previous 与规范旧正文的核对在 `InputTarget/nextBody/Execute` 公共授权阶段完成，物化时不重复将当前物理旧正文与 Previous 比对。
 
 首次改写保留原始块，`LoadOriginalBlock` 等接口供初始重放和同步。普通业务跟块读取原始执行版本，修订影响通过新块事件解释。最新物理正文、原始执行历史和经济状态是三个相关但不同的视图。
+
+固定版本的 [overlay.py](../../third_party/cometbft/overlay.py) 将 `consensus/replay.go` 与 `blocksync/reactor.go` 的读取接到 `LoadOriginalBlock`，将 `consensus/reactor.go` 的追块分片读取接到 `OriginalBlockPart`；当前生成源码也包含这些调用。这个结论限定于已列出的重放、blocksync 和共识追块路径，不代表另行实现了完整状态快照同步。
 
 原有 BFT 投票轮次及法定人数保留，数据承诺和历史表示已经适配，因此不能与未修改 Comet 网络直接互通，也不能只引用原共识证明就宣布修订协议安全。
 
@@ -170,8 +180,9 @@ Store 后端可选内存或 bbolt，`Group` 合并已经排队的更新：每个
 | 内存 Store、NoSync、Comet MemDB | 改变耐久性和性能配置，不改变输入和账务检查；需限制故障模型 |
 | 静态缓存、编码复用、Group | 减少重复工作；要保持同样的验证结果和原子可见性 |
 | 早发队列、并发配额、重试定时 | 改变调度；不能提前改变业务终态 |
-| 等待 INSTALL 的交付门槛开关 | E5 消融基线；正常模式仍为后台 INSTALL |
-| 序列化取证 gate | 默认关闭的 E2 实验选项；不把正常协议描述为逐笔等待全局串行 |
+| E5 外置交付代理 | B 模式等待三个不同成员的实际保存或已验证公共成功，先满足者放行；不是网关正常路径中的第二轮认证 |
+| E2 只取证接口 | `UTXO_EXPERIMENT_BUDGET=1` 才注册 `/debug/budget/collect`；构造证书后不调用正常早发／发布保存，用于独立控制父交易公开时机 |
+| 序列化取证 gate | `UTXO_EXPERIMENT_SERIAL_DIRECT=1` 启用，默认关闭；该模式在取证成功后同步保存结果再返回，不应套用正常模式“所有完整结果保存均在响应后”的描述 |
 | 动态补资控制器 | `internal/reservecontrol` 的水位策略与 `cmd/payctl` 观测；真实管理命令才改变资金 |
 | 负载器与观察器 | 测发送、快速接收、公共观察及成员完成；观测查询不属于私有委员会通知 |
 
@@ -198,6 +209,8 @@ Store 后端可选内存或 bbolt，`Group` 合并已经排队的更新：每个
 3. 原批准、累计 Applied、公开结果与本地权限释放的关系。
 4. 新块经济授权、旧块允许表示与原始重放一致性的关系。
 
-本轮执行了带 `comet_v3` 标记的 protocol、rules、member、gateway、wallet、committee、blockfollow、redaction、finality、reservecontrol 现有测试，均通过（Go 使用已有测试缓存）；本轮未新增性能实验。
+2026-09-26 复核使用 `go test -count=1 -tags=comet_v3` 重跑 protocol、rules、member、gateway、wallet、committee、blockfollow、redaction、finality、reservecontrol、cmd/gateway、cmd/payctl，共 12 个包，全部通过，没有使用测试结果缓存。另外重跑 Comet store 的 `TestCatchupCandidate*`，通过。两份设计文档的 58 个本地链接均有效，`git diff --check` 通过；本轮未修改业务代码或新增性能实验。
+
+本次按完整源文件与 [GPT](https://chatgpt.com/c/6aa8b2d7-b6f8-83ec-8e23-ea9f3b634e90) 分批交叉复核，范围覆盖 wire 4 协议、批准与接收、后台投递、公共执行、费用与责任、跟块、受限修订及相关装配。修正集中在 INSTALL 的本地消费状态、交付接口、405／406 编码、创世覆盖检查、NoSync 默认值、跟块与历史物化各自的验证边界。审阅结论限定于这些已核查路径；旧兼容协议、未枚举的故障轨迹及一般密码学安全不由本轮推出，形式化等价证明仍未进行。
 
 构建与运行见[运行指南](../operations.md)，精确字段见[实现参考](../reference/README.md)，论文证据见[E1–E8](../experiments/README.md)。业务代码、回归测试、Comet 补丁、实验驱动及原始结果都属于可复现材料；生成的二进制、数据库和上游展开副本不属于新增源代码。
