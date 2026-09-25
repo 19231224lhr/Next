@@ -1,0 +1,80 @@
+package main
+
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/json"
+	"os"
+	"time"
+	"utxo/internal/committee"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/internal/store"
+	"utxo/internal/testkit"
+	"utxo/protocol"
+)
+
+func check(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	check(err)
+	var results []map[string]any
+	for _, mode := range []string{"external_source", "same_account", "other_reserve_source"} {
+		f := testkit.NewFixture("security-alias", "target", 1)
+		probe := protocol.ReserveIncrease{}
+		probe.Sign(f.Owner)
+		subject := probe.Subject
+		sourceID := protocol.ReserveFundingAccount(f.Org.Network, subject)
+		if mode == "same_account" {
+			f.Org.Org = sourceID
+		}
+		g := state.Grant{ID: protocol.Digest("target-grant", nil), Organization: f.Org.Hash(), Key: protocol.ResourceKey{Kind: protocol.ResourceCAL, Account: f.Org.Org, Version: 1}, Amount: 1000, Subject: subject}
+		cfg := committee.EngineConfig{Network: f.Org.Network, Organizations: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Genesis: state.Genesis{Network: f.Org.Network, Grants: []state.Grant{g}}, Accounts: []committee.GenesisAccount{{Owner: f.Org.Org, Asset: protocol.AssetCAL, Balance: 1000}}, Direct: &rules.DirectSettings{Modulus: key.N.Bytes(), TimeoutSeconds: 30, RepairCost: 5}}
+		initial := uint64(1000)
+		if mode != "same_account" {
+			cfg.Accounts = append(cfg.Accounts, committee.GenesisAccount{Owner: sourceID, Asset: protocol.AssetCAL, Balance: 1000})
+			initial += 1000
+		}
+		sourceRequired := uint64(0)
+		if mode == "other_reserve_source" {
+			other := testkit.NewFixture("security-alias", "source", 1).Org
+			other.Org = sourceID
+			cfg.Organizations = append(cfg.Organizations, other)
+			cfg.Genesis.Grants = append(cfg.Genesis.Grants, state.Grant{ID: protocol.Digest("source-grant", nil), Organization: other.Hash(), Key: protocol.ResourceKey{Kind: protocol.ResourceCAL, Account: sourceID, Version: 1}, Amount: 1000, Subject: subject})
+			sourceRequired = 1000
+		}
+		db := store.NewMemory()
+		engine, err := committee.NewEngine(cfg, db)
+		check(err)
+		c := protocol.ReserveIncrease{Network: f.Org.Network, Organization: f.Org.Hash(), Grant: g.ID, Key: g.Key, Previous: 1000, Amount: 100}
+		c.Sign(f.Owner)
+		raw, err := c.MarshalBinary()
+		check(err)
+		check(db.Update(func(v state.ReadView) ([]state.Change, error) {
+			tr, e := engine.ExecuteAt(v, raw, committee.BlockContext{Height: 1, Time: time.Unix(100, 0)})
+			return tr.Changes, e
+		}))
+		var final, sourceBalance uint64
+		check(db.View(func(v state.ReadView) error {
+			for _, a := range cfg.Accounts {
+				balance, _, e := state.Load[uint64](v, rules.AccountKey(a.Owner, a.Asset))
+				if e != nil {
+					return e
+				}
+				final += balance
+				if a.Owner == sourceID {
+					sourceBalance = balance
+				}
+			}
+			return nil
+		}))
+		results = append(results, map[string]any{"case": mode, "genesis_accepted": true, "command_accepted": true, "initial_total_cal": initial, "final_total_cal": final, "source_balance_after": sourceBalance, "source_backing_required": sourceRequired})
+		check(db.Close())
+	}
+	check(json.NewEncoder(os.Stdout).Encode(results))
+}

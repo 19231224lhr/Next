@@ -81,6 +81,7 @@ TPS 实验使用独立最终 UTXO、少量地址高复用；续花实验使用�
 | 查阅 E1–E8、性能数据与复现材料 | [实验总索引](docs/experiments/README.md) |
 | 查阅消息、费用、跟块与补资细节 | [现行实现参考](docs/reference/README.md) |
 | 准备论文模型与安全论证 | [安全证明文献调研](docs/research/fast-payment-security-proof-survey-2026-09-25.md) |
+| 查阅源码安全分析与已知问题 | [安全分析与证明准备](docs/research/security-analysis-2026-09-26.md) |
 | 追溯旧版规范与工程决策 | [历史归档与迁移表](docs/archive/README.md) |
 
 两份设计文档已按 wire 4 当前代码重新梳理，包含快速取证、直接缺口执行、权限释放、用户自付费用、赔付与历史修订的完整流程，并列出原子状态转移及代码／测试映射。假设和待证明性质已明确；正式形式化模型与安全证明仍是下一阶段工作，实验通过不替代证明。
