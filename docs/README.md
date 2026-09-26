@@ -8,6 +8,7 @@
 | [工程架构与实现映射](design/architecture.md) | 关键函数、并发和存储边界、共识适配、现有回归测试与模型对应关系 |
 | [系统模型与条件安全论证](research/security-argument-wire4.md) | 论文模型、认证与唯一消费、动态预算到真实备付的推导、CAL/FUEL 记账及 E1–E8 证据映射；明确尚未完成的精化与密码学义务 |
 | [组合安全论证与实现对应](research/security-composition-wire4.md) | 统一状态、一般参数条件归纳、关键写入口与提交边界，8 个真实跨层回归；区分手工推导和机械验证 |
+| [门限哈希与共识接口论证](research/security-redaction-consensus-wire4.md) | 公开适配、公共授权与历史表示分层；原始分片绑定修复、回归和未完成的密码学义务 |
 | [第一轮有限模型与实现验证](research/security-model-validation-2026-09-26.md) | 16 个有限配置、七类错误反例及账务投影原始日志 |
 | [安全分析与最小修正计划](research/security-implementation-plan.md) | `security-analysis` 专用分支的模型、代码回归、修订接口审查及性能验收顺序 |
 | [安全分析与证明准备](research/security-analysis-2026-09-26.md) | 条件安全论证、动态预算草图、已复现的补资配置缺陷及活性边界；尚非完整证明 |
@@ -25,4 +26,4 @@
 
 ## 下一阶段
 
-已形成[条件安全论证](research/security-argument-wire4.md)，并完成分解有限检查和[组合模型的手工归纳及代码连接](research/security-composition-wire4.md)。下一步集中于 R6 的密码学与修改后共识接口；全程序精化仍是独立义务。以上工作没有改变付款生产代码，也没有把测试通过当作全面形式化验证。
+已形成[条件安全论证](research/security-argument-wire4.md)、分解有限检查、[组合模型的手工归纳及代码连接](research/security-composition-wire4.md)，以及 [R6 修订接口分层论证](research/security-redaction-consensus-wire4.md)。R6 阶段对实时共识分片增加原始 opening 检查；完整门限密码学归约、全程序精化和共识栈机械验证仍单列未完成，不把测试通过当作全面形式化验证。

@@ -18,6 +18,7 @@ import (
 	dbm "github.com/cometbft/cometbft-db"
 	"github.com/cometbft/cometbft/consensus"
 	"github.com/cometbft/cometbft/crypto/ed25519"
+	cmtcons "github.com/cometbft/cometbft/proto/tendermint/consensus"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/cometbft/cometbft/store"
 	"github.com/cometbft/cometbft/types"
@@ -25,6 +26,94 @@ import (
 )
 
 const chain = "utxo-v3-redaction-gate"
+
+// Isolates the extra admission check; this is not a consensus TPS benchmark.
+func BenchmarkOriginalPartGate(b *testing.B) {
+	var opening chameleon.Opening
+	opening[chameleon.Size-1] = 1
+	part := &types.Part{Redaction: &types.PartRedaction{Height: 1, Opening: opening}}
+	cases := []struct {
+		name string
+		gate func(*types.Part, int64) error
+	}{
+		{"legacy_label_only", func(p *types.Part, height int64) error {
+			if p != nil && p.Redaction != nil && (p.Redaction.Height != height || p.Redaction.Revision != 0) {
+				return types.ErrRedaction
+			}
+			return nil
+		}},
+		{"canonical_opening", (*types.Part).ValidateOriginal},
+	}
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				if err := tc.gate(part, 1); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// The revision label is not part of the commitment: an old valid adaptation
+// must not enter live consensus merely by relabelling it as revision zero.
+func TestConsensusRejectsRelabelledOpening(t *testing.T) {
+	p, signers, vals, _ := committee(t)
+	oldTx := types.EncodeRedactableTx([]byte("fixed"), []byte("old"))
+	b := block(t, 1, oldTx, &types.Commit{}, vals)
+	initial, err := b.MakePartSet(types.BlockPartSizeBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if initial.Total() != 1 {
+		t.Fatal("fixture must fit one part")
+	}
+	pb, err := b.ToProto()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pb.Data.Txs[0] = types.EncodeRedactableTx([]byte("fixed"), []byte("new"))
+	body, err := pb.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := initial.GetPart(0)
+	ctx := types.RedactionContext(1, 0)
+	c, err := p.Digest(ctx, old.Bytes, old.Redaction.Opening)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := adapt(t, p, signers, ctx, old.Bytes, body, c, old.Redaction.Opening)
+	revised, err := types.NewRedactablePartSet(body, types.BlockPartSizeBytes, 1, 1, []chameleon.Opening{r})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !revised.Header().Equals(initial.Header()) {
+		t.Fatal("fixture must retain the signed root")
+	}
+	part := revised.GetPart(0)
+	part.Redaction.Revision = 0 // Attacker-controlled metadata, no private key needed.
+	wire, err := part.ToProto()
+	if err != nil {
+		t.Fatal(err)
+	}
+	part, err = types.PartFromProto(wire)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Generic inclusion still succeeds; consensus needs an additional rule.
+	received := types.NewPartSetFromHeader(initial.Header())
+	if _, err := received.AddPart(part); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&consensus.BlockPartMessage{Height: 1, Part: part}).ValidateBasic(); err == nil {
+		t.Fatal("live consensus accepted relabelled adapted opening")
+	}
+	if _, err := consensus.MsgFromProto(&cmtcons.BlockPart{Height: 1, Part: *wire}); err == nil {
+		t.Fatal("network message decoder accepted relabelled adapted opening")
+	}
+}
 
 func TestConsensusRejectsUncertifiedPartRevision(t *testing.T) {
 	_, _, vals, _ := committee(t)
@@ -46,6 +135,19 @@ func TestConsensusRejectsUncertifiedPartRevision(t *testing.T) {
 	part.Redaction.Height = 2
 	if err = msg.ValidateBasic(); err == nil {
 		t.Fatal("part context height differs from consensus height")
+	}
+	part.Redaction.Height = 1
+	part.Redaction.Opening[0] = 1
+	if err = msg.ValidateBasic(); err == nil {
+		t.Fatal("noncanonical original opening accepted")
+	}
+	part.Redaction = nil
+	if err = msg.ValidateBasic(); err == nil {
+		t.Fatal("missing redaction metadata accepted")
+	}
+	msg.Part = nil
+	if err = msg.ValidateBasic(); err == nil {
+		t.Fatal("missing part accepted")
 	}
 }
 
@@ -264,6 +366,31 @@ func TestRealBlockStoreRewriteAndOriginalReplay(t *testing.T) {
 	}
 	if !bytes.Equal(origin.Data.Txs[0], originalTx) {
 		t.Fatal("lost original replay bytes")
+	}
+	// Catchup must feed the original representation through the same live gate.
+	catchup := types.NewPartSetFromHeader(id.PartSetHeader)
+	for i := 0; i < int(initial.Total()); i++ {
+		part, err := bs.OriginalBlockPart(1, i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wirePart, err := part.ToProto()
+		if err != nil {
+			t.Fatal(err)
+		}
+		decoded, err := consensus.MsgFromProto(&cmtcons.BlockPart{Height: 1, Part: *wirePart})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := catchup.AddPart(decoded.(*consensus.BlockPartMessage).Part); err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(part.Bytes, initial.GetPart(i).Bytes) {
+			t.Fatal("catchup served revised execution bytes")
+		}
+	}
+	if !catchup.IsComplete() {
+		t.Fatal("original catchup part set is incomplete")
 	}
 	if !bytes.Equal(bs.LoadBlock(2).Data.Txs[0], repairCommand) {
 		t.Fatal("repair command was altered")

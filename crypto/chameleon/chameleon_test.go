@@ -32,6 +32,45 @@ func TestPublicCommitment(t *testing.T) {
 	}
 }
 
+// Published collisions disclose a reusable ratio root, not a fresh business
+// authorization. This positive property prevents stronger security claims.
+func TestPublishedAdaptationReuse(t *testing.T) {
+	p, signers := fixture(t)
+	ctx, old, next := []byte("same-context"), []byte("old"), []byte("new")
+	c, r, err := p.Commit(ctx, old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var shares []Contribution
+	for i := 0; i < 3; i++ {
+		s, err := signers[i].Adapt(ctx, old, next, c, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		shares = append(shares, s)
+	}
+	r2, err := p.Combine(ctx, old, next, c, r, shares)
+	if err != nil {
+		t.Fatal(err)
+	}
+	z := new(big.Int).ModInverse(new(big.Int).SetBytes(r[:]), p.key.N)
+	z.Mul(z, new(big.Int).SetBytes(r2[:])).Mod(z, p.key.N)
+	otherC, otherR, err := p.Commit(ctx, old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := new(big.Int).Mul(new(big.Int).SetBytes(otherR[:]), z)
+	x.Mod(x, p.key.N)
+	var adapted Opening
+	x.FillBytes(adapted[:])
+	if !p.Verify(ctx, next, otherC, adapted) {
+		t.Fatal("public ratio root should transfer within the same context")
+	}
+	if p.Verify([]byte("different-context"), next, otherC, adapted) {
+		t.Fatal("opening transferred across contexts")
+	}
+}
+
 func fixture(t testing.TB) (*Public, []Signer) {
 	t.Helper()
 	b, err := os.ReadFile("testdata/rsa2048.pem")

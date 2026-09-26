@@ -68,6 +68,24 @@ type PartRedaction struct {
 	Opening  chameleon.Opening `json:"opening"`
 }
 
+// ValidateOriginal admits only canonical execution parts into live consensus.
+// Revision is metadata, so checking its zero label alone is insufficient.
+// Historical storage and generic inclusion use the separate revision path.
+func (p *Part) ValidateOriginal(height int64) error {
+	if p == nil {
+		return ErrRedaction
+	}
+	if redactionKey == nil && p.Redaction == nil {
+		return nil
+	}
+	var initial chameleon.Opening
+	initial[chameleon.Size-1] = 1
+	if p.Redaction == nil || p.Redaction.Height != height || p.Redaction.Revision != 0 || p.Redaction.Opening != initial {
+		return ErrRedaction
+	}
+	return nil
+}
+
 func RedactionContext(height int64, index uint32) []byte {
 	h := sha256.New()
 	h.Write([]byte("BLOCK_PART_V3"))

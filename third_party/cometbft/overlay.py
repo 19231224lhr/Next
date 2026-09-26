@@ -60,7 +60,7 @@ patch("blocksync/reactor.go", [
 ])
 patch("consensus/reactor.go", [
     ('part := conR.conS.blockStore.LoadBlockPart(prs.Height, index)', 'part := conR.conS.blockStore.LoadBlockPart(prs.Height, index)\n if original, ok := conR.conS.blockStore.(interface { OriginalBlockPart(int64,int) (*types.Part,error) }); ok { var e error; part, e = original.OriginalBlockPart(prs.Height,index); if e != nil { logger.Error("load original part", "err", e); return } }'),
-    ('if err := m.Part.ValidateBasic(); err != nil {', 'if m.Part != nil && m.Part.Redaction != nil && (m.Part.Redaction.Height != m.Height || m.Part.Redaction.Revision != 0) { return types.ErrRedaction }\n if err := m.Part.ValidateBasic(); err != nil {'),
+    ('if err := m.Part.ValidateBasic(); err != nil {', 'if err := m.Part.ValidateOriginal(m.Height); err != nil { return err }\n if err := m.Part.ValidateBasic(); err != nil {'),
 ])
 patch("node/node.go", [
     (') (*Node, error) {\n\tblockStore, stateDB, err := initDBs(config, dbProvider)\n\tif err != nil {\n\t\treturn nil, err\n\t}', ') (*Node, error) {\n\tblockStore, stateDB, err := initDBs(config, dbProvider)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n if BeforeReplay != nil { if err := BeforeReplay(blockStore); err != nil { return nil, err } }'),

@@ -163,6 +163,8 @@ Store 后端可选内存或 bbolt，`Group` 合并已经排队的更新：每个
 
 输入承诺与分片承诺分别约束交易和区块传播表示。`ReplaceInput` 与 `CompleteParts` 用门限贡献构造新 opening；上链的 `RepairInput` 保存适配后的交易字节、分片 opening 及 Base／Previous／Next，公共执行验证最终适配结果与精确授权关系，不重新验证三份成员贡献。这些构造步骤不替代公共 BFT 对修复命令的确认。密码学模块使用 RSA 门限适配及上下文绑定；不提供 DKG 或 Go 大整数恒时保证。
 
+公开适配关系可以复用，故有效 opening 不能单独证明新一轮三成员业务批准。公共授权始终来自成功提交的修复命令，具体安全游戏边界见 [R6 论证](../research/security-redaction-consensus-wire4.md)。
+
 ### 7.2 Comet 的边界
 
 [types/redaction.go](../../third_party/cometbft/types/redaction.go) 处理稳定交易／分片承诺；[store/redaction.go](../../third_party/cometbft/store/redaction.go) 的 `ReviseBlock` 检查本地修订版本次序、BlockID／PartSetHeader 不变，并调用应用授权回调精确核对新正文。Base／Previous 与规范旧正文的核对在 `InputTarget/nextBody/Execute` 公共授权阶段完成，物化时不重复将当前物理旧正文与 Previous 比对。
@@ -172,6 +174,8 @@ Store 后端可选内存或 bbolt，`Group` 合并已经排队的更新：每个
 固定版本的 [overlay.py](../../third_party/cometbft/overlay.py) 将 `consensus/replay.go` 与 `blocksync/reactor.go` 的读取接到 `LoadOriginalBlock`，将 `consensus/reactor.go` 的追块分片读取接到 `OriginalBlockPart`；当前生成源码也包含这些调用。这个结论限定于已列出的重放、blocksync 和共识追块路径，不代表另行实现了完整状态快照同步。
 
 原有 BFT 投票轮次及法定人数保留，数据承诺和历史表示已经适配，因此不能与未修改 Comet 网络直接互通，也不能只引用原共识证明就宣布修订协议安全。
+
+安全分支的 `BlockPartMessage.ValidateBasic → Part.ValidateOriginal` 在启用修订时要求高度一致、Revision=0、opening=1。Revision 是可改标签，不参与稳定承诺；仅检查标签不能排除重标记后的修订分片。通用 AddPart 保留修订验证能力，实时共识只接纳原始执行表示。
 
 ## 8. 实验扩展与协议模型分离
 
