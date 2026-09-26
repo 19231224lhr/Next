@@ -7,6 +7,7 @@
 | [系统设计与证明建模基线](design/system.md) | 身份与状态、完整付款及赔付流程、资金与权限公式、假设和待证明性质 |
 | [工程架构与实现映射](design/architecture.md) | 关键函数、并发和存储边界、共识适配、现有回归测试与模型对应关系 |
 | [系统模型与条件安全论证](research/security-argument-wire4.md) | 论文模型、认证与唯一消费、动态预算到真实备付的推导、CAL/FUEL 记账及 E1–E8 证据映射；明确尚未完成的精化与密码学义务 |
+| [安全分析与最小修正计划](research/security-implementation-plan.md) | `security-analysis` 专用分支的模型、代码回归、修订接口审查及性能验收顺序 |
 | [安全分析与证明准备](research/security-analysis-2026-09-26.md) | 条件安全论证、动态预算草图、已复现的补资配置缺陷及活性边界；尚非完整证明 |
 | [运行与验证](operations.md) | 构建、初始化、单笔运行、配置和检查 |
 | [E1–E8 实验索引](experiments/README.md) | 正式结果、复现材料和适用范围；原始数据保留 |
