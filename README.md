@@ -159,6 +159,7 @@ TPS 实验使用独立最终 UTXO、少量地址高复用；续花实验使用�
 | 查阅 E1–E8、性能数据与复现材料 | [实验总索引](docs/experiments/README.md) |
 | 查阅消息、费用、跟块与补资细节 | [现行实现参考](docs/reference/README.md) |
 | 准备论文模型与安全论证 | [安全证明文献调研](docs/research/fast-payment-security-proof-survey-2026-09-25.md) |
+| 阅读论文模型、条件推导与实验对应 | [系统模型与条件安全论证](docs/research/security-argument-wire4.md) |
 | 查阅源码安全分析与已知问题 | [安全分析与证明准备](docs/research/security-analysis-2026-09-26.md) |
 | 追溯旧版规范与工程决策 | [历史归档与迁移表](docs/archive/README.md) |
 
