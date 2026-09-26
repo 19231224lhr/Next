@@ -163,6 +163,53 @@ func projectMoney(t *testing.T, db store.Store) (p monetaryProjection) {
 			t.Fatalf("gap=%d obligations=%d", storedGap, gap)
 		}
 		p.cal -= int64(gap)
+		// Bridge certificate-local accounting to per-grant public accounting.
+		coverageUsage := make(map[protocol.ResourceKey]PublicUsage)
+		scan(keyDirectCoverage, func(row state.Entry) {
+			c, _, err := state.Load[directCoverage](v, row.Key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.Credit.Original != c.Credit.Paid+c.Credit.Discharged+c.Credit.Remaining {
+				t.Fatal("coverage conservation")
+			}
+			for _, a := range c.Summary.Admission {
+				if a.Key.Kind != protocol.ResourceCAL {
+					continue
+				}
+				u := coverageUsage[a.Key]
+				u.Reserved += c.Credit.Remaining
+				u.Spent += c.Credit.Paid
+				coverageUsage[a.Key] = u
+			}
+		})
+		backing := make(map[protocol.Hash]uint64)
+		scan(state.KeyGrant, func(row state.Entry) {
+			g, _, err := state.Load[state.Grant](v, row.Key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if g.Key.Kind != protocol.ResourceCAL {
+				return
+			}
+			u, _, err := state.Load[PublicUsage](v, state.Key(state.KeyUsage, g.Key.Encode()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if u != coverageUsage[g.Key] || u.Reserved+u.Spent > g.Amount {
+				t.Fatalf("CAL coverage/usage mismatch: usage=%+v coverage=%+v", u, coverageUsage[g.Key])
+			}
+			backing[g.Key.Account] += g.Amount - u.Spent
+		})
+		for account, required := range backing {
+			balance, _, err := state.Load[uint64](v, AccountKey(account, protocol.AssetCAL))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if balance < required {
+				t.Fatal("aggregate backing deficit")
+			}
+		}
 		scan(keyDirectPayment, func(row state.Entry) {
 			payment, _, err := state.Load[directPayment](v, row.Key)
 			if err != nil {

@@ -1,0 +1,32 @@
+Stage 2 verification record, 2026-09-26
+Environment: Windows amd64; go version go1.27.1 windows/amd64
+Branch: security-analysis
+Parent baseline: a80628f
+Production baseline: re@8d1590ba559eeb23548f2bf598f064f490553330
+
+Commands below completed with exit code 0 in this working tree:
+go test -count=1 -v -tags=comet_v3 ./internal/member ./internal/rules -run TestSecurity
+go test -count=1 -tags=comet_v3 ./...
+go test -count=1 ./...
+go test -race -count=1 -tags=comet_v3 ./internal/member ./internal/store ./internal/blockfollow
+go vet -tags=comet_v3 ./...
+go build -tags=comet_v3 ./...
+
+Race command output:
+ok  utxo/internal/member       9.664s
+ok  utxo/internal/store        2.260s
+ok  utxo/internal/blockfollow  1.259s
+
+gofmt -l on both changed test files: no output
+Relative Markdown file targets checked: 125, missing: 0 (before adding these evidence links)
+git diff --check: exit 0
+
+SHA256 of tested working-tree files (before Git line-ending normalization):
+3a06bfba1586f6fc8421fcdbd3fd6209e52b4e26723618ffed8bb56963a8e21b  internal/member/security_composition_test.go
+8bc7fc0151cea1e5c86cc7273c2cea443d21847d6499602471d7673dd7a715b5  internal/rules/security_projection_test.go
+
+Scope: 8 new cross-layer cases; existing 18 three-hop accounting cases and
+1 partial-output case now also check Coverage/Usage/account projections.
+Testkit-signed blocks and direct economic repair evaluation do not exercise
+real BFT, threshold contribution collection, or historical materialization.
+No production-code change and no performance experiment in this stage.
