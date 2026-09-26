@@ -1,0 +1,77 @@
+=== RUN   TestAccountsBounded
+=== RUN   TestAccountsBounded/[0_1]/funding1
+    accounts_test.go:93: states=12 transitions=32 complete=true
+=== RUN   TestAccountsBounded/[0_1]/funding2
+    accounts_test.go:93: states=16 transitions=48 complete=true
+=== RUN   TestAccountsBounded/[0_0]/funding1
+    accounts_test.go:93: states=12 transitions=32 complete=true
+=== RUN   TestAccountsBounded/[0_0]/funding2
+    accounts_test.go:93: states=16 transitions=48 complete=true
+--- PASS: TestAccountsBounded (0.00s)
+    --- PASS: TestAccountsBounded/[0_1]/funding1 (0.00s)
+    --- PASS: TestAccountsBounded/[0_1]/funding2 (0.00s)
+    --- PASS: TestAccountsBounded/[0_0]/funding1 (0.00s)
+    --- PASS: TestAccountsBounded/[0_0]/funding2 (0.00s)
+=== RUN   TestAccountsMutants
+    accounts_test.go:100: mutant detected: shared backing deficit; shortest trace: [topup(source1,g0)]
+    accounts_test.go:102: mutant detected: account conservation; shortest trace: [topup(source0,g0)]
+--- PASS: TestAccountsMutants (0.00s)
+=== RUN   TestFeesBounded
+    fees_test.go:83: states=8 transitions=15 complete=true
+--- PASS: TestFeesBounded (0.00s)
+=== RUN   TestFeeMutant
+    fees_test.go:87: mutant detected: FUEL conservation; shortest trace: [reserve register settle parent close refund-again]
+--- PASS: TestFeeMutant (0.00s)
+=== RUN   TestLifecycleBounded
+=== RUN   TestLifecycleBounded/approved0011/signed1011
+    lifecycle_test.go:274: states=87423 transitions=399829 complete=true
+=== RUN   TestLifecycleBounded/approved0111/signed0111
+    lifecycle_test.go:274: states=87423 transitions=399829 complete=true
+=== RUN   TestLifecycleBounded/approved0111/signed1011
+    lifecycle_test.go:274: states=87423 transitions=399829 complete=true
+--- PASS: TestLifecycleBounded (0.63s)
+    --- PASS: TestLifecycleBounded/approved0011/signed1011 (0.23s)
+    --- PASS: TestLifecycleBounded/approved0111/signed0111 (0.19s)
+    --- PASS: TestLifecycleBounded/approved0111/signed1011 (0.20s)
+=== RUN   TestLifecycleMutants
+    lifecycle_test.go:283: mutant detected: residual below risk; shortest trace: [consume-missing(o0) repair(o0) source-arrives follow(m0,event1) follow(m0,event2) follow(m0,event3)]
+    lifecycle_test.go:283: mutant detected: residual below risk; shortest trace: [consume-missing(o0) repair(o0) follow(m0,event1) follow(m0,event2)]
+--- PASS: TestLifecycleMutants (0.00s)
+=== RUN   TestSearchFindsShortestCounterexample
+--- PASS: TestSearchFindsShortestCounterexample (0.00s)
+=== RUN   TestSearchExhaustionAndLimit
+--- PASS: TestSearchExhaustionAndLimit (0.00s)
+=== RUN   TestVotesBounded
+=== RUN   TestVotesBounded/B2/conflictfalse
+    votes_test.go:87: states=4 transitions=4 complete=true
+=== RUN   TestVotesBounded/B3/conflictfalse
+    votes_test.go:87: states=556 transitions=1836 complete=true
+=== RUN   TestVotesBounded/B4/conflictfalse
+    votes_test.go:87: states=556 transitions=1836 complete=true
+=== RUN   TestVotesBounded/B6/conflictfalse
+    votes_test.go:87: states=3844 transitions=18600 complete=true
+=== RUN   TestVotesBounded/B2/conflicttrue
+    votes_test.go:87: states=4 transitions=4 complete=true
+=== RUN   TestVotesBounded/B3/conflicttrue
+    votes_test.go:87: states=556 transitions=1836 complete=true
+=== RUN   TestVotesBounded/B4/conflicttrue
+    votes_test.go:87: states=556 transitions=1836 complete=true
+=== RUN   TestVotesBounded/B6/conflicttrue
+    votes_test.go:87: states=556 transitions=1836 complete=true
+--- PASS: TestVotesBounded (0.00s)
+    --- PASS: TestVotesBounded/B2/conflictfalse (0.00s)
+    --- PASS: TestVotesBounded/B3/conflictfalse (0.00s)
+    --- PASS: TestVotesBounded/B4/conflictfalse (0.00s)
+    --- PASS: TestVotesBounded/B6/conflictfalse (0.00s)
+    --- PASS: TestVotesBounded/B2/conflicttrue (0.00s)
+    --- PASS: TestVotesBounded/B3/conflicttrue (0.00s)
+    --- PASS: TestVotesBounded/B4/conflicttrue (0.00s)
+    --- PASS: TestVotesBounded/B6/conflicttrue (0.00s)
+=== RUN   TestVotesMutants
+    votes_test.go:95: mutant detected: conflicting QC; shortest trace: [approve(m0,f0) vote(m0,f0) approve(m1,f0) vote(m1,f0) vote(m3,f0) approve(m0,f1) vote(m0,f1) approve(m1,f1) vote(m1,f1) vote(m3,f1)]
+    votes_test.go:97: mutant detected: uncovered QC; shortest trace: [approve(m0,f0) vote(m0,f0) approve(m1,f0) vote(m1,f0) vote(m3,f0) approve(m0,f1) vote(m0,f1) approve(m1,f1) vote(m1,f1) vote(m3,f1)]
+--- PASS: TestVotesMutants (0.00s)
+=== RUN   TestHiddenQCAndPartialApprovals
+--- PASS: TestHiddenQCAndPartialApprovals (0.00s)
+PASS
+ok  	utxo/tools/securitymodel	1.067s

@@ -216,7 +216,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	repairID := protocol.RepairIdentity(f.Org.Network, output)
 	// A valid chameleon opening is not sufficient authority: the exact target,
 	// revision, replacement bytes and original PartSetHeader must all agree.
-	for _, name := range []string{"output", "revision", "transaction", "part", "same-height"} {
+	for _, name := range []string{"output", "revision", "transaction", "part", "same-height", "owner-auth", "organization-auth", "input-certificate"} {
 		t.Run("reject-"+name, func(t *testing.T) {
 			bad := command
 			bad.TransactionBytes = bytes.Clone(command.TransactionBytes)
@@ -233,6 +233,37 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 				bad.Parts[0][0] ^= 1
 			case "same-height":
 				height = command.Height
+			case "owner-auth", "organization-auth", "input-certificate":
+				changed, err := protocol.DecodeDirectSubmission(bad.TransactionBytes)
+				if err != nil {
+					t.Fatal(err)
+				}
+				switch name {
+				case "owner-auth":
+					changed.Tx.Auth[0].Signature[0] ^= 1
+				case "organization-auth":
+					changed.Authorization.Votes[0].Signature[0] ^= 1
+				case "input-certificate":
+					changed.InputCertificates[0].Certificate.QC.Votes[0].Signature[0] ^= 1
+				}
+				funding := changed.Tx.Funding[command.Input]
+				if !policy.Key.Verify(payment.Tx.FundingContext(int(command.Input), policy.Key.KeyID()), funding.ReferenceBytes(), payment.Tx.Commitments[command.Input], funding.Opening) {
+					t.Fatal("test must retain a valid replacement opening")
+				}
+				if name == "owner-auth" {
+					// The canonical encoder already rejects bad owner signatures.
+					// Corrupt the received wire bytes to exercise the trust boundary.
+					at := bytes.Index(bad.TransactionBytes, payment.Tx.Auth[0].Signature[:])
+					if at < 0 {
+						t.Fatal("owner signature not found")
+					}
+					bad.TransactionBytes[at] ^= 1
+				} else {
+					bad.TransactionBytes, err = changed.MarshalBinary()
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
 			}
 			if err := db.View(func(v state.ReadView) error {
 				tr, err := redaction.Execute(v, blocks, policy, bad, height, 1700000033)

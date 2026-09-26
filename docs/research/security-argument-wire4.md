@@ -341,7 +341,9 @@ go test -count=1 -tags=comet_v3 ./protocol ./internal/rules ./internal/member \
 
 9 个包全部通过，无测试缓存。代表用例包括 `TestReserveFundingRejectsProtectedAccounts`、`TestReserveSharedExternalFunding`、`TestReserveMemberKeepsDebitsAndCumulativeRounding`、`TestDirectRepairThenLateParent`、`TestBlockFollowerMissingRepairLateAndDuplicate`、`TestPaymentRepairMonetaryReplay` 与 `TestEveryQuorumAndRepeatedPublicRepair`。这是回归证据，不是新增性能实验或模型检查。
 
-下一步优先将 R2–R5 写入小范围状态模型，枚举冲突批准、隐藏 QC、乱序跟块、父到与赔付、动态补资及部分输出使用；随后对一般参数给归纳证明。有限模型无反例只能说明所枚举范围。R6 另走密码学与共识适配论证，不把它埋进一个“哈希安全”的假设后声称工作完成。
+2026-09-26 后续已增加 R2–R5 的分解有限状态检查，覆盖冲突批准、隐藏 QC、不同成员前缀、父到与赔付、补资及部分输出；并新增真实规则账务投影和 R6 非目标字段拒绝回归。16 个配置完成穷尽、七类错误模型找到反例，全项目测试与 vet 通过，详见[第一轮验证报告](security-model-validation-2026-09-26.md)。生产代码未变。
+
+下一步是给出模块组合与一般参数归纳，并完善真实代码的精化对应。有限模型无反例只能说明所枚举范围；它未自动完成上表的实现义务。R6 另走密码学与共识适配论证，不把它埋进一个“哈希安全”的假设后声称工作完成。
 
 ## 12. 论文可采用的表述
 
