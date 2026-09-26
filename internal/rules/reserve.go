@@ -5,7 +5,9 @@ import (
 	"utxo/protocol"
 )
 
-func EvaluateReserveIncrease(v state.ReadView, c protocol.ReserveIncrease) (state.Transition, error) {
+// protectedCAL contains the full account keys of all configured CAL backing.
+// It is derived from the Engine's frozen configuration, never from the command.
+func EvaluateReserveIncrease(v state.ReadView, c protocol.ReserveIncrease, protectedCAL map[string]struct{}) (state.Transition, error) {
 	var tr state.Transition
 	if err := c.Verify(); err != nil {
 		return tr, err
@@ -27,6 +29,12 @@ func EvaluateReserveIncrease(v state.ReadView, c protocol.ReserveIncrease) (stat
 		return tr, protocol.ErrRule
 	}
 	source := AccountKey(protocol.ReserveFundingAccount(c.Network, c.Subject), protocol.AssetCAL)
+	destination := AccountKey(c.Key.Account, protocol.AssetCAL)
+	_, sourceProtected := protectedCAL[string(source)]
+	_, destinationProtected := protectedCAL[string(destination)]
+	if string(source) == string(destination) || sourceProtected || !destinationProtected {
+		return tr, protocol.ErrRule
+	}
 	balance, _, err := state.Load[uint64](v, source)
 	if err != nil {
 		return tr, err
@@ -35,7 +43,6 @@ func EvaluateReserveIncrease(v state.ReadView, c protocol.ReserveIncrease) (stat
 	if err != nil {
 		return tr, ErrLimited
 	}
-	destination := AccountKey(c.Key.Account, protocol.AssetCAL)
 	backing, _, err := state.Load[uint64](v, destination)
 	if err != nil {
 		return tr, err

@@ -105,7 +105,7 @@
 | `ValidateDirectFee` · [rules/direct_fee.go](../../internal/rules/direct_fee.go) | 用户最终 FUEL 的来源、授权、路由与金额校验 |
 | `AnchorDirectDeadlines` · [direct_deadline.go](../../internal/rules/direct_deadline.go) | H+1 一致区块时间锚定 |
 | `EvaluateDirectCompensation` · [rules/direct.go](../../internal/rules/direct.go) | 原发行账户真实 CAL 扣款、关闭缺口及费用推进 |
-| `EvaluateReserveIncrease / ApplyReserveIncrease` · [reserve.go](../../internal/rules/reserve.go) | 转资增加公共 Grant；成员按累计差额增加本地份额 |
+| `EvaluateReserveIncrease / ApplyReserveIncrease` · [reserve.go](../../internal/rules/reserve.go) | Engine 从冻结配置生成受保护 CAL 账户集合；公共执行拒绝同账户或从备付补资，原子转资增加 Grant；成员按累计差额增加本地份额 |
 
 当前应用哈希 `APP_V4` 按前一应用哈希及规范排序的修改集推进，不是完整状态树逐键证明服务。公开执行结果认证与数据库全状态成员证明不能混称。
 

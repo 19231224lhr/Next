@@ -29,6 +29,7 @@ type Engine struct {
 	cfg           EngineConfig
 	db            store.Store
 	orgs          map[protocol.Hash]protocol.OrgConfig
+	protectedCAL  map[string]struct{}
 	genesis       protocol.Hash
 	direct        *rules.DirectPolicy
 	repairCheck   CheckFunc
@@ -65,6 +66,25 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 			return nil, protocol.ErrRule
 		}
 		engine.orgs[org.Hash()] = org
+	}
+	// Account roles are static, just like organizations and grant identities.
+	// Validate before the stored-genesis shortcut so reopening cannot bypass it.
+	engine.protectedCAL = make(map[string]struct{})
+	for _, org := range c.Organizations {
+		engine.protectedCAL[string(rules.AccountKey(org.Org, protocol.AssetCAL))] = struct{}{}
+	}
+	for _, g := range c.Genesis.Grants {
+		if g.Key.Kind == protocol.ResourceCAL {
+			engine.protectedCAL[string(rules.AccountKey(g.Key.Account, protocol.AssetCAL))] = struct{}{}
+		}
+	}
+	for _, g := range c.Genesis.Grants {
+		if g.Key.Kind == protocol.ResourceCAL {
+			source := rules.AccountKey(protocol.ReserveFundingAccount(c.Network, g.Subject), protocol.AssetCAL)
+			if _, protected := engine.protectedCAL[string(source)]; protected {
+				return nil, protocol.ErrRule
+			}
+		}
 	}
 	e = db.Update(func(v state.ReadView) ([]state.Change, error) {
 		key := state.Key(state.KeyGenesis)

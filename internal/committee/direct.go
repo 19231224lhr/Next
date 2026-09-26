@@ -66,7 +66,7 @@ func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.
 		if c.Network != e.cfg.Network {
 			return state.Transition{}, protocol.ErrAuth
 		}
-		return rules.EvaluateReserveIncrease(v, c)
+		return rules.EvaluateReserveIncrease(v, c, e.protectedCAL)
 	}
 	if protocol.IsClockTick(raw, e.cfg.Network) {
 		return state.Transition{}, nil
