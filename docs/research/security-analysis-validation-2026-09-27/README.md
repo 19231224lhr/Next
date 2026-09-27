@@ -114,3 +114,30 @@ go test -mod=readonly -count=1 -v github.com/cometbft/cometbft/consensus \
 | 共识实现范围 | 核查入口与重放调用图，保留完整 BlockID 的状态机义务；组件注入结果不当作网络漏洞结论 |
 
 评审意见用于提出可检验问题，最终判断以代码、论文原文、实际测试及写明的假设为依据。
+
+## 8. 已提交终稿的三轮辩证复审
+
+在 `d097358` 终稿基础上，再向原侧边栏会话发送第五章、完整报告和本证据索引的全文，完成三轮实质复审。本节记录新增结论，不把 GPT 的意见算作独立证明或独立运行测试。第一轮要求按模型内反例、实现连接、措辞及范围扩展分类；第二轮用实际函数与新推导回应质疑；第三轮核对配置边界及最终主张。
+
+| 质疑 | 核实与处理 |
+| --- | --- |
+| 双计数公式中间项漏写 Grant 范围 | 采纳。同一成员可以在多个 Grant 下分别合法占用，全部批准之和不能用单 Grant 份额约束。正文、报告及组合附录统一以 `A_m,g` 限定同 Grant 的全部批准；诚实集合属于该 Grant 的组织。修正证明记号，不改变运行代码。 |
+| 身份、历史集合是否足够明确 | 补出完整 `(Config, ResourceKey, GrantID)` 与唯一状态键的对应；`C_g` 是曾经成证的 Fact 历史集合，不随票子集、材料或终结删除。不同 QC 表示不改变经济去重，完整字节缓存与修复检查仍保留原口径。 |
+| Follow 表与迟到补签轨迹冲突 | 采纳。`applyPayment/applyRepair` 可以在没有相关 Approval 时跟块；只有更新原占用与返还需要原 Approval/Debit。另核对 `InstallDirectClassified`，补回它记录本地 Consumed 的效果。 |
+| “有覆盖”是否只是把成功当作前提 | 新增 CAL 数值能力推论。按执行前状态及不同实际父 Fact 分组，证明 `V_g + S_g + Σ新登记cap ≤ Q_g ≤ B_g`，推出任意登记顺序不会单因 CAL 总额失败；Open 义务也有本金余额覆盖。多父、多输出、部分赔付、迟到和共享账户分别核对。 |
+| 是否仍要新增 QC 规范化机制 | 不采纳为运行改动。Fact 不依赖 Votes，现有经济身份已足够；新见证不能随报文票集合更换，字节认证缓存仍不得改成仅按 Fact。 |
+| 配置唯一性是否已由代码保证 | 尚未完整保证。`NewEngine` 检查重复 Config Hash，`DirectSettings.Policy` 按该哈希建表，不能排除同 Org 的不同配置。正文显式限定各诚实方共享单一活动配置／锁域，不把所有可初始化配置均称安全；报告列出最小启动检查作为后续实现补强。未将其冒充已复现的网络攻击。 |
+| 修订与共识是否只差机械化 | 不是。完整 BlockID 与公共执行的实现对应仍是实质待证项；门限控制、最新历史认证按各自实际主张分别列明，不自动推翻条件经济推导。 |
+| “经济效果相同”是否量化过宽 | 补充相同观察者本地状态、配置和游标；不要求不同成员得到相同返还。Repair 会改变备付、缺口及费用，所保持的是已认证字段与不重复的子付款入账。 |
+
+复核了 `PrepareDirectVector`、`OutputSummary.Validate/SummaryFor/Fact`、`VerifyDirectSubmission`、`grant/register/completeOutput/updateUsage`、`EvaluateDirectPaymentAt/EvaluateDirectCompensation`、成员跟块及 INSTALL、初始化和修订执行。补款、公开 Spent 与 Fact/Grant 的对应已在报告 §5.3 展开，不再只用“精化”一词概括。
+
+本轮重新运行的相关回归：
+
+```sh
+go test -count=1 ./internal/member ./internal/rules -run 'TestSecurityComposition|TestBlockFollowerMissingRepairLateAndDuplicate|TestDirectOwnerFeeRefundAfterParentArrives'
+```
+
+两个包均通过（成员包 1.079 s，规则包 0.551 s）。它只用于复核本轮引用的实际语义，不是新的全项目、网络 BFT 或性能测试。本轮变更仅为文档；`re` 和 E1–E8 测量保持原样。
+
+最终主张限定为：对满足明确配置及公共执行接口的 wire 4，给出隐藏 QC 风险、真实备付、守恒及条件后继使用的手工安全论证，并附代码对应与回归证据。未在本轮找到修正后条件推导的新反例，不等于排除了所有实现反例，也不等于整套实现已经完成安全证明。

@@ -52,7 +52,8 @@ Votes 是逻辑历史变量；证明不要求任何在线节点枚举所有隐�
 | Repair(o) | 唯一 Open 到期、合法经济修订授权，相关资金和费用条件满足 | 同事务更新 p、S、A、R、Gap、费用和待办；失败全不生效 |
 | TopUp(g,a) | 固定合法 Grant、正确 Previous、防重；真实外部来源不属于 Protected，余额足够且不同于目标 | 源减 a、备付加 a、B 加 a；不改变旧 Approved/Reserved/Paid |
 | Follow(m) | 经验证公共成功结果、连续前缀，按块内次序应用 | 只根据原 Approval 释放；游标与本地账同事务推进 |
-| Install／重传／Materialize | 按现有证据与已提交授权传播或更改物理表示 | 不解除原批准、不改变公共经济状态；同一已完成身份不再收费 |
+| Install | 验证完整证据，保存待办及输入／费用输入的本地 Consumed | 不新增 Approval、不返还预算；会约束后续本地冲突批准 |
+| 重传／Materialize | 按现有证据与已提交授权传播或更改物理表示 | 不解除原批准、不改变公共经济状态；同一已完成身份不再收费 |
 
 公开 Execute/Repair 的内部更新只有整体成功才可见；不能在调用 `completeOutput` 后、扣款前把半笔结果当作可达公共状态。拒绝和幂等重放均是无经济变化步骤。Anchor 只确定期限，不动金额或批准。
 
@@ -99,11 +100,11 @@ $$w_c=\begin{cases}cap_c,&z_c=false,\\p_c,&z_c=true.\end{cases}$$
 
 ### 定理 D：固定四成员的动态风险上界
 
-固定每 Grant 所属组织的三名诚实成员集合 H。即使实际四名都诚实，也可任取三名。每个三票集合与 H 至少交叠两人。由引理 A/C 和授权单调增加 `B_mg≤B_g`：
+对固定 Grant g，选择其所属组织的三名诚实成员组成 H。即使实际四名都诚实，也可任取三名。令 $\mathcal A_{m,g}$ 为成员 m 已批准且归属 g 的全部事实，含尚未形成 QC 的候选；不能混入其他 Grant 的残余。每个三票集合与 H 至少交叠两人。由引理 A/C 和授权单调增加 `B_mg≤B_g`：
 
 $$2\sum_{c\in C_g}w_c
 \le\sum_{m\in H}\sum_{c\in C_g:m\in W_c}r_{m,c}
-\le\sum_{m\in H}\sum_{c:m\text{批准}c}r_{m,c}
+\le\sum_{m\in H}\sum_{c\in\mathcal A_{m,g}}r_{m,c}
 \le3\lfloor2B_g/3\rfloor\le2B_g.$$
 
 于是 `Q_g=Σw_c≤B_g`。该证明不以当前公开 V 为前提，包含隐藏 QC、不同诚实成员集合、成员落后、重复补资和已恢复额度再次使用。p 已包含在 w 内，不能在 Q 外再加一次 p；反过来也不能把已赔证书从 C 删除以抹掉损失。
