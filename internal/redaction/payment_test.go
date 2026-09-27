@@ -216,12 +216,13 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	repairID := protocol.RepairIdentity(f.Org.Network, output)
 	// A valid chameleon opening is not sufficient authority: the exact target,
 	// revision, replacement bytes and original PartSetHeader must all agree.
-	for _, name := range []string{"output", "revision", "transaction", "part", "same-height", "owner-auth", "organization-auth", "input-certificate"} {
+	for _, name := range []string{"output", "revision", "transaction", "part", "same-height", "premature", "valid-opening-wrong-reserve", "owner-auth", "organization-auth", "input-certificate"} {
 		t.Run("reject-"+name, func(t *testing.T) {
 			bad := command
 			bad.TransactionBytes = bytes.Clone(command.TransactionBytes)
 			bad.Parts = append([]chameleon.Opening(nil), command.Parts...)
 			height := int64(3)
+			now := int64(1700000033)
 			switch name {
 			case "output":
 				bad.Output[0] ^= 1
@@ -233,6 +234,37 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 				bad.Parts[0][0] ^= 1
 			case "same-height":
 				height = command.Height
+			case "premature":
+				now = 1700000030
+			case "valid-opening-wrong-reserve":
+				// Model an untrusted adapter with even all fixture shares: a valid
+				// opening must not authorize a different reserve debit identity.
+				changed, err := protocol.DecodeDirectSubmission(bad.TransactionBytes)
+				if err != nil {
+					t.Fatal(err)
+				}
+				i := int(command.Input)
+				old := payment.Tx.Funding[i]
+				wrong := changed.Tx.Funding[i]
+				wrong.Ref = protocol.Digest("unauthorized-reserve-debit")
+				ctx := payment.Tx.FundingContext(i, policy.Key.KeyID())
+				var shares []chameleon.Contribution
+				for _, signer := range signers[:3] {
+					share, err := signer.Adapt(ctx, old.ReferenceBytes(), wrong.ReferenceBytes(), payment.Tx.Commitments[i], old.Opening)
+					if err != nil {
+						t.Fatal(err)
+					}
+					shares = append(shares, share)
+				}
+				wrong.Opening, err = policy.Key.Combine(ctx, old.ReferenceBytes(), wrong.ReferenceBytes(), payment.Tx.Commitments[i], old.Opening, shares)
+				if err != nil || !policy.Key.Verify(ctx, wrong.ReferenceBytes(), payment.Tx.Commitments[i], wrong.Opening) {
+					t.Fatalf("must be a cryptographically valid forbidden replacement: %v", err)
+				}
+				changed.Tx.Funding[i] = wrong
+				bad.TransactionBytes, err = changed.MarshalBinary()
+				if err != nil {
+					t.Fatal(err)
+				}
 			case "owner-auth", "organization-auth", "input-certificate":
 				changed, err := protocol.DecodeDirectSubmission(bad.TransactionBytes)
 				if err != nil {
@@ -266,7 +298,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 				}
 			}
 			if err := db.View(func(v state.ReadView) error {
-				tr, err := redaction.Execute(v, blocks, policy, bad, height, 1700000033)
+				tr, err := redaction.Execute(v, blocks, policy, bad, height, now)
 				if err == nil || len(tr.Changes) != 0 {
 					t.Fatalf("unauthorized repair returned changes: %v", err)
 				}

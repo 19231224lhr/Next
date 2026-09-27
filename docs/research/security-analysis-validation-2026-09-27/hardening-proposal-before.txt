@@ -1,0 +1,121 @@
+=== RUN   TestStableHashIdentity
+    block_identity_test.go:90: === RUN   TestStableHashIdentityCases
+        === RUN   TestStableHashIdentityCases/commit_fetch
+        I[2026-09-27|19:27:38.610] service start                                module=events msg="Starting EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.633] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+        D[2026-09-27|19:27:38.635] entering commit step                         module=consensus height=1 commit_round=0 current=1/0/RoundStepNewHeight
+        I[2026-09-27|19:27:38.635] commit is for a block we do not know about; set ProposalBlock=nil module=consensus height=1 commit_round=0 proposal=50CF076C4E9A878C1C02A12F12271C9C7B56BDAA0CFD270A56B47C952C57C7A7 commit=50CF076C4E9A878C1C02A12F12271C9C7B56BDAA0CFD270A56B47C952C57C7A7
+        D[2026-09-27|19:27:38.635] failed attempt to finalize commit; we do not have the commit block module=consensus height=1 proposal_block= commit_block=50CF076C4E9A878C1C02A12F12271C9C7B56BDAA0CFD270A56B47C952C57C7A7
+        I[2026-09-27|19:27:38.636] received complete proposal block             module=consensus height=1 hash=50CF076C4E9A878C1C02A12F12271C9C7B56BDAA0CFD270A56B47C952C57C7A7
+        I[2026-09-27|19:27:38.636] finalizing commit of block                   module=consensus height=1 hash=50CF076C4E9A878C1C02A12F12271C9C7B56BDAA0CFD270A56B47C952C57C7A7 root= num_txs=1
+        D[2026-09-27|19:27:38.636] committed block                              module=consensus height=1 block="Block{\n  Header{\n    Version:        {11 0}\n    ChainID:        test-chain\n    Height:         1\n    Time:           2026-09-27 11:27:38.6031873 +0000 UTC\n    LastBlockID:    :0:000000000000\n    LastCommit:     E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855\n    Data:           29A1413B135E56E6A1C0E3FA047B79B273241300FE4365ECA509E4C65BDD82EA\n    Validators:     3B3B2A87C7F306C1BFFAFB7EBAA9070777120A35D09D828088542CBFF8FEBA26\n    NextValidators: 3B3B2A87C7F306C1BFFAFB7EBAA9070777120A35D09D828088542CBFF8FEBA26\n    App:            \n    Consensus:      048091BC7DDC283F77BFBF91D73C44DA58C3DF8A9CBC867405D8B7F3DAADA22F\n    Results:        \n    Evidence:       E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855\n    Proposer:       6C169060BD8A8D70ED3B03B6D7D4649980575433\n  }#50CF076C4E9A878C1C02A12F12271C9C7B56BDAA0CFD270A56B47C952C57C7A7\n  Data{\n    1DE3919779A4C5F5BC3CED49B079D1D5A6E80B0344E12B97228D5A7E0E1FAB74 (25 bytes)\n  }#29A1413B135E56E6A1C0E3FA047B79B273241300FE4365ECA509E4C65BDD82EA\n  EvidenceData{\n    \n  }#E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855\n  Commit{\n    Height:     0\n    Round:      0\n    BlockID:    :0:000000000000\n    Signatures:\n      \n  }#E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855\n}#50CF076C4E9A878C1C02A12F12271C9C7B56BDAA0CFD270A56B47C952C57C7A7"
+        I[2026-09-27|19:27:38.636] finalized block                              height=1 num_txs_res=1 num_val_updates=0 block_app_hash=0200000000000000
+        I[2026-09-27|19:27:38.636] executed block                               height=1 app_hash=0200000000000000
+        I[2026-09-27|19:27:38.636] committed state                              height=1 block_app_hash=
+        I[2026-09-27|19:27:38.636] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.636] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+        === RUN   TestStableHashIdentityCases/finalize_waits
+        I[2026-09-27|19:27:38.641] service start                                module=events msg="Starting EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.641] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+        D[2026-09-27|19:27:38.643] failed attempt to finalize commit; we do not have the commit block module=consensus height=1 proposal_block=5CE5CD342808C5B2878EC292E370362DF8CC68EC8086EC8305A914C822C3CE8E commit_block=5CE5CD342808C5B2878EC292E370362DF8CC68EC8086EC8305A914C822C3CE8E
+        I[2026-09-27|19:27:38.643] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.643] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+        === RUN   TestStableHashIdentityCases/precommit
+        I[2026-09-27|19:27:38.647] service start                                module=events msg="Starting EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.647] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+        D[2026-09-27|19:27:38.648] entering precommit step                      module=consensus height=1 round=0 current=1/0/RoundStepNewHeight
+        D[2026-09-27|19:27:38.648] precommit step; +2/3 prevotes for a block we do not have; voting nil module=consensus height=1 round=0 block_id=AAE2CA05EC601549C53F69FD651396C5E79F310725205A0B01CE914C2870C830:1:906DFD3AA0D9
+        D[2026-09-27|19:27:38.648] signed and pushed vote                       module=consensus height=1 round=0 vote="Vote{0:01EBDE988BB2 1/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 000000000000 224676F04CDA 000000000000 @ 2026-09-27T11:27:38.6488387Z}"
+        I[2026-09-27|19:27:38.653] service start                                module=events msg="Starting EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.653] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+        D[2026-09-27|19:27:38.654] entering precommit step                      module=consensus height=1 round=0 current=1/0/RoundStepNewHeight
+        D[2026-09-27|19:27:38.654] precommit step; +2/3 prevotes for a block we do not have; voting nil module=consensus height=1 round=0 block_id=D0AFA6AFBC91BC8964C2F0E55D2B887F29D4306889256C9EC17B0A958444569F:1:6A76B5FC8953
+        D[2026-09-27|19:27:38.654] signed and pushed vote                       module=consensus height=1 round=0 vote="Vote{0:5782DFC47720 1/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 000000000000 556EED11613A 000000000000 @ 2026-09-27T11:27:38.6545988Z}"
+        I[2026-09-27|19:27:38.654] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.654] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+        I[2026-09-27|19:27:38.654] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.654] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+        === RUN   TestStableHashIdentityCases/valid_block
+        I[2026-09-27|19:27:38.660] service start                                module=events msg="Starting EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.660] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+        I[2026-09-27|19:27:38.661] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.661] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+        === RUN   TestStableHashIdentityCases/pol_rounds
+        I[2026-09-27|19:27:38.665] service start                                module=events msg="Starting EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.665] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+        D[2026-09-27|19:27:38.666] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=1 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.666] added vote to prevote                        module=consensus vote="Vote{1:96561BB81A62 1/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) D60BA3F36646 9781E41293E5 000000000000 @ 2026-09-27T11:27:38.6664655Z}" prevotes="VoteSet{H:1 R:0 T:SIGNED_MSG_TYPE_PREVOTE +2/3:<nil>(0.25) BA{4:_x__} map[]}"
+        D[2026-09-27|19:27:38.666] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=2 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.667] added vote to prevote                        module=consensus vote="Vote{2:A4CD7B89EC57 1/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) D60BA3F36646 A753622B05D3 000000000000 @ 2026-09-27T11:27:38.6664655Z}" prevotes="VoteSet{H:1 R:0 T:SIGNED_MSG_TYPE_PREVOTE +2/3:<nil>(0.5) BA{4:_xx_} map[]}"
+        D[2026-09-27|19:27:38.667] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=3 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.667] added vote to prevote                        module=consensus vote="Vote{3:C2C88D3E84A5 1/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) D60BA3F36646 6AA224CCC25F 000000000000 @ 2026-09-27T11:27:38.6664655Z}" prevotes="VoteSet{H:1 R:0 T:SIGNED_MSG_TYPE_PREVOTE +2/3:D60BA3F36646774B69B536498FA2F8716A8A9E9F75842D58FA196B17CBF54DE7:1:E92A5CDE7628(0.75) BA{4:_xxx} map[]}"
+        I[2026-09-27|19:27:38.669] service start                                module=events msg="Starting EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.669] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+        D[2026-09-27|19:27:38.671] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=1 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.671] added vote to prevote                        module=consensus vote="Vote{1:1D96A91D902D 1/01/SIGNED_MSG_TYPE_PREVOTE(Prevote) AF348E5A6E5B B2CF74BCB5B9 000000000000 @ 2026-09-27T11:27:38.6714244Z}" prevotes="VoteSet{H:1 R:1 T:SIGNED_MSG_TYPE_PREVOTE +2/3:<nil>(0.25) BA{4:_x__} map[]}"
+        D[2026-09-27|19:27:38.671] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=2 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.671] added vote to prevote                        module=consensus vote="Vote{2:7FC645D9986E 1/01/SIGNED_MSG_TYPE_PREVOTE(Prevote) AF348E5A6E5B AC68AE18B05F 000000000000 @ 2026-09-27T11:27:38.671896Z}" prevotes="VoteSet{H:1 R:1 T:SIGNED_MSG_TYPE_PREVOTE +2/3:<nil>(0.5) BA{4:_xx_} map[]}"
+        D[2026-09-27|19:27:38.671] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=3 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.672] added vote to prevote                        module=consensus vote="Vote{3:9D7267C0C54A 1/01/SIGNED_MSG_TYPE_PREVOTE(Prevote) AF348E5A6E5B 69DAF3000FB7 000000000000 @ 2026-09-27T11:27:38.671896Z}" prevotes="VoteSet{H:1 R:1 T:SIGNED_MSG_TYPE_PREVOTE +2/3:AF348E5A6E5B5EE4E59D605B9B66E263AA9F63C215891CA9F7A5D9B8768F0C51:1:D7B4E0EE153F(0.75) BA{4:_xxx} map[]}"
+        I[2026-09-27|19:27:38.675] service start                                module=events msg="Starting EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.675] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+        D[2026-09-27|19:27:38.677] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=1 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.677] added vote to prevote                        module=consensus vote="Vote{1:A49D34BC2831 1/02/SIGNED_MSG_TYPE_PREVOTE(Prevote) 1549C0437DD9 8B3EB5595FFD 000000000000 @ 2026-09-27T11:27:38.677373Z}" prevotes="VoteSet{H:1 R:2 T:SIGNED_MSG_TYPE_PREVOTE +2/3:<nil>(0.25) BA{4:_x__} map[]}"
+        D[2026-09-27|19:27:38.677] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=2 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.677] added vote to prevote                        module=consensus vote="Vote{2:CC0B305C47AD 1/02/SIGNED_MSG_TYPE_PREVOTE(Prevote) 1549C0437DD9 2C988F01DCB0 000000000000 @ 2026-09-27T11:27:38.677373Z}" prevotes="VoteSet{H:1 R:2 T:SIGNED_MSG_TYPE_PREVOTE +2/3:<nil>(0.5) BA{4:_xx_} map[]}"
+        D[2026-09-27|19:27:38.677] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=3 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.677] added vote to prevote                        module=consensus vote="Vote{3:EABB7D1FA08C 1/02/SIGNED_MSG_TYPE_PREVOTE(Prevote) 1549C0437DD9 47526DCB1495 000000000000 @ 2026-09-27T11:27:38.677373Z}" prevotes="VoteSet{H:1 R:2 T:SIGNED_MSG_TYPE_PREVOTE +2/3:1549C0437DD979D8D30F589D852EE0A76D0A9AF663AA91498BA0190393251BDE:1:770C7D649DBD(0.75) BA{4:_xxx} map[]}"
+        D[2026-09-27|19:27:38.677] unlocking because of POL                     module=consensus locked_round=1 pol_round=2
+        D[2026-09-27|19:27:38.677] valid block we do not know about; set ProposalBlock=nil module=consensus proposal=1549C0437DD979D8D30F589D852EE0A76D0A9AF663AA91498BA0190393251BDE block_id=1549C0437DD979D8D30F589D852EE0A76D0A9AF663AA91498BA0190393251BDE
+        D[2026-09-27|19:27:38.677] entering prevote wait step with invalid args module=consensus height=1 round=2 current=1/2/RoundStepPrecommit
+        I[2026-09-27|19:27:38.677] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.677] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+        I[2026-09-27|19:27:38.677] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.677] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+        I[2026-09-27|19:27:38.677] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.677] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+        === RUN   TestStableHashIdentityCases/exact_precommit
+        I[2026-09-27|19:27:38.682] service start                                module=events msg="Starting EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.682] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+        D[2026-09-27|19:27:38.683] entering precommit step                      module=consensus height=1 round=0 current=1/0/RoundStepNewHeight
+        D[2026-09-27|19:27:38.683] precommit step; +2/3 prevoted proposal block; locking module=consensus height=1 round=0 hash=9646F4D687743FF3C47A265686AA09E3C2942E3463513D62E9D9C5951B468196
+        D[2026-09-27|19:27:38.683] signed and pushed vote                       module=consensus height=1 round=0 vote="Vote{0:0428E1261283 1/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 9646F4D68774 2E614130CF4E 000000000000 @ 2026-09-27T11:27:38.6837863Z}"
+        I[2026-09-27|19:27:38.683] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.683] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+        === RUN   TestStableHashIdentityCases/proposal_binding
+        I[2026-09-27|19:27:38.689] service start                                module=events msg="Starting EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.689] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+            block_identity_test.go:266: different full identity counted as complete proposal
+        I[2026-09-27|19:27:38.692] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.692] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+        === RUN   TestStableHashIdentityCases/qc_without_matching_proposal
+        I[2026-09-27|19:27:38.693] service start                                module=events msg="Starting EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.693] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+        D[2026-09-27|19:27:38.696] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=1 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.696] added vote to prevote                        module=consensus vote="Vote{1:B4108937F4E4 1/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) E03F5CA6D2C8 7A2AE1AD3F4D 000000000000 @ 2026-09-27T11:27:38.6963756Z}" prevotes="VoteSet{H:1 R:0 T:SIGNED_MSG_TYPE_PREVOTE +2/3:<nil>(0.25) BA{4:_x__} map[]}"
+        D[2026-09-27|19:27:38.696] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=2 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.696] added vote to prevote                        module=consensus vote="Vote{2:C9E86CCBC311 1/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) E03F5CA6D2C8 F2384757797C 000000000000 @ 2026-09-27T11:27:38.6963756Z}" prevotes="VoteSet{H:1 R:0 T:SIGNED_MSG_TYPE_PREVOTE +2/3:<nil>(0.5) BA{4:_xx_} map[]}"
+        D[2026-09-27|19:27:38.696] adding vote                                  module=consensus vote_height=1 vote_type=SIGNED_MSG_TYPE_PREVOTE val_index=3 cs_height=1 extLen=0 extSigLen=0
+        D[2026-09-27|19:27:38.696] added vote to prevote                        module=consensus vote="Vote{3:D6AE54A73469 1/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) E03F5CA6D2C8 B45CD385268D 000000000000 @ 2026-09-27T11:27:38.6963756Z}" prevotes="VoteSet{H:1 R:0 T:SIGNED_MSG_TYPE_PREVOTE +2/3:E03F5CA6D2C8039726C68EB701B23269186094576E6862EAC4A3F2D4F3449E51:1:CD00B6AA558E(0.75) BA{4:_xxx} map[]}"
+        D[2026-09-27|19:27:38.696] valid block we do not know about; set ProposalBlock=nil module=consensus proposal=E03F5CA6D2C8039726C68EB701B23269186094576E6862EAC4A3F2D4F3449E51 block_id=E03F5CA6D2C8039726C68EB701B23269186094576E6862EAC4A3F2D4F3449E51
+        D[2026-09-27|19:27:38.696] entering prevote wait step                   module=consensus height=1 round=0 current=1/0/RoundStepPrevote
+        I[2026-09-27|19:27:38.697] received complete proposal block             module=consensus height=1 hash=E03F5CA6D2C8039726C68EB701B23269186094576E6862EAC4A3F2D4F3449E51
+        D[2026-09-27|19:27:38.697] updating valid block to new proposal block   module=consensus valid_round=0 valid_block_hash=E03F5CA6D2C8039726C68EB701B23269186094576E6862EAC4A3F2D4F3449E51
+            block_identity_test.go:324: partsFirst=false: matching QC/candidate stalled behind old proposal
+        I[2026-09-27|19:27:38.697] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+        I[2026-09-27|19:27:38.697] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+        --- FAIL: TestStableHashIdentityCases (0.09s)
+            --- PASS: TestStableHashIdentityCases/commit_fetch (0.03s)
+            --- PASS: TestStableHashIdentityCases/finalize_waits (0.01s)
+            --- PASS: TestStableHashIdentityCases/precommit (0.01s)
+            --- PASS: TestStableHashIdentityCases/valid_block (0.01s)
+            --- PASS: TestStableHashIdentityCases/pol_rounds (0.02s)
+            --- PASS: TestStableHashIdentityCases/exact_precommit (0.01s)
+            --- FAIL: TestStableHashIdentityCases/proposal_binding (0.01s)
+            --- FAIL: TestStableHashIdentityCases/qc_without_matching_proposal (0.01s)
+        FAIL
+    block_identity_test.go:92: exit status 1
+--- FAIL: TestStableHashIdentity (0.27s)
+FAIL
+FAIL	github.com/cometbft/cometbft/consensus	0.638s
+FAIL

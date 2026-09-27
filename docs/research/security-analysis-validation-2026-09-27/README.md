@@ -90,7 +90,7 @@ go test -run '^$' -fuzz '^FuzzDecoder$' -fuzztime=10m -parallel=2 ./protocol
 
 ## 6. 共识身份组件探针
 
-[测试源码](comet-identity-probe.go.txt) · [运行输出](comet-identity-probe.txt) · [边界解释](../security-redaction-consensus-wire4.md#44-稳定哈希与完整提交身份的边界)
+[测试源码](comet-identity-probe.go.txt) · [运行输出](comet-identity-probe.txt) · [边界解释](../security-redaction-consensus-wire4.md#44-完整候选身份反例与修复)
 
 在当前 overlay 生成的 `.scratch/comet-src/consensus` 中，将保存的源码复制为 `next_identity_probe_test.go` 后，从项目根运行：
 
@@ -141,3 +141,9 @@ go test -count=1 ./internal/member ./internal/rules -run 'TestSecurityCompositio
 两个包均通过（成员包 1.079 s，规则包 0.551 s）。它只用于复核本轮引用的实际语义，不是新的全项目、网络 BFT 或性能测试。本轮变更仅为文档；`re` 和 E1–E8 测量保持原样。
 
 最终主张限定为：对满足明确配置及公共执行接口的 wire 4，给出隐藏 QC 风险、真实备付、守恒及条件后继使用的手工安全论证，并附代码对应与回归证据。未在本轮找到修正后条件推导的新反例，不等于排除了所有实现反例，也不等于整套实现已经完成安全证明。
+
+## 9. 后续代码加固与联合证明
+
+上一节的配置和完整共识身份问题已继续落实，见[加固报告与回归说明](hardening.md)。共同启动校验拒绝同组织冲突配置；共识按完整 BlockID 处理 Proposal、POL、锁定和提交，并在新回归中按真实提交票取回、存储和执行正确正文一次。另用任意适配输出模型论证业务授权不依赖“有效 opening 必然是一次新的门限批准”。
+
+第 6 节的 panic 探针保留为 `37edf2a` 的历史证据，不应再复制到当前 fork 并期待相同 panic。当前正式回归由 overlay 复制，直接运行 `TestStableHashIdentity`。第 1–8 节的“未修改共识生产代码”“配置未完整保证”等是各轮当时状态；当前结论与验证以第 9 节及加固报告为准。

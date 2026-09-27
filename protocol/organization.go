@@ -96,6 +96,23 @@ type OrgConfig struct {
 	Members      [4]PublicKey
 }
 
+// ValidateOrganizations fixes one signing authority per consumption route.
+// An identical repeat (a member also in its peer list) is the same authority.
+// Other epochs or member sets require a migration protocol, not enabled here.
+func ValidateOrganizations(network Hash, organizations []OrgConfig) error {
+	seen := make(map[Hash]OrgConfig, len(organizations))
+	for _, org := range organizations {
+		if org.Network != network || org.Validate() != nil {
+			return ErrAuth
+		}
+		if previous, exists := seen[org.Org]; exists && previous != org {
+			return ErrRule
+		}
+		seen[org.Org] = org
+	}
+	return nil
+}
+
 func (c OrgConfig) Validate() error {
 	if c.Network == (Hash{}) || c.Org == (Hash{}) || c.Epoch == 0 {
 		return ErrRule

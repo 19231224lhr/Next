@@ -56,16 +56,16 @@ func New(cfg Config, db store.Store, gen state.Genesis) (*Member, error) {
 		cfg.Committee.Validators = cfg.Committee.Validators.Copy()
 	}
 	cfg.Key = bytes.Clone(cfg.Key)
+	orgs := append(append([]protocol.OrgConfig{}, cfg.Peers...), cfg.Organization)
+	if err := protocol.ValidateOrganizations(gen.Network, orgs); err != nil {
+		return nil, err
+	}
 	m := &Member{cfg: cfg, db: db, peers: make(map[protocol.Hash]protocol.OrgConfig)}
 	for _, p := range cfg.Peers {
-		if p.Validate() != nil || p.Network != gen.Network {
-			return nil, protocol.ErrAuth
-		}
 		m.peers[p.Hash()] = p
 	}
 	m.peers[cfg.Organization.Hash()] = cfg.Organization
 	if cfg.Direct != nil {
-		orgs := append(append([]protocol.OrgConfig{}, cfg.Peers...), cfg.Organization)
 		p, err := cfg.Direct.Policy(cfg.Schedule, orgs)
 		if err != nil {
 			return nil, err

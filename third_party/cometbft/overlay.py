@@ -20,10 +20,12 @@ if not out.exists():
 
 def patch(name, edits):
     text = (source / name).read_text(encoding="utf-8")
-    for before, after in edits:
-        if text.count(before) != 1:
+    for edit in edits:
+        before, after = edit[:2]
+        expected = edit[2] if len(edit) == 3 else 1
+        if text.count(before) != expected:
             raise RuntimeError(f"pinned source mismatch: {name}: {before[:70]}")
-        text = text.replace(before, after, 1)
+        text = text.replace(before, after, expected)
     target = out / name
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(text, encoding="utf-8")
@@ -124,6 +126,28 @@ patch("libs/tempfile/tempfile.go", [trace_import,
      'endRename := operationtrace.Start("atomic_file_rename", 0)\n renameErr := os.Rename(f.Name(), filename)\n endRename()\n return renameErr'),
 ])
 patch("consensus/state.go", [trace_import,
+    ('cs.LockedBlock.HashesTo(blockID.Hash)',
+     'matchesBlockID(cs.LockedBlock, cs.LockedBlockParts, blockID)', 3),
+    ('cs.ProposalBlock.HashesTo(blockID.Hash)',
+     'matchesBlockID(cs.ProposalBlock, cs.ProposalBlockParts, blockID)', 5),
+    ('if cs.Proposal == nil || cs.ProposalBlock == nil {', 'if !cs.hasProposalBlock() {'),
+    ('return cs.Votes.Prevotes(cs.Proposal.POLRound).HasTwoThirdsMajority()',
+     'id, ok := cs.Votes.Prevotes(cs.Proposal.POLRound).TwoThirdsMajority()\n return ok && id.Equals(cs.Proposal.BlockID)'),
+    ('// If ProposalBlock is nil, prevote nil.\n\tif cs.ProposalBlock == nil {\n\t\tlogger.Debug("prevote step: ProposalBlock is nil")',
+     '// A timeout does not authorize another proposal identity. The locked path above is independent.\n if !cs.hasProposalBlock() {\n logger.Debug("prevote step: matching proposal block is unavailable")'),
+    ('if ok && (cs.isProposalComplete() || len(blockID.Hash) == 0) {',
+     'if ok && (matchesBlockID(cs.ProposalBlock, cs.ProposalBlockParts, blockID) || len(blockID.Hash) == 0) {'),
+    ('\n\tif cs.Step <= cstypes.RoundStepPropose && cs.isProposalComplete() {',
+     '''
+ // A current-round polka authorizes its own exact candidate independently
+ // of a missing or conflicting Proposal. enterPrecommit retains step/round
+ // guards, so late parts cannot cause a second precommit in the same round.
+ if cs.Step != cstypes.RoundStepCommit && hasTwoThirds && !blockID.IsZero() && matchesBlockID(cs.ProposalBlock, cs.ProposalBlockParts, blockID) {
+     cs.enterPrecommit(blockHeight, cs.Round)
+     return
+ }
+
+	if cs.Step <= cstypes.RoundStepPropose && cs.isProposalComplete() {'''),
     ('block, err = cs.createProposalBlock(context.TODO())',
      'endBuild := operationtrace.Start("proposal_build", height)\n block, err = cs.createProposalBlock(context.TODO())\n endBuild()'),
     ('blockParts, err = block.MakePartSet(types.BlockPartSizeBytes)',
@@ -162,7 +186,7 @@ patch("consensus/state.go", [trace_import,
     ('\n\tfail.Fail() // XXX\n\n\t// Create a copy of the state', '\n endEndHeight()\n\tfail.Fail() // XXX\n\n\t// Create a copy of the state'),
 ])
 
-for name in ["types/redaction.go", "store/redaction.go", "node/redaction.go", "libs/operationtrace/trace.go", "libs/autofile/sync_test.go", "consensus/proposal_batch.go", "consensus/proposal_batch_test.go", "state/results_batch_test.go", "store/catchup_test.go"]:
+for name in ["types/redaction.go", "store/redaction.go", "node/redaction.go", "libs/operationtrace/trace.go", "libs/autofile/sync_test.go", "consensus/proposal_batch.go", "consensus/proposal_batch_test.go", "consensus/block_identity.go", "consensus/block_identity_test.go", "state/results_batch_test.go", "store/catchup_test.go"]:
     (out / name).parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(root / "third_party/cometbft" / name, out / name)
 subprocess.check_call(["go", "mod", "edit", "-replace",

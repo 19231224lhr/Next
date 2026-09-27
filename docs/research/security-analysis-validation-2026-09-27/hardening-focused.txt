@@ -1,0 +1,56 @@
+=== RUN   TestNetworkRejectsAmbiguousOrganization
+--- PASS: TestNetworkRejectsAmbiguousOrganization (0.00s)
+PASS
+ok  	utxo/cmd/internal/config	0.330s
+=== RUN   TestEngineRejectsAmbiguousOrganization
+--- PASS: TestEngineRejectsAmbiguousOrganization (0.01s)
+PASS
+ok  	utxo/internal/committee	0.343s
+=== RUN   TestMemberRejectsAmbiguousOrganization
+--- PASS: TestMemberRejectsAmbiguousOrganization (0.00s)
+PASS
+ok  	utxo/internal/member	0.335s
+=== RUN   TestDirectPolicyRejectsAmbiguousOrganization
+=== RUN   TestDirectPolicyRejectsAmbiguousOrganization/epoch
+=== RUN   TestDirectPolicyRejectsAmbiguousOrganization/members
+=== RUN   TestDirectPolicyRejectsAmbiguousOrganization/network
+--- PASS: TestDirectPolicyRejectsAmbiguousOrganization (0.00s)
+    --- PASS: TestDirectPolicyRejectsAmbiguousOrganization/epoch (0.00s)
+    --- PASS: TestDirectPolicyRejectsAmbiguousOrganization/members (0.00s)
+    --- PASS: TestDirectPolicyRejectsAmbiguousOrganization/network (0.00s)
+PASS
+ok  	utxo/internal/rules	1.040s
+=== RUN   TestWalletRejectsAmbiguousOrganization
+--- PASS: TestWalletRejectsAmbiguousOrganization (0.00s)
+PASS
+ok  	utxo/internal/wallet	0.309s
+=== RUN   TestPaymentRepairMonetaryReplay
+=== RUN   TestPaymentRepairMonetaryReplay/reject-output
+=== RUN   TestPaymentRepairMonetaryReplay/reject-revision
+=== RUN   TestPaymentRepairMonetaryReplay/reject-transaction
+=== RUN   TestPaymentRepairMonetaryReplay/reject-part
+=== RUN   TestPaymentRepairMonetaryReplay/reject-same-height
+=== RUN   TestPaymentRepairMonetaryReplay/reject-premature
+=== RUN   TestPaymentRepairMonetaryReplay/reject-valid-opening-wrong-reserve
+=== RUN   TestPaymentRepairMonetaryReplay/reject-owner-auth
+=== RUN   TestPaymentRepairMonetaryReplay/reject-organization-auth
+=== RUN   TestPaymentRepairMonetaryReplay/reject-input-certificate
+=== RUN   TestPaymentRepairMonetaryReplay/same-block-parent-first
+=== RUN   TestPaymentRepairMonetaryReplay/same-block-repair-first
+=== RUN   TestPaymentRepairMonetaryReplay/warm-cache-after-authorized-repair
+--- PASS: TestPaymentRepairMonetaryReplay (0.18s)
+    --- PASS: TestPaymentRepairMonetaryReplay/reject-output (0.00s)
+    --- PASS: TestPaymentRepairMonetaryReplay/reject-revision (0.00s)
+    --- PASS: TestPaymentRepairMonetaryReplay/reject-transaction (0.00s)
+    --- PASS: TestPaymentRepairMonetaryReplay/reject-part (0.00s)
+    --- PASS: TestPaymentRepairMonetaryReplay/reject-same-height (0.00s)
+    --- PASS: TestPaymentRepairMonetaryReplay/reject-premature (0.00s)
+    --- PASS: TestPaymentRepairMonetaryReplay/reject-valid-opening-wrong-reserve (0.02s)
+    --- PASS: TestPaymentRepairMonetaryReplay/reject-owner-auth (0.00s)
+    --- PASS: TestPaymentRepairMonetaryReplay/reject-organization-auth (0.00s)
+    --- PASS: TestPaymentRepairMonetaryReplay/reject-input-certificate (0.00s)
+    --- PASS: TestPaymentRepairMonetaryReplay/same-block-parent-first (0.01s)
+    --- PASS: TestPaymentRepairMonetaryReplay/same-block-repair-first (0.01s)
+    --- PASS: TestPaymentRepairMonetaryReplay/warm-cache-after-authorized-repair (0.00s)
+PASS
+ok  	utxo/internal/redaction	0.524s

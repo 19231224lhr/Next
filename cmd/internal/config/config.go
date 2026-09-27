@@ -38,6 +38,9 @@ type Network struct {
 }
 
 func (n Network) Trust() (finality.Trust, error) {
+	if err := protocol.ValidateOrganizations(n.Genesis.Network, n.Organizations); err != nil {
+		return finality.Trust{}, err
+	}
 	vals := make([]*ct.Validator, 4)
 	for i, p := range n.Committee {
 		vals[i] = ct.NewValidator(cmted.PubKey(bytes.Clone(p[:])), 1)

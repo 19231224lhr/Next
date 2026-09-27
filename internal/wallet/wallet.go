@@ -18,11 +18,11 @@ func New(db store.Store, network protocol.Hash, owner protocol.PublicKey, orgs [
 	if db == nil || network == (protocol.Hash{}) || owner == (protocol.PublicKey{}) {
 		return nil, protocol.ErrRule
 	}
+	if err := protocol.ValidateOrganizations(network, orgs); err != nil {
+		return nil, err
+	}
 	w := &Wallet{db: db, network: network, owner: owner, orgs: make(map[protocol.Hash]protocol.OrgConfig)}
 	for _, o := range orgs {
-		if o.Validate() != nil || o.Network != network {
-			return nil, protocol.ErrRule
-		}
 		w.orgs[o.Hash()] = o
 	}
 	return w, nil

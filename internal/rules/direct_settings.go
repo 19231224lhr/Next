@@ -16,6 +16,11 @@ type DirectSettings struct {
 
 func (s DirectSettings) Policy(base Schedule, organizations []protocol.OrgConfig) (DirectPolicy, error) {
 	p := DirectPolicy{Base: base, TimeoutSeconds: s.TimeoutSeconds, RepairCost: s.RepairCost, Organizations: map[protocol.Hash]protocol.OrgConfig{}}
+	if len(organizations) > 0 {
+		if err := protocol.ValidateOrganizations(organizations[0].Network, organizations); err != nil {
+			return p, err
+		}
+	}
 	if len(s.Modulus) != chameleon.Size || s.TimeoutSeconds <= 0 || s.RepairCost == 0 || base.Validate() != nil {
 		return p, protocol.ErrRule
 	}
@@ -25,9 +30,6 @@ func (s DirectSettings) Policy(base Schedule, organizations []protocol.OrgConfig
 	}
 	p.Key = key
 	for _, org := range organizations {
-		if org.Validate() != nil {
-			return p, protocol.ErrAuth
-		}
 		p.Organizations[org.Hash()] = org
 	}
 	return p, nil

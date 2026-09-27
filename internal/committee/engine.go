@@ -49,6 +49,9 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 		return nil, e
 	}
 	engine := &Engine{cfg: c, db: db, orgs: make(map[protocol.Hash]protocol.OrgConfig), genesis: protocol.Digest("PUBLIC_GENESIS_V2", b)}
+	if err := protocol.ValidateOrganizations(c.Network, c.Organizations); err != nil {
+		return nil, err
+	}
 	engine.directCache.disabled = os.Getenv("UTXO_EXPERIMENT_DISABLE_DIRECT_CACHE") == "1"
 	if c.Direct != nil {
 		p, err := c.Direct.Policy(c.Schedule, c.Organizations)
@@ -59,9 +62,6 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 		engine.genesis = protocol.Digest("PUBLIC_GENESIS_V3", b)
 	}
 	for _, org := range c.Organizations {
-		if org.Validate() != nil || org.Network != c.Network {
-			return nil, protocol.ErrAuth
-		}
 		if _, ok := engine.orgs[org.Hash()]; ok {
 			return nil, protocol.ErrRule
 		}

@@ -11,6 +11,14 @@ authenticated historical BlockStore revision, original-version replay and
 catch-up, and the node's pre-replay application hook. It preserves normal BFT
 rounds and quorum rules. It is not wire-compatible with an unmodified network.
 
+Consensus compares the full BlockID (stable hash and original part header) for
+locks, valid candidates and commits. A matching current-round polka can advance
+its exact candidate without a Proposal message; normal proposal/POL checks bind
+the same full identity. Existing round/step guards prevent signing a second
+precommit. `TestStableHashIdentity` covers aliases, arrival orders and execution
+of the exact committed bytes in an isolated process. See the
+[security connection and evidence](../../docs/research/security-analysis-validation-2026-09-27/hardening.md).
+
 Only an application-committed exact RepairInput can authorize ReviseBlock.
 Original bytes are retained for replay; current parts are genuinely rewritten.
 Monetary changes execute at the new repair height, never retrospectively.
