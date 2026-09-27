@@ -75,7 +75,8 @@ func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
 }
 
 // ReceiveDirect is the end of the fast-payment measurement: issuer signature
-// verified, output binding checked and the complete coin durably saved.
+// verified, output binding checked and the local coin transaction committed.
+// Durability depends on the configured Store; memory/NoSync is experimental.
 func (w *Wallet) ReceiveDirect(output protocol.Output, c protocol.OutputCertificate, index uint32) error {
 	org, ok := w.orgs[c.Summary.Config]
 	if !ok || c.Summary.Network != w.network || output.Recipient.Owner != w.owner || c.VerifyOutput(org, index, output) != nil {

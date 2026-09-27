@@ -29,14 +29,17 @@ func TestSecurityComposition(t *testing.T) {
 		for _, extraApproval := range []bool{false, true} {
 			for _, repair := range []bool{false, true} {
 				t.Run(fmt.Sprintf("workers%d/extra%v/repair%v", workers, extraApproval, repair), func(t *testing.T) {
-					securityComposition(t, workers, extraApproval, repair)
+					securityComposition(t, workers, extraApproval, repair, false)
 				})
 			}
 		}
+		t.Run(fmt.Sprintf("workers%d/late_extra_signer", workers), func(t *testing.T) {
+			securityComposition(t, workers, false, true, true)
+		})
 	}
 }
 
-func securityComposition(t *testing.T, workers uint32, extraApproval, repair bool) {
+func securityComposition(t *testing.T, workers uint32, extraApproval, repair, lateApproval bool) {
 	f := testkit.NewFixture("security-composition", "org", 2)
 	f.EnableDirect()
 	f.Genesis.Grants[0].Amount = 901
@@ -135,6 +138,7 @@ func securityComposition(t *testing.T, workers uint32, extraApproval, repair boo
 	settled := make(map[protocol.SpendFactID]bool)
 	paid := make(map[protocol.SpendFactID]uint64)
 	budget, spent, reserved := uint64(901), uint64(0), uint64(0)
+	lateSigned := false
 	check := func() {
 		t.Helper()
 		var risk, residualSum uint64
@@ -170,7 +174,10 @@ func securityComposition(t *testing.T, workers uint32, extraApproval, repair boo
 								t.Fatal("applied exceeds original cap")
 							}
 							r := d.Cap - applied[j]
-							if r < w {
+							// Only members 0 and 1 belong to the early witness QC.
+							// A later extra signer may have followed repair before
+							// creating its own approval, so it need not retain Paid.
+							if (i < 2 || !lateApproval) && r < w {
 								t.Fatalf("member%d residual%d < risk%d", i, r, w)
 							}
 							residualSum += r
@@ -196,7 +203,7 @@ func securityComposition(t *testing.T, workers uint32, extraApproval, repair boo
 				sum += s.Available + s.Reserved
 				localResidual += s.Reserved
 			}
-			if i == 2 && !extraApproval && localResidual != 0 {
+			if i == 2 && !extraApproval && !lateSigned && localResidual != 0 {
 				t.Fatal("unapproved member reserved")
 			}
 			if localResidual != localDebits[i] {
@@ -302,6 +309,19 @@ func securityComposition(t *testing.T, workers uint32, extraApproval, repair boo
 		check()
 		follow(0, blocks[len(blocks)-1])
 	}
+	if lateApproval {
+		// Follow the child and repair before making an additional parent vote.
+		// The witness certificate still consists of real approvals 0, 1 and
+		// the Byzantine vote 3; member 2 is not needed for its coverage.
+		for _, b := range blocks {
+			follow(2, b)
+		}
+		if _, err := members[2].ApproveDirect(context.Background(), protocol.DirectRequest{Tx: parent}); err != nil {
+			t.Fatal(err)
+		}
+		lateSigned = true
+		check()
+	}
 	for _, amount := range []uint64{1, 2} {
 		c := protocol.ReserveIncrease{Network: f.Org.Network, Organization: f.Org.Hash(), Key: g.Key, Grant: g.ID, Previous: budget, Amount: amount}
 		c.Sign(f.Owner)
@@ -334,8 +354,22 @@ func securityComposition(t *testing.T, workers uint32, extraApproval, repair boo
 	follow(0, blocks[len(blocks)-1])
 	for _, i := range []int{2, 1} {
 		for _, b := range blocks {
+			if lateApproval && i == 2 && b.Height() <= 2 {
+				continue // Already followed before the additional approval.
+			}
 			follow(i, b)
 			follow(i, b)
+		}
+	}
+	if lateApproval {
+		if err := localDB[2].View(func(v state.ReadView) error {
+			p, found, err := state.Load[member.LocalProgress](v, member.ProgressKey(pp.Certificate.QC.Fact))
+			if !found || !p.Settled || p.Paid != 0 {
+				t.Fatalf("unexpected later signer's progress: %+v", p)
+			}
+			return err
+		}); err != nil {
+			t.Fatal(err)
 		}
 	}
 	// Reuse released quota for a new independently funded payment.

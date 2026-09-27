@@ -67,9 +67,21 @@ func TestInvalidPaymentRejectedBeforeMemberWrite(t *testing.T) {
 
 func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 	for _, scenario := range []struct {
-		name                                   string
-		repair, split, sameBlock, owner, multi bool
-	}{{"source_arrives", false, false, false, false, false}, {"repair_then_late", true, false, false, false, false}, {"partial_repair_then_late", true, true, false, false, false}, {"child_parent_same_block", false, false, true, false, false}, {"owner_source", false, false, false, true, false}, {"owner_repair", true, false, false, true, false}, {"owner_same_block", false, false, true, true, false}, {"owner_multiple_refunds", false, true, false, true, true}} {
+		name                                                                 string
+		repair, split, sameBlock, owner, multi, alteredOpening, lateObserver bool
+	}{
+		{name: "source_arrives"},
+		{name: "repair_then_late", repair: true},
+		{name: "partial_repair_then_late", repair: true, split: true},
+		{name: "child_parent_same_block", sameBlock: true},
+		{name: "owner_source", owner: true},
+		{name: "owner_repair", repair: true, owner: true},
+		{name: "owner_same_block", sameBlock: true, owner: true},
+		{name: "owner_multiple_refunds", split: true, owner: true, multi: true},
+		{name: "projection_source", owner: true, alteredOpening: true},
+		{name: "projection_repair", repair: true, split: true, owner: true, alteredOpening: true},
+		{name: "late_extra_signer", repair: true, owner: true, lateObserver: true},
+	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			repair := scenario.repair
 			f := testkit.NewFixture("follow", "org", 1)
@@ -162,6 +174,17 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if scenario.lateObserver {
+				// Member 1 is outside the original witness QC. Its later vote
+				// must not be used as a witness for earlier compensation.
+				pc.QC.Votes = nil
+				for _, index := range []uint16{0, 2, 3} {
+					pc.QC.Votes = append(pc.QC.Votes, protocol.SignSpend(pc.QC.Fact, index, f.Keys[index]))
+				}
+				if err := pc.Verify(f.Org); err != nil {
+					t.Fatal(err)
+				}
+			}
 			body := parent.Body
 			body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(0), Evidence: protocol.Hash(pc.QC.Fact)}}
 			body.Outputs = []protocol.Output{parent.Body.Outputs[0]}
@@ -246,6 +269,25 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				height++
 				trust, data := testkit.Block("follow", height, previous, blockTxs, blockResults)
 				blockTxs, blockResults = nil, nil
+				if scenario.alteredOpening {
+					for i, raw := range data.Block.Txs {
+						if protocol.IsRepairInput(raw) {
+							continue // Repair commands authenticate their complete bytes.
+						}
+						pay, err := protocol.DecodeDirectSubmission(raw)
+						if err != nil {
+							t.Fatal(err)
+						}
+						pay.Tx.Funding[0].Opening[0] ^= 0x80
+						if _, err := rules.VerifyDirectSubmission(pay, policy); err == nil {
+							t.Fatal("altered opening accepted as a new payment")
+						}
+						data.Block.Txs[i], err = pay.MarshalBinary()
+						if err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
 				b, err := finality.VerifyBlock(trust, data)
 				if err != nil {
 					t.Fatal(err)
@@ -325,7 +367,26 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 					apply(raw, tr)
 				}
 			}
+			if scenario.lateObserver {
+				if _, err := observer.ApproveDirect(context.Background(), protocol.DirectRequest{Tx: parent}); err != nil {
+					t.Fatal(err)
+				}
+				before, err := observer.Quota(f.Genesis.Grants[0].Key, 0)
+				if err != nil || before.Reserved != 100 {
+					t.Fatalf("late approval did not occupy its cap: %+v %v", before, err)
+				}
+			}
 			settle(pp, 132)
+			if scenario.lateObserver {
+				// The observer had no approval when the repair was followed.
+				// It releases its own later debit; the original signer below
+				// retains the paid amount. The coverage proof therefore uses
+				// an early witness QC, not every eventual signature.
+				after, err := observer.Quota(f.Genesis.Grants[0].Key, 0)
+				if err != nil || after.Reserved != 0 {
+					t.Fatalf("unexpected late-signer accounting: %+v %v", after, err)
+				}
+			}
 			if scenario.owner {
 				refund := protocol.OutputIdentity(f.Org.Network, child.ID(), protocol.FeeRefundIndex)
 				if ok, err := w.DirectFinal(refund, 0); err != nil || !ok {

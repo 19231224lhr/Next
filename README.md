@@ -159,6 +159,7 @@ TPS 实验使用独立最终 UTXO、少量地址高复用；续花实验使用�
 | 查阅 E1–E8、性能数据与复现材料 | [实验总索引](docs/experiments/README.md) |
 | 查阅消息、费用、跟块与补资细节 | [现行实现参考](docs/reference/README.md) |
 | 准备论文模型与安全论证 | [安全证明文献调研](docs/research/fast-payment-security-proof-survey-2026-09-25.md) |
+| 阅读完整安全分析与论文正文 | [完整分析报告](docs/research/security-analysis-complete-wire4.md) · [第五章正文](docs/paper/security-analysis-chapter5.md) · [本轮验证](docs/research/security-analysis-validation-2026-09-27/README.md) |
 | 阅读论文模型、条件推导与实验对应 | [系统模型与条件安全论证](docs/research/security-argument-wire4.md) |
 | 复查模型组合、一般归纳及代码连接 | [组合安全论证与实现对应](docs/research/security-composition-wire4.md) |
 | 复查门限适配、修订授权与共识字节边界 | [变色龙哈希与共识接口论证](docs/research/security-redaction-consensus-wire4.md) |
@@ -166,6 +167,6 @@ TPS 实验使用独立最终 UTXO、少量地址高复用；续花实验使用�
 | 查阅源码安全分析与已知问题 | [安全分析与证明准备](docs/research/security-analysis-2026-09-26.md) |
 | 追溯旧版规范与工程决策 | [历史归档与迁移表](docs/archive/README.md) |
 
-两份设计文档已按 wire 4 当前代码重新梳理，包含快速取证、直接缺口执行、权限释放、用户自付费用、赔付与历史修订的完整流程，并列出原子状态转移及代码／测试映射。安全分析分支已完成分解有限检查、统一模型的手工条件归纳和关键跨层回归；进一步形成修订接口的分层条件论证，并修复了实时分片仅检查版本标签的缺口。完整密码学归约、全实现精化及共识栈机械验证仍未完成；未合并的安全分支不改写既有实验成绩。
+两份设计文档已按 wire 4 当前代码重新梳理，包含快速取证、直接缺口执行、权限释放、用户自付费用、赔付与历史修订的完整流程，并列出原子状态转移及代码／测试映射。安全分析分支形成了完整报告与论文第五章草稿，区分条件安全定理、有限模型、实现回归和实验依据。最新审查以最早认证集合中的诚实签署者证明覆盖，并用迟到补签轨迹修正此前过强的全称断言；原始分片接纳缺口也已有独立修复。完整密码学归约、全实现精化及共识栈机械验证仍未完成；未合并的安全分支不改写既有实验成绩。
 
 首次运行请从[运行指南](docs/operations.md#快速开始)开始；全部资料分类见[文档目录](docs/README.md)。

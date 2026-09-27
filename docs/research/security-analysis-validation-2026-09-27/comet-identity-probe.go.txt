@@ -1,0 +1,93 @@
+package consensus
+
+import (
+	"bytes"
+	"context"
+	"crypto/x509"
+	"encoding/pem"
+	"fmt"
+	"os"
+	"testing"
+
+	cstypes "github.com/cometbft/cometbft/consensus/types"
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	"github.com/cometbft/cometbft/types"
+	"utxo/crypto/chameleon"
+)
+
+// Characterizes an internal identity boundary, not a four-node network attack.
+func TestNextProjectedHashDifferentPartHeaderCommitBoundary(t *testing.T) {
+	cs, validators := randState(4)
+	t.Cleanup(func() { _ = cs.eventBus.Stop() })
+	raw, err := os.ReadFile("../../../crypto/chameleon/testdata/rsa2048.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, _ := pem.Decode(raw)
+	key, err := x509.ParsePKCS1PrivateKey(encoded.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := chameleon.NewPublic(&key.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = types.ConfigureRedaction(cs.state.ChainID, pub); err != nil {
+		t.Fatal(err)
+	}
+	base, err := cs.createProposalBlock(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeBlock := func(mutable string) (*types.Block, *types.PartSet) {
+		pb, err := base.ToProto()
+		if err != nil {
+			t.Fatal(err)
+		}
+		block, err := types.BlockFromProto(pb)
+		if err != nil {
+			t.Fatal(err)
+		}
+		block.Data = types.Data{Txs: types.Txs{types.EncodeRedactableTx([]byte("fixed"), []byte(mutable))}}
+		block.Header.DataHash = nil
+		_ = block.Hash()
+		parts, err := block.MakePartSet(types.BlockPartSizeBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < int(parts.Total()); i++ {
+			if err = parts.GetPart(i).ValidateOriginal(block.Height); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return block, parts
+	}
+	a, partsA := makeBlock("aaa")
+	b, partsB := makeBlock("bbb")
+	if !bytes.Equal(a.Hash(), b.Hash()) || partsA.HasHeader(partsB.Header()) {
+		t.Fatal("fixture must have equal projected hashes and different original part roots")
+	}
+	for _, validator := range validators {
+		validator.Height, validator.Round = cs.Height, cs.Round
+	}
+	extensions := cs.state.ConsensusParams.ABCI.VoteExtensionsEnabled(cs.Height)
+	for _, vote := range signVotes(cmtproto.PrecommitType, b.Hash(), partsB.Header(), extensions, validators[1:]...) {
+		added, err := cs.Votes.Precommits(cs.Round).AddVote(vote)
+		if err != nil || !added {
+			t.Fatalf("precommit: %v, %v", added, err)
+		}
+	}
+	cs.ProposalBlock, cs.ProposalBlockParts = a, partsA
+	cs.CommitRound, cs.Step = cs.Round, cstypes.RoundStepCommit
+	defer func() {
+		got := recover()
+		if got == nil {
+			t.Fatal("expected the existing header guard to reject the mismatched local candidate")
+		}
+		if fmt.Sprint(got) != "expected ProposalBlockParts header to be commit header" {
+			t.Fatalf("unexpected panic: %v", got)
+		}
+		t.Log("equal stable Block.Hash; distinct valid original PartSetHeader; tryFinalizeCommit reached fail-closed panic before application execution")
+	}()
+	cs.tryFinalizeCommit(cs.Height)
+}

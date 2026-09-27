@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-27",
+  "platform": "windows/amd64",
+  "go": "go1.27.1",
+  "branch": "security-analysis",
+  "baseline": "a6ebeb2918bfdc191d40daf0fc64fb5f7cffa827",
+  "checks": [
+    {
+      "command": "go test -count=1 -v ./tools/securitymodel",
+      "exit_code": 0,
+      "log": "models.txt"
+    },
+    {
+      "command": "go test -count=1 -tags=comet_v3 ./...",
+      "exit_code": 0,
+      "log": "go-test-comet.txt"
+    },
+    {
+      "command": "go test -count=1 ./...",
+      "exit_code": 0,
+      "log": "go-test-default.txt"
+    },
+    {
+      "command": "go vet -tags=comet_v3 ./...",
+      "exit_code": 0,
+      "output": "no diagnostics"
+    },
+    {
+      "command": "go test -count=1 -race -tags=comet_v3 ./internal/member ./finality ./tools/securitymodel",
+      "exit_code": 0,
+      "log": "go-race.txt"
+    },
+    {
+      "command": "go test -count=1 -v -tags=comet_v3 ./finality ./internal/member ./internal/committee -run 'TestBlockProofAuthenticatesProjectionNotMutableHistory|TestBlockFollowerMissingRepairLateAndDuplicate|TestSecurityComposition|TestDirectVerificationCacheReusesOnlyIdenticalBytes'",
+      "exit_code": 0,
+      "log": "regressions.txt"
+    },
+    {
+      "command": "go test -run '^$' -fuzz '^FuzzDecoder$' -fuzztime=10m -parallel=2 ./protocol",
+      "exit_code": 0,
+      "log": "decoder-fuzz.txt",
+      "scope": "shared decoder only; not full protocol verification"
+    },
+    {
+      "command": "go test -count=1 -v ./internal/rules -run 'TestDirectOwnerFeeRefundAfterParentArrives|TestDirectChildBeforeParentAndImmediateSuccessor'",
+      "exit_code": 0,
+      "log": "self-transfer.txt"
+    },
+    {
+      "command": "go test -count=1 -race ./internal/rules",
+      "exit_code": 0,
+      "log": "rules-race.txt"
+    },
+    {
+      "command": "go test -mod=readonly -count=1 -v github.com/cometbft/cometbft/consensus -run '^TestNextProjectedHashDifferentPartHeaderCommitBoundary$'",
+      "exit_code": 0,
+      "log": "comet-identity-probe.txt",
+      "scope": "component state injection; expected panic captured; network reachability not demonstrated"
+    }
+  ],
+  "production_behavior_delta_this_round": "none; only a wallet durability comment changed outside test files",
+  "not_claimed": [
+    "general liveness",
+    "complete cryptographic reduction",
+    "full Comet refinement",
+    "whole-Go mechanical proof",
+    "new Mac TPS result"
+  ],
+  "check_order_note": "Full suites preceded the final test-only self-transfer assertions; the affected rules package was tested afterward including race.",
+  "sidebar_review_rounds": 9
+}

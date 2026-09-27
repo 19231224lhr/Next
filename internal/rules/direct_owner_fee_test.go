@@ -152,6 +152,30 @@ func TestDirectOwnerFeeRefundAfterParentArrives(t *testing.T) {
 	parent := ownerPayment(t, f, f.payment(t, f.genesis, nil, 3), seedOwnerFee(t, f, "parent", 1500))
 	child := ownerPayment(t, f, f.payment(t, parent.Certificate.Summary.OutputID(0), &parent.Certificate, 4), seedOwnerFee(t, f, "child", 1500))
 	f.settle(t, child, 10)
+	// A self-payment can create a new final output without submitting the parent.
+	// This checks the rules path, not the availability of member service or consensus.
+	childID := child.Certificate.Summary.OutputID(0)
+	created := loadDirect[state.Creation](t, f.db, DirectCreationKey(childID, 0))
+	if !created.Final || created.Output != f.output {
+		t.Fatalf("self-payment did not create the owner's final CAL output: %+v", created)
+	}
+	parentID := parent.Certificate.Summary.OutputID(0)
+	ob := loadDirect[DirectObligation](t, f.db, DirectObligationKey(parentID))
+	if ob.Status != DirectOpen || ob.Issuer != f.org.Org {
+		t.Fatalf("missing direct backing obligation: %+v", ob)
+	}
+	if err := f.db.View(func(v state.ReadView) error {
+		_, found, err := state.Load[state.Creation](v, DirectCreationKey(parentID, 0))
+		if found {
+			t.Fatal("fixture unexpectedly submitted the parent")
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := loadDirect[uint64](t, f.db, AccountKey(f.org.Org, protocol.AssetFUEL)); got != 10000000 {
+		t.Fatal("self-payment charged organization FUEL instead of the owner")
+	}
 	refund := protocol.OutputIdentity(f.org.Network, child.Tx.ID(), protocol.MaxOutputs+1)
 	if err := f.db.View(func(v state.ReadView) error {
 		_, ok, e := state.Load[state.Creation](v, DirectCreationKey(refund, 0))

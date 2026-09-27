@@ -65,6 +65,8 @@ CIRCL v1.6.5 的 [README](https://raw.githubusercontent.com/cloudflare/circl/v1.
 
 实现使用非恒定时间的大整数运算；没有据此证明远程或本地侧信道安全。可信初始化、固定参数和密钥保管属于必要部署条件。
 
+**后续文献核对（2026-09-27）。** CIRCL 明确实现 Shoup Protocol 1；原论文对应定理要求签名门限 $k=t+1$，一般双参数授权性质由 Protocol 2 另行分析。本项目的 $k=3,t=1$ 和 FDH 比值适配不能直接援引前一定理取得“两个诚实成员新授权”的保证。这是证明适用范围问题，不是已复现的密码学攻击。当前经济安全依赖公共 Repair 的精确验证和已提交 Task，不将 opening 本身用作业务许可；详见[完整安全分析 §5.5](security-analysis-complete-wire4.md#55-受限修订与共识接口)。
+
 ## 3. 公共修订的状态机论证
 
 ### 3.1 转移与线性化点
@@ -131,6 +133,7 @@ Materialize 只接受已提交 Task 中的精确正文。ReviseBlock 检查版�
 | 本地提案 | MakePartSet 生成 opening=1 的原始分片 | types/redaction.go；不允许后台物化替换本地候选 |
 | 共识追块分片 | OriginalBlockPart | overlay 对 consensus/reactor.go 的替换 |
 | blocksync 发送块 | LoadOriginalBlock | overlay 对 blocksync/reactor.go 的替换 |
+| blocksync 接收块 | MakePartSet 以原始 opening 重建完整 PartSetHeader，再以完整 BlockID 核对下一块 LastCommit，验证后才保存与执行 | 生成的 v0.38.26 blocksync/reactor.go；只检查 Block.Hash 不足以代替该路径 |
 | 启动重放 | LoadOriginalBlock | overlay 对 consensus/replay.go 的替换 |
 | 修订规范状态 | 已提交 Revision，未修订则原始块 | redaction.Canonical |
 | 历史物化 | 已提交 Task＋精确正文、版本、稳定根 | redaction.Materialize → BlockStore.ReviseBlock |
@@ -140,6 +143,18 @@ Materialize 只接受已提交 Task 中的精确正文。ReviseBlock 检查版�
 在上述路径闭合、原始字节绑定、确定性应用转移及既有 BFT 顺序安全成立的条件下，可把物化步骤从经济轨迹中擦除：剩下的轨迹按同一原始交易序列和 Repair 命令执行。由 R6-A/B/C 得到“受限字段修改、至多一次经济赔付、表示滞后不影响经济状态”的条件组合结论。
 
 [CometBFT v0.38.26 共识规范](https://raw.githubusercontent.com/cometbft/cometbft/v0.38.26/spec/consensus/consensus.md) 是轮次与提交规则的参考。本报告没有用其文档直接证明本地补丁；网络消息、WAL、同步及所有异常路径到该模型的完整精化仍未完成。原始块可用性、状态快照同步、轻客户端如何认证“最新而非某个合法旧修订”也不能从稳定哈希单独推出。
+
+## 4.4 稳定哈希与完整提交身份的边界
+
+上述入口检查证明的是**同一 PartSetHeader 内原始字节的绑定**。由于普通付款的 Block.Hash 使用稳定投影，不同的原始可变表示仍可具有相同 Block.Hash、不同的原始 PartSetHeader。不能仅由前一个引理推出修改后 Comet 在所有轮次与缓存状态中的身份一致性。
+
+本轮检查 v0.38.26 的 `enterPrecommit`、`enterCommit`、`tryFinalizeCommit`，发现部分候选／锁定块比较只使用 Block.Hash；`finalizeCommit` 另检查本地分片集合与提交票的完整 PartSetHeader，不一致时在保存和应用前 panic。因此还需要证明这些仅比较哈希的分支不能在实际合法执行中造成候选根与提交根失配，或按完整身份处理这种状态。
+
+为区分已观测事实与推测，本轮运行了一个独立组件探针：构造两个都满足原始 opening=1 的通用修订封装，稳定块哈希相同而分片根不同；在 Comet 自有测试状态中人工设置本地候选 A 和三份针对 B 的真实 precommit。调用 `tryFinalizeCommit` 后触发既有 `expected ProposalBlockParts header to be commit header` 守卫，未进入业务应用。源码及输出见[验证记录](security-analysis-validation-2026-09-27/README.md#6-共识身份组件探针)。
+
+**这不是有效 Next 付款的四节点网络攻击复现。** 中间状态由测试直接注入，通用封装未通过 Next 业务接纳；结果只说明该探针中的失配被最终守卫中止，不能推广为所有失配都能被阻断，也不能说明网络可达性或资产分叉。当前源码核查不足以把“一致公共顺序”从条件接口升级为已证明的完整实现性质。后续最小检查是合法已认证块与攻击者替代表示能否通过真实入口形成该状态，以及多轮提案／锁定中完整 BlockID 的保持；替代表示本身不必是合法付款。本轮只保存证据，不扩大为共识重构。
+
+在一致公共执行接口成立的模型中，CAL 双计数与资产守恒推导不因此改变。接口实现的完整安全与活性，仍需单独论证；这个探针不能用于无条件宣称系统安全或不安全。
 
 ## 5. 源码、测试与结论范围
 

@@ -6,8 +6,11 @@
 | --- | --- |
 | [系统设计与证明建模基线](design/system.md) | 身份与状态、完整付款及赔付流程、资金与权限公式、假设和待证明性质 |
 | [工程架构与实现映射](design/architecture.md) | 关键函数、并发和存储边界、共识适配、现有回归测试与模型对应关系 |
+| [完整安全性分析报告](research/security-analysis-complete-wire4.md) | 文献写法、系统与攻击者模型、潜在责任到真实资金的证明、源码审查、实验对应及剩余义务 |
+| [论文第五章：安全性分析](paper/security-analysis-chapter5.md) | 可供论文采用的中文正文：模型、引理、定理、短证明、条件终结性与限制；附参考文献 |
+| [本轮分析与回归证据](research/security-analysis-validation-2026-09-27/README.md) | 迟到批准反例、见证集合模型、经济投影回归、文献版本及核查记录 |
 | [系统模型与条件安全论证](research/security-argument-wire4.md) | 论文模型、认证与唯一消费、动态预算到真实备付的推导、CAL/FUEL 记账及 E1–E8 证据映射；明确尚未完成的精化与密码学义务 |
-| [组合安全论证与实现对应](research/security-composition-wire4.md) | 统一状态、一般参数条件归纳、关键写入口与提交边界，8 个真实跨层回归；区分手工推导和机械验证 |
+| [组合安全论证与实现对应](research/security-composition-wire4.md) | 统一状态、一般参数条件归纳、关键写入口与提交边界；原 8 场景及本轮 2 场景扩展，区分手工推导和机械验证 |
 | [门限哈希与共识接口论证](research/security-redaction-consensus-wire4.md) | 公开适配、公共授权与历史表示分层；原始分片绑定修复、回归和未完成的密码学义务 |
 | [第一轮有限模型与实现验证](research/security-model-validation-2026-09-26.md) | 16 个有限配置、七类错误反例及账务投影原始日志 |
 | [安全分析与最小修正计划](research/security-implementation-plan.md) | `security-analysis` 专用分支的模型、代码回归、修订接口审查及性能验收顺序 |
@@ -26,4 +29,4 @@
 
 ## 下一阶段
 
-已形成[条件安全论证](research/security-argument-wire4.md)、分解有限检查、[组合模型的手工归纳及代码连接](research/security-composition-wire4.md)，以及 [R6 修订接口分层论证](research/security-redaction-consensus-wire4.md)。R6 阶段对实时共识分片增加原始 opening 检查；完整门限密码学归约、全程序精化和共识栈机械验证仍单列未完成，不把测试通过当作全面形式化验证。
+以[完整报告](research/security-analysis-complete-wire4.md)和[论文正文](paper/security-analysis-chapter5.md)为主入口，旧阶段报告保留版本与原始证据。后续优先补强用户可兑现性质、适配查询下的密码学边界与修改后共识接口精化。R6 阶段增加了实时原始 opening 检查，合并实验分支前仍需其性能验收；本轮主要修订论证并补回归，不把测试通过当作全面形式化验证。

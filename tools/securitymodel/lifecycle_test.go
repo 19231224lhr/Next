@@ -15,6 +15,7 @@ const (
 
 type local struct {
 	cursor, seenPaid, applied, available, reserved, grant int
+	approvedAt                                            int
 	settled                                               bool
 }
 
@@ -22,6 +23,7 @@ type local struct {
 // final input is worth two. A log event is atomic; each honest member follows
 // that same log one event at a time, at any relative speed.
 type lifeState struct {
+	approved                                                     uint8
 	outputs                                                      [2]uint8
 	promises, created, consumed                                  [2]uint8
 	childCoins                                                   int
@@ -33,7 +35,7 @@ type lifeState struct {
 }
 
 func (m lifeModel) initial() lifeState {
-	s := lifeState{grant: 3, account: 3, external: 3, coins: 2}
+	s := lifeState{approved: m.approved, grant: 3, account: 3, external: 3, coins: 2}
 	for i := range s.members {
 		s.members[i] = local{available: 2, grant: 3}
 		if m.approved&(1<<i) != 0 {
@@ -47,6 +49,7 @@ func (m lifeModel) initial() lifeState {
 type lifeModel struct {
 	approved, signed         uint8
 	returnPaid, earlyRelease bool
+	allowLate, allSigners    bool
 }
 
 func (m lifeModel) next(s lifeState) (out []edge[lifeState]) {
@@ -127,12 +130,26 @@ func (m lifeModel) next(s lifeState) (out []edge[lifeState]) {
 		add(n, 6, "topup-external")
 	}
 	for i, l := range s.members {
+		if m.allowLate && s.approved&(1<<i) == 0 && l.available >= 2 {
+			observed := false
+			for j := 0; j < l.cursor; j++ {
+				observed = observed || s.log[j] == 5
+			}
+			if !observed {
+				n := s
+				n.approved |= 1 << i
+				n.members[i].approvedAt = l.cursor
+				n.members[i].available -= 2
+				n.members[i].reserved += 2
+				add(n, 0, fmt.Sprintf("late-approve(m%d,prefix%d)", i, l.cursor))
+			}
+		}
 		if l.cursor >= s.length {
 			continue
 		}
 		n := s
 		p := &n.members[i]
-		approved := m.approved&(1<<i) != 0
+		approved := s.approved&(1<<i) != 0
 		switch s.log[p.cursor] {
 		case 3, 4:
 			if approved {
@@ -231,16 +248,20 @@ func (m lifeModel) check(s lifeState) string {
 	if s.remaining < s.gap || s.remaining > w-s.paid {
 		return "public versus hidden risk"
 	}
+	witnessResidual := 0
 	for i, l := range s.members {
 		cap := 0
-		if m.approved&(1<<i) != 0 {
+		if s.approved&(1<<i) != 0 {
 			cap = 2
 		}
 		if l.applied < 0 || l.applied > cap || l.reserved != cap-l.applied || l.available+l.reserved != 2*l.grant/3 {
 			return "local accounting"
 		}
-		if cap > 0 && l.reserved < w {
+		if (m.signed&(1<<i) != 0 || m.allSigners && cap > 0) && l.reserved < w {
 			return "residual below risk"
+		}
+		if m.signed&(1<<i) != 0 {
+			witnessResidual += l.reserved
 		}
 		if l.grant > s.grant || l.seenPaid > s.paid || l.settled && !s.settled {
 			return "future observation"
@@ -250,7 +271,9 @@ func (m lifeModel) check(s lifeState) string {
 		for j := 0; j < l.cursor; j++ {
 			switch s.log[j] {
 			case 3, 4:
-				p++
+				if j >= l.approvedAt {
+					p++
+				}
 			case 5:
 				settled = true
 			case 6:
@@ -265,7 +288,25 @@ func (m lifeModel) check(s lifeState) string {
 			return "prefix mismatch"
 		}
 	}
+	if 2*w > witnessResidual || w > s.grant {
+		return "witness coverage"
+	}
 	return ""
+}
+
+// The original model fixes all approvals before the public history. This
+// extension permits an extra member to approve after following a repair.
+// The old universal-signers claim is deliberately checked as a false property;
+// the early witness QC and accounting invariants must still exhaust safely.
+func TestLifecycleLateApprovalWitness(t *testing.T) {
+	m := lifeModel{approved: 3, signed: 11, allowLate: true}
+	t.Run("early-witness", func(t *testing.T) {
+		requireExhausted(t, search(m.initial(), m.next, m.check, 2000000))
+	})
+	t.Run("all-signers-is-too-strong", func(t *testing.T) {
+		m.allSigners = true
+		requireWitness(t, search(m.initial(), m.next, m.check, 2000000), "residual below risk")
+	})
 }
 
 func TestLifecycleBounded(t *testing.T) {

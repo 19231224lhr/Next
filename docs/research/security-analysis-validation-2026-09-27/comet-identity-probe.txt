@@ -1,0 +1,9 @@
+=== RUN   TestNextProjectedHashDifferentPartHeaderCommitBoundary
+I[2026-09-27|03:36:11.518] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-09-27|03:36:11.532] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+    next_identity_probe_test.go:90: equal stable Block.Hash; distinct valid original PartSetHeader; tryFinalizeCommit reached fail-closed panic before application execution
+I[2026-09-27|03:36:11.533] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-09-27|03:36:11.533] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+--- PASS: TestNextProjectedHashDifferentPartHeaderCommitBoundary (0.02s)
+PASS
+ok  	github.com/cometbft/cometbft/consensus	0.199s
