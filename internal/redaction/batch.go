@@ -96,6 +96,13 @@ func BuildBatch(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy,
 		a, b := c.Items[i], c.Items[j]
 		return a.Transaction < b.Transaction || (a.Transaction == b.Transaction && a.Input < b.Input)
 	})
+	outputs := make([]protocol.OutputID, len(c.Items))
+	for i, item := range c.Items {
+		outputs[i] = item.Output
+	}
+	if err := preflightRepairs(v, p, outputs, now); err != nil {
+		return c, err
+	}
 	_, body, err := batchBody(v, bs, p, c, now)
 	if err != nil {
 		return c, err
@@ -167,6 +174,16 @@ func BatchPartRequests(v state.ReadView, bs *cmtstore.BlockStore, p rules.Direct
 	return partRequestsForBody(v, bs, p, c.Height, body)
 }
 func BatchPartShares(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, signer chameleon.Signer, c protocol.RepairBatch, now int64) ([]chameleon.Contribution, error) {
+	if _, err := c.MarshalBinary(); err != nil {
+		return nil, err
+	}
+	outputs := make([]protocol.OutputID, len(c.Items))
+	for i, item := range c.Items {
+		outputs[i] = item.Output
+	}
+	if err := preflightRepairs(v, p, outputs, now); err != nil {
+		return nil, err
+	}
 	requests, _, _, err := BatchPartRequests(v, bs, p, c, now)
 	if err != nil {
 		return nil, err
@@ -185,23 +202,9 @@ func CompleteBatchParts(v state.ReadView, bs *cmtstore.BlockStore, p rules.Direc
 	if err != nil {
 		return c, err
 	}
-	if len(shares) < 3 || len(shares) > 4 {
-		return c, protocol.ErrAuth
-	}
-	for index, r := range requests {
-		votes := make([]chameleon.Contribution, 0, len(shares))
-		for _, member := range shares {
-			if len(member) != len(requests) {
-				return c, protocol.ErrAuth
-			}
-		}
-		for _, member := range shares {
-			votes = append(votes, member[index])
-		}
-		openings[r.Index], err = p.Key.Combine(r.Context, r.Old, r.Next, r.Commitment, r.Opening, votes)
-		if err != nil {
-			return c, err
-		}
+	openings, err = combinePartOpenings(p, requests, openings, shares)
+	if err != nil {
+		return c, err
 	}
 	c.Parts, c.Next = openings, digest(body)
 	return c, nil

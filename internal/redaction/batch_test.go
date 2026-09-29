@@ -38,7 +38,9 @@ func TestRepairBatchCost(t *testing.T) {
 		}
 	})
 }
-func testAtomicRepairBatch(t *testing.T, count int) {
+func TestRepairBatchAcrossParts(t *testing.T) { testAtomicRepairBatch(t, 2, true) }
+
+func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 	pub, signers, vals, keys := committee(t)
 	f := testkit.NewFixture(chain, "batch-org", count)
 	f.EnableDirect()
@@ -131,11 +133,57 @@ func testAtomicRepairBatch(t *testing.T, count int) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	paymentIndex := 0
 	var roots [][]byte
 	last := &types.Commit{}
 	appendBlock := func(height, stamp int64, raw []byte) []byte {
 		b := block(t, height, raw, last, vals)
 		b.Time = time.Unix(stamp, 0).UTC()
+		if height == 1 && len(acrossParts) > 0 && acrossParts[0] {
+			tick := protocol.ClockTick(f.Org.Network, height)
+			initial, err := b.ToProto()
+			if err != nil {
+				t.Fatal(err)
+			}
+			initialRaw, err := initial.Marshal()
+			if err != nil {
+				t.Fatal(err)
+			}
+			offset := bytes.Index(initialRaw, tx.Funding[0].Opening[:])
+			if offset < 0 {
+				t.Fatal("missing input opening")
+			}
+			start := max(0, (int(types.BlockPartSizeBytes)-offset)/(len(tick)+2)-8)
+			found := false
+			for padding := start; padding < start+64; padding++ {
+				txs := make(types.Txs, padding+1)
+				for i := range padding {
+					txs[i] = tick
+				}
+				txs[padding] = raw
+				b.Data = types.Data{Txs: txs}
+				b.DataHash = b.Data.Hash()
+				pb, err := b.ToProto()
+				if err != nil {
+					t.Fatal(err)
+				}
+				encoded, err := pb.Marshal()
+				if err != nil {
+					t.Fatal(err)
+				}
+				a := bytes.Index(encoded, tx.Funding[0].Opening[:])
+				z := bytes.Index(encoded, tx.Funding[1].Opening[:])
+				if a >= 0 && z >= 0 && a/int(types.BlockPartSizeBytes) != z/int(types.BlockPartSizeBytes) {
+					paymentIndex = padding
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatal("could not place funding slots across two real parts")
+			}
+		}
+
 		parts, e := b.MakePartSet(types.BlockPartSizeBytes)
 		if e != nil {
 			t.Fatal(e)
@@ -143,18 +191,26 @@ func testAtomicRepairBatch(t *testing.T, count int) {
 		id := types.BlockID{Hash: b.Hash(), PartSetHeader: parts.Header()}
 		last = commit(t, height, id, vals, keys)
 		blocks.SaveBlock(b, parts, last)
-		r, e := app.FinalizeBlock(context.Background(), &abci.RequestFinalizeBlock{Height: height, Hash: b.Hash(), Time: b.Time, Txs: [][]byte{raw}})
+		r, e := app.FinalizeBlock(context.Background(), &abci.RequestFinalizeBlock{Height: height, Hash: b.Hash(), Time: b.Time, Txs: func() [][]byte {
+			out := make([][]byte, len(b.Data.Txs))
+			for i, tx := range b.Data.Txs {
+				out[i] = tx
+			}
+			return out
+		}()})
 		if e != nil {
 			t.Fatal(e)
 		}
-		if r.TxResults[0].Code != 0 {
-			t.Fatalf("execution: %+v", r.TxResults[0])
+		for _, result := range r.TxResults {
+			if result.Code != 0 {
+				t.Fatalf("execution: %+v", result)
+			}
 		}
 		if _, e = app.Commit(context.Background(), &abci.RequestCommit{}); e != nil {
 			t.Fatal(e)
 		}
 		roots = append(roots, bytes.Clone(r.AppHash))
-		return r.TxResults[0].Data
+		return r.TxResults[len(r.TxResults)-1].Data
 	}
 	appendBlock(1, 1700000001, paymentRaw)
 	originalID := blocks.LoadBlockMeta(1).BlockID
@@ -213,6 +269,68 @@ func testAtomicRepairBatch(t *testing.T, count int) {
 				return e
 			}
 			votes = append(votes, s)
+		}
+
+		if count == 2 {
+			for name, fourth := range map[string][]chameleon.Contribution{"empty": nil, "duplicate": votes[0], "short": votes[0][:len(votes[0])-1]} {
+				t.Run("honest_quorum_"+name, func(t *testing.T) {
+					rows := append(append([][]chameleon.Contribution(nil), votes...), fourth)
+					if _, err := redaction.CompleteBatchParts(v, blocks, policy, c, 1700000032, rows); err != nil {
+						t.Fatalf("bad fourth response blocked three honest members: %v", err)
+					}
+				})
+			}
+			t.Run("unaffordable_batch_not_signed", func(t *testing.T) {
+				limited := state.NewOverlay(v)
+				if err := state.Put(limited, rules.AccountKey(f.Org.Org, protocol.AssetCAL), uint64(99)); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := redaction.BuildBatch(limited, blocks, policy, singles, 1700000032); err == nil {
+					t.Error("final candidate missed economic recheck")
+				}
+				if _, err := redaction.BatchPartShares(limited, blocks, policy, signers[0], c, 1700000032); err == nil {
+					t.Fatal("signed an economically impossible fixed batch")
+				}
+				selected, err := redaction.SelectRepairInputs(limited, blocks, policy, []protocol.OutputID{c.Items[1].Output, c.Items[0].Output}, 1700000032)
+				if err != nil || len(selected) != 1 || selected[0] != c.Items[0].Output {
+					t.Fatalf("wrong affordable subset: %v %v", selected, err)
+				}
+				balance, _, err := state.Load[uint64](limited, rules.AccountKey(f.Org.Org, protocol.AssetCAL))
+				if err != nil || balance != 99 {
+					t.Fatal("preflight changed caller balance", balance, err)
+				}
+
+			})
+		}
+
+		if len(acrossParts) > 0 && acrossParts[0] {
+			t.Run("bad_second_part_does_not_publish_partial_result", func(t *testing.T) {
+				requests, _, _, err := redaction.BatchPartRequests(v, blocks, policy, c, 1700000032)
+				if err != nil || len(requests) < 2 {
+					t.Fatal("requires two part requests", err)
+				}
+				bad, err := redaction.BatchPartShares(v, blocks, policy, signers[3], c, 1700000032)
+				if err != nil {
+					t.Fatal(err)
+				}
+				r := requests[1]
+				bad[1], err = signers[3].Adapt(r.Context, r.Old, append(bytes.Clone(r.Next), byte(0)), r.Commitment, r.Opening)
+				if err != nil {
+					t.Fatal(err)
+				}
+				rows := append([][]chameleon.Contribution{bad}, votes...)
+				got, err := redaction.CompleteBatchParts(v, blocks, policy, c, 1700000032, rows)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want, err := redaction.CompleteBatchParts(v, blocks, policy, c, 1700000032, votes)
+				if err != nil || !reflect.DeepEqual(got.Parts, want.Parts) {
+					t.Fatal("published incomplete candidate", err)
+				}
+				if _, err := redaction.CompleteBatchParts(v, blocks, policy, c, 1700000032, rows[:3]); err == nil {
+					t.Fatal("accepted partial candidate with two good rows")
+				}
+			})
 		}
 		c, e = redaction.CompleteBatchParts(v, blocks, policy, c, 1700000032, votes)
 		return e
@@ -312,6 +430,18 @@ func testAtomicRepairBatch(t *testing.T, count int) {
 				}
 				votes = append(votes, row)
 			}
+
+			if count == 2 && len(legacy) == 0 {
+				for _, bad := range [][]chameleon.Contribution{nil, votes[0]} {
+					rows := append(append([][]chameleon.Contribution(nil), votes...), bad)
+					if _, err := redaction.CompleteParts(sequential, blocks, policy, target, 1700000032, rows); err != nil {
+						t.Fatal("legacy parts lost honest quorum", err)
+					}
+				}
+				if _, err := redaction.CompleteParts(sequential, blocks, policy, target, 1700000032, votes[:2]); err == nil {
+					t.Fatal("legacy parts accepted two signers")
+				}
+			}
 			target, e = redaction.CompleteParts(sequential, blocks, policy, target, 1700000032, votes)
 			if e != nil {
 				return e
@@ -334,6 +464,9 @@ func testAtomicRepairBatch(t *testing.T, count int) {
 			return e
 		}
 		batchParts = len(requests)
+		if len(acrossParts) > 0 && acrossParts[0] && batchParts < 2 {
+			t.Fatal("test did not adapt multiple parts")
+		}
 		started = time.Now()
 		tr, e := redaction.ExecuteBatch(v, blocks, policy, c, 3, 1700000032)
 		if e != nil {
@@ -406,7 +539,7 @@ func testAtomicRepairBatch(t *testing.T, count int) {
 	if !blocks.LoadBlockMeta(1).BlockID.Equals(originalID) {
 		t.Fatal("block identity changed")
 	}
-	repaired, err := protocol.DecodeDirectSubmission(blocks.LoadBlock(1).Data.Txs[0])
+	repaired, err := protocol.DecodeDirectSubmission(blocks.LoadBlock(1).Data.Txs[paymentIndex])
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,7 +3,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"github.com/cometbft/cometbft/node"
 	"github.com/cometbft/cometbft/rpc/client/local"
 	"github.com/cometbft/cometbft/types"
-	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -202,62 +200,10 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 		}
 	})
 	httpClient := &http.Client{Timeout: 2 * time.Second}
-	collect := func(ctx context.Context, path string, command any) ([][]chameleon.Contribution, error) {
-		raw, err := json.Marshal(command)
-		if err != nil {
-			return nil, err
-		}
-		type result struct {
-			shares []chameleon.Contribution
-			err    error
-		}
-		responses := make(chan result, 4)
-		for _, url := range n.CommitteeURLs {
-			go func(url string) {
-				req, err := http.NewRequestWithContext(ctx, "POST", url+path, bytes.NewReader(raw))
-				if err != nil {
-					responses <- result{err: err}
-					return
-				}
-				req.Header.Set("Content-Type", "application/json")
-				resp, err := httpClient.Do(req)
-				if err != nil {
-					responses <- result{err: err}
-					return
-				}
-				defer resp.Body.Close()
-				if resp.StatusCode != 200 {
-					responses <- result{err: rules.ErrMissing}
-					return
-				}
-				var wire [][]byte
-				err = json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&wire)
-				var shares []chameleon.Contribution
-				if err == nil {
-					for _, b := range wire {
-						s, e := chameleon.DecodeContribution(b)
-						if e != nil {
-							err = e
-							break
-						}
-						shares = append(shares, s)
-					}
-				}
-				responses <- result{shares: shares, err: err}
-			}(url)
-		}
-		var all [][]chameleon.Contribution
-		for i := 0; i < 4; i++ {
-			r := <-responses
-			if r.err == nil {
-				all = append(all, r.shares)
-			}
-		}
-		if len(all) < 3 {
-			return nil, protocol.ErrAuth
-		}
-		return all, nil
+	collect := func(ctx context.Context, path string, command any, accept func([][]chameleon.Contribution) error) error {
+		return collectRepairShares(ctx, httpClient, n.CommitteeURLs[:], path, command, accept)
 	}
+
 	ctx, cancel := context.WithCancel(parent)
 	worker := &repairWorker{db: db, blocks: blocks, policy: policy, index: int(c.Index), head: head, collect: collect, network: n.Genesis.Network,
 		submit: func(ctx context.Context, raw []byte) (uint32, error) {

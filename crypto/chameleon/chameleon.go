@@ -135,20 +135,25 @@ func (p *Public) Combine(context, old, next []byte, c Commitment, r Opening, sha
 	if len(shares) < 3 || len(shares) > 4 || !p.Verify(context, old, c, r) {
 		return Opening{}, ErrInvalid
 	}
-	seen := uint(0)
-	for _, s := range shares {
-		i := s.share.Index
-		if i < 1 || i > 4 || s.share.Players != 4 || s.share.Threshold != 3 || seen&(1<<i) != 0 {
-			return Opening{}, ErrInvalid
-		}
-		seen |= 1 << i
-	}
 	q := p.ratio(context, old, next)
 	// Four fixed members => at most four triples. This avoids a new share-proof
 	// protocol while tolerating one authenticated but incorrect contribution.
 	for i := 0; i < len(shares)-2; i++ {
 		for j := i + 1; j < len(shares)-1; j++ {
 			for k := j + 1; k < len(shares); k++ {
+				seen := uint(0)
+				valid := true
+				for _, s := range []Contribution{shares[i], shares[j], shares[k]} {
+					n := s.share.Index
+					if !s.ValidFor(n) || seen&(1<<n) != 0 {
+						valid = false
+						break
+					}
+					seen |= 1 << n
+				}
+				if !valid {
+					continue
+				}
 				root, err := tss.CombineSignShares(&p.key, 4, 3, []tss.SignShare{shares[i].share, shares[j].share, shares[k].share}, q)
 				if err != nil {
 					continue

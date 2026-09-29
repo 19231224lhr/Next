@@ -20,7 +20,7 @@
 >
 > **E1–E8 共八组实验及安全分析工作已汇总到 `re` 分支**，包含实验代码、报告、图表、原始证据与安全修正。`main` 保留早期性能基线代码，首页同步展示研究进展；复现实验请使用 [`re`](https://github.com/19231224lhr/Next/tree/re)。
 
-**最新机制实现：** [授权合批修复与直达物化](docs/design/authorized-repair-batching.md)已在 `feat/authorized-repair-batching` 分支完成回归。同块 8 项缺口的局部对照将修复命令和分片适配各从 8 次降为 1 次；Mac 四项真实合批及随后 1,000 笔正常付款通过。[实现与验证报告 →](docs/experiments/authorized-repair-2026-09-29/README.md)
+**最新机制实现：** [授权合批修复与直达物化](docs/design/authorized-repair-batching.md)已在 `feat/authorized-repair-batching` 分支完成回归。同块 8 项缺口的局部对照将修复命令和分片适配各从 8 次降为 1 次；Mac 四项真实合批及随后 1,000 笔正常付款通过。后续审查已修复异常份额阻塞与经济预执行缺失，并再次完成真实闭环。[实现与验证报告 →](docs/experiments/authorized-repair-2026-09-29/README.md) · [审查修复与最新结果 →](docs/experiments/authorized-repair-2026-09-29/fix-report.md)
 
 ## 实验总览
 

@@ -4,6 +4,8 @@
 
 [设计与接口](../../design/authorized-repair-batching.md) · [实施计划](../../design/authorized-repair-implementation.md) · [GPT 评审](review.md) · [测试日志](verification.txt) · [成本原始记录](cost-tests.txt) · [成本统计](cost-summary.json)
 
+**后续审查修复：** 已修复第四个异常份额阻断有效门限、构造前经济预执行缺失两项问题；新增跨分片失败候选隔离测试，并以最新源码再次完成 Mac 修复与正常付款闭环。[修复内容与最新证据 →](fix-report.md) 本页下方数字保留为初版实验记录，不冒充修复后的重新测量。
+
 ## 1. 完成了什么
 
 原来的每项缺口仍独立承担责任、扣除真实备付、核销费用；现在同一历史块内的多个来源补丁，可以通过一个 `RepairBatch` 原子提交，累计构造最终正文、共享分片适配材料。原子批中任一项目不合法，整批不产生账务效果。旧 `RepairInput` 与批入口共享义务终态，不能重复赔付。
@@ -84,4 +86,4 @@ go test github.com/cometbft/cometbft/consensus -run 'TestStableHashIdentity|Test
 
 网络驱动 `smoke-final.py` 须在独立源码副本、空实验目录中执行；先构建 `committee`（带 `comet_v3`）、`member`、`gateway` 和 `payctl`。将 `inspect-batches.go.txt` 复制为临时 `.go` 文件，可只读核对已停止节点的批记录。不要读取、归档或输出实验私钥。
 
-本轮普通测试、race 全项目测试、vet/build 与修改后 Comet 共识身份回归均通过。后续若将收益写成独立论文性能实验，再补同块跨分片、持续混合异常负载和正常付款延迟成对消融即可；当前不扩大运行机制。
+本轮普通测试、race 全项目测试、vet/build 与修改后 Comet 共识身份回归均通过。跨分片正确性已在后续修复中补齐；若将收益写成独立论文性能实验，再补跨分片成本对照、持续混合异常负载和正常付款延迟成对消融；当前不扩大运行机制。

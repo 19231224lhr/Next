@@ -135,6 +135,9 @@ func InputShare(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy,
 	i := int(command.Input)
 	old := payment.Tx.Funding[i]
 	next := protocol.Funding{Kind: protocol.ReserveFunding, Ref: protocol.ReserveDebitIdentity(command.Network, output)}
+	if err := preflightRepairs(v, p, []protocol.OutputID{output}, now); err != nil {
+		return chameleon.Contribution{}, err
+	}
 	return signer.Adapt(payment.Tx.FundingContext(i, p.Key.KeyID()), old.ReferenceBytes(), next.ReferenceBytes(), payment.Tx.Commitments[i], old.Opening)
 }
 
@@ -266,6 +269,9 @@ func partRequestsForBody(v state.ReadView, bs *cmtstore.BlockStore, p rules.Dire
 }
 
 func PartShares(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, signer chameleon.Signer, c protocol.RepairInput, now int64) ([]chameleon.Contribution, error) {
+	if err := preflightRepairs(v, p, []protocol.OutputID{c.Output}, now); err != nil {
+		return nil, err
+	}
 	requests, _, _, err := PartRequests(v, bs, p, c, now)
 	if err != nil {
 		return nil, err
@@ -285,21 +291,9 @@ func CompleteParts(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPoli
 	if err != nil {
 		return c, err
 	}
-	if len(shares) < 3 || len(shares) > 4 {
-		return c, protocol.ErrAuth
-	}
-	for i, r := range requests {
-		var votes []chameleon.Contribution
-		for _, member := range shares {
-			if len(member) != len(requests) {
-				return c, protocol.ErrAuth
-			}
-			votes = append(votes, member[i])
-		}
-		openings[r.Index], err = p.Key.Combine(r.Context, r.Old, r.Next, r.Commitment, r.Opening, votes)
-		if err != nil {
-			return c, err
-		}
+	openings, err = combinePartOpenings(p, requests, openings, shares)
+	if err != nil {
+		return c, err
 	}
 	c.Parts = openings
 	c.Next = digest(body)
@@ -427,4 +421,35 @@ func Materialize(v state.ReadView, bs *cmtstore.BlockStore, id protocol.Hash) er
 		return err
 	}
 	return m.Install(bs)
+}
+
+// A malformed row invalidates only triples containing that row. All changed
+// parts must verify with one triple of distinct fixed-committee contributors.
+func combinePartOpenings(p rules.DirectPolicy, requests []PartRequest, base []chameleon.Opening, rows [][]chameleon.Contribution) ([]chameleon.Opening, error) {
+	if len(rows) < 3 || len(rows) > 4 || len(requests) == 0 {
+		return nil, protocol.ErrAuth
+	}
+	for i := 0; i < len(rows)-2; i++ {
+		for j := i + 1; j < len(rows)-1; j++ {
+			for k := j + 1; k < len(rows); k++ {
+				if len(rows[i]) != len(requests) || len(rows[j]) != len(requests) || len(rows[k]) != len(requests) {
+					continue
+				}
+				openings := append([]chameleon.Opening(nil), base...)
+				valid := true
+				for n, r := range requests {
+					opening, err := p.Key.Combine(r.Context, r.Old, r.Next, r.Commitment, r.Opening, []chameleon.Contribution{rows[i][n], rows[j][n], rows[k][n]})
+					if err != nil {
+						valid = false
+						break
+					}
+					openings[r.Index] = opening
+				}
+				if valid {
+					return openings, nil
+				}
+			}
+		}
+	}
+	return nil, protocol.ErrAuth
 }

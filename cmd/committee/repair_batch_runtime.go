@@ -52,7 +52,7 @@ type repairWorker struct {
 	policy  rules.DirectPolicy
 	index   int
 	head    func() (int64, int64)
-	collect func(context.Context, string, any) ([][]chameleon.Contribution, error)
+	collect func(context.Context, string, any, func([][]chameleon.Contribution) error) error
 	submit  func(context.Context, []byte) (uint32, error)
 	network protocol.Hash
 	pending map[int64]*repairPending
@@ -242,8 +242,28 @@ func (w *repairWorker) send(ctx context.Context, p *repairPending) {
 	slog.Debug("repair batch submit", "height", p.command.Height, "items", len(p.command.Items), "bytes", len(p.raw), "code", code, "error", err)
 }
 func (w *repairWorker) build(ctx context.Context, outputs []protocol.OutputID, now int64) (protocol.RepairBatch, error) {
-	var singles []protocol.RepairInput
+	var selected []protocol.OutputID
+	if err := w.db.View(func(v state.ReadView) error {
+		var err error
+		selected, err = redaction.SelectRepairInputs(v, w.blocks, w.policy, outputs, now)
+		return err
+	}); err != nil {
+		return protocol.RepairBatch{}, err
+	}
+	accepted := make(map[protocol.OutputID]bool, len(selected))
+	for _, output := range selected {
+		accepted[output] = true
+	}
 	for _, output := range outputs {
+		if !accepted[output] {
+			w.failed(output, time.Now())
+		}
+	}
+	if len(selected) == 0 {
+		return protocol.RepairBatch{}, rules.ErrLimited
+	}
+	var singles []protocol.RepairInput
+	for _, output := range selected {
 		var command protocol.RepairInput
 		var pay protocol.DirectSubmission
 		err := w.db.View(func(v state.ReadView) error {
@@ -267,22 +287,22 @@ func (w *repairWorker) build(ctx context.Context, outputs []protocol.OutputID, n
 			pay.Tx.Funding[i] = next
 			command.TransactionBytes, err = pay.MarshalBinary()
 		} else {
-			var votes [][]chameleon.Contribution
-			votes, err = w.collect(ctx, "/v3/repair/input-share", command)
-			if err == nil {
+			err = w.collect(ctx, "/v3/repair/input-share", command, func(votes [][]chameleon.Contribution) error {
 				var shares []chameleon.Contribution
-				for _, v := range votes {
-					if len(v) == 1 {
-						shares = append(shares, v[0])
+				for _, row := range votes {
+					if len(row) == 1 {
+						shares = append(shares, row[0])
 					}
 				}
-				command, err = redaction.ReplaceInput(w.policy, command, pay, shares)
+				var e error
+				command, e = redaction.ReplaceInput(w.policy, command, pay, shares)
+				return e
+			})
+			if err == nil {
+				var adapted protocol.DirectSubmission
+				adapted, err = protocol.DecodeDirectSubmission(command.TransactionBytes)
 				if err == nil {
-					var adapted protocol.DirectSubmission
-					adapted, err = protocol.DecodeDirectSubmission(command.TransactionBytes)
-					if err == nil {
-						w.cache.put(key, adapted.Tx.Funding[i].Opening)
-					}
+					w.cache.put(key, adapted.Tx.Funding[i].Opening)
 				}
 			}
 		}
@@ -301,14 +321,12 @@ func (w *repairWorker) build(ctx context.Context, outputs []protocol.OutputID, n
 	if err != nil {
 		return batch, err
 	}
-	votes, err := w.collect(ctx, "/v3/repair/batch-part-shares", batch)
-	if err != nil {
-		return batch, err
-	}
-	err = w.db.View(func(v state.ReadView) error {
-		var e error
-		batch, e = redaction.CompleteBatchParts(v, w.blocks, w.policy, batch, now, votes)
-		return e
+	err = w.collect(ctx, "/v3/repair/batch-part-shares", batch, func(votes [][]chameleon.Contribution) error {
+		return w.db.View(func(v state.ReadView) error {
+			var e error
+			batch, e = redaction.CompleteBatchParts(v, w.blocks, w.policy, batch, now, votes)
+			return e
+		})
 	})
 	return batch, err
 }

@@ -159,6 +159,16 @@ func TestBadOrInsufficientShares(t *testing.T) {
 	if _, err := p.Combine(ctx, old, next, c, r, []Contribution{parts[0], parts[0], parts[1]}); err == nil {
 		t.Fatal("duplicate share accepted")
 	}
+
+	for name, bad := range map[string]Contribution{"replayed": parts[0], "malformed": {}} {
+		t.Run(name, func(t *testing.T) {
+			candidates := append([]Contribution{bad}, parts[:3]...)
+			opening, err := p.Combine(ctx, old, next, c, r, candidates)
+			if err != nil || !p.Verify(ctx, next, c, opening) {
+				t.Fatalf("three good shares rejected: %v", err)
+			}
+		})
+	}
 	bad, err := signers[0].Adapt(ctx, old, []byte("other target"), c, r)
 	if err != nil {
 		t.Fatal(err)

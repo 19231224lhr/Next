@@ -52,3 +52,9 @@ func DecodeContribution(b []byte) (Contribution, error) {
 	}
 	return Contribution{share: share}, nil
 }
+
+// ValidFor checks fixed-committee metadata, not the cryptographic contribution.
+// Callers must still verify the combined opening.
+func (c Contribution) ValidFor(index uint) bool {
+	return index >= 1 && index <= 4 && c.share.Index == index && c.share.Players == 4 && c.share.Threshold == 3
+}
