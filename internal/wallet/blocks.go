@@ -35,7 +35,7 @@ func collectBlockCoins(network protocol.Hash, owners map[protocol.PublicKey]bool
 		if entry.Code != 0 || len(entry.Data) == 0 {
 			continue
 		}
-		result, err := protocol.DecodeExecution(entry.Data)
+		result, _, err := protocol.DecodePublicExecution(network, entry.Bytes, entry.Data)
 		if err != nil {
 			return nil, err
 		}
@@ -53,7 +53,7 @@ func collectBlockCoins(network protocol.Hash, owners map[protocol.PublicKey]bool
 			coin := DirectCoin{Output: fee.Output, Index: fee.Index, Final: protocol.CreationIdentity(network, fee.Transaction, fee.Index, 0)}
 			coins = append(coins, blockCoin{DirectCoinKey(id, 0), coin})
 		}
-		if protocol.IsRepairInput(entry.Bytes) {
+		if protocol.IsRepairInput(entry.Bytes) || protocol.IsRepairBatch(entry.Bytes) {
 			continue
 		}
 		pay, err := protocol.DecodeDirectSubmission(entry.Bytes)

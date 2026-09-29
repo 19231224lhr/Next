@@ -1,0 +1,122 @@
+=== RUN   TestAtomicRepairBatchTwoInputs
+    batch_test.go:360: COST items=2 single_commands=2 batch_commands=1 single_bytes=10978 batch_bytes=976 single_part_adaptations=2 batch_part_adaptations=1 single_ms=56.834 batch_ms=26.029
+--- PASS: TestAtomicRepairBatchTwoInputs (0.10s)
+=== RUN   TestRepairBatchCost
+=== RUN   TestRepairBatchCost/same_block_1
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=25.349 batch_ms=15.478
+=== RUN   TestRepairBatchCost/same_block_4
+    batch_test.go:360: COST items=4 single_commands=4 batch_commands=1 single_bytes=35860 batch_bytes=1568 single_part_adaptations=4 batch_part_adaptations=1 single_ms=85.569 batch_ms=53.737
+=== RUN   TestRepairBatchCost/same_block_8
+    batch_test.go:360: COST items=8 single_commands=8 batch_commands=1 single_bytes=127336 batch_bytes=2752 single_part_adaptations=8 batch_part_adaptations=1 single_ms=209.984 batch_ms=91.915
+=== RUN   TestRepairBatchCost/separate_blocks_8
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=17.645 batch_ms=19.283
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=21.411 batch_ms=21.012
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=19.655 batch_ms=24.513
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=18.693 batch_ms=17.709
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=19.629 batch_ms=20.690
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=20.619 batch_ms=23.538
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=17.553 batch_ms=18.691
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=17.107 batch_ms=17.761
+--- PASS: TestRepairBatchCost (0.97s)
+    --- PASS: TestRepairBatchCost/same_block_1 (0.05s)
+    --- PASS: TestRepairBatchCost/same_block_4 (0.16s)
+    --- PASS: TestRepairBatchCost/same_block_8 (0.34s)
+    --- PASS: TestRepairBatchCost/separate_blocks_8 (0.41s)
+=== RUN   TestAtomicRepairBatchTwoInputs
+    batch_test.go:360: COST items=2 single_commands=2 batch_commands=1 single_bytes=10978 batch_bytes=976 single_part_adaptations=2 batch_part_adaptations=1 single_ms=38.415 batch_ms=28.696
+--- PASS: TestAtomicRepairBatchTwoInputs (0.08s)
+=== RUN   TestRepairBatchCost
+=== RUN   TestRepairBatchCost/same_block_1
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=18.750 batch_ms=16.480
+=== RUN   TestRepairBatchCost/same_block_4
+    batch_test.go:360: COST items=4 single_commands=4 batch_commands=1 single_bytes=35860 batch_bytes=1568 single_part_adaptations=4 batch_part_adaptations=1 single_ms=78.708 batch_ms=49.872
+=== RUN   TestRepairBatchCost/same_block_8
+    batch_test.go:360: COST items=8 single_commands=8 batch_commands=1 single_bytes=127336 batch_bytes=2752 single_part_adaptations=8 batch_part_adaptations=1 single_ms=195.612 batch_ms=91.750
+=== RUN   TestRepairBatchCost/separate_blocks_8
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=18.173 batch_ms=19.270
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=26.633 batch_ms=14.667
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=21.573 batch_ms=17.425
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=18.154 batch_ms=18.750
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=18.595 batch_ms=15.503
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=20.546 batch_ms=16.090
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=19.020 batch_ms=18.259
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=16.603 batch_ms=17.813
+--- PASS: TestRepairBatchCost (0.93s)
+    --- PASS: TestRepairBatchCost/same_block_1 (0.04s)
+    --- PASS: TestRepairBatchCost/same_block_4 (0.15s)
+    --- PASS: TestRepairBatchCost/same_block_8 (0.36s)
+    --- PASS: TestRepairBatchCost/separate_blocks_8 (0.37s)
+=== RUN   TestAtomicRepairBatchTwoInputs
+    batch_test.go:360: COST items=2 single_commands=2 batch_commands=1 single_bytes=10978 batch_bytes=976 single_part_adaptations=2 batch_part_adaptations=1 single_ms=38.548 batch_ms=36.410
+--- PASS: TestAtomicRepairBatchTwoInputs (0.09s)
+=== RUN   TestRepairBatchCost
+=== RUN   TestRepairBatchCost/same_block_1
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=19.370 batch_ms=17.824
+=== RUN   TestRepairBatchCost/same_block_4
+    batch_test.go:360: COST items=4 single_commands=4 batch_commands=1 single_bytes=35860 batch_bytes=1568 single_part_adaptations=4 batch_part_adaptations=1 single_ms=83.625 batch_ms=51.150
+=== RUN   TestRepairBatchCost/same_block_8
+    batch_test.go:360: COST items=8 single_commands=8 batch_commands=1 single_bytes=127336 batch_bytes=2752 single_part_adaptations=8 batch_part_adaptations=1 single_ms=182.336 batch_ms=102.671
+=== RUN   TestRepairBatchCost/separate_blocks_8
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=23.878 batch_ms=21.448
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=19.551 batch_ms=28.408
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=21.953 batch_ms=19.021
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=21.430 batch_ms=18.004
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=27.555 batch_ms=23.327
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=27.128 batch_ms=25.822
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=23.850 batch_ms=27.858
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=26.278 batch_ms=25.143
+--- PASS: TestRepairBatchCost (1.00s)
+    --- PASS: TestRepairBatchCost/same_block_1 (0.05s)
+    --- PASS: TestRepairBatchCost/same_block_4 (0.16s)
+    --- PASS: TestRepairBatchCost/same_block_8 (0.32s)
+    --- PASS: TestRepairBatchCost/separate_blocks_8 (0.47s)
+=== RUN   TestAtomicRepairBatchTwoInputs
+    batch_test.go:360: COST items=2 single_commands=2 batch_commands=1 single_bytes=10978 batch_bytes=976 single_part_adaptations=2 batch_part_adaptations=1 single_ms=52.253 batch_ms=41.834
+--- PASS: TestAtomicRepairBatchTwoInputs (0.12s)
+=== RUN   TestRepairBatchCost
+=== RUN   TestRepairBatchCost/same_block_1
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=26.910 batch_ms=23.383
+=== RUN   TestRepairBatchCost/same_block_4
+    batch_test.go:360: COST items=4 single_commands=4 batch_commands=1 single_bytes=35860 batch_bytes=1568 single_part_adaptations=4 batch_part_adaptations=1 single_ms=107.833 batch_ms=66.705
+=== RUN   TestRepairBatchCost/same_block_8
+    batch_test.go:360: COST items=8 single_commands=8 batch_commands=1 single_bytes=127336 batch_bytes=2752 single_part_adaptations=8 batch_part_adaptations=1 single_ms=221.892 batch_ms=131.887
+=== RUN   TestRepairBatchCost/separate_blocks_8
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=23.303 batch_ms=21.090
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=34.524 batch_ms=28.526
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=37.152 batch_ms=35.793
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=21.144 batch_ms=30.226
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=24.804 batch_ms=25.097
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=28.040 batch_ms=24.308
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=24.000 batch_ms=25.374
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=25.680 batch_ms=19.617
+--- PASS: TestRepairBatchCost (1.17s)
+    --- PASS: TestRepairBatchCost/same_block_1 (0.06s)
+    --- PASS: TestRepairBatchCost/same_block_4 (0.19s)
+    --- PASS: TestRepairBatchCost/same_block_8 (0.39s)
+    --- PASS: TestRepairBatchCost/separate_blocks_8 (0.52s)
+=== RUN   TestAtomicRepairBatchTwoInputs
+    batch_test.go:360: COST items=2 single_commands=2 batch_commands=1 single_bytes=10978 batch_bytes=976 single_part_adaptations=2 batch_part_adaptations=1 single_ms=51.161 batch_ms=42.185
+--- PASS: TestAtomicRepairBatchTwoInputs (0.10s)
+=== RUN   TestRepairBatchCost
+=== RUN   TestRepairBatchCost/same_block_1
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=25.910 batch_ms=22.676
+=== RUN   TestRepairBatchCost/same_block_4
+    batch_test.go:360: COST items=4 single_commands=4 batch_commands=1 single_bytes=35860 batch_bytes=1568 single_part_adaptations=4 batch_part_adaptations=1 single_ms=109.572 batch_ms=66.910
+=== RUN   TestRepairBatchCost/same_block_8
+    batch_test.go:360: COST items=8 single_commands=8 batch_commands=1 single_bytes=127336 batch_bytes=2752 single_part_adaptations=8 batch_part_adaptations=1 single_ms=240.386 batch_ms=129.736
+=== RUN   TestRepairBatchCost/separate_blocks_8
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=25.854 batch_ms=27.672
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=26.213 batch_ms=24.694
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=27.589 batch_ms=22.654
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=24.988 batch_ms=32.188
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=26.074 batch_ms=23.779
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=21.368 batch_ms=26.168
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=26.795 batch_ms=22.531
+    batch_test.go:360: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=22.179 batch_ms=26.480
+--- PASS: TestRepairBatchCost (1.16s)
+    --- PASS: TestRepairBatchCost/same_block_1 (0.06s)
+    --- PASS: TestRepairBatchCost/same_block_4 (0.20s)
+    --- PASS: TestRepairBatchCost/same_block_8 (0.41s)
+    --- PASS: TestRepairBatchCost/separate_blocks_8 (0.50s)
+PASS
+ok  	utxo/internal/redaction	5.867s

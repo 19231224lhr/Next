@@ -220,7 +220,11 @@ func PartRequests(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolic
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	_, revision, err := Canonical(v, bs, c.Height)
+	return partRequestsForBody(v, bs, p, c.Height, next)
+}
+
+func partRequestsForBody(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, height int64, next []byte) ([]PartRequest, []chameleon.Opening, []byte, error) {
+	_, revision, err := Canonical(v, bs, height)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -228,13 +232,13 @@ func PartRequests(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolic
 	if revision.Number > 0 {
 		// The preceding command is stored with its materialization; never infer
 		// current authorization from the mutable local block store.
-		old, found, err := state.Load[protocol.RepairInput](v, state.Key(110, RevisionKey(c.Height)))
+		old, found, err := state.Load[protocol.RepairInput](v, state.Key(110, RevisionKey(height)))
 		if err != nil || !found {
 			return nil, nil, nil, rules.ErrMissing
 		}
 		oldOpenings = old.Parts
 	}
-	oldParts, err := types.NewRedactablePartSet(revision.Body, types.BlockPartSizeBytes, c.Height, revision.Number, oldOpenings)
+	oldParts, err := types.NewRedactablePartSet(revision.Body, types.BlockPartSizeBytes, height, revision.Number, oldOpenings)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -251,7 +255,7 @@ func PartRequests(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolic
 		if bytes.Equal(part.Bytes, next[start:end]) {
 			continue
 		}
-		ctx := types.RedactionContext(c.Height, uint32(i))
+		ctx := types.RedactionContext(height, uint32(i))
 		commitment, err := p.Key.Digest(ctx, part.Bytes, openings[i])
 		if err != nil {
 			return nil, nil, nil, err
@@ -304,7 +308,7 @@ func CompleteParts(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPoli
 
 func Execute(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairInput, height, now int64) (state.Transition, error) {
 	id := protocol.RepairIdentity(c.Network, c.Output)
-	if old, found, err := state.Load[Task](v, TaskKey(id)); err != nil {
+	if old, found, err := LoadTask(v, id); err != nil {
 		return state.Transition{}, err
 	} else if found {
 		a, _ := old.Command.MarshalBinary()
@@ -356,34 +360,52 @@ func Execute(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c 
 
 // Materialize is idempotent after Commit. It verifies the application-committed
 // exact bytes; an isolated hash collision never grants editing authority.
-func Materialize(v state.ReadView, bs *cmtstore.BlockStore, id protocol.Hash) error {
-	task, found, err := state.Load[Task](v, TaskKey(id))
+// Materialization owns decoded committed bytes; installation never re-enters
+// application storage while holding the block store revision lock.
+type Materialization struct{ task Task }
+
+func PrepareMaterialization(v state.ReadView, id protocol.Hash) (Materialization, error) {
+	task, found, err := LoadTask(v, id)
 	if err != nil {
-		return err
+		return Materialization{}, err
 	}
 	if !found {
-		return rules.ErrMissing
+		return Materialization{}, rules.ErrMissing
 	}
-	c := task.Command
-	// The local cursor may be lost while the block store retains newer repairs.
-	// Only ReviseBlock writes this revision metadata, after exact authorization.
-	// A later authorized revision already incorporates this task; never undo it.
-	part := bs.LoadBlockPart(c.Height, 0)
-	if part != nil && part.Redaction != nil && part.Redaction.Revision > c.Base+1 {
-		_, committed, err := Canonical(v, bs, c.Height)
+	revision, found, err := state.Load[Revision](v, RevisionKey(task.Command.Height))
+	if err != nil {
+		return Materialization{}, err
+	}
+	if !found || revision.Number < task.Command.Base+1 {
+		return Materialization{}, rules.ErrConflict
+	}
+	if revision.Number > task.Command.Base+1 {
+		command, ok, err := state.Load[protocol.RepairInput](v, state.Key(110, RevisionKey(task.Command.Height)))
 		if err != nil {
-			return err
+			return Materialization{}, err
 		}
-		if part.Redaction.Revision > committed.Number {
-			return rules.ErrConflict
+		if !ok || command.Height != task.Command.Height || command.Base+1 != revision.Number || digest(revision.Body) != command.Next {
+			return Materialization{}, rules.ErrConflict
 		}
-		return nil
+		task.Command, task.Body = command, revision.Body
+	}
+	if digest(task.Body) != task.Command.Next {
+		return Materialization{}, protocol.ErrAuth
+	}
+	return Materialization{task: task}, nil
+}
+
+func (m Materialization) Install(bs *cmtstore.BlockStore) error {
+	task := m.task
+	c := task.Command
+	if c.Base == ^uint64(0) || len(task.Body) == 0 {
+		return protocol.ErrRule
 	}
 	parts, err := types.NewRedactablePartSet(task.Body, types.BlockPartSizeBytes, c.Height, c.Base+1, c.Parts)
 	if err != nil {
 		return err
 	}
-	return bs.ReviseBlock(c.Height, c.Base, parts, func(_, next *types.Block) error {
+	return bs.InstallCommittedRevision(c.Height, c.Base+1, parts, func(_, next *types.Block) error {
 		pb, err := next.ToProto()
 		if err != nil {
 			return err
@@ -397,4 +419,12 @@ func Materialize(v state.ReadView, bs *cmtstore.BlockStore, id protocol.Hash) er
 		}
 		return nil
 	})
+}
+
+func Materialize(v state.ReadView, bs *cmtstore.BlockStore, id protocol.Hash) error {
+	m, err := PrepareMaterialization(v, id)
+	if err != nil {
+		return err
+	}
+	return m.Install(bs)
 }

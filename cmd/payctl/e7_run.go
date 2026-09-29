@@ -31,7 +31,7 @@ func (w *e7Wallet) follow(ctx context.Context, cancel context.CancelFunc, owners
 		}
 		clear(rows)
 		for _, entry := range b.Transactions() {
-			if entry.Code != 0 || protocol.IsRepairInput(entry.Bytes) || len(entry.Data) == 0 {
+			if entry.Code != 0 || protocol.IsRepairInput(entry.Bytes) || protocol.IsRepairBatch(entry.Bytes) || len(entry.Data) == 0 {
 				continue
 			}
 			r, e := protocol.DecodeExecution(entry.Data)

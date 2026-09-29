@@ -74,7 +74,7 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 		return info.LastBlockHeight, meta.Header.Time.Unix()
 	}
 	slots := make(chan struct{}, 2)
-	handler := func(parts bool) http.HandlerFunc {
+	handler := func(mode int) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			select {
 			case slots <- struct{}{}:
@@ -85,16 +85,27 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 			}
 			_, now := head()
 			var command protocol.RepairInput
+			var batch protocol.RepairBatch
+			var request any = &command
+			if mode == 2 {
+				request = &batch
+			}
 			decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, protocol.MaxRequestBytes))
 			decoder.DisallowUnknownFields()
-			if err := decoder.Decode(&command); err != nil {
+			if err := decoder.Decode(request); err != nil {
 				http.Error(w, "INVALID_REQUEST", 400)
 				return
 			}
 			var response [][]byte
 			err := db.View(func(v state.ReadView) error {
 				var shares []chameleon.Contribution
-				if parts {
+				if mode == 2 {
+					var err error
+					shares, err = redaction.BatchPartShares(v, blocks, policy, signer, batch, now)
+					if err != nil {
+						return err
+					}
+				} else if mode == 1 {
 					var err error
 					shares, err = redaction.PartShares(v, blocks, policy, signer, command, now)
 					if err != nil {
@@ -124,8 +135,9 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 			_ = json.NewEncoder(w).Encode(response)
 		}
 	}
-	mux.HandleFunc("POST /v3/repair/input-share", handler(false))
-	mux.HandleFunc("POST /v3/repair/part-shares", handler(true))
+	mux.HandleFunc("POST /v3/repair/input-share", handler(0))
+	mux.HandleFunc("POST /v3/repair/part-shares", handler(1))
+	mux.HandleFunc("POST /v3/repair/batch-part-shares", handler(2))
 	mux.HandleFunc("GET /v3/repairs/{output}/status", func(w http.ResponseWriter, r *http.Request) {
 		var id protocol.Hash
 		if id.UnmarshalText([]byte(r.PathValue("output"))) != nil {
@@ -176,7 +188,7 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 			return
 		}
 		err := db.View(func(v state.ReadView) error {
-			task, found, err := state.Load[redaction.Task](v, redaction.TaskKey(protocol.RepairIdentity(n.Genesis.Network, protocol.OutputID(id))))
+			task, found, err := redaction.LoadTask(v, protocol.RepairIdentity(n.Genesis.Network, protocol.OutputID(id)))
 			if err != nil {
 				return err
 			}
@@ -190,7 +202,7 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 		}
 	})
 	httpClient := &http.Client{Timeout: 2 * time.Second}
-	collect := func(ctx context.Context, path string, command protocol.RepairInput) ([][]chameleon.Contribution, error) {
+	collect := func(ctx context.Context, path string, command any) ([][]chameleon.Contribution, error) {
 		raw, err := json.Marshal(command)
 		if err != nil {
 			return nil, err
@@ -247,6 +259,19 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 		return all, nil
 	}
 	ctx, cancel := context.WithCancel(parent)
+	worker := &repairWorker{db: db, blocks: blocks, policy: policy, index: int(c.Index), head: head, collect: collect, network: n.Genesis.Network,
+		submit: func(ctx context.Context, raw []byte) (uint32, error) {
+			ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			defer cancel()
+			response, err := client.BroadcastTxSync(ctx, types.Tx(raw))
+			if response != nil {
+				return response.Code, err
+			}
+			return 0, err
+		},
+	}
+	workerDone := make(chan struct{})
+	go func() { defer close(workerDone); worker.run(ctx) }()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -273,7 +298,15 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 						break
 					}
 					started := time.Now()
-					err = db.View(func(v state.ReadView) error { return redaction.Materialize(v, blocks, id) })
+					var installation redaction.Materialization
+					err = db.View(func(v state.ReadView) error {
+						var err error
+						installation, err = redaction.PrepareMaterialization(v, id)
+						return err
+					})
+					if err == nil {
+						err = installation.Install(blocks)
+					}
 					trace("materialize", id, started, err)
 					if err != nil {
 						slog.Error("repair materialization", "error", err)
@@ -288,78 +321,9 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 						return
 					}
 				}
-				due, err := store.Scan(db, state.Key(112), nil, 8)
-				if err != nil {
-					continue
-				}
-				for _, entry := range due {
-					var ob rules.DirectObligation
-					if json.Unmarshal(entry.Value, &ob) != nil {
-						continue
-					}
-					if time.Now().Unix() < ob.Deadline+int64(c.Index) {
-						break
-					}
-					height, now := head()
-					if now < ob.Deadline {
-						_, _ = client.BroadcastTxSync(ctx, types.Tx(protocol.ClockTick(n.Genesis.Network, height+1)))
-						break
-					}
-					var command protocol.RepairInput
-					var payment protocol.DirectSubmission
-					err = db.View(func(v state.ReadView) error {
-						var err error
-						command, payment, err = redaction.InputTarget(v, blocks, policy, ob.Output, now)
-						return err
-					})
-					if err != nil {
-						continue
-					}
-					id := protocol.RepairIdentity(n.Genesis.Network, ob.Output)
-					started := time.Now()
-					inputVotes, err := collect(ctx, "/v3/repair/input-share", command)
-					trace("input_shares", id, started, err, "output", protocol.Hash(ob.Output).String(), "deadline", ob.Deadline)
-					if err != nil {
-						continue
-					}
-					var inputShares []chameleon.Contribution
-					for _, votes := range inputVotes {
-						if len(votes) == 1 {
-							inputShares = append(inputShares, votes[0])
-						}
-					}
-					command, err = redaction.ReplaceInput(policy, command, payment, inputShares)
-					if err != nil {
-						continue
-					}
-					started = time.Now()
-					partVotes, err := collect(ctx, "/v3/repair/part-shares", command)
-					trace("part_shares", id, started, err)
-					if err != nil {
-						continue
-					}
-					err = db.View(func(v state.ReadView) error {
-						var err error
-						command, err = redaction.CompleteParts(v, blocks, policy, command, now, partVotes)
-						return err
-					})
-					if err != nil {
-						continue
-					}
-					raw, err := command.MarshalBinary()
-					if err != nil {
-						continue
-					}
-					started = time.Now()
-					response, err := client.BroadcastTxSync(ctx, types.Tx(raw))
-					code := uint32(0)
-					if response != nil {
-						code = response.Code
-					}
-					trace("submit", id, started, err, "code", code, "bytes", len(raw), "target_height", command.Height, "base_revision", command.Base)
-				}
+
 			}
 		}
 	}()
-	return func() { cancel(); <-done }, nil
+	return func() { cancel(); <-done; <-workerDone }, nil
 }

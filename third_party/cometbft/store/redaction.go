@@ -18,6 +18,23 @@ func originalKey(height int64) []byte { return []byte(fmt.Sprintf("RO:%d", heigh
 // authorize must verify an already-finalized RepairInput and its exact byte diff.
 // This method never changes account balances or rewrites historical AppHash.
 func (bs *BlockStore) ReviseBlock(height int64, base uint64, parts *types.PartSet, authorize func(*types.Block, *types.Block) error) error {
+	if base == ^uint64(0) {
+		return types.ErrRedaction
+	}
+	return bs.installRevision(height, base+1, parts, authorize, true)
+}
+
+// InstallCommittedRevision installs an exact, already-authorized snapshot.
+// The callback must use copied committed data, never acquire application locks.
+func (bs *BlockStore) InstallCommittedRevision(height int64, revision uint64, parts *types.PartSet, authorize func(*types.Block, *types.Block) error) error {
+	return bs.installRevision(height, revision, parts, authorize, false)
+}
+
+func (bs *BlockStore) installRevision(height int64, target uint64, parts *types.PartSet, authorize func(*types.Block, *types.Block) error, sequential bool) error {
+	if target == 0 {
+		return types.ErrRedaction
+	}
+
 	if parts == nil || !parts.IsComplete() || authorize == nil {
 		return types.ErrRedaction
 	}
@@ -58,16 +75,10 @@ func (bs *BlockStore) ReviseBlock(height int64, base uint64, parts *types.PartSe
 		rev = binary.BigEndian.Uint64(state[:8])
 	}
 	digest := sha256.Sum256(data)
-	if rev == base+1 && len(state) == 40 && bytes.Equal(state[8:], digest[:]) {
-		return nil
-	}
-	if rev != base || base == ^uint64(0) {
-		return types.ErrRedaction
-	}
 	checked := types.NewPartSetFromHeader(meta.BlockID.PartSetHeader)
 	for i := 0; i < int(parts.Total()); i++ {
 		p := parts.GetPart(i)
-		if p.Redaction == nil || p.Redaction.Height != height || p.Redaction.Revision != base+1 {
+		if p.Redaction == nil || p.Redaction.Height != height || p.Redaction.Revision != target {
 			return types.ErrRedaction
 		}
 		if err = p.ValidateBasic(); err != nil {
@@ -76,6 +87,25 @@ func (bs *BlockStore) ReviseBlock(height int64, base uint64, parts *types.PartSe
 		if _, err = checked.AddPart(p); err != nil {
 			return err
 		}
+	}
+
+	if rev == target {
+		if len(state) != 40 || !bytes.Equal(state[8:], digest[:]) {
+			return types.ErrRedaction
+		}
+		for i := 0; i < int(parts.Total()); i++ {
+			old := bs.LoadBlockPart(height, i)
+			if old == nil || old.Redaction == nil || *old.Redaction != *parts.GetPart(i).Redaction || !bytes.Equal(old.Bytes, parts.GetPart(i).Bytes) {
+				return types.ErrRedaction
+			}
+		}
+		return nil
+	}
+	if !sequential && rev > target {
+		return nil
+	}
+	if sequential && rev != target-1 {
+		return types.ErrRedaction
 	}
 	batch := bs.db.NewBatch()
 	defer batch.Close()
@@ -106,7 +136,7 @@ func (bs *BlockStore) ReviseBlock(height int64, base uint64, parts *types.PartSe
 		}
 	}
 	state = make([]byte, 40)
-	binary.BigEndian.PutUint64(state[:8], base+1)
+	binary.BigEndian.PutUint64(state[:8], target)
 	copy(state[8:], digest[:])
 	if err = batch.Set(revisionKey(height), state); err != nil {
 		return err

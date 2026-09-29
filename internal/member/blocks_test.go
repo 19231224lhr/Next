@@ -12,6 +12,7 @@ import (
 	"utxo/finality"
 	"utxo/internal/blockfollow"
 	"utxo/internal/committee"
+	"utxo/internal/gateway"
 	"utxo/internal/member"
 	"utxo/internal/rules"
 	"utxo/internal/state"
@@ -20,6 +21,88 @@ import (
 	"utxo/internal/wallet"
 	"utxo/protocol"
 )
+
+func TestRepairBatchMaximumFollowerResult(t *testing.T) {
+	f := testkit.NewFixture("batch-max", "org", 1)
+	f.EnableDirect()
+	pemraw, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemblock, _ := pem.Decode(pemraw)
+	key, err := x509.ParsePKCS1PrivateKey(pemblock.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := rules.DirectSettings{Modulus: key.N.Bytes(), TimeoutSeconds: 30, RepairCost: 5}
+
+	c := protocol.RepairBatch{Network: f.Org.Network, Height: 1, Parts: []chameleon.Opening{{}}}
+	r := protocol.RepairBatchResult{Applied: true}
+	for i := 0; i < protocol.MaxRepairItems; i++ {
+		out := protocol.OutputID{byte(i + 1)}
+		tx := protocol.TxID{byte(i + 1)}
+		c.Items = append(c.Items, protocol.RepairItem{Output: out, Transaction: uint32(i)})
+		r.Effects = append(r.Effects, protocol.RepairEffect{Output: out, ParentFact: protocol.SpendFactID{byte(i + 1)}, ConsumerFact: protocol.SpendFactID{byte(i + 33)}, ConsumerTx: tx, Amount: 100, Debit: protocol.ReserveDebitIdentity(f.Org.Network, out)})
+		fee := f.Genesis.Outputs[0].Output
+		fee.Asset = protocol.AssetFUEL
+		fee.Amount = 10
+		for _, index := range []uint32{protocol.FeeChangeIndex, protocol.FeeRefundIndex} {
+			r.FeeOutputs = append(r.FeeOutputs, protocol.FeeOutput{Transaction: tx, Index: index, Output: fee})
+		}
+	}
+	r.Batch = c.ID()
+	wire, err := c.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := r.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	trust, data := testkit.Block("batch-max", 1, nil, [][]byte{wire}, []*abci.ExecTxResult{{Data: result}})
+	b, err := finality.VerifyBlock(trust, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	md, wd, gd := store.NewMemory(), store.NewMemory(), store.NewMemory()
+	defer md.Close()
+	defer wd.Close()
+	defer gd.Close()
+	m, err := member.New(member.Config{Organization: f.Org, Index: 0, Key: f.Keys[0], Peers: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Workers: 1, Direct: &settings}, md, f.Genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := wallet.New(wd, f.Org.Network, f.Genesis.Outputs[0].Output.Recipient.Owner, []protocol.OrgConfig{f.Org})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := &gateway.Relay{DB: gd}
+	for _, x := range []struct {
+		db      store.Store
+		prepare blockfollow.Prepare
+	}{{md, m.PrepareBlock}, {wd, w.PrepareBlock}, {gd, g.ObserveBlock(f.Org.Hash())}} {
+		for i := 0; i < 2; i++ {
+			if err := blockfollow.Commit(x.db, b, x.prepare); err != nil {
+				t.Fatal("32-effect block or repeat", err)
+			}
+		}
+	}
+	for _, fee := range r.FeeOutputs {
+		id := protocol.OutputIdentity(f.Org.Network, fee.Transaction, fee.Index)
+		if ok, err := w.DirectFinal(id, 0); err != nil || !ok {
+			t.Fatal("fee output absent", err)
+		}
+		if err := md.View(func(v state.ReadView) error {
+			_, found, e := state.Load[state.Creation](v, rules.DirectCreationKey(id, 0))
+			if e == nil && !found {
+				t.Fatal("member missed fee output")
+			}
+			return e
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
 
 type countedBlockStore struct {
 	store.Store
@@ -67,8 +150,8 @@ func TestInvalidPaymentRejectedBeforeMemberWrite(t *testing.T) {
 
 func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 	for _, scenario := range []struct {
-		name                                                                 string
-		repair, split, sameBlock, owner, multi, alteredOpening, lateObserver bool
+		name                                                                        string
+		repair, split, sameBlock, owner, multi, alteredOpening, lateObserver, batch bool
 	}{
 		{name: "source_arrives"},
 		{name: "repair_then_late", repair: true},
@@ -76,6 +159,8 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 		{name: "child_parent_same_block", sameBlock: true},
 		{name: "owner_source", owner: true},
 		{name: "owner_repair", repair: true, owner: true},
+		{name: "batch_owner_repair", repair: true, owner: true, batch: true},
+		{name: "batch_late_signer", repair: true, owner: true, lateObserver: true, batch: true},
 		{name: "owner_same_block", sameBlock: true, owner: true},
 		{name: "owner_multiple_refunds", split: true, owner: true, multi: true},
 		{name: "projection_source", owner: true, alteredOpening: true},
@@ -363,6 +448,21 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 					raw, err = command.MarshalBinary()
 					if err != nil {
 						t.Fatal(err)
+					}
+					if scenario.batch {
+						batch := protocol.RepairBatch{Network: f.Org.Network, Height: 1, Items: []protocol.RepairItem{{Output: pc.Summary.OutputID(0)}}, Parts: []chameleon.Opening{{}}}
+						raw, err = batch.MarshalBinary()
+						if err != nil {
+							t.Fatal(err)
+						}
+						result, e := protocol.DecodeExecution(tr.Data)
+						if e != nil {
+							t.Fatal(e)
+						}
+						tr.Data, err = (protocol.RepairBatchResult{Batch: batch.ID(), Applied: true, Effects: []protocol.RepairEffect{{Output: pc.Summary.OutputID(0), ParentFact: pc.QC.Fact, ConsumerFact: cc.QC.Fact, ConsumerTx: child.ID(), Amount: parent.Body.Outputs[0].Amount, Debit: protocol.ReserveDebitIdentity(f.Org.Network, pc.Summary.OutputID(0))}}, FeeOutputs: result.FeeOutputs}).MarshalBinary()
+						if err != nil {
+							t.Fatal(err)
+						}
 					}
 					apply(raw, tr)
 				}

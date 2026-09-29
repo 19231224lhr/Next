@@ -254,7 +254,7 @@ func (p *e5Proxy) follow(ctx context.Context, cancel context.CancelFunc) func() 
 	stop := blockfollow.Start(ctx, cancel, db, transport.NewCommitteeClient(p.network.CommitteeURLs[0]), trust, func(b finality.VerifiedBlock) (blockfollow.Apply, error) {
 		pending = nil
 		for _, t := range b.Transactions() {
-			if t.Code != 0 || len(t.Data) == 0 {
+			if t.Code != 0 || len(t.Data) == 0 || protocol.IsRepairBatch(t.Bytes) {
 				continue
 			}
 			r, e := protocol.DecodeExecution(t.Data)

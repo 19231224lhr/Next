@@ -185,7 +185,7 @@ func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
 		if entry.Code != 0 || len(entry.Data) == 0 {
 			continue
 		}
-		result, err := protocol.DecodeExecution(entry.Data)
+		result, effects, err := protocol.DecodePublicExecution(m.cfg.Organization.Network, entry.Bytes, entry.Data)
 		if err != nil {
 			return nil, err
 		}
@@ -205,7 +205,11 @@ func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
 				return state.Put(o, rules.DirectCreationKey(id, 0), c)
 			})
 		}
-		if protocol.IsRepairInput(entry.Bytes) {
+		if protocol.IsRepairBatch(entry.Bytes) {
+			for _, effect := range effects {
+				updates = append(updates, func(o *state.Overlay) error { return m.applyRepairEffect(o, effect) })
+			}
+		} else if protocol.IsRepairInput(entry.Bytes) {
 			repair, err := protocol.DecodeRepairInput(entry.Bytes)
 			if err != nil {
 				return nil, err
@@ -237,8 +241,16 @@ func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
 }
 
 func (m *Member) applyRepair(o *state.Overlay, repair protocol.RepairInput, pay protocol.DirectSubmission) error {
-	in := pay.Tx.Body.Inputs[repair.Input]
-	fact := protocol.SpendFactID(in.Evidence)
+	return m.applyRepairEffect(o, protocol.RepairEffect{Output: repair.Output, ParentFact: protocol.SpendFactID(pay.Tx.Body.Inputs[repair.Input].Evidence), ConsumerFact: pay.Summary().Fact(), Amount: pay.Tx.Claims[repair.Input].Output.Amount})
+}
+
+func (m *Member) applyRepairEffect(o *state.Overlay, effect protocol.RepairEffect) error {
+	if waiting, found, err := state.Load[protocol.SpendFactID](o, waitingKey(effect.Output)); err != nil {
+		return err
+	} else if found && waiting != effect.ConsumerFact {
+		return rules.ErrAccounting
+	}
+	fact := effect.ParentFact
 	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
 	if err != nil {
 		return err
@@ -248,7 +260,7 @@ func (m *Member) applyRepair(o *state.Overlay, repair protocol.RepairInput, pay 
 		if err != nil {
 			return err
 		}
-		p.Paid, err = protocol.Add(p.Paid, pay.Tx.Claims[repair.Input].Output.Amount)
+		p.Paid, err = protocol.Add(p.Paid, effect.Amount)
 		if err != nil {
 			return err
 		}
@@ -256,7 +268,7 @@ func (m *Member) applyRepair(o *state.Overlay, repair protocol.RepairInput, pay 
 			return err
 		}
 	}
-	if err = m.resolveLocal(o, repair.Output, true); err != nil {
+	if err = m.resolveLocal(o, effect.Output, true); err != nil {
 		return err
 	}
 	return nil

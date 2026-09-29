@@ -284,7 +284,7 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 		}
 		blockRows = nil
 		for _, entry := range b.Transactions() {
-			if entry.Code != 0 || protocol.IsRepairInput(entry.Bytes) || len(entry.Data) == 0 {
+			if entry.Code != 0 || protocol.IsRepairInput(entry.Bytes) || protocol.IsRepairBatch(entry.Bytes) || len(entry.Data) == 0 {
 				continue
 			}
 			r, e := protocol.DecodeExecution(entry.Data)

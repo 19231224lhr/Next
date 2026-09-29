@@ -15,7 +15,7 @@ import (
 // only the repaired funding slot also permits later repairs to other inputs.
 func Observe(v state.ReadView, bs *cmtstore.BlockStore, id protocol.Hash) (Observation, error) {
 	var s Observation
-	task, found, err := state.Load[Task](v, TaskKey(id))
+	task, found, err := LoadTask(v, id)
 	if err != nil || !found {
 		return s, err
 	}

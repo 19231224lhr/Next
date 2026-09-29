@@ -6,6 +6,8 @@
 
 2026-09-27 安全分支补充了注册表唯一性和完整共识身份检查，见[加固记录](../research/security-analysis-validation-2026-09-27/hardening.md)。下文保留原工程基线的流程，并明确这两处实现约束。
 
+2026-09-29 功能分支接入 `RepairBatch`、独立批结果及 `InstallCommittedRevision`。新接口、状态键和有界工作器见[合批设计 §5](authorized-repair-batching.md#5-已实现接口与本轮范围)，原始单项修复接口保留。
+
 ## 1. 工程分层与运行拓扑
 
 项目使用 Go，模块为 `utxo`，版本由 [go.mod](../../go.mod) 固定。CometBFT v0.38.26 通过仓库内受限适配接入；[overlay.py](../../third_party/cometbft/overlay.py) 生成被忽略的 `.scratch/comet-src`，补丁源必须保留，上游生成副本可以重建。

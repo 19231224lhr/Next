@@ -11,7 +11,7 @@ func (r *Relay) ObserveBlock(config protocol.Hash) blockfollow.Prepare {
 	return func(b finality.VerifiedBlock) (blockfollow.Apply, error) {
 		var facts []protocol.SpendFactID
 		for _, t := range b.Transactions() {
-			if t.Code != 0 || len(t.Data) == 0 {
+			if t.Code != 0 || len(t.Data) == 0 || protocol.IsRepairBatch(t.Bytes) {
 				continue
 			}
 			result, err := protocol.DecodeExecution(t.Data)
