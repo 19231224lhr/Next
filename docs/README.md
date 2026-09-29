@@ -5,6 +5,7 @@
 | 文档 | 用途与状态 |
 | --- | --- |
 | [系统设计与证明建模基线](design/system.md) | 身份与状态、完整付款及赔付流程、资金与权限公式、假设和待证明性质 |
+| [授权历史修复增强设计](design/authorized-repair-batching.md) | 同块原子合批、已提交版本直达及验证方案；设计定稿，尚未实现 |
 | [工程架构与实现映射](design/architecture.md) | 关键函数、并发和存储边界、共识适配、现有回归测试与模型对应关系 |
 | [完整安全性分析报告](research/security-analysis-complete-wire4.md) | 文献写法、系统与攻击者模型、潜在责任到真实资金的证明、源码审查、实验对应及剩余义务 |
 | [论文第五章：安全性分析](paper/security-analysis-chapter5.md) | 可供论文采用的中文正文：模型、引理、定理、短证明、条件终结性与限制；附参考文献 |
@@ -13,7 +14,7 @@
 | [组合安全论证与实现对应](research/security-composition-wire4.md) | 统一状态、一般参数条件归纳、关键写入口与提交边界；原 8 场景及本轮 2 场景扩展，区分手工推导和机械验证 |
 | [门限哈希与共识接口论证](research/security-redaction-consensus-wire4.md) | 公开适配、公共授权与历史表示分层；原始分片绑定修复、回归和未完成的密码学义务 |
 | [第一轮有限模型与实现验证](research/security-model-validation-2026-09-26.md) | 16 个有限配置、七类错误反例及账务投影原始日志 |
-| [安全分析与最小修正计划](research/security-implementation-plan.md) | `security-analysis` 专用分支的模型、代码回归、修订接口审查及性能验收顺序 |
+| [安全分析与最小修正计划](research/security-implementation-plan.md) | 已并入 `re` 的安全分析工作计划：模型、代码回归、修订接口审查及性能验收顺序 |
 | [安全分析与证明准备](research/security-analysis-2026-09-26.md) | 条件安全论证、动态预算草图、已复现的补资配置缺陷及活性边界；尚非完整证明 |
 | [运行与验证](operations.md) | 构建、初始化、单笔运行、配置和检查 |
 | [E1–E8 实验索引](experiments/README.md) | 正式结果、复现材料和适用范围；原始数据保留 |
@@ -29,4 +30,4 @@
 
 ## 下一阶段
 
-以[完整报告](research/security-analysis-complete-wire4.md)和[论文正文](paper/security-analysis-chapter5.md)为主入口，旧阶段报告保留版本与原始证据。后续优先补强用户可兑现性质、适配查询下的密码学边界与修改后共识接口精化。R6 阶段增加了实时原始 opening 检查，合并实验分支前仍需其性能验收；本轮主要修订论证并补回归，不把测试通过当作全面形式化验证。
+以[完整报告](research/security-analysis-complete-wire4.md)和[论文正文](paper/security-analysis-chapter5.md)为主入口，旧阶段报告保留版本与原始证据。后续优先补强用户可兑现性质、适配查询下的密码学边界与修改后共识接口精化。安全分析与代码修正现已合并到 `re`；本次整合通过功能、竞态、共识回归、静态检查和构建验证，不代表重新测量了历史性能，也不把测试通过当作全面形式化验证。
