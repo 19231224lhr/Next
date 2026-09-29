@@ -11,6 +11,7 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmtstore "github.com/cometbft/cometbft/store"
 	"github.com/cometbft/cometbft/types"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -105,6 +106,42 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The child is already spent before its own missing source is repaired.
+	// Keep a further, pre-signed payment to exercise usability after repair.
+	body = child.Body
+	body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: cc.Summary.OutputID(0), Evidence: protocol.Hash(cc.QC.Fact)}}
+	body.Nonce[0] = 42
+	body.Intent = body.IntentID()
+	grandchild, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: child.Body.Outputs[0]}}, pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grandchild.Auth = []protocol.OwnerAuth{protocol.SignOwner(grandchild.ID(), f.Owner)}
+	gc, err := f.DirectCertificate(grandchild, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grandchildRaw, err := (protocol.DirectPayment{Tx: grandchild, Certificate: gc, InputCertificates: []protocol.InputCertificate{{Certificate: cc, Index: 0}}}).Submission().MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = grandchild.Body
+	body.Inputs = []protocol.Input{{Kind: protocol.FinalInput, Output: gc.Summary.OutputID(0), Evidence: protocol.CreationIdentity(f.Org.Network, grandchild.ID(), 0, 0)}}
+	body.Nonce[0] = 43
+	body.Intent = body.IntentID()
+	next, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: grandchild.Body.Outputs[0]}}, pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next.Auth = []protocol.OwnerAuth{protocol.SignOwner(next.ID(), f.Owner)}
+	nc, err := f.DirectCertificate(next, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextRaw, err := (protocol.DirectPayment{Tx: next, Certificate: nc}).Submission().MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
 	var roots [][]byte
 	var ledgers [][]state.Entry
 	snapshot := func(db appstore.Store) []state.Entry {
@@ -167,7 +204,23 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	}
 	first := appendBlock(1, 1700000001, childRaw)
 	originalID := blocks.LoadBlockMeta(1).BlockID
-	appendBlock(2, 1700000002, nil)
+	appendBlock(2, 1700000002, grandchildRaw)
+	grandchildBlockID := blocks.LoadBlockMeta(2).BlockID
+	protectedPayments := func() []state.Entry {
+		var protected []state.Entry
+		for _, row := range snapshot(db) {
+			for _, id := range []protocol.OutputID{cc.Summary.OutputID(0), gc.Summary.OutputID(0)} {
+				if bytes.Equal(row.Key, rules.DirectCreationKey(id, 0)) || bytes.Equal(row.Key, rules.DirectSpendKey(id, 0)) {
+					protected = append(protected, row)
+				}
+			}
+		}
+		return protected
+	}
+	beforeRepairPayments := protectedPayments()
+	if len(beforeRepairPayments) != 3 {
+		t.Fatalf("expected two created outputs and the consumed child, got %d records", len(beforeRepairPayments))
+	}
 	output := pc.Summary.OutputID(0)
 	var command protocol.RepairInput
 	var payment protocol.DirectSubmission
@@ -369,6 +422,10 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		})
 	}
 	appendBlock(3, 1700000033, repairRaw)
+	if !reflect.DeepEqual(beforeRepairPayments, protectedPayments()) {
+		t.Fatal("economic repair changed descendant payment records")
+	}
+	beforeMaterialize := snapshot(db)
 	checkObserved := func(materialized bool) {
 		t.Helper()
 		if err := db.View(func(v state.ReadView) error {
@@ -390,6 +447,9 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 			t.Fatal(err)
 		}
 		checkObserved(true)
+		if !reflect.DeepEqual(beforeMaterialize, snapshot(db)) {
+			t.Fatal("materialization changed the economic ledger")
+		}
 	}
 	revised := blocks.LoadBlock(1)
 	if bytes.Equal(revised.Data.Txs[0], first.Data.Txs[0]) || !bytes.Equal(revised.Hash(), first.Hash()) {
@@ -398,8 +458,44 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	if !blocks.LoadBlockMeta(1).BlockID.Equals(originalID) {
 		t.Fatal("full BlockID changed")
 	}
+	received := types.NewPartSetFromHeader(originalID.PartSetHeader)
+	for i := 0; i < int(originalID.PartSetHeader.Total); i++ {
+		if _, err = received.AddPart(blocks.LoadBlockPart(1, i)); err != nil {
+			t.Fatal("stored revised part failed its original commitment", err)
+		}
+	}
+	if !received.IsComplete() {
+		t.Fatal("revised parts incomplete")
+	}
+	revisedProto, err := revised.ToProto()
+	if err != nil {
+		t.Fatal(err)
+	}
+	revisedWire, err := revisedProto.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedWire, err := io.ReadAll(received.GetReader())
+	if err != nil || !bytes.Equal(storedWire, revisedWire) {
+		t.Fatal("stored parts do not reconstruct the authorized revised block", err)
+	}
 	if err = vals.VerifyCommitLight(chain, originalID, 1, blocks.LoadBlockCommit(1)); err != nil {
 		t.Fatal(err)
+	}
+	if !blocks.LoadBlockMeta(2).BlockID.Equals(grandchildBlockID) || !bytes.Equal(blocks.LoadBlock(2).Data.Txs[0], grandchildRaw) {
+		t.Fatal("repair changed the already committed descendant")
+	}
+	if err = vals.VerifyCommitLight(chain, grandchildBlockID, 2, blocks.LoadBlockCommit(2)); err != nil {
+		t.Fatal(err)
+	}
+	fixed, err := protocol.DecodeDirectSubmission(revised.Data.Txs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixed.Tx.Funding = child.Funding
+	fixedRaw, err := fixed.MarshalBinary()
+	if err != nil || !bytes.Equal(fixedRaw, childRaw) {
+		t.Fatal("repair changed fixed payment authorization or outputs", err)
 	}
 	t.Run("warm-cache-after-authorized-repair", func(t *testing.T) {
 		// The original child was cached before its funding was legally repaired.
@@ -457,12 +553,31 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	appendBlock(5, 1700000035, lateRaw)
+	if !reflect.DeepEqual(beforeRepairPayments, protectedPayments()) {
+		t.Fatal("late source changed previously delivered descendant outputs")
+	}
+	// This exact request was signed before repair: no new signature, certificate,
+	// ancestor history or replay of the child/grandchild is needed to spend it.
+	appendBlock(6, 1700000036, nextRaw)
+	if err = db.View(func(v state.ReadView) error {
+		spent, found, err := state.Load[state.Spend](v, rules.DirectSpendKey(gc.Summary.OutputID(0), 0))
+		if err != nil || !found || spent.Consumed != nc.QC.Fact {
+			t.Fatal("pre-signed successor did not consume the original grandchild output", err)
+		}
+		created, found, err := state.Load[state.Creation](v, rules.DirectCreationKey(nc.Summary.OutputID(0), 0))
+		if err != nil || !found || !created.Final || created.Output != next.Body.Outputs[0] {
+			t.Fatal("pre-signed successor did not create its authorized output", err)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 	// Start the application from genesis with an already-redacted block store.
 	// Replay into the experimental backend: every historical state hash,
 	// ledger row and the single debit must reproduce exactly.
 	replayDB, replay, _ := newApp(true)
 	defer replayDB.Close()
-	for i := int64(1); i <= 5; i++ {
+	for i := int64(1); i <= int64(len(roots)); i++ {
 		original, err := blocks.LoadOriginalBlock(i)
 		if err != nil {
 			t.Fatal(err)
