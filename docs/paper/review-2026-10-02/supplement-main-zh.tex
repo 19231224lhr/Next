@@ -1,0 +1,28 @@
+% Chinese reading edition of the supplementary material. Compile with XeLaTeX.
+\RequirePackage[OT1]{fontenc}
+\documentclass[letterpaper,11pt,onecolumn,journal]{IEEEtran}
+\usepackage[UTF8,fontset=none,heading=false]{ctex}
+\setCJKmainfont{FandolSong-Regular}[BoldFont=FandolSong-Bold,ItalicFont=FandolKai-Regular,BoldItalicFont=FandolSong-Bold,SmallCapsFont=FandolSong-Regular]
+\setCJKsansfont{FandolHei-Regular}[BoldFont=FandolHei-Bold]
+\setCJKmonofont{FandolFang-Regular}
+\setmainfont{TeX Gyre Termes}
+\setsansfont{TeX Gyre Heros}
+\usepackage{amsmath,amssymb,booktabs,array,graphicx}
+\graphicspath{{figures/}{./}}
+\usepackage[unicode,hidelinks]{hyperref}
+\hypersetup{pdftitle={Next：以直接担保实现连续 UTXO 支付——补充材料},pdfauthor={Lu Hengrun}}
+\renewcommand{\thesection}{S\arabic{section}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\theequation}{S\arabic{equation}}
+\renewcommand{\tablename}{表}
+\title{Next：以直接担保实现连续 UTXO 支付\\补充材料（中文阅读版）}
+\author{Lu Hengrun}
+\begin{document}
+\maketitle
+\input{zh-supplement-security}
+\input{zh-supplement-methods}
+\clearpage
+\section{逐轮实验记录}
+\input{zh-supplement-tables}
+\end{document}

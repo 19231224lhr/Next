@@ -38,7 +38,7 @@
 | 四成员分发 | [gateway/direct.go](../../internal/gateway/direct.go) · `CollectDirect` | 规范请求编码复用，前三份匹配有效票结束收集；不把任意三响应当 QC |
 | 成员批准 | [member/direct.go](../../internal/member/direct.go) · `ApproveDirectBytes` | 从原始字节验证，同一事务占用输入、Worker 权限并保存批准，成功后签票 |
 | 资源计算 | [rules/direct.go](../../internal/rules/direct.go) · `PrepareDirectVector` | 全输出 CAL、费用来源、工作上界和 Grant 绑定 |
-| 收款钱包 | [wallet/direct.go](../../internal/wallet/direct.go) · `ReceiveDirect` | 验证可信配置、输出正文绑定和 QC，原子接收；重复与迟到实例处理不增余额 |
+| 收款钱包 | [wallet/direct.go](../../internal/wallet/direct.go) · `ReceiveDirect` | 验证可信配置、输出正文绑定和 QC，原子接收；重复与已回收输出处理不增余额 |
 
 `protocol/v3.go` 中的 `FastTx` 把不可变 core 与可替换 Funding 分开；`SummaryFor` 将交易、输出、资源和 Grant 绑定成签署事实。业务层不能信任调用方预解析后的可变切片。
 
@@ -111,6 +111,7 @@
 | `ValidateDirectFee` · [rules/direct_fee.go](../../internal/rules/direct_fee.go) | 用户最终 FUEL 的来源、授权、路由与金额校验 |
 | `AnchorDirectDeadlines` · [direct_deadline.go](../../internal/rules/direct_deadline.go) | H+1 一致区块时间锚定 |
 | `EvaluateDirectCompensation` · [rules/direct.go](../../internal/rules/direct.go) | 原发行账户真实 CAL 扣款、关闭缺口及费用推进 |
+| 来源回收 · [rules/source_recovery.go](../../internal/rules/source_recovery.go) | 在迟到付款成功执行的同一事务中偿还实际赔付者，减少净 Spent，保留 Paid 与 Recovered 累计事实 |
 | `EvaluateReserveIncrease / ApplyReserveIncrease` · [reserve.go](../../internal/rules/reserve.go) | Engine 从冻结配置生成受保护 CAL 账户集合；公共执行拒绝同账户或从备付补资，原子转资增加 Grant；成员按累计差额增加本地份额 |
 
 当前应用哈希 `APP_V4` 按前一应用哈希及规范排序的修改集推进，不是完整状态树逐键证明服务。公开执行结果认证与数据库全状态成员证明不能混称。
@@ -132,7 +133,7 @@ Store 后端可选内存或 bbolt，`Group` 合并已经排队的更新：每个
 
 回调只使用传入 ReadView，不在事务里重新进入同一 Store、调用网络或等待其他任务。停止接入后等待后台保存、relay、follower 退出，再关闭共享 Store，避免关闭期间丢任务或持锁等待。
 
-内存模式仍有状态和原子事务；NoSync 仍写数据库，只是不等待同步耐久落盘。当前 `cmd/member/main.go` 默认调用 OpenNoSync，设置 `UTXO_EXPERIMENT_MEMBER_MEMORY=1` 才调用 OpenEphemeral；二者都不提供掉电耐久恢复保证。网关默认调用 Open，不能把成员默认配置套到所有角色。应用 DB、Comet BlockStore、WAL、FilePV 各有配置，不能把应用内存模式写成整个系统完全无磁盘操作。停机审计快照不等于可恢复数据库。
+内存模式仍有状态和原子事务；NoSync 仍写数据库，只是不等待同步耐久落盘。当前 `cmd/member/main.go` 默认调用 OpenNoSync，设置 `UTXO_EXPERIMENT_MEMBER_MEMORY=1` 才调用 OpenEphemeral；二者都不提供掉电耐久恢复保证。`UTXO_EXPERIMENT_MEMBER_SYNC=1` 可单独启用同步磁盘写作为实验对照，与成员内存模式互斥，不改变默认设置，也不声称提供全系统恢复协议。网关默认调用 Open，不能把成员默认配置套到所有角色。应用 DB、Comet BlockStore、WAL、FilePV 各有配置，不能把应用内存模式写成整个系统完全无磁盘操作。停机审计快照不等于可恢复数据库。
 
 ## 6. 跟块、权限与钱包同步
 
@@ -142,13 +143,13 @@ Store 后端可选内存或 bbolt，`Group` 合并已经排队的更新：每个
 
 [member/blocks.go](../../internal/member/blocks.go) 将公共结果映射为：
 
-- `applyPayment`：自己批准的付款记 Settled、MissingInputs 与费用阶段；标记公共输入消费，关闭先前等待当前输出的记录。
+- `applyPayment`：自己批准的付款记 Settled、MissingInputs 与费用阶段；标记公共输入消费，关闭先前等待当前输出的记录；核对 RecoveredOutputs 后，只更新自身确实记录过的 Paid 对应回收。
 - `applyRepair`：在原发行批准中累计实际 Paid，并处理消费交易的 Pending 与修复费用。
-- `finishLocal`：CAL 在自身 Settled 后恢复 `cap−Paid`；其余资源等待 Fee.Closed；仅恢复相对 Applied 的新增差额。
+- `finishLocal`：CAL 在自身 Settled 后恢复 `cap−(Paid−Recovered)`；其余资源等待 Fee.Closed；仅恢复相对 Applied 的新增差额。
 
 这三个函数是形式模型连接公共账本与本地重叠授权的关键。成员无需事先收到 INSTALL 才能处理自己已有批准的公共结果；未实际批准的成员也不能借跟块凭空恢复额度。
 
-钱包按成功结果收集本金及费用输出。正常来源最终化实例 0；赔付没有新增用户收款；赔付后迟到来源单独写实例 1，不删除既有实例 0。`KeyWalletSpend` 独立保存本钱包发送请求形成的消费标记，跟块写币不会清掉它；此处不等于实现了多设备钱包的全部支出同步。晚到 TXCer 不能覆盖已确认的迟到实例。
+钱包按成功结果收集本金及费用输出。正常来源最终化实例 0；赔付没有新增用户收款；赔付后迟到来源写 Recovered 终态，删除该钱包记录中的可花凭证，不创建实例 1。`KeyWalletSpend` 独立保存本钱包发送请求形成的消费标记，跟块写币不会清掉它；此处不等于实现了多设备钱包的全部支出同步。晚到 TXCer 不能覆盖 Recovered 终态；`DirectRecovered` 与可消费的 `DirectFinal` 分开。
 
 ## 7. 真实历史修订与共识适配
 

@@ -1,0 +1,16 @@
+=== RUN   TestLifecycleSourceRecovery
+=== RUN   TestLifecycleSourceRecovery/new-rule/latefalse
+    lifecycle_test.go:327: states=37005 transitions=150975 complete=true
+=== RUN   TestLifecycleSourceRecovery/old-rule-counterexample/latefalse
+    lifecycle_test.go:331: mutant detected: delay creates principal profit; shortest trace: [consume-missing(o0) repair(o0) source-arrives]
+=== RUN   TestLifecycleSourceRecovery/new-rule/latetrue
+    lifecycle_test.go:327: states=159976 transitions=667535 complete=true
+=== RUN   TestLifecycleSourceRecovery/old-rule-counterexample/latetrue
+    lifecycle_test.go:331: mutant detected: delay creates principal profit; shortest trace: [consume-missing(o0) repair(o0) source-arrives]
+--- PASS: TestLifecycleSourceRecovery (0.48s)
+    --- PASS: TestLifecycleSourceRecovery/new-rule/latefalse (0.10s)
+    --- PASS: TestLifecycleSourceRecovery/old-rule-counterexample/latefalse (0.00s)
+    --- PASS: TestLifecycleSourceRecovery/new-rule/latetrue (0.38s)
+    --- PASS: TestLifecycleSourceRecovery/old-rule-counterexample/latetrue (0.00s)
+PASS
+ok  	utxo/tools/securitymodel	0.882s

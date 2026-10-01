@@ -1,0 +1,85 @@
+{
+  "case": "s59-p1",
+  "passed": true,
+  "checks": {
+    "all_offered_started": true,
+    "all_units_closed": true,
+    "no_driver_errors": true,
+    "all_selected_admitted": true,
+    "repair_count_matches_selected": true,
+    "physical_before_parent_and_child_already_final": true,
+    "committee_state_equal": true,
+    "gap_closed": true,
+    "all_public": true,
+    "cal_recovered": true,
+    "all_sources_recovered": true,
+    "net_authorization_restored": true,
+    "no_organization_fuel": true,
+    "fee_conservation": true,
+    "owner_conservation": true,
+    "all_fees_closed": true,
+    "full_fee_formula": true
+  },
+  "offered_units": 1200,
+  "admitted_units": 1200,
+  "not_started": 0,
+  "closed_units": 1200,
+  "selected_exceptions": 12,
+  "actual_repairs": 12,
+  "actual_recoveries": 12,
+  "net_cal_loss": 0,
+  "actual_obligations": 1188,
+  "physical_complete": 12,
+  "cal_net_loss": 0,
+  "fee": {
+    "Maximum": 2400000,
+    "Held": 0,
+    "Rewards": 201660,
+    "Burned": 24000,
+    "Refunded": 2174340
+  },
+  "timing": {
+    "normal_parent_fast_ms": {
+      "n": 1188,
+      "p50": 1.196,
+      "p95": 1.471,
+      "max": 84.958
+    },
+    "normal_child_fast_ms": {
+      "n": 1188,
+      "p50": 1.193,
+      "p95": 1.452,
+      "max": 13.695
+    },
+    "exceptional_parent_fast_ms": {
+      "n": 12,
+      "p50": 1.207,
+      "p95": 1.261,
+      "max": 1.4
+    },
+    "exceptional_child_fast_ms": {
+      "n": 12,
+      "p50": 1.189,
+      "p95": 1.227,
+      "max": 1.275
+    },
+    "deadline_to_first_commit_observed_ms": {
+      "n": 12,
+      "p50": 1254.057984,
+      "p95": 1504.152064,
+      "max": 1504.376064
+    },
+    "deadline_to_all_physical_observed_ms": {
+      "n": 12,
+      "p50": 1760.541952,
+      "p95": 1762.401024,
+      "max": 1763.033088
+    }
+  },
+  "errors": [],
+  "unfinished_exceptions": [],
+  "probe_requests": 385,
+  "probe_errors": 20,
+  "elapsed_s": 90.595021,
+  "timing_note": "Local observation times include 250 ms polling, RPC and scheduling; no exact remote Commit latency claim."
+}

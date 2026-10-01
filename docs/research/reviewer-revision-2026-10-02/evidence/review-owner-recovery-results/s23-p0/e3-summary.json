@@ -1,0 +1,85 @@
+{
+  "case": "s23-p0",
+  "passed": true,
+  "checks": {
+    "all_offered_started": true,
+    "all_units_closed": true,
+    "no_driver_errors": true,
+    "all_selected_admitted": true,
+    "repair_count_matches_selected": true,
+    "physical_before_parent_and_child_already_final": true,
+    "committee_state_equal": true,
+    "gap_closed": true,
+    "all_public": true,
+    "cal_recovered": true,
+    "all_sources_recovered": true,
+    "net_authorization_restored": true,
+    "no_organization_fuel": true,
+    "fee_conservation": true,
+    "owner_conservation": true,
+    "all_fees_closed": true,
+    "full_fee_formula": true
+  },
+  "offered_units": 1200,
+  "admitted_units": 1200,
+  "not_started": 0,
+  "closed_units": 1200,
+  "selected_exceptions": 0,
+  "actual_repairs": 0,
+  "actual_recoveries": 0,
+  "net_cal_loss": 0,
+  "actual_obligations": 1200,
+  "physical_complete": 0,
+  "cal_net_loss": 0,
+  "fee": {
+    "Maximum": 2400000,
+    "Held": 0,
+    "Rewards": 201600,
+    "Burned": 24000,
+    "Refunded": 2174400
+  },
+  "timing": {
+    "normal_parent_fast_ms": {
+      "n": 1200,
+      "p50": 1.254,
+      "p95": 1.6,
+      "max": 84.516
+    },
+    "normal_child_fast_ms": {
+      "n": 1200,
+      "p50": 1.251,
+      "p95": 1.62,
+      "max": 21.285
+    },
+    "exceptional_parent_fast_ms": {
+      "n": 0,
+      "p50": null,
+      "p95": null,
+      "max": null
+    },
+    "exceptional_child_fast_ms": {
+      "n": 0,
+      "p50": null,
+      "p95": null,
+      "max": null
+    },
+    "deadline_to_first_commit_observed_ms": {
+      "n": 0,
+      "p50": null,
+      "p95": null,
+      "max": null
+    },
+    "deadline_to_all_physical_observed_ms": {
+      "n": 0,
+      "p50": null,
+      "p95": null,
+      "max": null
+    }
+  },
+  "errors": [],
+  "unfinished_exceptions": [],
+  "probe_requests": 0,
+  "probe_errors": 0,
+  "elapsed_s": 61.539559,
+  "timing_note": "Local observation times include 250 ms polling, RPC and scheduling; no exact remote Commit latency claim."
+}

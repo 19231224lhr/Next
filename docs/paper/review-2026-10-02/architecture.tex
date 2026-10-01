@@ -1,0 +1,26 @@
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,font=\footnotesize,
+  box/.style={draw=black!55,rounded corners=2pt,align=center,minimum height=1.0cm,text width=2.6cm,fill=white},
+  flow/.style={-{Stealth[length=2mm]},thick,draw=blue!60!black},
+  bgflow/.style={-{Stealth[length=2mm]},draw=black!65,dashed},
+  lab/.style={font=\scriptsize,align=center,fill=white,inner sep=2pt}]
+\node[box,text width=1.9cm] (sender) at (0,0) {Sender wallet\\\textbf{Authorize payment}};
+\node[box,text width=3.3cm,fill=blue!4] (org) at (4,0) {Consumption organization\\4 independent members\\\textbf{3 matching signatures}};
+\node[box,fill=blue!4] (wallet) at (8.8,0) {Recipient wallet\\Verify and record TXCer\\\textbf{Ready to continue}};
+\node[box] (next) at (13,0) {Next payment\\Same or another\\registered organization};
+\draw[flow] (sender) -- node[lab,above]{Transaction} (org);
+\draw[flow] (org) -- node[lab,above]{Output + TXCer} (wallet);
+\draw[flow] (wallet) -- node[lab,above]{Direct evidence} (next);
+\node[box,text width=3.3cm,fill=green!4] (comm) at (4,-3) {Public committee\\\textbf{Execute child payment}\\Consume once; record direct gap};
+\node[box,fill=green!4] (resolve) at (8.8,-3) {Await source\\Arrival closes\\the obligation};
+\node[box,fill=orange!6] (repair) at (13,-3) {Authorized repair\\Reserve debit + revision\\Late source: repay issuer\\Background installation};
+\draw[bgflow] (org) -- node[lab,right]{Public submission} (comm);
+\node[lab,left] at (2.1,-1.25) {Background INSTALL\\replicates complete evidence\\within the organization};
+\draw[bgflow] (comm) -- node[lab,above]{Direct\\obligation} (resolve);
+\draw[bgflow] (resolve) -- node[lab,above]{Still missing\\at deadline} (repair);
+\node[align=center,font=\scriptsize,text=black!75] at (8.6,-4.5) {Source resolution preserves the authorized outputs and successor references.\\Wallets and members follow authenticated public blocks; no per-payment committee notification.};
+\end{tikzpicture}
+\caption{Continuous payment and public source resolution in Next. Solid arrows form the recipient's continuation path. Dashed arrows denote background work. Each subsequent payment is independently authorized; an unresolved source is assigned to its direct issuer rather than propagated as an ancestor-waiting requirement. Historical repair is authorized by a later public command; a source that executes after compensation repays the compensating issuer without crediting the recipient again.}
+\label{fig:architecture}
+\end{figure*}

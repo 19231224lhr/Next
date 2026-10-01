@@ -1,0 +1,51 @@
+% GPT-authored independent supplement, retrieved from its source preview.
+\section{Details of the Original-Execution Connection}
+\label{supp:original-execution}
+
+\noindent\textbf{Earliest conflicting polka.}
+Fix a height and a commit certificate for nonempty value $v$ in round
+$r$. Select two honest signers $K$ of that certificate. Each locks $v$
+before issuing its precommit. The certificate can be assembled after
+these signers have advanced; its observation time is irrelevant.
+
+Suppose a higher-round polka for a different value exists, counting nil
+if it permits unlocking. Select the smallest round $s>r$ with such a
+polka and, within $s$, the earliest event $\tau$ at which its distinct
+prevotes exist. Its three voters include a member $m\in K$. Because
+honest rounds increase, $m$'s round-$s$ prevote follows its round-$r$
+precommit. Without an unlocking justification, $m$ must prevote its
+locked value. Relocking on $v$ in intervening rounds preserves this
+restriction. A conflicting justification from a round below $s$
+contradicts the choice of $s$; one from round $s$ must have existed before
+$m$ cast the vote counted at $\tau$, contradicting the choice of $\tau$.
+Evidence from above $s$ cannot precede a subsequent round-$s$ vote.
+Thus no such polka exists. A higher-round conflicting commit would
+require one. Same-round conflicting commits require an honest double
+precommit. This argument depends on the stated lock-transition and
+round-monotonicity rules, not timely receipt of commit evidence.
+
+\noindent\textbf{Pairing, validation, and execution.}
+Induct on candidate updates: local construction pairs a body with its
+original parts; remote completion reconstructs the body from checked
+parts. Moving Locked or Valid transfers both; switching targets clears
+the old body. Historical installation does not mutate these active
+candidates. A nonempty precommit follows a matching polka. An honest
+prevote is justified by actual proposal validation or an earlier lock;
+tracing the latter decreases the lock round and terminates at validation.
+The final full-identity guard fixes the original transactions, height,
+time, and other application context before Finalize. Synchronization
+and replay supply the same original material. Hence same-height retries
+cannot introduce a second original body through the stable-hash cache
+within this call boundary.
+
+\noindent\textbf{Meaning of the two equivalences.}
+Batch refinement compares economic state after a whole batch with the
+state after its specified sequence of single-item steps. It projects
+away command identities, revision counters, and materialization tasks.
+Replay equality instead fixes the entire original command sequence and
+its block contexts; deterministic execution then reproduces each
+application hash. These are different relations. Neither compares histories that order
+parent arrivals and compensations differently. The delay-neutrality
+theorem of the main text makes that comparison under its own hypotheses,
+equating final CAL holders and reserve balances rather than application
+hashes or revision metadata.

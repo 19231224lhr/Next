@@ -1,0 +1,187 @@
+\section{Supplementary Experimental Methods}
+\label{sec:supp-methods}
+
+\noindent\textbf{Build lineage and deployment.}
+Current source-recovery code is committed as \texttt{d99ec92}. The
+artifact records per-binary SHA-256 fingerprints and configuration for
+each run. The current nine-service continuation, recovery, storage, and
+short throughput series use this source-recovery rule. The initial
+fourteen-service paired runs use the same single-obligation recovery
+rule before the batch-result tag was separated from the direct-result
+tag; the current cross-type codec regressions cover that separation.
+Members in the current storage, in-memory continuation, and short
+throughput controls run with GOGC=200 and GOMAXPROCS=16; this override is
+not applied to committee, gateway, or wallet processes.
+
+Archived operating-range runs record
+base \texttt{e3870e1} and implementation \texttt{a083ff6}; original
+continuation records \texttt{f0c0a274}; capital records base
+\texttt{8e1fb40} and implementation \texttt{5807546}; organization paths
+record base \texttt{bb65af69} and verified source \texttt{13be856}.
+
+The archived batch integration uses \texttt{f82f8cd}; structural repair
+counts were repeated on the current code. The source-failure checkpoint
+\texttt{c1ebf2d} uses the superseded late-source rule and does not support
+the current recovery claims.
+
+Mac trials share one M4 Max host with 16 CPU cores and 64\,GiB RAM;
+structural microbenchmarks run on Windows amd64. Current memory chains
+and short throughput trials use in-memory service state and NoSync
+wallets. Recovery trials use disk-backed committee application state
+and BlockStore with in-memory members and gateway. Storage controls
+change only member commits between bbolt NoSync and synchronous
+transactions. Each run starts from fresh genesis.
+
+Six additional fourteen-service disk-backed chain runs use the same
+source-recovery rule and user-paid FUEL. Their three fast 100-hop runs
+take 668.960--688.080\,ms; the inter-hop confirmation runs take
+114.496--118.742\,s. They are a separate storage/deployment configuration
+from the nine-service results in the main paper.
+
+\noindent\textbf{Timing and aggregation.}
+Certified-receipt latency generally runs from the first actual wallet
+HTTP send through recipient verification and local atomic recording.
+Capital and source-failure drivers include a small amount of pre-send
+construction; their comparisons remain within the same driver family.
+A local NoSync transaction completion is not a synchronous durability
+receipt. Public and member completion timestamps record observation of
+authenticated execution, rather than the committee's internal commit.
+The sender's single monotonic clock measures cross-site ACK latency,
+including the return path. A recipient can start its successor before
+the preceding sender receives that ACK. Offered targets, actual send
+rates, and completion rates including drain are retained separately.
+Captions distinguish
+transaction quantiles from statistics across runs. Within-run sample
+variability is not an estimate of cross-run uncertainty.
+
+\noindent\textbf{Externally funded authorization controller.}
+The capital experiments sample member availability every 200\,ms.
+Let $\rho$ be the declared CAL authorization demand per second, counting
+both parent and child requests in each workload unit, and let $u$ count
+unique requests whose certification remains unfinished. The controller
+sets
+\begin{align*}
+ b &= 200+100u,\\
+ H_{\mathrm{low}} &= \rho\,(0.8\,\mathrm{s})+b,\\
+ H_{\mathrm{target}} &= 1.25H_{\mathrm{low}}.
+\end{align*}
+Here the watermarks and burst allowance are in CAL. When the minimum
+observed member availability $A_{\min}$ falls below $H_{\mathrm{low}}$,
+the proposed grant increment is
+\[
+ \Delta B=100\left\lceil
+ \frac{1.5(H_{\mathrm{target}}-A_{\min})}{100}
+ \right\rceil,
+\]
+subject to the configured authorization cap and available external
+funding. At most one increment is in flight. Its public command debits
+the external source and credits the reserve and grant atomically;
+following members add the resulting share difference without clearing
+existing approvals. The experiment supplies $\rho$ in advance rather
+than estimating unknown production demand. Controller decisions are
+requests for actual funded transfers, not a mechanism for creating
+backing capital.
+
+\noindent\textbf{Capital workload accounting.}
+Each condition has one 300-s run with one Worker per member and sufficient
+user FUEL. Starting from 3,600 CAL, the constant, rate-step, and delayed-parent
+conditions end at 14,400, 21,600, and 23,300 CAL after external transfers
+of 10,800, 18,000, and 19,700 CAL. Each completes 6,000 two-hop units,
+or 12,000 payments, spending 1,128,000 user FUEL. Corresponding fixed-high
+controls complete; the fixed-low condition closes 46 of 6,000 units,
+leaves 5,826 unstarted, and records 64 partially approved payments.
+These categories have different units and are not summed as one
+payment count. The per-run tables preserve the full seven-condition
+comparison without implying three repetitions per condition.
+
+\noindent\textbf{Identities, resource use, and retained history.}
+The multi-identity configurations use shared clients; 2,048 wallet
+identities do not represent 2,048 separate operating system processes. Comparing
+independent inputs with ten-hop payments, the three-run medians are
+12.67 versus 15.24 core-ms per payment and 59.32 versus 71.83\,KiB of
+HTTP payload per payment. Memory reporting separates total node RSS
+and retained history from active obligations, pending work, and outboxes.
+An increasing historical footprint is therefore not reported as an
+increasing payment backlog. Per-run resource summaries and their archived source locations are included in the artifact index.
+
+\noindent\textbf{Endpoint-specific Lightning reference.}
+The archived deployment uses LND v0.21.3-beta and Bitcoin Core 31.1 in regtest, with synchronous LND persistence and its 50-ms channel-commit setting. Each of three fresh deployments has two nodes and a direct channel. After 20 warm-up transfers, each run issues 100 serial, alternating 10,000-satoshi payments using prepared invoices,
+with receiver \texttt{SETTLED} as the completion event; the reported
+P50/P95 are 282.12/320.17\,ms. A separate Next run sends 300 payments
+at 100 payments/s for 3\,s using in-memory service state and NoSync
+wallet storage. Recipient-certified receipt has P50/P95 of
+0.9625/1.2075\,ms. Workload concurrency, durability, and completion
+semantics differ, so these records are deployment references rather
+than a normalized acceleration ratio.
+
+
+\begin{table}[t]
+  \caption{Append-only compensation records and authorized representation
+    updates (C3). Both close the account through the same economic
+    transition; they differ in the stored historical representation.}
+  \label{tab:c3-compare}
+  \centering
+  \small
+  \begin{tabular}{@{}p{0.2\columnwidth}p{0.37\columnwidth}p{0.37\columnwidth}@{}}
+    \toprule
+    & Append-only record & Representation update (C3) \\
+    \midrule
+    Economic closure
+      & Reserve debit and obligation state in the public command;
+        successors unchanged.
+      & Same transition and atomic step, committed with a revision task. \\
+    Historical representation and original commitments
+      & Original body unchanged; the funding source of a consumed output
+        is found through an index of compensation records.
+      & Stored body names the reserve debit; transaction identity, owner
+        authorization, and complete block identity $(H_b,P_b)$ are
+        unchanged and verified. \\
+    Actual readers
+      & Any reader of the command history and records.
+      & Repair construction, installation, and local inspection read the
+        revised body; wallets, synchronization, and replay read original
+        commands. \\
+    Storage and replay
+      & Original blocks plus records; replay runs original commands and
+        compensation events.
+      & Original blocks plus revised bodies, revisions, and tasks; replay
+        runs original commands and repair events; same-block repairs
+        share part adaptation and installation advances to the latest
+        committed revision. \\
+    Progress dependency
+      & Public execution of the compensation record.
+      & Compensation commits with its validated revision and requires
+        three adaptation contributions. \\
+    Status
+      & Design baseline; not implemented as a mode and not measured.
+      & Implemented; costs in the main paper. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Archived Operating-Range Series}
+The archived operating-range series complements the
+continuation results. One active organization uses sponsored fees,
+reused addresses, and independent final inputs. Five runs of 150,000
+payments each all finish (Fig.~\ref{fig:operating}). At a target of
+2,000 payments/s, two runs achieve completion rates of
+1,948.66--1,950.45 payments/s, including drain, with receipt P50s of
+2.521--2.566\,ms. Raising the target to 2,200 yields
+2,103.63--2,106.29 completed payments/s. At 2,400, the achieved rate is
+2,174.68, P50/P95 rise to 7.174/89.38\,ms, and the 4,096-entry pending
+admission limit records 1,635 hits. The operating curve pairs achieved completion rates with their corresponding queue pressure.
+
+
+
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.62\columnwidth]{operating-point.pdf}
+  \caption{Operating points versus target offered load. Top: completion
+    throughput (payments/s), including drain. Bottom: receipt latency (ms).
+    Each point is one 150,000-payment run:
+    two at target 2,000, two at 2,200, and one at 2,400.
+    P50/P95 summarize transactions within each run, not cross-run
+    uncertainty. All services share one host.}
+  \label{fig:operating}
+\end{figure}

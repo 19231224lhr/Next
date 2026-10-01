@@ -53,6 +53,7 @@ bin/payctl audit -dir experiments/local-v4
 | 配置 | 用途 |
 | :--- | :--- |
 | `UTXO_EXPERIMENT_MEMBER_MEMORY=1` | 成员使用内存状态，保留原子更新与签票顺序 |
+| `UTXO_EXPERIMENT_MEMBER_SYNC=1` | 成员使用同步提交的磁盘状态，不能与成员内存模式同时启用；用于存储对照 |
 | `UTXO_EXPERIMENT_GATEWAY_MEMORY=1` | 网关使用内存状态，保留已完成状态检查与有界后台任务 |
 | `UTXO_EXPERIMENT_COMMITTEE_MEMORY=1` | 委员会应用使用内存状态；需搭配 Comet 内存存储 |
 | `UTXO_EXPERIMENT_MEM_BLOCKSTORE=1` | Comet 区块及相关状态使用实验 MemDB |
