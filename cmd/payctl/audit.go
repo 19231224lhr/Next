@@ -57,8 +57,9 @@ func audit(args []string) error {
 		Approvals, Pending, Payments, Closed int
 		PrivateProofRecords                  int `json:",omitempty"`
 		CAL, FUEL, Rewards, Burned           string
-		StateHash, Gap                       string `json:",omitempty"`
-		Revisions                            int    `json:",omitempty"`
+		StateHash, Gap                       string               `json:",omitempty"`
+		Revisions                            int                  `json:",omitempty"`
+		Recovery                             *sourceRecoveryAudit `json:",omitempty"`
 	}
 	var report []nodeReport
 	var directState string
@@ -148,6 +149,11 @@ func audit(args []string) error {
 					item.Closed = result.Closed
 					item.PrivateProofRecords = result.PrivateProofRecords
 					item.StateHash = result.StateHash
+					recovery, err := auditSourceRecovery(v, network)
+					if err != nil {
+						return err
+					}
+					item.Recovery = &recovery
 					if directState != "" && directState != result.StateHash {
 						return fmt.Errorf("committee application states differ")
 					}

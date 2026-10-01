@@ -27,7 +27,7 @@ import (
 
 type budgetUnit struct {
 	RepairExpected                       bool
-	ParentFinalInstance                  uint8
+	ExpectParentRecovery                 bool
 	Repair                               *repairTrial `json:",omitempty"`
 	ParentFee, ChildFee                  protocol.OutputID
 	Index                                int
@@ -49,7 +49,7 @@ type budgetReport struct {
 	DurationSeconds, DelaySeconds             float64
 	Offered, Admitted, NotStarted, MaxPending int
 	Units                                     []*budgetUnit
-	ParentFinalInstance                       uint8
+	ExpectParentRecovery                      bool
 }
 
 func budgetPause(ctx context.Context, d time.Duration) error {
@@ -123,7 +123,7 @@ func budgetDirect(args []string) error {
 	count := f.Int("count", 0, "optional single-probe unit limit")
 	pending := f.Int("pending", 64, "maximum admitted unfinished units")
 	gatewayParent := f.Bool("gateway-parent", false, "obtain parent QC through the same gateway without public delivery")
-	late := f.Bool("late-parent", false, "fee audit: observe late parent output instance one")
+	late := f.Bool("late-parent", false, "fee audit: observe reserve recovery from the late parent")
 	replay := f.Bool("replay", false, "fee audit: replay the identical completed child three times")
 	repairPercent := f.Int("repair-percent", -1, "E3: percent withheld until all four physical repairs; -1 disables")
 	repairSeed := f.Int64("repair-seed", 23, "E3: deterministic nested anomaly selection")
@@ -259,7 +259,7 @@ func budgetDirect(args []string) error {
 		}
 	}
 	if *late {
-		report.ParentFinalInstance = 1
+		report.ExpectParentRecovery = true
 	}
 	if *repairPercent >= 0 {
 		if err := cfg.Write(filepath.Join(*dir, "reports", "repair-selection.json"), struct {
@@ -312,10 +312,10 @@ func budgetDirect(args []string) error {
 			continue
 		}
 		u := &budgetUnit{Index: index, PlannedUnixNS: planned.UnixNano(), StartedUnixNS: time.Now().UnixNano(), ParentFailures: map[string]int{}, ChildFailures: map[string]int{}}
-		u.ParentFinalInstance = report.ParentFinalInstance
+		u.ExpectParentRecovery = report.ExpectParentRecovery
 		if selected[index] {
 			u.RepairExpected = true
-			u.ParentFinalInstance = 1
+			u.ExpectParentRecovery = true
 			u.Repair = new(repairTrial)
 		}
 		report.Units = append(report.Units, u)
@@ -414,7 +414,7 @@ func budgetDirect(args []string) error {
 				go func() {
 					defer close(retryDone)
 					for budgetPause(retryCtx, 2*time.Second) == nil {
-						final, _ := wallets[1].DirectFinal(u.Parent.Output, u.ParentFinalInstance)
+						final, _ := sourceObserved(wallets[1], u.Parent.Output, u.ExpectParentRecovery)
 						if final {
 							return
 						}
@@ -422,7 +422,7 @@ func budgetDirect(args []string) error {
 						_ = public.Submit(retryCtx, raw)
 					}
 				}()
-				if err = observeChainHop(ctx, batches, wallets[1], &u.Parent, start, make(chan struct{}), u.ParentFinalInstance); err != nil {
+				if err = observeChainHop(ctx, batches, wallets[1], &u.Parent, start, make(chan struct{}), u.ExpectParentRecovery); err != nil {
 					u.ParentError = err.Error()
 				}
 				stopRetry()

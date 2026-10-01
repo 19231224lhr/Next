@@ -56,11 +56,11 @@ func TestSecurityPartialOutputRepairAndLateSource(t *testing.T) {
 	f.settle(t, parent, 131)
 	audit()
 	after := loadDirect[directCoverage](t, f.db, coverageKey).Credit
-	if after.Paid != 50 || after.Discharged != 50 || after.Remaining != 0 {
+	if after.Paid != 50 || after.Recovered != 50 || after.Discharged != 50 || after.Remaining != 0 {
 		t.Fatalf("wrong terminal coverage: %+v", after)
 	}
-	if !loadDirect[state.Creation](t, f.db, DirectCreationKey(pid, 1)).Final {
-		t.Fatal("missing late instance")
+	if loadDirect[DirectObligation](t, f.db, DirectObligationKey(pid)).Status != DirectRecovered {
+		t.Fatal("missing reserve recovery")
 	}
 	f.settle(t, right, 132)
 	audit()
@@ -179,7 +179,10 @@ func projectMoney(t *testing.T, db store.Store) (p monetaryProjection) {
 				}
 				u := coverageUsage[a.Key]
 				u.Reserved += c.Credit.Remaining
-				u.Spent += c.Credit.Paid
+				if c.Credit.Recovered > c.Credit.Paid {
+					t.Fatal("recovery exceeds actual compensation")
+				}
+				u.Spent += c.Credit.Paid - c.Credit.Recovered
 				coverageUsage[a.Key] = u
 			}
 		})

@@ -234,11 +234,11 @@ func TestDirectRepairThenLateParent(t *testing.T) {
 		t.Fatalf("duplicate/missing debit: %d", balance)
 	}
 	f.settle(t, parent, 132)
-	if got := loadDirect[state.Creation](t, f.db, DirectCreationKey(pid, 1)); !got.Final {
-		t.Fatal("late output not available")
+	if got := loadDirect[DirectObligation](t, f.db, DirectObligationKey(pid)); got.Status != DirectRecovered {
+		t.Fatal("late source did not recover the paid obligation")
 	}
-	if got := loadDirect[directCoverage](t, f.db, state.Key(keyDirectCoverage, parent.Certificate.QC.Fact[:])).Credit; got.Paid != 100 || got.Discharged != 0 {
-		t.Fatalf("paid principal returned as credit: %+v", got)
+	if got := loadDirect[directCoverage](t, f.db, state.Key(keyDirectCoverage, parent.Certificate.QC.Fact[:])).Credit; got.Paid != 100 || got.Recovered != 100 || got.Discharged != 0 {
+		t.Fatalf("wrong gross compensation/recovery: %+v", got)
 	}
 	conflict := f.payment(t, pid, &parent.Certificate, 4)
 	v, err := VerifyDirectPayment(conflict, f.policy)

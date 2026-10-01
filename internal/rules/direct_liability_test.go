@@ -99,14 +99,14 @@ func TestDirectTwoOrganizationsGrandchildFirst(t *testing.T) {
 			at, expectedG1 := int64(102), uint64(10000000)
 			if repairedBeforeParent {
 				repair(o1, 130)
-				at, expectedG1 = 132, 9999900
+				at = 132
 			}
 			g1.settle(t, t1, at)
 			first := loadDirect[DirectObligation](t, g0.db, DirectObligationKey(o1))
 			ancestor := loadDirect[DirectObligation](t, g0.db, DirectObligationKey(o0))
 			want := uint8(DirectFulfilled)
 			if repairedBeforeParent {
-				want = DirectRepaired
+				want = DirectRecovered
 			}
 			if first.Issuer != g1.org.Org || first.Status != want || ancestor.Issuer != g0.org.Org || ancestor.Status != DirectOpen {
 				t.Fatal("independent direct obligations were transferred or erased")
@@ -118,6 +118,12 @@ func TestDirectTwoOrganizationsGrandchildFirst(t *testing.T) {
 			}
 			if !loadDirect[state.Creation](t, g0.db, DirectCreationKey(t2.Certificate.Summary.OutputID(0), 0)).Final {
 				t.Fatal("grandchild was rolled back")
+			}
+			g0.settle(t, t0, at+32)
+			for _, org := range []protocol.Hash{g0.org.Org, g1.org.Org} {
+				if loadDirect[uint64](t, g0.db, AccountKey(org, protocol.AssetCAL)) != 10000000 {
+					t.Fatal("fully arrived chain left a reserve loss")
+				}
 			}
 		})
 	}

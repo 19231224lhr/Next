@@ -6,6 +6,7 @@ import (
 )
 
 const MaxRepairItems = 32
+const repairBatchResultTag uint16 = 414
 
 var repairBatchMagic = []byte("RPBATCH4")
 
@@ -120,7 +121,7 @@ func (r RepairBatchResult) MarshalBinary() ([]byte, error) {
 		return nil, ErrRule
 	}
 	e := new(Encoder)
-	e.U16(412)
+	e.U16(repairBatchResultTag)
 	e.Fixed(r.Batch[:])
 	e.Optional(r.Applied)
 	e.U32(uint32(len(r.Effects)))
@@ -159,13 +160,15 @@ func (r RepairBatchResult) MarshalBinary() ([]byte, error) {
 	}
 	return e.Data(), nil
 }
-func IsRepairBatchResult(b []byte) bool { return len(b) >= 2 && b[0] == 1 && b[1] == 156 }
+func IsRepairBatchResult(b []byte) bool {
+	return len(b) >= 2 && uint16(b[0])<<8|uint16(b[1]) == repairBatchResultTag
+}
 func DecodeRepairBatchResult(b []byte) (r RepairBatchResult, err error) {
 	if len(b) > MaxRequestBytes {
 		return r, ErrEncoding
 	}
 	d := NewDecoder(b)
-	if d.U16() != 412 {
+	if d.U16() != repairBatchResultTag {
 		return r, ErrEncoding
 	}
 	copy(r.Batch[:], d.Fixed(32))

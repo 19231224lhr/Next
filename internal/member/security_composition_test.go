@@ -137,6 +137,7 @@ func securityComposition(t *testing.T, workers uint32, extraApproval, repair, la
 	cp := certify(child, []protocol.InputCertificate{{Certificate: pp.Certificate}})
 	settled := make(map[protocol.SpendFactID]bool)
 	paid := make(map[protocol.SpendFactID]uint64)
+	recovered := make(map[protocol.SpendFactID]uint64)
 	budget, spent, reserved := uint64(901), uint64(0), uint64(0)
 	lateSigned := false
 	check := func() {
@@ -144,7 +145,7 @@ func securityComposition(t *testing.T, workers uint32, extraApproval, repair, la
 		var risk, residualSum uint64
 		var localDebits [3]uint64
 		for _, p := range payments {
-			w := paid[p.Certificate.QC.Fact]
+			w := paid[p.Certificate.QC.Fact] - recovered[p.Certificate.QC.Fact]
 			if !settled[p.Certificate.QC.Fact] {
 				w = 0
 				for _, out := range p.Tx.Body.Outputs {
@@ -277,6 +278,8 @@ func securityComposition(t *testing.T, workers uint32, extraApproval, repair, la
 			t.Fatal(err)
 		}
 		settled[p.Certificate.QC.Fact] = true
+		spent -= paid[p.Certificate.QC.Fact] - recovered[p.Certificate.QC.Fact]
+		recovered[p.Certificate.QC.Fact] = paid[p.Certificate.QC.Fact]
 		appendBlock(raw, tr)
 	}
 	execute(cp, 100)

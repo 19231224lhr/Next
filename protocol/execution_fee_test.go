@@ -36,11 +36,15 @@ func TestExecutionFeeOutputEncoding(t *testing.T) {
 		}
 	}
 	legacy, _ := (ExecutionResult{Applied: true}).MarshalBinary()
-	if legacy[1] != 154 {
-		t.Fatal("legacy tag changed")
+	if legacy[1] != 156 {
+		t.Fatal("source-recovery result tag mismatch")
 	}
 	if _, e := DecodeExecution(legacy); e != nil {
 		t.Fatal(e)
+	}
+	legacy[1] = 154
+	if _, e := DecodeExecution(legacy); e == nil {
+		t.Fatal("legacy late-user-credit result reinterpreted as reserve recovery")
 	}
 	if _, e := DecodeExecution(append(raw, 0)); e == nil {
 		t.Fatal("trailing data accepted")

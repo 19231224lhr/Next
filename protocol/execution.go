@@ -16,23 +16,23 @@ type FeeOutput struct {
 }
 
 // ExecutionResult records only execution choices not derivable from the signed
-// transaction: missing inputs, late instances, and final fee change/refunds.
+// transaction: missing inputs, recovered outputs, and final fee change/refunds.
 // It contains public ledger effects, not private notifications or credit proofs.
 type ExecutionResult struct {
-	Applied                    bool
-	MissingInputs, LateOutputs []uint32
-	FeeOutputs                 []FeeOutput
+	Applied                         bool
+	MissingInputs, RecoveredOutputs []uint32
+	FeeOutputs                      []FeeOutput
 }
 
 func (r ExecutionResult) MarshalBinary() ([]byte, error) {
 	e := new(Encoder)
 	if len(r.FeeOutputs) == 0 {
-		e.U16(410)
+		e.U16(412)
 	} else {
-		e.U16(411)
+		e.U16(413)
 	}
 	e.Optional(r.Applied)
-	for _, v := range [][]uint32{r.MissingInputs, r.LateOutputs} {
+	for _, v := range [][]uint32{r.MissingInputs, r.RecoveredOutputs} {
 		if len(v) > MaxInputs+MaxOutputs {
 			return nil, ErrEncoding
 		}
@@ -70,17 +70,17 @@ func (r ExecutionResult) MarshalBinary() ([]byte, error) {
 func DecodeExecution(b []byte) (r ExecutionResult, err error) {
 	d := NewDecoder(b)
 	tag := d.U16()
-	if tag != 410 && tag != 411 {
+	if tag != 412 && tag != 413 {
 		return r, ErrEncoding
 	}
 	r.Applied = d.Optional()
-	for _, v := range []*[]uint32{&r.MissingInputs, &r.LateOutputs} {
+	for _, v := range []*[]uint32{&r.MissingInputs, &r.RecoveredOutputs} {
 		*v = make([]uint32, d.Count(MaxInputs+MaxOutputs))
 		for i := range *v {
 			(*v)[i] = d.U32()
 		}
 	}
-	if tag == 411 {
+	if tag == 413 {
 		r.FeeOutputs = make([]FeeOutput, d.Count(MaxOutputs+2))
 		if len(r.FeeOutputs) == 0 {
 			return r, ErrEncoding

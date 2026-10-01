@@ -46,6 +46,8 @@ func LoadTask(v state.ReadView, id protocol.Hash) (Task, bool, error) {
 	if err != nil || !found {
 		return task, found, err
 	}
+	// A batch ID projects item zero only to reuse the single-task installer.
+	// Body, Next and Parts describe the complete batch revision, not one item.
 	index := int(ref.Index)
 	if index >= len(batch.Command.Items) {
 		return task, false, protocol.ErrRule

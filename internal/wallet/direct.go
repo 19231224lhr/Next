@@ -12,6 +12,9 @@ type DirectCoin struct {
 	Certificate *protocol.OutputCertificate
 	Index       uint32
 	Final       protocol.Hash
+	// Recovered is a terminal observation, not a spendable coin. The source
+	// executed after compensation and its value repaid the reserve payer.
+	Recovered bool `json:",omitempty"`
 }
 
 func DirectCoinKey(id protocol.OutputID, instance uint8) []byte {
@@ -44,6 +47,13 @@ func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
 			return nil, err
 		}
 		for i, in := range req.Tx.Body.Inputs {
+			coin, found, err := state.Load[DirectCoin](o, DirectCoinKey(in.Output, req.Tx.Claims[i].Instance))
+			if err != nil {
+				return nil, err
+			}
+			if found && coin.Recovered {
+				return nil, protocol.ErrAuth
+			}
 			key := state.Key(state.KeyWalletSpend, in.Output[:], []byte{req.Tx.Claims[i].Instance})
 			prior, found, err := state.Load[protocol.TxID](o, key)
 			if err != nil {
@@ -85,16 +95,6 @@ func (w *Wallet) ReceiveDirect(output protocol.Output, c protocol.OutputCertific
 	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
 		key := DirectCoinKey(c.Summary.OutputID(index), 0)
-		late, exists, err := state.Load[DirectCoin](v, DirectCoinKey(c.Summary.OutputID(index), 1))
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			if late.Output != output {
-				return nil, protocol.ErrAuth
-			}
-			return nil, nil
-		}
 		old, found, err := state.Load[DirectCoin](v, key)
 		if err != nil {
 			return nil, err

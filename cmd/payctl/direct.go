@@ -245,12 +245,12 @@ func demoDirect(args []string) error {
 			return err
 		}
 		for {
-			ok, err := w1.DirectFinal(pc.Summary.OutputID(0), 1)
+			ok, err := w1.DirectRecovered(pc.Summary.OutputID(0))
 			if err != nil {
 				return err
 			}
 			if ok {
-				report["late_parent_instance"] = 1
+				report["late_parent_reserve_recovered"] = true
 				break
 			}
 

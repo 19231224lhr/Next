@@ -71,3 +71,28 @@ func TestRepairBatchResultEffects(t *testing.T) {
 		t.Fatal("no-op", err)
 	}
 }
+
+func TestPublicResultCodecsAreDisjoint(t *testing.T) {
+	batch, err := (RepairBatchResult{Batch: Hash{1}}).MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, applied := range []bool{false, true} {
+		execution, err := (ExecutionResult{Applied: applied}).MarshalBinary()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if IsRepairBatchResult(execution) {
+			t.Fatal("execution misclassified as repair batch")
+		}
+		if _, err := DecodeRepairBatchResult(execution); err == nil {
+			t.Fatal("execution accepted by batch decoder")
+		}
+	}
+	if !IsRepairBatchResult(batch) {
+		t.Fatal("batch not recognized")
+	}
+	if _, err := DecodeExecution(batch); err == nil {
+		t.Fatal("batch accepted by execution decoder")
+	}
+}

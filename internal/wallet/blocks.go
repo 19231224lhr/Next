@@ -63,24 +63,23 @@ func collectBlockCoins(network protocol.Hash, owners map[protocol.PublicKey]bool
 		if pay.Tx.Body.Network != network {
 			return nil, protocol.ErrAuth
 		}
-		late := map[uint32]bool{}
-		for _, i := range result.LateOutputs {
+		recovered := map[uint32]bool{}
+		for _, i := range result.RecoveredOutputs {
 			if int(i) >= len(pay.Tx.Body.Outputs) {
 				return nil, protocol.ErrRule
 			}
-			late[i] = true
+			recovered[i] = true
 		}
 		for i, out := range pay.Tx.Body.Outputs {
 			if !owners[out.Recipient.Owner] {
 				continue
 			}
-			instance := uint8(0)
-			if late[uint32(i)] {
-				instance = 1
-			}
 			id := pay.Summary().OutputID(uint32(i))
-			coin := DirectCoin{Output: out, Instance: instance, Index: uint32(i), Final: protocol.CreationIdentity(network, pay.Tx.ID(), uint32(i), instance)}
-			coins = append(coins, blockCoin{DirectCoinKey(id, instance), coin})
+			coin := DirectCoin{Output: out, Index: uint32(i), Recovered: recovered[uint32(i)]}
+			if !coin.Recovered {
+				coin.Final = protocol.CreationIdentity(network, pay.Tx.ID(), uint32(i), 0)
+			}
+			coins = append(coins, blockCoin{DirectCoinKey(id, 0), coin})
 		}
 	}
 	return coins, nil
@@ -105,8 +104,20 @@ func (w *Wallet) DirectFinal(id protocol.OutputID, instance uint8) (bool, error)
 	var final bool
 	err := w.db.View(func(v state.ReadView) error {
 		coin, found, err := state.Load[DirectCoin](v, DirectCoinKey(id, instance))
-		final = found && coin.Final != (protocol.Hash{})
+		final = found && !coin.Recovered && coin.Final != (protocol.Hash{})
 		return err
 	})
 	return final, err
+}
+
+// DirectRecovered observes public source execution and reserve repayment. It
+// deliberately does not report an owned final output or a new wallet balance.
+func (w *Wallet) DirectRecovered(id protocol.OutputID) (bool, error) {
+	var recovered bool
+	err := w.db.View(func(v state.ReadView) error {
+		coin, found, err := state.Load[DirectCoin](v, DirectCoinKey(id, 0))
+		recovered = found && coin.Recovered
+		return err
+	})
+	return recovered, err
 }

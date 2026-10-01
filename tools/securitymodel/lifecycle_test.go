@@ -11,6 +11,7 @@ const (
 	open
 	fulfilled
 	repaired
+	recovered
 )
 
 type local struct {
@@ -29,6 +30,7 @@ type lifeState struct {
 	childCoins                                                   int
 	settled, registered, topped                                  bool
 	paid, remaining, spent, grant, account, external, coins, gap int
+	recovered                                                    int
 	log                                                          [6]uint8 // 1,2=open; 3,4=repair; 5=source; 6=topup
 	length                                                       int
 	members                                                      [3]local
@@ -50,6 +52,7 @@ type lifeModel struct {
 	approved, signed         uint8
 	returnPaid, earlyRelease bool
 	allowLate, allSigners    bool
+	recoverSource            bool
 }
 
 func (m lifeModel) next(s lifeState) (out []edge[lifeState]) {
@@ -112,8 +115,16 @@ func (m lifeModel) next(s lifeState) (out []edge[lifeState]) {
 				n.outputs[i] = fulfilled
 				n.gap--
 			case repaired:
-				n.created[i] = 2
-				n.coins++
+				if m.recoverSource {
+					n.created[i] = 0
+					n.outputs[i] = recovered
+					n.account++
+					n.recovered++
+					n.spent--
+				} else {
+					n.created[i] = 2
+					n.coins++
+				}
 			case unused:
 				n.coins++
 			}
@@ -168,7 +179,7 @@ func (m lifeModel) next(s lifeState) (out []edge[lifeState]) {
 		if p.settled || m.earlyRelease && p.seenPaid > 0 {
 			target = 2 - p.seenPaid
 		}
-		if p.settled && m.returnPaid {
+		if p.settled && (m.returnPaid || m.recoverSource) {
 			target = 2
 		}
 		delta := target - p.applied
@@ -195,7 +206,7 @@ func (m lifeModel) check(s lifeState) string {
 		if status == open {
 			gap++
 		}
-		if status == repaired {
+		if status == repaired || status == recovered {
 			paid++
 		}
 		creation := uint8(0)
@@ -203,6 +214,9 @@ func (m lifeModel) check(s lifeState) string {
 			creation = 1
 			if status == repaired {
 				creation = 2
+			}
+			if status == recovered {
+				creation = 0
 			}
 		}
 		if s.created[i] != creation {
@@ -215,7 +229,7 @@ func (m lifeModel) check(s lifeState) string {
 			if s.settled {
 				promise = fulfilled
 			}
-			if status == repaired {
+			if status == repaired || status == recovered {
 				promise = repaired
 			}
 		}
@@ -232,7 +246,7 @@ func (m lifeModel) check(s lifeState) string {
 	if s.remaining != remaining || s.coins != coins {
 		return "asset projection"
 	}
-	if s.gap != gap || s.paid != paid || s.spent != paid {
+	if s.gap != gap || s.paid != paid || s.spent != paid-s.recovered || s.recovered > paid {
 		return "obligation accounting"
 	}
 	if s.coins+s.account+s.external-s.gap != 8 {
@@ -243,9 +257,9 @@ func (m lifeModel) check(s lifeState) string {
 	}
 	w := 2
 	if s.settled {
-		w = s.paid
+		w = s.paid - s.recovered
 	}
-	if s.remaining < s.gap || s.remaining > w-s.paid {
+	if s.remaining < s.gap || s.remaining > w-(s.paid-s.recovered) {
 		return "public versus hidden risk"
 	}
 	witnessResidual := 0
@@ -292,6 +306,31 @@ func (m lifeModel) check(s lifeState) string {
 		return "witness coverage"
 	}
 	return ""
+}
+
+// The pre-recovery model remains above as an explicit old-rule baseline.
+// Under source subrogation every complete arrival restores the same principal
+// allocation, even when followers lag and an extra signer joins late.
+func TestLifecycleSourceRecovery(t *testing.T) {
+	for _, late := range []bool{false, true} {
+		m := lifeModel{approved: 3, signed: 11, allowLate: late, allSigners: true, recoverSource: true}
+		check := func(s lifeState) string {
+			if err := m.check(s); err != "" {
+				return err
+			}
+			if s.settled && (s.coins != 2 || s.spent != 0 || s.account != s.grant) {
+				return "delay creates principal profit"
+			}
+			return ""
+		}
+		t.Run(fmt.Sprintf("new-rule/late%v", late), func(t *testing.T) {
+			requireExhausted(t, search(m.initial(), m.next, check, 2000000))
+		})
+		m.recoverSource = false
+		t.Run(fmt.Sprintf("old-rule-counterexample/late%v", late), func(t *testing.T) {
+			requireWitness(t, search(m.initial(), m.next, check, 2000000), "delay creates principal profit")
+		})
+	}
 }
 
 // The original model fixes all approvals before the public history. This

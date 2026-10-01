@@ -59,8 +59,15 @@ func run() (result error) {
 	}
 	id := store.Identity{Network: n.Genesis.Network.String(), Role: "member", Node: fmt.Sprintf("%s/%d", org.Org, c.Index), Schema: schema}
 	var db store.Store
-	if os.Getenv("UTXO_EXPERIMENT_MEMBER_MEMORY") == "1" {
+	memory := os.Getenv("UTXO_EXPERIMENT_MEMBER_MEMORY") == "1"
+	syncWrites := os.Getenv("UTXO_EXPERIMENT_MEMBER_SYNC") == "1"
+	if memory && syncWrites {
+		return fmt.Errorf("member memory and synchronized-disk experiments are mutually exclusive")
+	}
+	if memory {
 		db, e = store.OpenEphemeral(filepath.Join(c.DataDir, "member.db"), id)
+	} else if syncWrites {
+		db, e = store.Open(filepath.Join(c.DataDir, "member.db"), id)
 	} else {
 		db, e = store.OpenNoSync(filepath.Join(c.DataDir, "member.db"), id)
 	}
@@ -125,7 +132,7 @@ func run() (result error) {
 
 	done := make(chan error, 1)
 	go func() { done <- cfg.Serve(server) }()
-	slog.Info("member started", "listen", c.Listen, "organization", org.Org.String(), "index", c.Index, "storage_no_sync", true, "storage_memory", os.Getenv("UTXO_EXPERIMENT_MEMBER_MEMORY") == "1")
+	slog.Info("member started", "listen", c.Listen, "organization", org.Org.String(), "index", c.Index, "storage_no_sync", !syncWrites, "storage_memory", memory)
 	select {
 	case e = <-done:
 		return e

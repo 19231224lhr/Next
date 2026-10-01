@@ -410,7 +410,10 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 				balance, _, err := state.Load[uint64](v, rules.AccountKey(f.Org.Org, protocol.AssetCAL))
 				wantStatus, wantBalance := uint8(rules.DirectFulfilled), uint64(1000000000)
 				if repairFirst {
-					wantStatus, wantBalance = rules.DirectRepaired, 999999900
+					wantStatus = rules.DirectRecovered
+				}
+				if _, found, e := redaction.LoadTask(v, repairID); e != nil || found != repairFirst {
+					t.Fatalf("repair task without matching debit: found=%v err=%v", found, e)
 				}
 				if ob.Status != wantStatus || balance != wantBalance {
 					t.Fatalf("order changed accounting: status=%d balance=%d", ob.Status, balance)
@@ -527,32 +530,17 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		}
 	})
 	appendBlock(4, 1700000034, parentRaw)
-	var late state.Creation
 	err = db.View(func(v state.ReadView) error {
-		late, _, err = state.Load[state.Creation](v, rules.DirectCreationKey(output, 1))
+		_, found, err := state.Load[state.Creation](v, rules.DirectCreationKey(output, 1))
+		if found {
+			t.Fatal("source repayment created a second user output")
+		}
 		return err
 	})
-	if err != nil || !late.Final {
-		t.Fatal("late output missing")
-	}
-	body = parent.Body
-	body.Inputs = []protocol.Input{{Kind: protocol.FinalInput, Output: output, Evidence: late.Fact}}
-	body.Nonce[0] = 41
-	body.Intent = body.IntentID()
-	spendLate, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: late.Output, Instance: 1}}, pub)
 	if err != nil {
 		t.Fatal(err)
 	}
-	spendLate.Auth = []protocol.OwnerAuth{protocol.SignOwner(spendLate.ID(), f.Owner)}
-	lc, err := f.DirectCertificate(spendLate, policy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lateRaw, err := (protocol.DirectPayment{Tx: spendLate, Certificate: lc}).Submission().MarshalBinary()
-	if err != nil {
-		t.Fatal(err)
-	}
-	appendBlock(5, 1700000035, lateRaw)
+	appendBlock(5, 1700000035, parentRaw) // Exact source replay cannot repay twice.
 	if !reflect.DeepEqual(beforeRepairPayments, protectedPayments()) {
 		t.Fatal("late source changed previously delivered descendant outputs")
 	}
@@ -592,12 +580,12 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	for _, storage := range []appstore.Store{db, replayDB} {
 		if err = storage.View(func(v state.ReadView) error {
 			balance, _, err := state.Load[uint64](v, rules.AccountKey(f.Org.Org, protocol.AssetCAL))
-			if balance != 999999900 {
-				t.Fatalf("wrong reserve debit %d", balance)
+			if balance != 1000000000 {
+				t.Fatalf("wrong net reserve balance after repayment %d", balance)
 			}
 			credit, _, err := state.Load[struct{ Credit rules.CoverageBalance }](v, state.Key(100, pc.QC.Fact[:]))
-			if credit.Credit.Paid != 100 || credit.Credit.Discharged != 0 {
-				t.Fatal("late parent returned spent budget")
+			if credit.Credit.Paid != 100 || credit.Credit.Recovered != 100 || credit.Credit.Discharged != 0 {
+				t.Fatal("late parent did not reconcile gross loss and recovery")
 			}
 			return err
 		}); err != nil {

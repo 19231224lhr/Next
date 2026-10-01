@@ -237,9 +237,9 @@ func liabilityDirect(args []string) (err error) {
 		}
 		id = h.Output
 	}
-	observe := func(i int, instance uint8) error {
+	observe := func(i int, recovered bool) error {
 		for {
-			ok, e := wallets[(i+1)%3].DirectFinal(report.Hops[i].Output, instance)
+			ok, e := sourceObserved(wallets[(i+1)%3], report.Hops[i].Output, recovered)
 			if e != nil {
 				return e
 			}
@@ -278,10 +278,10 @@ func liabilityDirect(args []string) (err error) {
 		return nil
 	}
 	// T2 becomes final while the older transactions remain unpublished.
-	if err = observe(2, 0); err != nil {
+	if err = observe(2, false); err != nil {
 		return err
 	}
-	publish := func(i int, instance uint8) error {
+	publish := func(i int, recovered bool) error {
 		if e := budgetRelease(ctx, time.Now(), func(c context.Context) error { return public.Submit(c, raw[i]) }, func() {}); e != nil {
 			return e
 		}
@@ -293,7 +293,7 @@ func liabilityDirect(args []string) (err error) {
 				_ = public.Submit(retryCtx, raw[i])
 			}
 		}()
-		e := observe(i, instance)
+		e := observe(i, recovered)
 		stop()
 		<-done
 		return e
@@ -302,13 +302,13 @@ func liabilityDirect(args []string) (err error) {
 		if err = obligation(report.Hops[1].Output, n.Organizations[1].Org, rules.DirectOpen); err != nil {
 			return err
 		}
-		if err = publish(1, 0); err != nil {
+		if err = publish(1, false); err != nil {
 			return err
 		}
 		if err = obligation(report.Hops[1].Output, n.Organizations[1].Org, rules.DirectFulfilled); err != nil {
 			return err
 		}
-	} else if err = observe(1, 0); err != nil {
+	} else if err = observe(1, false); err != nil {
 		return err
 	}
 	if err = obligation(report.Hops[0].Output, n.Organizations[0].Org, rules.DirectOpen); err != nil {
@@ -322,7 +322,7 @@ func liabilityDirect(args []string) (err error) {
 	}
 	if *mode == "cross" {
 		report.ParentPublished = true
-		if err = publish(0, 1); err != nil {
+		if err = publish(0, true); err != nil {
 			return err
 		}
 	} else if err = budgetPause(ctx, 3*time.Second); err != nil {
@@ -334,12 +334,12 @@ func liabilityDirect(args []string) (err error) {
 		if i == 0 && *mode == "missing" {
 			continue
 		}
-		var instance uint8
+		var recovered bool
 		if i == 0 {
-			instance = 1
+			recovered = true
 		}
 		h := report.Hops[i]
-		if err = observeChainHop(ctx, batches[orgIndex[i]], wallets[(i+1)%3], &h, start, make(chan struct{}), instance); err != nil {
+		if err = observeChainHop(ctx, batches[orgIndex[i]], wallets[(i+1)%3], &h, start, make(chan struct{}), recovered); err != nil {
 			return err
 		}
 		report.Hops[i].MemberClosedUnixNS = h.MemberClosedUnixNS
@@ -389,7 +389,7 @@ func auditLiability(dir string, lab cfg.Lab, n cfg.Network) error {
 				}
 				out.CAL[i] = balance
 				want := uint64(60000)
-				if i == 0 {
+				if i == 0 && r.Mode == "missing" {
 					want -= 100
 				}
 				if balance != want {
@@ -420,7 +420,11 @@ func auditLiability(dir string, lab cfg.Lab, n cfg.Network) error {
 			if e != nil {
 				return e
 			}
-			if !found || ob.Status != rules.DirectRepaired || ob.Issuer != n.Organizations[0].Org {
+			want := uint8(rules.DirectRepaired)
+			if r.Mode == "cross" {
+				want = rules.DirectRecovered
+			}
+			if !found || ob.Status != want || ob.Issuer != n.Organizations[0].Org {
 				return fmt.Errorf("lost paid liability")
 			}
 			if r.Mode == "cross" {

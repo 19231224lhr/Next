@@ -23,10 +23,10 @@ type DebitTotal struct {
 	Charged, Released, NetSpent uint64
 }
 type Detail struct {
-	Approvals, Settled, Closed, Payments, Open, Fulfilled, Repaired uint64
-	OldestDeadline                                                  int64
-	Debits                                                          []DebitTotal `json:",omitempty"`
-	Fee                                                             rules.Escrow
+	Approvals, Settled, Closed, Payments, Open, Fulfilled, Repaired, Recovered uint64
+	OldestDeadline                                                             int64
+	Debits                                                                     []DebitTotal `json:",omitempty"`
+	Fee                                                                        rules.Escrow
 }
 type Snapshot struct {
 	UnixNS    int64
@@ -133,7 +133,11 @@ func Read(db store.Store, grants []state.Grant, org protocol.Hash, workers uint3
 					t.Charged += d.Cap
 					t.Released += applied[i]
 					if d.Key.Kind == protocol.ResourceCAL {
-						t.NetSpent += p.Paid
+						net, err := protocol.Sub(p.Paid, p.Recovered)
+						if err != nil {
+							return err
+						}
+						t.NetSpent += net
 					}
 					if d.Key.Kind == protocol.ResourceFUEL || d.Key.Kind == protocol.ResourcePolicy {
 						t.NetSpent += p.Fee.Rewards + p.Fee.Burned
@@ -167,6 +171,8 @@ func Read(db store.Store, grants []state.Grant, org protocol.Hash, workers uint3
 				s.Detail.Fulfilled++
 			case rules.DirectRepaired:
 				s.Detail.Repaired++
+			case rules.DirectRecovered:
+				s.Detail.Recovered++
 			}
 			return nil
 		})

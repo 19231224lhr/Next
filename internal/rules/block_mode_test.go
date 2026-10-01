@@ -13,7 +13,7 @@ func TestBlockSettlementProducesNoPrivateReceipts(t *testing.T) {
 		t.Fatalf("normal settlement still manufactures %d proof facts", len(tr.Facts))
 	}
 	result, err := protocol.DecodeExecution(tr.Data)
-	if err != nil || !result.Applied || len(result.MissingInputs) != 0 || len(result.LateOutputs) != 0 {
+	if err != nil || !result.Applied || len(result.MissingInputs) != 0 || len(result.RecoveredOutputs) != 0 {
 		t.Fatalf("wrong execution outcome: %+v %v", result, err)
 	}
 	if len(f.settle(t, p, 101).Data) != 0 {

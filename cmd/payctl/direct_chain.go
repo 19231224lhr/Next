@@ -55,7 +55,7 @@ type chainReport struct {
 // precedence over a retained certificate; no ancestor bundle is manufactured.
 func chainInput(id protocol.OutputID, coin wallet.DirectCoin) (protocol.Input, []protocol.InputCertificate, error) {
 	in := protocol.Input{Output: id}
-	if coin.Instance != 0 {
+	if coin.Instance != 0 || coin.Recovered {
 		return in, nil, protocol.ErrRule
 	}
 	if coin.Final != (protocol.Hash{}) {
@@ -462,15 +462,12 @@ func submitChain(ctx context.Context, client *http.Client, url string, raw []byt
 	}
 }
 
-func observeChainHop(ctx context.Context, batches [4]*progressBatcher, w *wallet.Wallet, h *chainHop, start time.Time, finalReady chan<- struct{}, instance ...uint8) error {
-	var outputInstance uint8
-	if len(instance) > 0 {
-		outputInstance = instance[0]
-	}
+func observeChainHop(ctx context.Context, batches [4]*progressBatcher, w *wallet.Wallet, h *chainHop, start time.Time, finalReady chan<- struct{}, recovered ...bool) error {
+	expectRecovery := len(recovered) > 0 && recovered[0]
 	tick := time.NewTicker(5 * time.Millisecond)
 	defer tick.Stop()
 	for {
-		ok, err := w.DirectFinal(h.Output, outputInstance)
+		ok, err := sourceObserved(w, h.Output, expectRecovery)
 		if err != nil {
 			return err
 		}
@@ -516,6 +513,13 @@ func observeChainHop(ctx context.Context, batches [4]*progressBatcher, w *wallet
 		case <-time.After(25 * time.Millisecond):
 		}
 	}
+}
+
+func sourceObserved(w *wallet.Wallet, id protocol.OutputID, recovered bool) (bool, error) {
+	if recovered {
+		return w.DirectRecovered(id)
+	}
+	return w.DirectFinal(id, 0)
 }
 
 func auditChain(dir string, lab cfg.Lab) error {

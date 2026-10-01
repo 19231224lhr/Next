@@ -25,7 +25,7 @@ func (p DirectPolicy) Rules() protocol.RuleIDs {
 	e.Fixed(r.Accounting[:])
 	e.U64(uint64(p.TimeoutSeconds))
 	e.U64(p.RepairCost)
-	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V4_OWNER_FUEL", e.Data())
+	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V4_SOURCE_RECOVERY", e.Data())
 	return r
 }
 
@@ -51,6 +51,7 @@ const (
 	DirectOpen uint8 = iota
 	DirectFulfilled
 	DirectRepaired
+	DirectRecovered
 )
 
 func DirectCreationKey(id protocol.OutputID, instance uint8) []byte {
@@ -90,7 +91,7 @@ type directPromise struct {
 	Index       uint32
 	Status      uint8
 }
-type CoverageBalance struct{ Original, Paid, Discharged, Remaining, Revision uint64 }
+type CoverageBalance struct{ Original, Paid, Recovered, Discharged, Remaining, Revision uint64 }
 
 type directCoverage struct {
 	Summary protocol.OutputSummary
@@ -720,13 +721,16 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 		if err != nil {
 			return state.Transition{}, err
 		}
-		instance := uint8(0)
 		if exists {
-			if ob.Certificate != fact || ob.Amount != out.Amount {
+			if ob.Certificate != fact || ob.Amount != out.Amount || ob.Issuer != summary.Issuer {
 				return state.Transition{}, protocol.ErrAuth
 			}
 			if ob.Status == DirectRepaired {
-				instance = 1
+				if err = e.recoverOutput(&ob); err != nil {
+					return state.Transition{}, err
+				}
+				e.resultData.RecoveredOutputs = append(e.resultData.RecoveredOutputs, uint32(i))
+				continue // The payer is subrogated; no second user-owned output.
 			} else if ob.Status == DirectOpen {
 				if err = e.endObligation(&ob, false); err != nil {
 					return state.Transition{}, err
@@ -742,11 +746,8 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 				return state.Transition{}, err
 			}
 		}
-		if instance == 1 {
-			e.resultData.LateOutputs = append(e.resultData.LateOutputs, uint32(i))
-		}
-		created := protocol.CreationIdentity(t.Network, tx.ID(), uint32(i), instance)
-		if err = state.Put(e.o, DirectCreationKey(id, instance), state.Creation{Output: out, Fact: created, Source: protocol.Hash(fact), Final: true}); err != nil {
+		created := protocol.CreationIdentity(t.Network, tx.ID(), uint32(i), 0)
+		if err = state.Put(e.o, DirectCreationKey(id, 0), state.Creation{Output: out, Fact: created, Source: protocol.Hash(fact), Final: true}); err != nil {
 			return state.Transition{}, err
 		}
 

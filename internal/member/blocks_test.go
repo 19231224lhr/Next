@@ -480,7 +480,8 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 			if scenario.lateObserver {
 				// The observer had no approval when the repair was followed.
 				// It releases its own later debit; the original signer below
-				// retains the paid amount. The coverage proof therefore uses
+				// also recovers its paid amount from actual source repayment.
+				// Before repayment, the coverage proof therefore uses
 				// an early witness QC, not every eventual signature.
 				after, err := observer.Quota(f.Genesis.Grants[0].Key, 0)
 				if err != nil || after.Reserved != 0 {
@@ -535,9 +536,6 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				t.Fatal(err)
 			}
 			expected := uint64(0)
-			if repair {
-				expected = parent.Body.Outputs[0].Amount
-			}
 			if cal.Reserved != expected {
 				t.Fatalf("CAL residual=%d expected=%d", cal.Reserved, expected)
 			}
@@ -559,16 +557,30 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 			}); err != nil {
 				t.Fatal(err)
 			}
-			instance := uint8(0)
 			if repair {
-				instance = 1
-			}
-			if ok, err := w.DirectFinal(pc.Summary.OutputID(0), instance); err != nil || !ok {
-				t.Fatal("wrong source output instance", err)
+				if ok, err := w.DirectRecovered(pc.Summary.OutputID(0)); err != nil || !ok {
+					t.Fatal("wallet missed reserve recovery", err)
+				}
+				if ok, err := w.DirectFinal(pc.Summary.OutputID(0), 1); err != nil || ok {
+					t.Fatal("wallet gained a second user output", err)
+				}
+			} else if ok, err := w.DirectFinal(pc.Summary.OutputID(0), 0); err != nil || !ok {
+				t.Fatal("source output not final", err)
 			}
 			// A fast certificate arriving after its block must not overwrite finality.
 			if err = w.ReceiveDirect(parent.Body.Outputs[0], pc, 0); err != nil {
 				t.Fatal(err)
+			}
+			if repair {
+				if ok, err := w.DirectRecovered(pc.Summary.OutputID(0)); err != nil || !ok {
+					t.Fatal("late certificate revived recovered output", err)
+				}
+				if ok, err := w.DirectFinal(pc.Summary.OutputID(0), 0); err != nil || ok {
+					t.Fatal("recovered output became final", err)
+				}
+				if err := w.SaveDirectRequest(protocol.DirectRequest{Tx: child, InputCertificates: cp.InputCertificates}); err == nil {
+					t.Fatal("wallet authorized spending recovered output")
+				}
 			}
 			err = db.View(func(v state.ReadView) error {
 				for fact, original := range approved {

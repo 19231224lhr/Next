@@ -10,18 +10,19 @@ import (
 
 // LocalProgress contains only this member's own signed obligations and fee plan.
 type LocalProgress struct {
-	Settled bool
-	Pending uint32
-	Paid    uint64
-	Fee     rules.Escrow
-	Height  int64
+	Settled   bool
+	Pending   uint32
+	Paid      uint64
+	Recovered uint64
+	Fee       rules.Escrow
+	Height    int64
 	// Positional entries bind to the immutable Approval.Debits (resource,
 	// grant version, worker and cap). Only this record changes during settlement.
 	Applied []uint64 `json:",omitempty"`
 }
 
 // DirectStoreSchema prevents old member binaries from ignoring split credits.
-const DirectStoreSchema uint64 = 5
+const DirectStoreSchema uint64 = 6
 
 func localApplied(a state.Approval, p LocalProgress) ([]uint64, error) {
 	values := p.Applied
@@ -76,8 +77,11 @@ func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgre
 		d := &a.Debits[i]
 		target := uint64(0)
 		if d.Key.Kind == protocol.ResourceCAL && p.Settled {
-			var err error
-			target, err = protocol.Sub(d.Cap, p.Paid)
+			net, err := protocol.Sub(p.Paid, p.Recovered)
+			if err != nil {
+				return err
+			}
+			target, err = protocol.Sub(d.Cap, net)
 			if err != nil {
 				return err
 			}
@@ -280,6 +284,19 @@ func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, r
 	if tx.Body.Network != m.cfg.Organization.Network {
 		return protocol.ErrAuth
 	}
+	recovered := make(map[uint32]bool, len(result.RecoveredOutputs))
+	var returned uint64
+	for _, i := range result.RecoveredOutputs {
+		if int(i) >= len(tx.Body.Outputs) || recovered[i] {
+			return protocol.ErrRule
+		}
+		recovered[i] = true
+		var err error
+		returned, err = protocol.Add(returned, tx.Body.Outputs[i].Amount)
+		if err != nil {
+			return err
+		}
+	}
 	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
 	if err != nil {
 		return err
@@ -292,6 +309,12 @@ func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, r
 		if p.Settled {
 			return rules.ErrConflict
 		}
+		if p.Paid > returned {
+			return rules.ErrAccounting
+		}
+		// A signer joining after compensation never occupied the earlier paid
+		// amount. Restore only its own recorded loss, not another member's.
+		p.Recovered = p.Paid
 		p.Settled = true
 		p.Height = height
 		p.Pending = uint32(len(result.MissingInputs))
@@ -335,27 +358,16 @@ func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, r
 			}
 		}
 	}
-	late := make(map[uint32]bool, len(result.LateOutputs))
-	for _, i := range result.LateOutputs {
-		if int(i) >= len(tx.Body.Outputs) {
-			return protocol.ErrRule
-		}
-		late[i] = true
-	}
 	for i, out := range tx.Body.Outputs {
 		id := pay.Summary().OutputID(uint32(i))
 		if err = m.resolveLocal(o, id, false); err != nil {
 			return err
 		}
-		if out.Recipient.Route.Org != m.cfg.Organization.Org {
+		if recovered[uint32(i)] || out.Recipient.Route.Org != m.cfg.Organization.Org {
 			continue
 		}
-		instance := uint8(0)
-		if late[uint32(i)] {
-			instance = 1
-		}
-		creation := state.Creation{Output: out, Fact: protocol.CreationIdentity(tx.Body.Network, tx.ID(), uint32(i), instance), Source: protocol.Hash(fact), Final: true}
-		if err = state.Put(o, rules.DirectCreationKey(id, instance), creation); err != nil {
+		creation := state.Creation{Output: out, Fact: protocol.CreationIdentity(tx.Body.Network, tx.ID(), uint32(i), 0), Source: protocol.Hash(fact), Final: true}
+		if err = state.Put(o, rules.DirectCreationKey(id, 0), creation); err != nil {
 			return err
 		}
 	}

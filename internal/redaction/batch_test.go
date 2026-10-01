@@ -78,12 +78,13 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 		t.Fatal(err)
 	}
 	var parents []protocol.OutputCertificate
+	var parentCommands [][]byte
 	var inputs []protocol.Input
 	var claims []protocol.InputClaim
 	var certs []protocol.InputCertificate
 	var body protocol.TxBody
 	for i := 0; i < count; i++ {
-		tx, e := f.FastTransaction(i, 1, policy)
+		tx, e := f.FastTransaction(i, uint64(i+1), policy)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -92,6 +93,11 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 			t.Fatal(e)
 		}
 		parents = append(parents, cert)
+		parentRaw, e := (protocol.DirectPayment{Tx: tx, Certificate: cert}).Submission().MarshalBinary()
+		if e != nil {
+			t.Fatal(e)
+		}
+		parentCommands = append(parentCommands, parentRaw)
 		inputs = append(inputs, protocol.Input{Kind: protocol.CertificateInput, Output: cert.Summary.OutputID(0), Evidence: protocol.Hash(cert.QC.Fact)})
 		claims = append(claims, protocol.InputClaim{Output: tx.Body.Outputs[0]})
 		certs = append(certs, protocol.InputCertificate{Certificate: cert, Index: 0})
@@ -339,6 +345,92 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 		t.Fatal(err)
 	}
 	batchBuildDuration := time.Since(batchStarted)
+	// A revision may follow a batch through either entry point. The persisted
+	// revision header must remain readable without installing intermediate bodies.
+	if count == 2 {
+		for _, secondBatch := range []bool{false, true} {
+			t.Run(fmt.Sprintf("batch_then_batch_%v", secondBatch), func(t *testing.T) {
+				err := db.View(func(v state.ReadView) error {
+					o := state.NewOverlay(v)
+					var firstID protocol.Hash
+					for i, parent := range parents {
+						output := parent.Summary.OutputID(0)
+						single, pay, e := redaction.InputTarget(o, blocks, policy, output, 1700000032)
+						if e != nil {
+							return e
+						}
+						var shares []chameleon.Contribution
+						for _, signer := range signers[:3] {
+							share, e := redaction.InputShare(o, blocks, policy, signer, output, 1700000032)
+							if e != nil {
+								return e
+							}
+							shares = append(shares, share)
+						}
+						single, e = redaction.ReplaceInput(policy, single, pay, shares)
+						if e != nil {
+							return e
+						}
+						if i == 0 || secondBatch {
+							batch, e := redaction.BuildBatch(o, blocks, policy, []protocol.RepairInput{single}, 1700000032)
+							if e != nil {
+								return e
+							}
+							var votes [][]chameleon.Contribution
+							for _, signer := range signers[:3] {
+								vote, e := redaction.BatchPartShares(o, blocks, policy, signer, batch, 1700000032)
+								if e != nil {
+									return e
+								}
+								votes = append(votes, vote)
+							}
+							batch, e = redaction.CompleteBatchParts(o, blocks, policy, batch, 1700000032, votes)
+							if e != nil {
+								return e
+							}
+							tr, e := redaction.ExecuteBatch(o, blocks, policy, batch, 3, 1700000032)
+							if e != nil {
+								return e
+							}
+							o.Apply(tr.Changes)
+							if i == 0 {
+								firstID = batch.ID()
+							}
+						} else {
+							var votes [][]chameleon.Contribution
+							for _, signer := range signers[:3] {
+								vote, e := redaction.PartShares(o, blocks, policy, signer, single, 1700000032)
+								if e != nil {
+									return e
+								}
+								votes = append(votes, vote)
+							}
+							single, e = redaction.CompleteParts(o, blocks, policy, single, 1700000032, votes)
+							if e != nil {
+								return e
+							}
+							tr, e := redaction.Execute(o, blocks, policy, single, 3, 1700000032)
+							if e != nil {
+								return e
+							}
+							o.Apply(tr.Changes)
+						}
+					}
+					_, revision, e := redaction.Canonical(o, blocks, 1)
+					if e != nil || revision.Number != 2 {
+						return fmt.Errorf("revision %d: %w", revision.Number, e)
+					}
+					// Preparing the first task must jump directly to the second
+					// revision and validate its latest Next and Parts fields.
+					_, e = redaction.PrepareMaterialization(o, firstID)
+					return e
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
+	}
 	raw, err = c.MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
@@ -351,6 +443,20 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 	}
 	err = db.View(func(v state.ReadView) error {
 		limited := state.NewOverlay(v)
+		// Use real source execution, not a hand-edited terminal flag. A source
+		// fulfilled earlier at this height makes the whole fixed batch stale.
+		parentFirst := state.NewOverlay(v)
+		pt, e := engine.ExecuteAt(parentFirst, parentCommands[0], apppkg.BlockContext{Height: 3, Time: time.Unix(1700000032, 0)})
+		if e != nil {
+			return e
+		}
+		parentFirst.Apply(pt.Changes)
+		if tr, e := redaction.ExecuteBatch(parentFirst, blocks, policy, c, 3, 1700000032); e == nil || len(tr.Changes) != 0 || len(tr.Data) != 0 {
+			t.Fatal("batch after source execution leaked effects")
+		}
+		if _, exists, e := redaction.LoadTask(parentFirst, c.ID()); e != nil || exists {
+			t.Fatal("rejected batch published task", e)
+		}
 		if e := state.Put(limited, rules.AccountKey(f.Org.Org, protocol.AssetCAL), body.Outputs[0].Amount-1); e != nil {
 			return e
 		}
@@ -501,6 +607,25 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 			t.Fatal("closed item regrouped")
 		}
 		t.Logf("COST items=%d single_commands=%d batch_commands=1 single_bytes=%d batch_bytes=%d single_part_adaptations=%d batch_part_adaptations=%d single_ms=%.3f batch_ms=%.3f", count, count, sequentialBytes, len(raw), sequentialParts, batchParts, float64(sequentialDuration.Microseconds())/1000, float64(batchDuration.Microseconds())/1000)
+		// Conversely, successful batch compensation followed by all sources
+		// recovers exactly those debits and never creates a second user coin.
+		for _, source := range parentCommands {
+			pt, e := engine.ExecuteAt(applied, source, apppkg.BlockContext{Height: 3, Time: time.Unix(1700000032, 0)})
+			if e != nil {
+				return e
+			}
+			applied.Apply(pt.Changes)
+		}
+		balance, _, e := state.Load[uint64](applied, rules.AccountKey(f.Org.Org, protocol.AssetCAL))
+		if e != nil || balance != 1000000000 {
+			t.Fatal("batch recovery balance", balance, e)
+		}
+		for _, parent := range parents {
+			ob, _, e := state.Load[rules.DirectObligation](applied, rules.DirectObligationKey(parent.Summary.OutputID(0)))
+			if e != nil || ob.Status != rules.DirectRecovered {
+				t.Fatal("batch source not recovered", ob.Status, e)
+			}
+		}
 		return nil
 	})
 	if err != nil {
