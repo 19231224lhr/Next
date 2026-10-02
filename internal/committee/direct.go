@@ -71,7 +71,7 @@ func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.
 	if protocol.IsClockTick(raw, e.cfg.Network) {
 		return state.Transition{}, nil
 	}
-	if protocol.IsRepairInput(raw) || protocol.IsRepairBatch(raw) {
+	if protocol.IsRepairInput(raw) || protocol.IsRepairBatch(raw) || protocol.IsCompensationDecision(raw) {
 		if e.repairExecute == nil {
 			return state.Transition{}, protocol.ErrUnsupported
 		}

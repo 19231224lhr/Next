@@ -106,6 +106,9 @@ type Approval struct {
 	Effects   protocol.CertifiedEffects
 	Debits    []Debit
 	Parents   [][]byte
+	// DirectParents retains the validated witnesses needed to reconstruct a
+	// direct request if its QC is later exposed by a public successor.
+	DirectParents []protocol.InputCertificate `json:",omitempty"`
 }
 type Outbox struct {
 	Fact                 protocol.SpendFactID

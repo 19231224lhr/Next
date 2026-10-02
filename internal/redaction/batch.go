@@ -98,13 +98,6 @@ func BuildBatch(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy,
 		a, b := c.Items[i], c.Items[j]
 		return a.Transaction < b.Transaction || (a.Transaction == b.Transaction && a.Input < b.Input)
 	})
-	outputs := make([]protocol.OutputID, len(c.Items))
-	for i, item := range c.Items {
-		outputs[i] = item.Output
-	}
-	if err := preflightRepairs(v, p, outputs, now); err != nil {
-		return c, err
-	}
 	_, body, err := batchBody(v, bs, p, c, now)
 	if err != nil {
 		return c, err
@@ -179,13 +172,6 @@ func BatchPartShares(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPo
 	if _, err := c.MarshalBinary(); err != nil {
 		return nil, err
 	}
-	outputs := make([]protocol.OutputID, len(c.Items))
-	for i, item := range c.Items {
-		outputs[i] = item.Output
-	}
-	if err := preflightRepairs(v, p, outputs, now); err != nil {
-		return nil, err
-	}
 	requests, _, _, err := BatchPartRequests(v, bs, p, c, now)
 	if err != nil {
 		return nil, err
@@ -220,7 +206,7 @@ func ExecuteBatch(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolic
 	if _, found, err := state.Load[BatchTask](v, BatchTaskKey(id)); err != nil {
 		return state.Transition{}, err
 	} else if found {
-		raw, e := (protocol.RepairBatchResult{Batch: id}).MarshalBinary()
+		raw, e := (protocol.RepairResult{Command: id}).MarshalBinary()
 		return state.Transition{Data: raw}, e
 	}
 	if c.Height >= height {
@@ -242,38 +228,13 @@ func ExecuteBatch(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolic
 		return state.Transition{}, protocol.ErrAuth
 	}
 	o := state.NewOverlay(v)
-	result := protocol.RepairBatchResult{Batch: id, Applied: true}
+	result := protocol.RepairResult{Command: id, Applied: true}
 	for i, x := range c.Items {
-		ob, found, err := state.Load[rules.DirectObligation](o, rules.DirectObligationKey(x.Output))
-		if err != nil {
-			return state.Transition{}, err
-		}
-		if !found || ob.Status != rules.DirectOpen {
-			return state.Transition{}, rules.ErrConflict
-		}
-		tr, err := rules.EvaluateDirectCompensation(o, x.Output, p, now)
-		if err != nil {
-			return state.Transition{}, err
-		}
-		one, err := protocol.DecodeExecution(tr.Data)
-		if err != nil {
-			return state.Transition{}, err
-		}
-		if !one.Applied {
-			return state.Transition{}, rules.ErrConflict
-		}
-		o.Apply(tr.Changes)
-		result.Effects = append(result.Effects, protocol.RepairEffect{Output: x.Output, ParentFact: ob.Certificate, ConsumerFact: ob.Consumer, ConsumerTx: ob.Transaction, Input: ob.Input, Amount: ob.Amount, Debit: protocol.ReserveDebitIdentity(c.Network, x.Output)})
-		result.FeeOutputs = append(result.FeeOutputs, one.FeeOutputs...)
+		o.Apply([]state.Change{{Key: DecisionPendingKey(c.Height, x.Output), Delete: true}})
 		if err = state.Put(o, batchReferenceKey(protocol.RepairIdentity(c.Network, x.Output)), batchReference{Batch: id, Index: uint32(i)}); err != nil {
 			return state.Transition{}, err
 		}
 	}
-	sort.Slice(result.FeeOutputs, func(i, j int) bool {
-		a, b := result.FeeOutputs[i], result.FeeOutputs[j]
-		n := bytes.Compare(a.Transaction[:], b.Transaction[:])
-		return n < 0 || (n == 0 && a.Index < b.Index)
-	})
 	raw, err := result.MarshalBinary()
 	if err != nil {
 		return state.Transition{}, err

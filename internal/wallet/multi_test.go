@@ -23,12 +23,17 @@ func TestMultiOwnerFeeBlockAndBinding(t *testing.T) {
 		}
 		f := protocol.FeeOutput{Transaction: protocol.TxID(protocol.Digest("tx", []byte{i})), Index: protocol.FeeRefundIndex, Output: protocol.Output{Asset: protocol.AssetFUEL, Amount: 906, Recipient: d}}
 		fees = append(fees, f)
-		raw, e := (protocol.ExecutionResult{Applied: true, FeeOutputs: []protocol.FeeOutput{f}}).MarshalBinary()
+		c := protocol.CompensationDecision{Network: network, Output: protocol.OutputID{i}, Height: 1}
+		command, e := c.MarshalBinary()
 		if e != nil {
 			t.Fatal(e)
 		}
-		// A repair command has no ordinary payment outputs, but may release fees.
-		entries = append(entries, finality.ExecutedTx{Bytes: []byte("REPAIR3\x00"), Data: raw})
+		effect := protocol.RepairEffect{Output: c.Output, ParentFact: protocol.SpendFactID{1}, ConsumerFact: protocol.SpendFactID{2}, ConsumerTx: protocol.TxID{3}, Amount: 100, Debit: protocol.ReserveDebitIdentity(network, c.Output)}
+		raw, e := (protocol.CompensationResult{Decision: c.ID(), Applied: true, Effects: []protocol.RepairEffect{effect}, FeeOutputs: []protocol.FeeOutput{f}}).MarshalBinary()
+		if e != nil {
+			t.Fatal(e)
+		}
+		entries = append(entries, finality.ExecutedTx{Bytes: command, Data: raw})
 	}
 	// Test parsed fee effects separately from block proof construction.
 	coins, e := collectBlockCoins(network, owners, entries)

@@ -1,0 +1,57 @@
+=== RUN   TestAtomicRepairBatchTwoInputs
+=== RUN   TestAtomicRepairBatchTwoInputs/honest_quorum_empty
+=== RUN   TestAtomicRepairBatchTwoInputs/honest_quorum_duplicate
+=== RUN   TestAtomicRepairBatchTwoInputs/honest_quorum_short
+=== RUN   TestAtomicRepairBatchTwoInputs/paid_batch_needs_no_second_balance
+=== RUN   TestAtomicRepairBatchTwoInputs/batch_then_batch_false
+=== RUN   TestAtomicRepairBatchTwoInputs/batch_then_batch_true
+=== NAME  TestAtomicRepairBatchTwoInputs
+    batch_test.go:627: COST items=2 single_commands=2 batch_commands=1 single_bytes=10978 batch_bytes=976 single_part_adaptations=2 batch_part_adaptations=1 single_ms=44.039 batch_ms=40.889
+--- PASS: TestAtomicRepairBatchTwoInputs (0.29s)
+    --- PASS: TestAtomicRepairBatchTwoInputs/honest_quorum_empty (0.00s)
+    --- PASS: TestAtomicRepairBatchTwoInputs/honest_quorum_duplicate (0.00s)
+    --- PASS: TestAtomicRepairBatchTwoInputs/honest_quorum_short (0.00s)
+    --- PASS: TestAtomicRepairBatchTwoInputs/paid_batch_needs_no_second_balance (0.01s)
+    --- PASS: TestAtomicRepairBatchTwoInputs/batch_then_batch_false (0.04s)
+    --- PASS: TestAtomicRepairBatchTwoInputs/batch_then_batch_true (0.04s)
+=== RUN   TestRepairBatchCost
+=== RUN   TestRepairBatchCost/same_block_1
+    batch_test.go:627: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=21.086 batch_ms=18.369
+=== RUN   TestRepairBatchCost/same_block_4
+    batch_test.go:627: COST items=4 single_commands=4 batch_commands=1 single_bytes=35860 batch_bytes=1568 single_part_adaptations=4 batch_part_adaptations=1 single_ms=102.618 batch_ms=54.178
+=== RUN   TestRepairBatchCost/same_block_8
+    batch_test.go:627: COST items=8 single_commands=8 batch_commands=1 single_bytes=127336 batch_bytes=2752 single_part_adaptations=8 batch_part_adaptations=1 single_ms=196.527 batch_ms=105.070
+=== RUN   TestRepairBatchCost/separate_blocks_8
+    batch_test.go:627: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=18.564 batch_ms=19.499
+    batch_test.go:627: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=19.225 batch_ms=23.800
+    batch_test.go:627: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=18.048 batch_ms=20.613
+    batch_test.go:627: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=19.674 batch_ms=21.578
+    batch_test.go:627: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=21.086 batch_ms=20.583
+    batch_test.go:627: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=18.036 batch_ms=17.060
+    batch_test.go:627: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=17.543 batch_ms=20.075
+    batch_test.go:627: COST items=1 single_commands=1 batch_commands=1 single_bytes=3751 batch_bytes=680 single_part_adaptations=1 batch_part_adaptations=1 single_ms=19.576 batch_ms=19.249
+--- PASS: TestRepairBatchCost (1.70s)
+    --- PASS: TestRepairBatchCost/same_block_1 (0.05s)
+    --- PASS: TestRepairBatchCost/same_block_4 (0.41s)
+    --- PASS: TestRepairBatchCost/same_block_8 (0.81s)
+    --- PASS: TestRepairBatchCost/separate_blocks_8 (0.42s)
+=== RUN   TestRepairBatchAcrossParts
+=== RUN   TestRepairBatchAcrossParts/honest_quorum_empty
+=== RUN   TestRepairBatchAcrossParts/honest_quorum_duplicate
+=== RUN   TestRepairBatchAcrossParts/honest_quorum_short
+=== RUN   TestRepairBatchAcrossParts/paid_batch_needs_no_second_balance
+=== RUN   TestRepairBatchAcrossParts/bad_second_part_does_not_publish_partial_result
+=== RUN   TestRepairBatchAcrossParts/batch_then_batch_false
+=== RUN   TestRepairBatchAcrossParts/batch_then_batch_true
+=== NAME  TestRepairBatchAcrossParts
+    batch_test.go:627: COST items=2 single_commands=2 batch_commands=1 single_bytes=11490 batch_bytes=1232 single_part_adaptations=3 batch_part_adaptations=2 single_ms=98.765 batch_ms=145.600
+--- PASS: TestRepairBatchAcrossParts (0.66s)
+    --- PASS: TestRepairBatchAcrossParts/honest_quorum_empty (0.01s)
+    --- PASS: TestRepairBatchAcrossParts/honest_quorum_duplicate (0.01s)
+    --- PASS: TestRepairBatchAcrossParts/honest_quorum_short (0.01s)
+    --- PASS: TestRepairBatchAcrossParts/paid_batch_needs_no_second_balance (0.02s)
+    --- PASS: TestRepairBatchAcrossParts/bad_second_part_does_not_publish_partial_result (0.03s)
+    --- PASS: TestRepairBatchAcrossParts/batch_then_batch_false (0.08s)
+    --- PASS: TestRepairBatchAcrossParts/batch_then_batch_true (0.08s)
+PASS
+ok  	utxo/internal/redaction	2.794s

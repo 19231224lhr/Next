@@ -71,9 +71,17 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 		}
 		return info.LastBlockHeight, meta.Header.Time.Unix()
 	}
+	// Fault injection affects adaptation only; the decision worker stays active.
+	pauseFile := os.Getenv("UTXO_EXPERIMENT_ADAPTATION_PAUSE_FILE")
 	slots := make(chan struct{}, 2)
 	handler := func(mode int) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
+			if pauseFile != "" {
+				if _, err := os.Stat(pauseFile); err == nil {
+					http.Error(w, "ADAPTATION_PAUSED", http.StatusServiceUnavailable)
+					return
+				}
+			}
 			select {
 			case slots <- struct{}{}:
 				defer func() { <-slots }()
@@ -216,6 +224,8 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 			return 0, err
 		},
 	}
+	decisionDone := make(chan struct{})
+	go func() { defer close(decisionDone); worker.runDecisions(ctx) }()
 	workerDone := make(chan struct{})
 	go func() { defer close(workerDone); worker.run(ctx) }()
 	done := make(chan struct{})
@@ -271,5 +281,5 @@ func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, 
 			}
 		}
 	}()
-	return func() { cancel(); <-done; <-workerDone }, nil
+	return func() { cancel(); <-done; <-workerDone; <-decisionDone }, nil
 }

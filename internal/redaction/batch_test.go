@@ -142,7 +142,9 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 	paymentIndex := 0
 	var roots [][]byte
 	last := &types.Commit{}
+	heightOffset := int64(0)
 	appendBlock := func(height, stamp int64, raw []byte) []byte {
+		height += heightOffset
 		b := block(t, height, raw, last, vals)
 		b.Time = time.Unix(stamp, 0).UTC()
 		if height == 1 && len(acrossParts) > 0 && acrossParts[0] {
@@ -240,6 +242,23 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 	}
 	appendBlock(2, 1700000002, successorRaw)
 	successorID := blocks.LoadBlockMeta(2).BlockID
+	// Economic decisions commit before any adaptation work begins.
+	for i, parent := range parents {
+		decision := protocol.CompensationDecision{Network: f.Org.Network, Output: parent.Summary.OutputID(0), Height: 1, Transaction: uint32(paymentIndex), Input: func() uint32 {
+			for j, input := range tx.Body.Inputs {
+				if input.Output == parent.Summary.OutputID(0) {
+					return uint32(j)
+				}
+			}
+			panic("missing input")
+		}()}
+		raw, err := decision.MarshalBinary()
+		if err != nil {
+			t.Fatal(err)
+		}
+		appendBlock(int64(i+3), 1700000032, raw)
+	}
+	heightOffset = int64(len(parents))
 	var c protocol.RepairBatch
 	batchStarted := time.Now()
 	err = db.View(func(v state.ReadView) error {
@@ -286,26 +305,21 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 					}
 				})
 			}
-			t.Run("unaffordable_batch_not_signed", func(t *testing.T) {
+			t.Run("paid_batch_needs_no_second_balance", func(t *testing.T) {
 				limited := state.NewOverlay(v)
-				if err := state.Put(limited, rules.AccountKey(f.Org.Org, protocol.AssetCAL), uint64(99)); err != nil {
+				if err := state.Put(limited, rules.AccountKey(f.Org.Org, protocol.AssetCAL), uint64(0)); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := redaction.BuildBatch(limited, blocks, policy, singles, 1700000032); err == nil {
-					t.Error("final candidate missed economic recheck")
+				if _, err := redaction.BuildBatch(limited, blocks, policy, singles, 1700000032); err != nil {
+					t.Fatal(err)
 				}
-				if _, err := redaction.BatchPartShares(limited, blocks, policy, signers[0], c, 1700000032); err == nil {
-					t.Fatal("signed an economically impossible fixed batch")
+				if _, err := redaction.BatchPartShares(limited, blocks, policy, signers[0], c, 1700000032); err != nil {
+					t.Fatal(err)
 				}
 				selected, err := redaction.SelectRepairInputs(limited, blocks, policy, []protocol.OutputID{c.Items[1].Output, c.Items[0].Output}, 1700000032)
-				if err != nil || len(selected) != 1 || selected[0] != c.Items[0].Output {
-					t.Fatalf("wrong affordable subset: %v %v", selected, err)
+				if err != nil || len(selected) != 2 {
+					t.Fatalf("paid items lost eligibility: %v %v", selected, err)
 				}
-				balance, _, err := state.Load[uint64](limited, rules.AccountKey(f.Org.Org, protocol.AssetCAL))
-				if err != nil || balance != 99 {
-					t.Fatal("preflight changed caller balance", balance, err)
-				}
-
 			})
 		}
 
@@ -442,48 +456,27 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 		t.Fatal("batch proof excluded from consensus identity")
 	}
 	err = db.View(func(v state.ReadView) error {
-		limited := state.NewOverlay(v)
-		// Use real source execution, not a hand-edited terminal flag. A source
-		// fulfilled earlier at this height makes the whole fixed batch stale.
+		// Late recovery cannot revoke an already committed repair authorization.
 		parentFirst := state.NewOverlay(v)
 		pt, e := engine.ExecuteAt(parentFirst, parentCommands[0], apppkg.BlockContext{Height: 3, Time: time.Unix(1700000032, 0)})
 		if e != nil {
 			return e
 		}
 		parentFirst.Apply(pt.Changes)
-		if tr, e := redaction.ExecuteBatch(parentFirst, blocks, policy, c, 3, 1700000032); e == nil || len(tr.Changes) != 0 || len(tr.Data) != 0 {
-			t.Fatal("batch after source execution leaked effects")
+		if _, e := redaction.ExecuteBatch(parentFirst, blocks, policy, c, 3, 1700000032); e != nil {
+			t.Fatal("recovery revoked repair", e)
 		}
-		if _, exists, e := redaction.LoadTask(parentFirst, c.ID()); e != nil || exists {
-			t.Fatal("rejected batch published task", e)
-		}
-		if e := state.Put(limited, rules.AccountKey(f.Org.Org, protocol.AssetCAL), body.Outputs[0].Amount-1); e != nil {
+		limited := state.NewOverlay(v)
+		if e := state.Put(limited, rules.AccountKey(f.Org.Org, protocol.AssetCAL), uint64(0)); e != nil {
 			return e
 		}
-		tr, e := redaction.ExecuteBatch(limited, blocks, policy, c, 3, 1700000032)
-		if e == nil || len(tr.Changes) != 0 || len(tr.Data) != 0 {
-			t.Fatal("partially affordable batch leaked effects")
-		}
-		for _, parent := range parents {
-			ob, _, e := state.Load[rules.DirectObligation](limited, rules.DirectObligationKey(parent.Summary.OutputID(0)))
-			if e != nil {
-				return e
-			}
-			if ob.Status != rules.DirectOpen {
-				t.Fatal("failed batch mutated caller view")
-			}
+		if _, e := redaction.ExecuteBatch(limited, blocks, policy, c, 3, 1700000032); e != nil {
+			t.Fatal("repair charged twice", e)
 		}
 		closed := state.NewOverlay(v)
-		ob, _, e := state.Load[rules.DirectObligation](closed, rules.DirectObligationKey(parents[0].Summary.OutputID(0)))
-		if e != nil {
-			return e
-		}
-		ob.Status = rules.DirectFulfilled
-		if e = state.Put(closed, rules.DirectObligationKey(ob.Output), ob); e != nil {
-			return e
-		}
+		closed.Delete(rules.DirectRepairKey(parents[0].Summary.OutputID(0)))
 		if tr, e := redaction.ExecuteBatch(closed, blocks, policy, c, 3, 1700000032); e == nil || len(tr.Changes) != 0 {
-			t.Fatal("closed source accepted")
+			t.Fatal("repair without decision accepted")
 		}
 		stale := c
 		stale.Base++
@@ -595,6 +588,31 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 		// Cross-entry repeats and partially overlapping batches cannot debit again.
 		applied := state.NewOverlay(v)
 		applied.Apply(tr.Changes)
+		// Same public decision set, same final bytes: sequential and batched
+		// adaptation must agree at both the input and block-part layers.
+		_, normal, e := redaction.Canonical(applied, blocks, 1)
+		if e != nil {
+			return e
+		}
+		_, sequentialFinal, e := redaction.Canonical(sequential, blocks, 1)
+		if e != nil {
+			return e
+		}
+		if !bytes.Equal(normal.Body, sequentialFinal.Body) || !reflect.DeepEqual(c.Parts, legacy[len(legacy)-1].Parts) {
+			t.Fatal("sequential and all-at-once representation differ")
+		}
+		if count > 1 {
+			outputs := make([]protocol.OutputID, count)
+			for i := range parents {
+				outputs[i] = parents[count-1-i].Summary.OutputID(0)
+			}
+			for _, size := range []int{1, 2, 3} {
+				derived, derivedParts := derivePartitionedRepairs(t, v, blocks, policy, signers, outputs, size)
+				if !bytes.Equal(normal.Body, derived) || !reflect.DeepEqual(c.Parts, derivedParts) {
+					t.Fatalf("reverse order/partition %d changed canonical representation", size)
+				}
+			}
+		}
 		if again, e := redaction.ExecuteBatch(sequential, blocks, policy, c, 3, 1700000032); e == nil || len(again.Changes) != 0 {
 			t.Fatal("batch after legacy debited again")
 		}
@@ -632,8 +650,8 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 		t.Fatal(err)
 	}
 	resultRaw := appendBlock(3, 1700000032, raw)
-	result, err := protocol.DecodeRepairBatchResult(resultRaw)
-	if err != nil || !result.Applied || len(result.Effects) != count {
+	result, err := protocol.DecodeRepairResult(resultRaw)
+	if err != nil || !result.Applied {
 		t.Fatal("batch result", err)
 	}
 	err = db.View(func(v state.ReadView) error {
@@ -679,8 +697,8 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 		t.Fatal("fixed authorization changed", err)
 	}
 	repeated := appendBlock(4, 1700000033, raw)
-	again, err := protocol.DecodeRepairBatchResult(repeated)
-	if err != nil || again.Applied || len(again.Effects) != 0 {
+	again, err := protocol.DecodeRepairResult(repeated)
+	if err != nil || again.Applied {
 		t.Fatal("repeat economic effects", err)
 	}
 	replayDB := store.NewMemory()

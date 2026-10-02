@@ -16,6 +16,16 @@ func (e *Engine) EnableRepair(blocks *cmtstore.BlockStore) error {
 		return protocol.ErrRule
 	}
 	e.repairCheck = func(raw []byte) error {
+		if protocol.IsCompensationDecision(raw) {
+			c, err := protocol.DecodeCompensationDecision(raw)
+			if err != nil {
+				return err
+			}
+			if c.Network != e.cfg.Network {
+				return protocol.ErrAuth
+			}
+			return nil
+		}
 		if protocol.IsRepairBatch(raw) {
 			c, err := protocol.DecodeRepairBatch(raw)
 			if err != nil {
@@ -36,6 +46,13 @@ func (e *Engine) EnableRepair(blocks *cmtstore.BlockStore) error {
 		return nil
 	}
 	e.repairExecute = func(v state.ReadView, raw []byte, b BlockContext) (state.Transition, error) {
+		if protocol.IsCompensationDecision(raw) {
+			c, err := protocol.DecodeCompensationDecision(raw)
+			if err != nil {
+				return state.Transition{}, err
+			}
+			return redaction.ExecuteDecision(v, blocks, *e.direct, c, b.Height, b.Time.Unix())
+		}
 		if protocol.IsRepairBatch(raw) {
 			c, err := protocol.DecodeRepairBatch(raw)
 			if err != nil {

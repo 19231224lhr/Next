@@ -125,8 +125,8 @@ func (w *repairWorker) step(ctx context.Context) {
 				return e
 			}
 			for _, x := range p.command.Items {
-				ob, found, e := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(x.Output))
-				if e != nil || !found || ob.Status != rules.DirectOpen {
+				decision, found, e := state.Load[rules.DirectRepairTodo](v, rules.DirectRepairKey(x.Output))
+				if e != nil || !found || decision.DecisionHeight == 0 {
 					return e
 				}
 			}
@@ -152,7 +152,7 @@ func (w *repairWorker) step(ctx context.Context) {
 	if ctx.Err() != nil || len(w.pending) >= 16 {
 		return
 	}
-	entries, err := store.Scan(w.db, state.Key(112), w.cursor, 64)
+	entries, err := store.Scan(w.db, state.Key(116), w.cursor, 64)
 	if err != nil {
 		return
 	}
@@ -163,21 +163,12 @@ func (w *repairWorker) step(ctx context.Context) {
 	groups := make(map[int64][]protocol.OutputID)
 	var order []int64
 	selected := 0
-	height, publicNow := w.head()
+	_, publicNow := w.head()
 	for _, entry := range entries {
 		w.cursor = entry.Key // advance across busy, invalid and cooling entries too
 		var ob rules.DirectObligation
 		if json.Unmarshal(entry.Value, &ob) != nil {
 			continue
-		}
-		if now.Unix() < ob.Deadline+int64(w.index) {
-			w.cursor = nil
-			break
-		}
-		if publicNow < ob.Deadline {
-			_, _ = w.submit(ctx, protocol.ClockTick(w.network, height+1))
-			w.cursor = nil
-			break
 		}
 		if until := w.failures[ob.Output]; now.Before(until) {
 			continue

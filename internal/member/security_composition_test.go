@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	abci "github.com/cometbft/cometbft/abci/types"
-	"utxo/crypto/chameleon"
 	"utxo/finality"
 	"utxo/internal/blockfollow"
 	"utxo/internal/committee"
@@ -297,17 +296,29 @@ func securityComposition(t *testing.T, workers uint32, extraApproval, repair, la
 			t.Fatal(err)
 		}
 		paid[pp.Certificate.QC.Fact], spent, reserved = 40, 40, 60
-		raw, err := cp.Submission().MarshalBinary()
+		command := protocol.CompensationDecision{Network: f.Org.Network, Output: pp.Certificate.Summary.OutputID(0), Height: 1}
+		raw, err := command.MarshalBinary()
 		if err != nil {
 			t.Fatal(err)
 		}
-		command := protocol.RepairInput{Network: f.Org.Network, Output: pp.Certificate.Summary.OutputID(0), Height: 1, TransactionBytes: raw, Parts: []chameleon.Opening{{}}}
-		raw, err = command.MarshalBinary()
+		var ob rules.DirectObligation
+		if err := ledger.View(func(v state.ReadView) error {
+			var e error
+			ob, _, e = state.Load[rules.DirectObligation](v, rules.DirectObligationKey(command.Output))
+			return e
+		}); err != nil {
+			t.Fatal(err)
+		}
+		fees, err := protocol.DecodeExecution(tr.Data)
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Public repair economic result is the boundary here. The synthetic
-		// repair body is for follower decoding; redaction.Execute has separate tests.
+		tr.Data, err = (protocol.CompensationResult{Decision: command.ID(), Applied: true, Effects: []protocol.RepairEffect{{Output: command.Output, ParentFact: ob.Certificate, ConsumerFact: ob.Consumer, ConsumerTx: ob.Transaction, Input: ob.Input, Amount: ob.Amount, Debit: protocol.ReserveDebitIdentity(command.Network, command.Output)}}, FeeOutputs: fees.FeeOutputs}).MarshalBinary()
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Public economic results drive the follower; full command validation is
+		// exercised by the redaction integration tests.
 		appendBlock(raw, tr)
 		check()
 		follow(0, blocks[len(blocks)-1])

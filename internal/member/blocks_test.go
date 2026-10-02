@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	abci "github.com/cometbft/cometbft/abci/types"
 	"os"
+	"reflect"
 	"testing"
 	"utxo/crypto/chameleon"
 	"utxo/finality"
@@ -36,30 +37,33 @@ func TestRepairBatchMaximumFollowerResult(t *testing.T) {
 	}
 	settings := rules.DirectSettings{Modulus: key.N.Bytes(), TimeoutSeconds: 30, RepairCost: 5}
 
-	c := protocol.RepairBatch{Network: f.Org.Network, Height: 1, Parts: []chameleon.Opening{{}}}
-	r := protocol.RepairBatchResult{Applied: true}
+	var wires [][]byte
+	var results []*abci.ExecTxResult
+	var fees []protocol.FeeOutput
 	for i := 0; i < protocol.MaxRepairItems; i++ {
 		out := protocol.OutputID{byte(i + 1)}
 		tx := protocol.TxID{byte(i + 1)}
-		c.Items = append(c.Items, protocol.RepairItem{Output: out, Transaction: uint32(i)})
-		r.Effects = append(r.Effects, protocol.RepairEffect{Output: out, ParentFact: protocol.SpendFactID{byte(i + 1)}, ConsumerFact: protocol.SpendFactID{byte(i + 33)}, ConsumerTx: tx, Amount: 100, Debit: protocol.ReserveDebitIdentity(f.Org.Network, out)})
+		c := protocol.CompensationDecision{Network: f.Org.Network, Output: out, Height: 1, Transaction: uint32(i)}
+		r := protocol.CompensationResult{Decision: c.ID(), Applied: true, Effects: []protocol.RepairEffect{{Output: out, ParentFact: protocol.SpendFactID{byte(i + 1)}, ConsumerFact: protocol.SpendFactID{byte(i + 33)}, ConsumerTx: tx, Amount: 100, Debit: protocol.ReserveDebitIdentity(f.Org.Network, out)}}}
 		fee := f.Genesis.Outputs[0].Output
 		fee.Asset = protocol.AssetFUEL
 		fee.Amount = 10
 		for _, index := range []uint32{protocol.FeeChangeIndex, protocol.FeeRefundIndex} {
 			r.FeeOutputs = append(r.FeeOutputs, protocol.FeeOutput{Transaction: tx, Index: index, Output: fee})
 		}
+		wire, e := c.MarshalBinary()
+		if e != nil {
+			t.Fatal(e)
+		}
+		result, e := r.MarshalBinary()
+		if e != nil {
+			t.Fatal(e)
+		}
+		wires = append(wires, wire)
+		results = append(results, &abci.ExecTxResult{Data: result})
+		fees = append(fees, r.FeeOutputs...)
 	}
-	r.Batch = c.ID()
-	wire, err := c.MarshalBinary()
-	if err != nil {
-		t.Fatal(err)
-	}
-	result, err := r.MarshalBinary()
-	if err != nil {
-		t.Fatal(err)
-	}
-	trust, data := testkit.Block("batch-max", 1, nil, [][]byte{wire}, []*abci.ExecTxResult{{Data: result}})
+	trust, data := testkit.Block("batch-max", 1, nil, wires, results)
 	b, err := finality.VerifyBlock(trust, data)
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +91,7 @@ func TestRepairBatchMaximumFollowerResult(t *testing.T) {
 			}
 		}
 	}
-	for _, fee := range r.FeeOutputs {
+	for _, fee := range fees {
 		id := protocol.OutputIdentity(f.Org.Network, fee.Transaction, fee.Index)
 		if ok, err := w.DirectFinal(id, 0); err != nil || !ok {
 			t.Fatal("fee output absent", err)
@@ -356,7 +360,7 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				blockTxs, blockResults = nil, nil
 				if scenario.alteredOpening {
 					for i, raw := range data.Block.Txs {
-						if protocol.IsRepairInput(raw) {
+						if protocol.IsCompensationDecision(raw) || protocol.IsRepairBatch(raw) {
 							continue // Repair commands authenticate their complete bytes.
 						}
 						pay, err := protocol.DecodeDirectSubmission(raw)
@@ -426,6 +430,29 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 			}
 			settle(cp, 100)
 			if !scenario.sameBlock {
+				// A public successor exposes the source QC even when the source
+				// never reached INSTALL. Its original signer must enqueue the
+				// original payment, not require another quorum or a client retry.
+				if err := db.View(func(v state.ReadView) error {
+					pending, found, err := state.Load[state.Outbox](v, state.Key(state.KeyOutbox, pc.QC.Fact[:]))
+					if err != nil {
+						return err
+					}
+					if !found {
+						t.Fatal("public successor did not recover withheld source")
+					}
+					rebuilt, err := protocol.DecodeDirectPayment(pending.Certificate)
+					if err != nil {
+						return err
+					}
+					if rebuilt.Tx.ID() != parent.ID() || rebuilt.Certificate.QC.Fact != pc.QC.Fact {
+						t.Fatal("recovery changed source identity")
+					}
+					_, err = rules.VerifyDirectPayment(rebuilt, policy)
+					return err
+				}); err != nil {
+					t.Fatal(err)
+				}
 				if ok, err := w.DirectFinal(cc.Summary.OutputID(0), 0); err != nil || !ok {
 					t.Fatal("child wallet still waits for source", err)
 				}
@@ -443,28 +470,50 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					raw, _ := cp.Submission().MarshalBinary()
-					command := protocol.RepairInput{Network: f.Org.Network, Output: pc.Summary.OutputID(0), Height: 1, TransactionBytes: raw, Parts: []chameleon.Opening{{}}}
-					raw, err = command.MarshalBinary()
+					command := protocol.CompensationDecision{Network: f.Org.Network, Output: pc.Summary.OutputID(0), Height: 1}
+					raw, err := command.MarshalBinary()
 					if err != nil {
 						t.Fatal(err)
 					}
-					if scenario.batch {
-						batch := protocol.RepairBatch{Network: f.Org.Network, Height: 1, Items: []protocol.RepairItem{{Output: pc.Summary.OutputID(0)}}, Parts: []chameleon.Opening{{}}}
-						raw, err = batch.MarshalBinary()
-						if err != nil {
-							t.Fatal(err)
-						}
-						result, e := protocol.DecodeExecution(tr.Data)
-						if e != nil {
-							t.Fatal(e)
-						}
-						tr.Data, err = (protocol.RepairBatchResult{Batch: batch.ID(), Applied: true, Effects: []protocol.RepairEffect{{Output: pc.Summary.OutputID(0), ParentFact: pc.QC.Fact, ConsumerFact: cc.QC.Fact, ConsumerTx: child.ID(), Amount: parent.Body.Outputs[0].Amount, Debit: protocol.ReserveDebitIdentity(f.Org.Network, pc.Summary.OutputID(0))}}, FeeOutputs: result.FeeOutputs}).MarshalBinary()
-						if err != nil {
-							t.Fatal(err)
-						}
+					result, e := protocol.DecodeExecution(tr.Data)
+					if e != nil {
+						t.Fatal(e)
+					}
+					tr.Data, err = (protocol.CompensationResult{Decision: command.ID(), Applied: true, Effects: []protocol.RepairEffect{{Output: pc.Summary.OutputID(0), ParentFact: pc.QC.Fact, ConsumerFact: cc.QC.Fact, ConsumerTx: child.ID(), Amount: parent.Body.Outputs[0].Amount, Debit: protocol.ReserveDebitIdentity(f.Org.Network, pc.Summary.OutputID(0))}}, FeeOutputs: result.FeeOutputs}).MarshalBinary()
+					if err != nil {
+						t.Fatal(err)
 					}
 					apply(raw, tr)
+					// Representation success is not a second public credit event.
+					beforeProgress, e := store.Scan(db, state.Key(122), nil, 100)
+					if e != nil {
+						t.Fatal(e)
+					}
+					beforeSlices, e := store.Scan(db, state.Key(state.KeySlice), nil, 100)
+					if e != nil {
+						t.Fatal(e)
+					}
+					representation := protocol.RepairBatch{Network: f.Org.Network, Height: 1, Items: []protocol.RepairItem{{Output: command.Output}}, Parts: []chameleon.Opening{{}}}
+					reprRaw, e := representation.MarshalBinary()
+					if e != nil {
+						t.Fatal(e)
+					}
+					reprResult, e := (protocol.RepairResult{Command: representation.ID(), Applied: true}).MarshalBinary()
+					if e != nil {
+						t.Fatal(e)
+					}
+					apply(reprRaw, state.Transition{Data: reprResult})
+					afterProgress, e := store.Scan(db, state.Key(122), nil, 100)
+					if e != nil {
+						t.Fatal(e)
+					}
+					afterSlices, e := store.Scan(db, state.Key(state.KeySlice), nil, 100)
+					if e != nil {
+						t.Fatal(e)
+					}
+					if !reflect.DeepEqual(beforeProgress, afterProgress) || !reflect.DeepEqual(beforeSlices, afterSlices) {
+						t.Fatal("representation changed credit or Worker budgets")
+					}
 				}
 			}
 			if scenario.lateObserver {

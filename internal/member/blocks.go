@@ -22,7 +22,7 @@ type LocalProgress struct {
 }
 
 // DirectStoreSchema prevents old member binaries from ignoring split credits.
-const DirectStoreSchema uint64 = 6
+const DirectStoreSchema uint64 = 7
 
 func localApplied(a state.Approval, p LocalProgress) ([]uint64, error) {
 	values := p.Applied
@@ -209,23 +209,11 @@ func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
 				return state.Put(o, rules.DirectCreationKey(id, 0), c)
 			})
 		}
-		if protocol.IsRepairBatch(entry.Bytes) {
+		if protocol.IsCompensationDecision(entry.Bytes) {
 			for _, effect := range effects {
 				updates = append(updates, func(o *state.Overlay) error { return m.applyRepairEffect(o, effect) })
 			}
-		} else if protocol.IsRepairInput(entry.Bytes) {
-			repair, err := protocol.DecodeRepairInput(entry.Bytes)
-			if err != nil {
-				return nil, err
-			}
-			pay, err := protocol.DecodeDirectSubmission(repair.TransactionBytes)
-			if err != nil {
-				return nil, err
-			}
-			if int(repair.Input) >= len(pay.Tx.Body.Inputs) {
-				return nil, protocol.ErrRule
-			}
-			updates = append(updates, func(o *state.Overlay) error { return m.applyRepair(o, repair, pay) })
+
 		} else {
 			pay, err := protocol.DecodeDirectSubmission(entry.Bytes)
 			if err != nil {
@@ -242,10 +230,6 @@ func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
 		}
 		return nil
 	}, nil
-}
-
-func (m *Member) applyRepair(o *state.Overlay, repair protocol.RepairInput, pay protocol.DirectSubmission) error {
-	return m.applyRepairEffect(o, protocol.RepairEffect{Output: repair.Output, ParentFact: protocol.SpendFactID(pay.Tx.Body.Inputs[repair.Input].Evidence), ConsumerFact: pay.Summary().Fact(), Amount: pay.Tx.Claims[repair.Input].Output.Amount})
 }
 
 func (m *Member) applyRepairEffect(o *state.Overlay, effect protocol.RepairEffect) error {
@@ -283,6 +267,9 @@ func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, r
 	fact := pay.Authorization.Fact
 	if tx.Body.Network != m.cfg.Organization.Network {
 		return protocol.ErrAuth
+	}
+	if err := m.recoverExposedSources(o, pay.InputCertificates); err != nil {
+		return err
 	}
 	recovered := make(map[uint32]bool, len(result.RecoveredOutputs))
 	var returned uint64

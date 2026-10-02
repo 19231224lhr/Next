@@ -179,7 +179,9 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		}
 		return bytes.Clone(r.AppHash)
 	}
+	heightOffset := int64(0)
 	appendBlock := func(height, stamp int64, raw []byte) *types.Block {
+		height += heightOffset
 		b := block(t, height, raw, last, vals)
 		b.Time = time.Unix(stamp, 0).UTC()
 		if raw == nil {
@@ -222,6 +224,24 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		t.Fatalf("expected two created outputs and the consumed child, got %d records", len(beforeRepairPayments))
 	}
 	output := pc.Summary.OutputID(0)
+	decision := protocol.CompensationDecision{Network: f.Org.Network, Output: output, Height: 1}
+	decisionRaw, err := decision.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.View(func(v state.ReadView) error {
+		if _, err := redaction.InputShare(v, blocks, policy, signers[0], output, 1700000032); err == nil {
+			t.Fatal("share before public decision")
+		}
+		if _, err := redaction.ExecuteDecision(v, blocks, policy, decision, 3, 1700000030); err == nil {
+			t.Fatal("premature decision accepted")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	appendBlock(3, 1700000032, decisionRaw)
+	heightOffset = 1
 	var command protocol.RepairInput
 	var payment protocol.DirectSubmission
 	var inputShares []chameleon.Contribution
@@ -230,9 +250,6 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		command, payment, err = redaction.InputTarget(v, blocks, policy, output, 1700000032)
 		if err != nil {
 			return err
-		}
-		if _, err = redaction.InputShare(v, blocks, policy, signers[0], output, 1700000030); err == nil {
-			t.Fatal("early repair share issued")
 		}
 		for i := 0; i < 3; i++ {
 			s, err := redaction.InputShare(v, blocks, policy, signers[i], output, 1700000032)
@@ -269,7 +286,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	repairID := protocol.RepairIdentity(f.Org.Network, output)
 	// A valid chameleon opening is not sufficient authority: the exact target,
 	// revision, replacement bytes and original PartSetHeader must all agree.
-	for _, name := range []string{"output", "revision", "transaction", "part", "same-height", "premature", "valid-opening-wrong-reserve", "owner-auth", "organization-auth", "input-certificate"} {
+	for _, name := range []string{"output", "revision", "transaction", "part", "same-height", "valid-opening-wrong-reserve", "owner-auth", "organization-auth", "input-certificate"} {
 		t.Run("reject-"+name, func(t *testing.T) {
 			bad := command
 			bad.TransactionBytes = bytes.Clone(command.TransactionBytes)
@@ -287,8 +304,6 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 				bad.Parts[0][0] ^= 1
 			case "same-height":
 				height = command.Height
-			case "premature":
-				now = 1700000030
 			case "valid-opening-wrong-reserve":
 				// Model an untrusted adapter with even all fixture shares: a valid
 				// opening must not authorize a different reserve debit identity.
@@ -387,9 +402,9 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 				}
 				execute(fork, original)
 			}
-			txs := [][]byte{parentRaw, repairRaw}
+			txs := [][]byte{parentRaw, decisionRaw}
 			if repairFirst {
-				txs = [][]byte{repairRaw, parentRaw}
+				txs = [][]byte{decisionRaw, parentRaw}
 			}
 			hash := protocol.Digest("E3-ORDER", []byte(name))
 			result, err := fork.FinalizeBlock(ctx, &abci.RequestFinalizeBlock{Height: 3, Hash: hash[:], Time: time.Unix(1700000033, 0), Txs: txs})
@@ -412,7 +427,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 				if repairFirst {
 					wantStatus = rules.DirectRecovered
 				}
-				if _, found, e := redaction.LoadTask(v, repairID); e != nil || found != repairFirst {
+				if _, found, e := state.Load[rules.DirectRepairTodo](v, rules.DirectRepairKey(output)); e != nil || found != repairFirst {
 					t.Fatalf("repair task without matching debit: found=%v err=%v", found, e)
 				}
 				if ob.Status != wantStatus || balance != wantBalance {
@@ -436,7 +451,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if !s.Committed || s.Materialized != materialized || !s.IdentityStable || s.BytesChanged != materialized || s.CommitHeight != 3 || s.TargetHeight != 1 {
+			if !s.Committed || s.Materialized != materialized || !s.IdentityStable || s.BytesChanged != materialized || s.CommitHeight != 4 || s.TargetHeight != 1 {
 				t.Fatalf("incorrect repair observation: %+v", s)
 			}
 			return nil

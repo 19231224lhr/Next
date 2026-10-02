@@ -149,7 +149,7 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 				return nil, err
 			}
 		}
-		a := state.Approval{Fact: fact, Direct: &tx, Admission: vector}
+		a := state.Approval{Fact: fact, Direct: &tx, Admission: vector, DirectParents: req.InputCertificates}
 		for i, allocation := range vector {
 			ref := t.Admission[i]
 			g, found, err := state.Load[state.Grant](o, state.Key(state.KeyGrant, allocation.Key.Encode()))

@@ -80,7 +80,7 @@ func run() (result error) {
 		return e
 	}
 	defer func() { result = errors.Join(result, group.Close()) }()
-	m, e := member.New(member.Config{Organization: org, Index: c.Index, Key: key, Peers: n.Organizations, Committee: trust, Schedule: n.Schedule, Workers: c.Workers, Direct: n.Direct}, group, n.Genesis)
+	m, e := member.New(member.Config{DisableSourceRecovery: os.Getenv("UTXO_EXPERIMENT_DISABLE_SOURCE_RECOVERY") == "1", Organization: org, Index: c.Index, Key: key, Peers: n.Organizations, Committee: trust, Schedule: n.Schedule, Workers: c.Workers, Direct: n.Direct}, group, n.Genesis)
 	if e != nil {
 		return e
 	}

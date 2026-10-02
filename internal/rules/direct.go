@@ -25,7 +25,7 @@ func (p DirectPolicy) Rules() protocol.RuleIDs {
 	e.Fixed(r.Accounting[:])
 	e.U64(uint64(p.TimeoutSeconds))
 	e.U64(p.RepairCost)
-	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V4_SOURCE_RECOVERY", e.Data())
+	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V5_DECISION_FIRST", e.Data())
 	return r
 }
 
@@ -83,8 +83,10 @@ type DirectObligation struct {
 	Status                uint8
 }
 type DirectRepairTodo struct {
-	ID, Debit  protocol.Hash
-	Obligation DirectObligation
+	ID, Debit      protocol.Hash
+	Obligation     DirectObligation
+	Decision       protocol.CompensationDecision
+	DecisionHeight int64
 }
 type directPromise struct {
 	Certificate protocol.SpendFactID

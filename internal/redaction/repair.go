@@ -80,9 +80,9 @@ func Canonical(v state.ReadView, bs *cmtstore.BlockStore, height int64) (*types.
 
 func digest(b []byte) protocol.Hash { return protocol.Hash(sha256.Sum256(b)) }
 
-// InputTarget validates responsibility and timing before a member computes its
-// local share. No caller supplies an arbitrary RSA representative.
-func InputTarget(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, output protocol.OutputID, now int64) (protocol.RepairInput, protocol.DirectSubmission, error) {
+// CompensationTarget checks the due obligation and exact original funding
+// slot without requesting an adaptation witness.
+func CompensationTarget(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, output protocol.OutputID, now int64) (protocol.RepairInput, protocol.DirectSubmission, error) {
 	var command protocol.RepairInput
 	ob, found, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(output))
 	if err != nil {
@@ -94,6 +94,29 @@ func InputTarget(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy
 	if ob.Deadline == 0 || now < ob.Deadline {
 		return command, protocol.DirectSubmission{}, rules.ErrLimited
 	}
+	return targetSlot(v, bs, p, ob)
+}
+
+// InputTarget authorizes adaptation from the immutable successful decision.
+// Later source recovery does not revoke an already paid repair.
+func InputTarget(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, output protocol.OutputID, now int64) (protocol.RepairInput, protocol.DirectSubmission, error) {
+	todo, found, err := state.Load[rules.DirectRepairTodo](v, rules.DirectRepairKey(output))
+	if err != nil {
+		return protocol.RepairInput{}, protocol.DirectSubmission{}, err
+	}
+	if !found || todo.DecisionHeight <= 0 || todo.Decision.Output != output || todo.Debit != protocol.ReserveDebitIdentity(todo.Decision.Network, output) {
+		return protocol.RepairInput{}, protocol.DirectSubmission{}, rules.ErrMissing
+	}
+	c, pay, err := targetSlot(v, bs, p, todo.Obligation)
+	if err == nil && (c.Network != todo.Decision.Network || c.Height != todo.Decision.Height || c.Transaction != todo.Decision.Transaction || c.Input != todo.Decision.Input) {
+		err = protocol.ErrAuth
+	}
+	return c, pay, err
+}
+
+func targetSlot(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, ob rules.DirectObligation) (protocol.RepairInput, protocol.DirectSubmission, error) {
+	var command protocol.RepairInput
+	output := ob.Output
 	cfg, ok := p.Organizations[ob.Config]
 	if !ok || cfg.Org != ob.Issuer {
 		return command, protocol.DirectSubmission{}, protocol.ErrAuth
@@ -135,9 +158,6 @@ func InputShare(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy,
 	i := int(command.Input)
 	old := payment.Tx.Funding[i]
 	next := protocol.Funding{Kind: protocol.ReserveFunding, Ref: protocol.ReserveDebitIdentity(command.Network, output)}
-	if err := preflightRepairs(v, p, []protocol.OutputID{output}, now); err != nil {
-		return chameleon.Contribution{}, err
-	}
 	return signer.Adapt(payment.Tx.FundingContext(i, p.Key.KeyID()), old.ReferenceBytes(), next.ReferenceBytes(), payment.Tx.Commitments[i], old.Opening)
 }
 
@@ -269,9 +289,6 @@ func partRequestsForBody(v state.ReadView, bs *cmtstore.BlockStore, p rules.Dire
 }
 
 func PartShares(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, signer chameleon.Signer, c protocol.RepairInput, now int64) ([]chameleon.Contribution, error) {
-	if err := preflightRepairs(v, p, []protocol.OutputID{c.Output}, now); err != nil {
-		return nil, err
-	}
 	requests, _, _, err := PartRequests(v, bs, p, c, now)
 	if err != nil {
 		return nil, err
@@ -308,7 +325,8 @@ func Execute(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c 
 		a, _ := old.Command.MarshalBinary()
 		b, _ := c.MarshalBinary()
 		if bytes.Equal(a, b) {
-			return state.Transition{}, nil
+			raw, e := (protocol.RepairResult{Command: c.ID()}).MarshalBinary()
+			return state.Transition{Data: raw}, e
 		}
 		return state.Transition{}, rules.ErrConflict
 	}
@@ -330,12 +348,13 @@ func Execute(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c 
 	if meta == nil || !bytes.Equal(b.Hash(), meta.BlockID.Hash) || !parts.Header().Equals(meta.BlockID.PartSetHeader) {
 		return state.Transition{}, protocol.ErrAuth
 	}
-	tr, err := rules.EvaluateDirectCompensation(v, c.Output, p, now)
+	raw, err := (protocol.RepairResult{Command: c.ID(), Applied: true}).MarshalBinary()
 	if err != nil {
 		return state.Transition{}, err
 	}
+	tr := state.Transition{Data: raw}
 	o := state.NewOverlay(v)
-	o.Apply(tr.Changes)
+	o.Apply([]state.Change{{Key: DecisionPendingKey(c.Height, c.Output), Delete: true}})
 	if err = state.Put(o, RevisionKey(c.Height), Revision{Number: c.Base + 1, Body: body}); err != nil {
 		return state.Transition{}, err
 	}

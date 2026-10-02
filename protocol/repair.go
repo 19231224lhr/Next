@@ -5,7 +5,7 @@ import (
 	"utxo/crypto/chameleon"
 )
 
-var repairMagic = []byte{'R', 'E', 'P', 'A', 'I', 'R', '3', 0}
+var repairMagic = []byte{'R', 'E', 'P', 'A', 'I', 'R', '5', 0}
 
 func ClockTick(network Hash, height int64) []byte {
 	e := new(Encoder)
@@ -19,7 +19,7 @@ func IsClockTick(raw []byte, network Hash) bool {
 }
 
 // RepairInput is immutable. It authenticates the exact next bytes of one input
-// and all affected block part openings in the block where compensation occurs.
+// and affected block-part openings, authorized by a prior public decision.
 type RepairInput struct {
 	Network          Hash
 	Output           OutputID
@@ -33,6 +33,13 @@ type RepairInput struct {
 }
 
 func IsRepairInput(b []byte) bool { return len(b) >= 8 && bytes.Equal(b[:8], repairMagic) }
+func (r RepairInput) ID() Hash {
+	raw, err := r.MarshalBinary()
+	if err != nil {
+		return Hash{}
+	}
+	return Digest("REPAIR_INPUT_V5", raw)
+}
 func (r RepairInput) MarshalBinary() ([]byte, error) {
 	if r.Network == (Hash{}) || r.Output == (OutputID{}) || r.Height <= 0 || r.Base == ^uint64(0) || len(r.TransactionBytes) == 0 || len(r.Parts) == 0 || len(r.Parts) > 16384 {
 		return nil, ErrRule

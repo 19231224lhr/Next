@@ -15,14 +15,16 @@ import (
 )
 
 type Config struct {
-	Committee    finality.Trust
-	Organization protocol.OrgConfig
-	Index        uint16
-	Key          ed25519.PrivateKey
-	Peers        []protocol.OrgConfig
-	Schedule     rules.Schedule
-	Workers      uint32
-	Direct       *rules.DirectSettings
+	// Experiment control: disables only autonomous reconstruction, not INSTALL relay.
+	DisableSourceRecovery bool
+	Committee             finality.Trust
+	Organization          protocol.OrgConfig
+	Index                 uint16
+	Key                   ed25519.PrivateKey
+	Peers                 []protocol.OrgConfig
+	Schedule              rules.Schedule
+	Workers               uint32
+	Direct                *rules.DirectSettings
 }
 type Request = protocol.PaymentRequest
 type Approval = protocol.Approval

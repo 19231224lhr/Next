@@ -25,6 +25,8 @@ func demoDirect(args []string) error {
 	dir := flags.String("dir", "", "laboratory directory")
 	index := flags.Int("input", 0, "genesis output index per owner")
 	withhold := flags.Bool("withhold-parent", false, "certify parent but withhold its submission to exercise compensation")
+	recoverSource := flags.Bool("recover-source", false, "expect exposed certificate to recover withheld source without publisher")
+	waitPhysical := flags.Bool("wait-repair", false, "observe all physical repairs after late-source recovery")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -217,7 +219,7 @@ func demoDirect(args []string) error {
 		}
 	}
 	report := map[string]any{"timing_origin": "wallet_http_submit_v4", "parent_fast_ms": float64(parentFast) / float64(time.Millisecond), "child_fast_ms": float64(childFast) / float64(time.Millisecond), "child_block_observed_ms": float64(finalElapsed) / float64(time.Millisecond), "parent_output": protocol.Hash(pc.Summary.OutputID(0)).String(), "child_output": protocol.Hash(cc.Summary.OutputID(0)).String(), "parent_withheld": *withhold}
-	fmt.Println("Child finalized; waiting for compensation only when the parent is deliberately withheld.")
+	fmt.Println("Child finalized; observing withheld-source outcome.")
 	if *withhold {
 		url := n.CommitteeURLs[0] + "/v3/obligations/" + protocol.Hash(pc.Summary.OutputID(0)).String()
 		for {
@@ -226,6 +228,11 @@ func demoDirect(args []string) error {
 				var ob rules.DirectObligation
 				err = json.NewDecoder(resp.Body).Decode(&ob)
 				resp.Body.Close()
+				if err == nil && *recoverSource && ob.Status == rules.DirectFulfilled {
+					report["autonomous_source_observed_ms"] = float64(time.Since(sent)) / float64(time.Millisecond)
+					report["compensation_avoided"] = true
+					break
+				}
 				if err == nil && ob.Status == rules.DirectRepaired {
 					report["compensation_observed_ms"] = float64(time.Since(sent)) / float64(time.Millisecond)
 					break
@@ -237,33 +244,46 @@ func demoDirect(args []string) error {
 			case <-ticker.C:
 			}
 		}
-		raw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).Submission().MarshalBinary()
-		if err != nil {
-			return err
-		}
-		if err = public.Submit(ctx, raw); err != nil {
-			return err
-		}
-		for {
-			ok, err := w1.DirectRecovered(pc.Summary.OutputID(0))
+		if !*recoverSource {
+			raw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).Submission().MarshalBinary()
 			if err != nil {
 				return err
 			}
-			if ok {
-				report["late_parent_reserve_recovered"] = true
-				break
+			if err = public.Submit(ctx, raw); err != nil {
+				return err
 			}
+			for {
+				ok, err := w1.DirectRecovered(pc.Summary.OutputID(0))
+				if err != nil {
+					return err
+				}
+				if ok {
+					report["late_parent_reserve_recovered"] = true
+					break
+				}
 
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-ticker.C:
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-ticker.C:
+				}
 			}
 		}
 	}
 	path := filepath.Join(*dir, "reports", fmt.Sprintf("direct-%d.json", *index))
 	if err = cfg.Write(path, report); err != nil {
 		return err
+	}
+	if *waitPhysical {
+		var trial repairTrial
+		if err := waitRepair(ctx, httpClient, n.CommitteeURLs[:], pc.Summary.OutputID(0), &trial); err != nil {
+			return err
+		}
+		report["physical_repair"] = trial
+		report["physical_repair_observed_ms"] = float64(time.Since(sent)) / float64(time.Millisecond)
+		if err := cfg.Write(path, report); err != nil {
+			return err
+		}
 	}
 	pretty, _ := json.MarshalIndent(report, "", "  ")
 	fmt.Println(string(pretty))

@@ -227,7 +227,7 @@ func (e *Engine) Check(raw []byte) error {
 		if protocol.IsClockTick(raw, e.cfg.Network) {
 			return nil
 		}
-		if protocol.IsRepairInput(raw) || protocol.IsRepairBatch(raw) {
+		if protocol.IsRepairInput(raw) || protocol.IsRepairBatch(raw) || protocol.IsCompensationDecision(raw) {
 			if e.repairCheck == nil {
 				return protocol.ErrUnsupported
 			}

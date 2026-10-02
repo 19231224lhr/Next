@@ -44,7 +44,7 @@ func TestRepairScanPassesBadHead(t *testing.T) {
 		o := state.NewOverlay(v)
 		for i := 1; i <= 80; i++ {
 			ob := rules.DirectObligation{Output: protocol.OutputID{byte(i)}, Transaction: protocol.TxID{byte(i)}, Deadline: 1}
-			if err := state.Put(o, rules.DirectDueKey(1, ob.Output), ob); err != nil {
+			if err := state.Put(o, redaction.DecisionPendingKey(1, ob.Output), ob); err != nil {
 				return nil, err
 			}
 			if err := state.Put(o, redaction.LocationKey(ob.Transaction), redaction.Location{Height: int64(i)}); err != nil {
@@ -84,7 +84,7 @@ func TestRepairAcceptedRetriesKeepBytesAndStopOnPublicCompletion(t *testing.T) {
 	}
 	if err = db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
-		e := state.Put(o, rules.DirectObligationKey(c.Items[0].Output), rules.DirectObligation{Status: rules.DirectOpen})
+		e := state.Put(o, rules.DirectRepairKey(c.Items[0].Output), rules.DirectRepairTodo{DecisionHeight: 2})
 		return o.Changes(), e
 	}); err != nil {
 		t.Fatal(err)

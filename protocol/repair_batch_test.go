@@ -46,14 +46,14 @@ func TestRepairBatchCanonicalIdentity(t *testing.T) {
 	}
 }
 
-func TestRepairBatchResultEffects(t *testing.T) {
+func TestCompensationResultEffects(t *testing.T) {
 	effect := RepairEffect{Output: OutputID{1}, ParentFact: SpendFactID{2}, ConsumerFact: SpendFactID{3}, ConsumerTx: TxID{4}, Amount: 40, Debit: Hash{5}}
-	r := RepairBatchResult{Batch: Hash{1}, Applied: true, Effects: []RepairEffect{effect}}
+	r := CompensationResult{Decision: Hash{1}, Applied: true, Effects: []RepairEffect{effect}}
 	raw, err := r.MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := DecodeRepairBatchResult(raw)
+	got, err := DecodeCompensationResult(raw)
 	if err != nil || !reflect.DeepEqual(got, r) {
 		t.Fatal("result round trip", err)
 	}
@@ -66,14 +66,14 @@ func TestRepairBatchResultEffects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err = DecodeRepairBatchResult(raw)
+	got, err = DecodeCompensationResult(raw)
 	if err != nil || got.Applied || len(got.Effects) != 0 {
 		t.Fatal("no-op", err)
 	}
 }
 
 func TestPublicResultCodecsAreDisjoint(t *testing.T) {
-	batch, err := (RepairBatchResult{Batch: Hash{1}}).MarshalBinary()
+	batch, err := (CompensationResult{Decision: Hash{1}}).MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,14 +82,14 @@ func TestPublicResultCodecsAreDisjoint(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if IsRepairBatchResult(execution) {
+		if IsCompensationResult(execution) {
 			t.Fatal("execution misclassified as repair batch")
 		}
-		if _, err := DecodeRepairBatchResult(execution); err == nil {
+		if _, err := DecodeCompensationResult(execution); err == nil {
 			t.Fatal("execution accepted by batch decoder")
 		}
 	}
-	if !IsRepairBatchResult(batch) {
+	if !IsCompensationResult(batch) {
 		t.Fatal("batch not recognized")
 	}
 	if _, err := DecodeExecution(batch); err == nil {

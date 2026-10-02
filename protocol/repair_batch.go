@@ -6,9 +6,8 @@ import (
 )
 
 const MaxRepairItems = 32
-const repairBatchResultTag uint16 = 414
 
-var repairBatchMagic = []byte("RPBATCH4")
+var repairBatchMagic = []byte("RPBATCH5")
 
 type RepairItem struct {
 	Output             OutputID
@@ -30,7 +29,7 @@ func (r RepairBatch) ID() Hash {
 	if err != nil {
 		return Hash{}
 	}
-	return Digest("REPAIR_BATCH_V4", raw)
+	return Digest("REPAIR_BATCH_V5", raw)
 }
 func (r RepairBatch) MarshalBinary() ([]byte, error) {
 	if r.Network == (Hash{}) || r.Height <= 0 || r.Base == ^uint64(0) || len(r.Items) == 0 || len(r.Items) > MaxRepairItems || len(r.Parts) == 0 || len(r.Parts) > 16384 {
@@ -108,128 +107,4 @@ type RepairEffect struct {
 	Input                    uint32
 	Amount                   uint64
 	Debit                    Hash
-}
-type RepairBatchResult struct {
-	Batch      Hash
-	Applied    bool
-	Effects    []RepairEffect
-	FeeOutputs []FeeOutput
-}
-
-func (r RepairBatchResult) MarshalBinary() ([]byte, error) {
-	if r.Batch == (Hash{}) || len(r.Effects) > MaxRepairItems || len(r.FeeOutputs) > MaxRepairItems*(MaxOutputs+2) || (!r.Applied && (len(r.Effects) != 0 || len(r.FeeOutputs) != 0)) || (r.Applied && len(r.Effects) == 0) {
-		return nil, ErrRule
-	}
-	e := new(Encoder)
-	e.U16(repairBatchResultTag)
-	e.Fixed(r.Batch[:])
-	e.Optional(r.Applied)
-	e.U32(uint32(len(r.Effects)))
-	seen := make(map[OutputID]bool, len(r.Effects))
-	for _, x := range r.Effects {
-		if x.Output == (OutputID{}) || seen[x.Output] || x.ParentFact == (SpendFactID{}) || x.ConsumerFact == (SpendFactID{}) || x.ConsumerTx == (TxID{}) || x.Amount == 0 || x.Debit == (Hash{}) || x.Input >= MaxInputs {
-			return nil, ErrRule
-		}
-		seen[x.Output] = true
-		e.Fixed(x.Output[:])
-		e.Fixed(x.ParentFact[:])
-		e.Fixed(x.ConsumerFact[:])
-		e.Fixed(x.ConsumerTx[:])
-		e.U32(x.Input)
-		e.U64(x.Amount)
-		e.Fixed(x.Debit[:])
-	}
-	e.U32(uint32(len(r.FeeOutputs)))
-	for i, f := range r.FeeOutputs {
-		if _, err := (ExecutionResult{Applied: true, FeeOutputs: []FeeOutput{f}}).MarshalBinary(); err != nil {
-			return nil, err
-		}
-		if i > 0 {
-			p := r.FeeOutputs[i-1]
-			n := bytes.Compare(p.Transaction[:], f.Transaction[:])
-			if n > 0 || (n == 0 && p.Index >= f.Index) {
-				return nil, ErrRule
-			}
-		}
-		e.Fixed(f.Transaction[:])
-		e.U32(f.Index)
-		encodeOutput(e, f.Output)
-	}
-	if len(e.Data()) > MaxRequestBytes {
-		return nil, ErrEncoding
-	}
-	return e.Data(), nil
-}
-func IsRepairBatchResult(b []byte) bool {
-	return len(b) >= 2 && uint16(b[0])<<8|uint16(b[1]) == repairBatchResultTag
-}
-func DecodeRepairBatchResult(b []byte) (r RepairBatchResult, err error) {
-	if len(b) > MaxRequestBytes {
-		return r, ErrEncoding
-	}
-	d := NewDecoder(b)
-	if d.U16() != repairBatchResultTag {
-		return r, ErrEncoding
-	}
-	copy(r.Batch[:], d.Fixed(32))
-	r.Applied = d.Optional()
-	if n := d.Count(MaxRepairItems); n > 0 {
-		r.Effects = make([]RepairEffect, n)
-	}
-	for i := range r.Effects {
-		x := &r.Effects[i]
-		copy(x.Output[:], d.Fixed(32))
-		copy(x.ParentFact[:], d.Fixed(32))
-		copy(x.ConsumerFact[:], d.Fixed(32))
-		copy(x.ConsumerTx[:], d.Fixed(32))
-		x.Input = d.U32()
-		x.Amount = d.U64()
-		copy(x.Debit[:], d.Fixed(32))
-	}
-	if n := d.Count(MaxRepairItems * (MaxOutputs + 2)); n > 0 {
-		r.FeeOutputs = make([]FeeOutput, n)
-	}
-	for i := range r.FeeOutputs {
-		f := &r.FeeOutputs[i]
-		copy(f.Transaction[:], d.Fixed(32))
-		f.Index = d.U32()
-		f.Output = decodeOutput(d)
-	}
-	if err = d.Done(); err != nil {
-		return r, err
-	}
-	_, err = r.MarshalBinary()
-	return
-}
-
-// DecodePublicExecution projects authenticated public effects for followers.
-// Callers must first verify the block and its execution-result commitment.
-func DecodePublicExecution(network Hash, command, data []byte) (ExecutionResult, []RepairEffect, error) {
-	if !IsRepairBatch(command) {
-		r, err := DecodeExecution(data)
-		return r, nil, err
-	}
-	c, err := DecodeRepairBatch(command)
-	if err != nil {
-		return ExecutionResult{}, nil, err
-	}
-	r, err := DecodeRepairBatchResult(data)
-	if err != nil {
-		return ExecutionResult{}, nil, err
-	}
-	if c.Network != network || r.Batch != c.ID() {
-		return ExecutionResult{}, nil, ErrAuth
-	}
-	if r.Applied {
-		if len(r.Effects) != len(c.Items) {
-			return ExecutionResult{}, nil, ErrAuth
-		}
-		for i, x := range c.Items {
-			e := r.Effects[i]
-			if e.Output != x.Output || e.Input != x.Input || e.Debit != ReserveDebitIdentity(network, x.Output) {
-				return ExecutionResult{}, nil, ErrAuth
-			}
-		}
-	}
-	return ExecutionResult{Applied: r.Applied, FeeOutputs: r.FeeOutputs}, r.Effects, nil
 }
