@@ -1,0 +1,24 @@
+结项意见
+
+本项可以结项：依据你提供的十二轮结果与原始数据复核说明，此前“最终版本在持续普通流中的代表性组合负载”证据缺口已补足。
+
+最有决定力的是P组的执行顺序：四副本均先确认全部目标已赔付、已回款，表示仍未提交或物化；恢复适配后，表示又在普通发送窗口内完成。 这支持经济闭合不依赖适配可用性，而不只是最终状态碰巧一致。R的24项自动恢复、C/P的48项赔付与回款及完整账务审计，共同补齐了其余目标路径。
+
+应避免把依赖解耦写成性能隔离：实际存在准入背压，且N也触顶，不能将全部背压归因于修复；组中位数差异不构成性能改进证据，有限流完成、排空也不等于稳定100 TPS容量。CAL本金与备付恢复不代表费用中性——C/P每轮额外40 FUEL应保留。读者微基准及长期存储增长不属于本项已完成结论。
+
+英文替换段落
+
+Economic closure proceeded during ordinary traffic with all adaptation endpoints paused. Twelve N/R/C/P runs on unchanged build 721800c used 14 colocated services, synchronous members, NoSync ordinary wallets, and authorized organization-paid FUEL. Each combined 7,000 ordinary payments targeting 100 payments/s for 70 s with eight cross-organization parent–child pairs. R automatically fulfilled all 24 withheld sources without compensation; C/P reserve debits and repayments each totaled 4,800 CAL. In P, all four replicas confirmed repayment of all eight targets per run before adaptation resumed, with no target representation committed or materialized; representations subsequently committed and materialized during ordinary traffic. All 84,192 payments passed closure and conservation audits. Some runs reached the 256-outstanding cap; two P runs also reached the 64-fast-request cap. The largest run-level dispatch-lag P95 was 895.879 ms. Background drain was observed 0.815–1.356 s after the last ordinary send.
+
+对应中文
+
+在所有适配端点暂停时，经济闭合仍在普通付款流期间完成。十二轮N/R/C/P实验使用未改动的721800c节点构建，部署14个同机服务，采用成员同步提交、普通钱包NoSync及明确授权的组织代付FUEL。每轮将目标为100笔/秒、持续70秒的7000笔普通付款，与八对跨组织父子付款混合运行。R组全部24个扣留来源自动执行并履行义务，无需赔付；C/P组备付扣款与回款分别合计4800 CAL。P组每轮四副本均在恢复适配前确认八项目标全部回款，且目标表示尚未提交或物化；恢复后，表示提交和物化仍在普通付款流期间完成。全部84192笔付款通过闭合与守恒审计。部分轮次触及256笔总未完成上限，P组两轮还触及64笔快速请求并发上限；逐轮派发滞后P95的最大值为895.879毫秒。末笔普通付款发送后0.815–1.356秒，观察到后台任务全部排空。
+
+ChatGPT can make mistakes. Check important info.
+Latest response
+
+
+
+
+Pro
+Response complete

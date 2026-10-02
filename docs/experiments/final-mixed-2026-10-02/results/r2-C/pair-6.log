@@ -1,0 +1,86 @@
+EVENT {"fact":"754eea46c678bd91c85171b7cffe4df0d989beb6b3d2e5af0fc24427923bffd7","input":6,"output":"940ec99637875e4431b99859f693c3691b7b3c29e443f84078aa1f383f98b0db","sent_unix_ns":1790951724582467000,"stage":"parent_ready","unix_ns":1790951724680470000}
+EVENT {"fact":"d83bcd28bfb6d4eb8519db94564b0c7d68cd25cc1ea601811d9a7632cf420893","input":6,"output":"c8c6cdaeb5c930aa001268d53d8d61d7344a0a05c69bb34d9f7373af9c75d27e","sent_unix_ns":1790951724756596000,"stage":"child_ready","unix_ns":1790951724859525000}
+EVENT {"input":6,"stage":"child_public_observed","unix_ns":1790951726660846000}
+Child finalized; observing withheld-source outcome.
+EVENT {"input":6,"obligation":{"AnchorHeight":28,"Output":[148,14,201,150,55,135,94,68,49,185,152,89,246,147,195,105,27,123,60,41,228,67,248,64,120,170,31,56,63,152,176,219],"Issuer":"798ad5bfa2784648dd20522a2ca6c7550ad71b45fc2a2fb8f603e973f3e5a8c6","Config":"ac5930da9caf75f4aa633af09c8a84ee3e034394465965e5231e8008f48916fa","Certificate":[117,78,234,70,198,120,189,145,200,81,113,183,207,254,77,240,217,137,190,182,179,210,229,175,15,194,68,39,146,59,255,215],"Consumer":[216,59,205,40,191,182,212,235,133,25,219,148,86,75,12,125,104,205,37,204,30,166,1,129,29,154,118,50,207,66,8,147],"Transaction":[71,0,206,189,20,171,118,73,129,104,119,48,0,194,236,14,19,218,146,157,35,176,226,85,79,204,47,134,247,151,12,80],"Input":0,"Amount":100,"Deadline":1790951755,"Status":2},"stage":"compensation_observed","unix_ns":1790951757809982000}
+EVENT {"input":6,"stage":"late_source_submit_start","unix_ns":1790951757824641000}
+EVENT {"input":6,"stage":"source_repaid_observed","unix_ns":1790951758909897000}
+EVENT {"input":6,"stage":"materialization_observed","unix_ns":1790951759272650000}
+{
+  "child_block_observed_ms": 1904.245125,
+  "child_fast_ms": 102.925834,
+  "child_output": "c8c6cdaeb5c930aa001268d53d8d61d7344a0a05c69bb34d9f7373af9c75d27e",
+  "compensation_observed_ms": 33053.377042,
+  "late_parent_reserve_recovered": true,
+  "parent_fast_ms": 98.000334,
+  "parent_output": "940ec99637875e4431b99859f693c3691b7b3c29e443f84078aa1f383f98b0db",
+  "parent_withheld": true,
+  "physical_repair": {
+    "DeadlineUnix": 1790951755,
+    "DeadlineObservedUnixNS": 1790951758946825000,
+    "ProbeRequests": 9,
+    "ProbeErrors": 0,
+    "ProbeTimeNS": 75895792,
+    "MaxProbeNS": 44333000,
+    "Nodes": [
+      {
+        "URL": "http://127.0.0.1:32100",
+        "CommittedUnixNS": 1790951759243496000,
+        "MaterializedUnixNS": 1790951759243496000,
+        "Snapshot": {
+          "Committed": true,
+          "Materialized": true,
+          "IdentityStable": true,
+          "BytesChanged": true,
+          "CommitHeight": 83,
+          "TargetHeight": 27,
+          "Revision": 1
+        }
+      },
+      {
+        "URL": "http://127.0.0.1:32101",
+        "CommittedUnixNS": 1790951759262500000,
+        "MaterializedUnixNS": 1790951759262500000,
+        "Snapshot": {
+          "Committed": true,
+          "Materialized": true,
+          "IdentityStable": true,
+          "BytesChanged": true,
+          "CommitHeight": 83,
+          "TargetHeight": 27,
+          "Revision": 1
+        }
+      },
+      {
+        "URL": "http://127.0.0.1:32102",
+        "CommittedUnixNS": 1790951758948889000,
+        "MaterializedUnixNS": 1790951759271398000,
+        "Snapshot": {
+          "Committed": true,
+          "Materialized": true,
+          "IdentityStable": true,
+          "BytesChanged": true,
+          "CommitHeight": 83,
+          "TargetHeight": 27,
+          "Revision": 1
+        }
+      },
+      {
+        "URL": "http://127.0.0.1:32103",
+        "CommittedUnixNS": 1790951759272649000,
+        "MaterializedUnixNS": 1790951759272649000,
+        "Snapshot": {
+          "Committed": true,
+          "Materialized": true,
+          "IdentityStable": true,
+          "BytesChanged": true,
+          "CommitHeight": 83,
+          "TargetHeight": 27,
+          "Revision": 1
+        }
+      }
+    ]
+  },
+  "physical_repair_observed_ms": 34516.0445,
+  "timing_origin": "wallet_http_submit_v4"
+}

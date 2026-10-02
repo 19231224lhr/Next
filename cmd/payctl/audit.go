@@ -53,13 +53,14 @@ func audit(args []string) error {
 		return e
 	}
 	type nodeReport struct {
-		Name                                 string
-		Approvals, Pending, Payments, Closed int
-		PrivateProofRecords                  int `json:",omitempty"`
-		CAL, FUEL, Rewards, Burned           string
-		StateHash, Gap                       string               `json:",omitempty"`
-		Revisions                            int                  `json:",omitempty"`
-		Recovery                             *sourceRecoveryAudit `json:",omitempty"`
+		Name                                                             string
+		Approvals, Pending, Payments, Closed                             int
+		RetainedPayments, RetainedPaymentBytes, RetainedCertificateBytes int `json:",omitempty"`
+		PrivateProofRecords                                              int `json:",omitempty"`
+		CAL, FUEL, Rewards, Burned                                       string
+		StateHash, Gap                                                   string               `json:",omitempty"`
+		Revisions                                                        int                  `json:",omitempty"`
+		Recovery                                                         *sourceRecoveryAudit `json:",omitempty"`
 	}
 	var report []nodeReport
 	var directState string
@@ -75,6 +76,38 @@ func audit(args []string) error {
 				return e
 			}
 			item.Pending = len(outbox)
+			if node.Binary == "member" || node.Binary == "gateway" {
+				kind := state.KeyInstall
+				if node.Binary == "gateway" {
+					kind = state.KeyCollected
+				}
+				var cursor []byte
+				for {
+					rows, err := v.(state.ScanView).Scan(state.Key(kind), cursor, 512)
+					if err != nil {
+						return err
+					}
+					if len(rows) == 0 {
+						break
+					}
+					for _, row := range rows {
+						item.RetainedPayments++
+						item.RetainedPaymentBytes += len(row.Value)
+						if network.Direct != nil {
+							p, err := protocol.DecodeDirectPayment(row.Value)
+							if err != nil {
+								return err
+							}
+							cert, err := p.Certificate.MarshalBinary()
+							if err != nil {
+								return err
+							}
+							item.RetainedCertificateBytes += len(cert)
+						}
+						cursor = row.Key
+					}
+				}
+			}
 			if node.Binary == "member" {
 				approvals, e := records[state.Approval](v, state.KeyApproval)
 				if e != nil {

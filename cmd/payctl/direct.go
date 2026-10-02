@@ -27,8 +27,17 @@ func demoDirect(args []string) error {
 	withhold := flags.Bool("withhold-parent", false, "certify parent but withhold its submission to exercise compensation")
 	recoverSource := flags.Bool("recover-source", false, "expect exposed certificate to recover withheld source without publisher")
 	waitPhysical := flags.Bool("wait-repair", false, "observe all physical repairs after late-source recovery")
+	events := flags.Bool("events", false, "print experiment observation timestamps as EVENT JSON lines")
+	observeFor := flags.Duration("observe-for", 0, "keep experiment wallets following blocks for this duration")
 	if err := flags.Parse(args); err != nil {
 		return err
+	}
+	emit := func(stage string, fields map[string]any) {
+		if *events {
+			fields["stage"], fields["unix_ns"], fields["input"] = stage, time.Now().UnixNano(), *index
+			raw, _ := json.Marshal(fields)
+			fmt.Println("EVENT", string(raw))
+		}
 	}
 	var lab cfg.Lab
 	if err := cfg.Read(filepath.Join(*dir, "lab.json"), &lab); err != nil {
@@ -120,6 +129,7 @@ func demoDirect(args []string) error {
 	httpClient := transport.NewHTTPClient(10 * time.Second)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
+	observeUntil := time.Now().Add(*observeFor)
 	defer blockfollow.Start(ctx, cancel, db0, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w0.PrepareBlock)()
 	defer blockfollow.Start(ctx, cancel, db1, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w1.PrepareBlock)()
 	var sent time.Time
@@ -181,6 +191,7 @@ func demoDirect(args []string) error {
 		return err
 	}
 	parentFast := time.Since(sent)
+	emit("parent_ready", map[string]any{"sent_unix_ns": sent.UnixNano(), "fact": protocol.Hash(pc.QC.Fact).String(), "output": protocol.Hash(pc.Summary.OutputID(0)).String()})
 	child, err := build(n.Organizations[1], protocol.Input{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(0), Evidence: protocol.Hash(pc.QC.Fact)}, parent.Body.Outputs[0], desc0, 2)
 	if err != nil {
 		return err
@@ -198,6 +209,7 @@ func demoDirect(args []string) error {
 		return err
 	}
 	childFast := time.Since(sent)
+	emit("child_ready", map[string]any{"sent_unix_ns": sent.UnixNano(), "fact": protocol.Hash(cc.QC.Fact).String(), "output": protocol.Hash(cc.Summary.OutputID(0)).String()})
 	public := transport.NewCommitteeClient(n.CommitteeURLs[0])
 	var finalElapsed time.Duration
 	ticker := time.NewTicker(25 * time.Millisecond)
@@ -219,6 +231,7 @@ func demoDirect(args []string) error {
 		}
 	}
 	report := map[string]any{"timing_origin": "wallet_http_submit_v4", "parent_fast_ms": float64(parentFast) / float64(time.Millisecond), "child_fast_ms": float64(childFast) / float64(time.Millisecond), "child_block_observed_ms": float64(finalElapsed) / float64(time.Millisecond), "parent_output": protocol.Hash(pc.Summary.OutputID(0)).String(), "child_output": protocol.Hash(cc.Summary.OutputID(0)).String(), "parent_withheld": *withhold}
+	emit("child_public_observed", map[string]any{})
 	fmt.Println("Child finalized; observing withheld-source outcome.")
 	if *withhold {
 		url := n.CommitteeURLs[0] + "/v3/obligations/" + protocol.Hash(pc.Summary.OutputID(0)).String()
@@ -231,10 +244,12 @@ func demoDirect(args []string) error {
 				if err == nil && *recoverSource && ob.Status == rules.DirectFulfilled {
 					report["autonomous_source_observed_ms"] = float64(time.Since(sent)) / float64(time.Millisecond)
 					report["compensation_avoided"] = true
+					emit("source_fulfilled_observed", map[string]any{"obligation": ob})
 					break
 				}
 				if err == nil && ob.Status == rules.DirectRepaired {
 					report["compensation_observed_ms"] = float64(time.Since(sent)) / float64(time.Millisecond)
+					emit("compensation_observed", map[string]any{"obligation": ob})
 					break
 				}
 			}
@@ -249,6 +264,7 @@ func demoDirect(args []string) error {
 			if err != nil {
 				return err
 			}
+			emit("late_source_submit_start", map[string]any{})
 			if err = public.Submit(ctx, raw); err != nil {
 				return err
 			}
@@ -259,6 +275,7 @@ func demoDirect(args []string) error {
 				}
 				if ok {
 					report["late_parent_reserve_recovered"] = true
+					emit("source_repaid_observed", map[string]any{})
 					break
 				}
 
@@ -281,11 +298,15 @@ func demoDirect(args []string) error {
 		}
 		report["physical_repair"] = trial
 		report["physical_repair_observed_ms"] = float64(time.Since(sent)) / float64(time.Millisecond)
+		emit("materialization_observed", map[string]any{})
 		if err := cfg.Write(path, report); err != nil {
 			return err
 		}
 	}
 	pretty, _ := json.MarshalIndent(report, "", "  ")
 	fmt.Println(string(pretty))
+	if remaining := time.Until(observeUntil); remaining > 0 {
+		return budgetPause(ctx, remaining)
+	}
 	return nil
 }
