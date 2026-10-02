@@ -4,6 +4,8 @@
 
 代码与状态转换的逐项对应见 [C3 安全审查](../research/c3-security-review-2026-10-02/README.md)；当前论文同步修改见[清单](../research/c3-security-review-2026-10-02/paper-change-list.md)。
 
+2026-10-02 联合评审后补充：[定点审查与来源执行边界](../research/review-step1-2026-10-02/README.md)、[历史读者契约](historical-reader-contract.md)。已获证来源仍须满足全局 Intent 等公共执行规则；补交不意味着无条件上链。
+
 本文定义当前分支对第三项贡献的补强。正常付款仍是一轮组织取证后可续花，委员会仍从区块公开结果驱动钱包和成员更新；新增工作只处理来源交付失败及到期责任。
 
 ## 1. 三个不同的问题

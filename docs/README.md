@@ -4,6 +4,8 @@
 
 | 文档 | 用途与状态 |
 | --- | --- |
+| [联合评审第①项：代码审查与执行边界](research/review-step1-2026-10-02/README.md) | 资金消费、来源补交、额度恢复、赔付防重及身份映射；规则—函数—正反测试对应 |
+| [历史资金表示的读者契约](design/historical-reader-contract.md) | 固定已执行前缀、内部 Canonical 视图、决定与义务独立读取；逻辑／物理版本隔离 |
 | [当前 C3 安全审查与证明更新](research/c3-security-review-2026-10-02/README.md) | `7a2517e` 来源补交、独立赔付决定、零经济效果表示及新增回归；当前入口 |
 | [论文同步修改清单](research/c3-security-review-2026-10-02/paper-change-list.md) | 英／中文正文、算法、证明和实验的逐文件更新计划；PDF 尚未完成同步 |
 | [系统设计与证明建模基线](design/system.md) | 身份与状态、完整付款及赔付流程、资金与权限公式、假设和待证明性质 |

@@ -460,6 +460,18 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		}
 	}
 	checkObserved(false)
+	if err := db.View(func(v state.ReadView) error {
+		logical, revision, err := redaction.Canonical(v, blocks, 1)
+		if err != nil || revision.Number != 1 || !bytes.Equal(logical.Data.Txs[0], command.TransactionBytes) {
+			t.Fatal("logical reader waited for physical installation", err)
+		}
+		if !bytes.Equal(blocks.LoadBlock(1).Data.Txs[0], childRaw) {
+			t.Fatal("test must observe a still-original physical block")
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < 2; i++ {
 		if err = db.View(func(v state.ReadView) error { return redaction.Materialize(v, blocks, repairID) }); err != nil {
 			t.Fatal(err)
@@ -591,6 +603,19 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		if !reflect.DeepEqual(ledgers[i-1], snapshot(replayDB)) {
 			t.Fatalf("storage backend changed ledger at height %d", i)
 		}
+		if i == 1 {
+			// A verified older state prefix must not borrow a later physical
+			// revision, even when replay uses an already-materialized store.
+			if err := replayDB.View(func(v state.ReadView) error {
+				logical, revision, err := redaction.Canonical(v, blocks, 1)
+				if err != nil || revision.Number != 0 || !bytes.Equal(logical.Data.Txs[0], childRaw) {
+					t.Fatal("old prefix reader leaked a later physical revision", err)
+				}
+				return err
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 	for _, storage := range []appstore.Store{db, replayDB} {
 		if err = storage.View(func(v state.ReadView) error {
@@ -601,6 +626,14 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 			credit, _, err := state.Load[struct{ Credit rules.CoverageBalance }](v, state.Key(100, pc.QC.Fact[:]))
 			if credit.Credit.Paid != 100 || credit.Credit.Recovered != 100 || credit.Credit.Discharged != 0 {
 				t.Fatal("late parent did not reconcile gross loss and recovery")
+			}
+			logical, revision, err := redaction.Canonical(v, blocks, 1)
+			if err != nil || revision.Number != 1 || !bytes.Equal(logical.Data.Txs[0], command.TransactionBytes) {
+				t.Fatal("repayment removed the authorized historical debit representation", err)
+			}
+			ob, found, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(output))
+			if err != nil || !found || ob.Status != rules.DirectRecovered {
+				t.Fatal("historical debit must be read separately from current repayment", err)
 			}
 			return err
 		}); err != nil {

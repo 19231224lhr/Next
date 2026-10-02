@@ -50,6 +50,10 @@ type Task struct {
 
 // Canonical reads application-committed revisions, not the background worker's
 // materialized view. Worker timing can never change consensus execution.
+// The caller supplies a state snapshot from a verified committed prefix and a
+// height within that prefix. This is an internal view, not an authentication
+// check for a block returned by an untrusted peer. Physical installation may
+// lag behind this logical revision; compensation is recorded independently.
 func Canonical(v state.ReadView, bs *cmtstore.BlockStore, height int64) (*types.Block, Revision, error) {
 	revision, found, err := state.Load[Revision](v, RevisionKey(height))
 	if err != nil {

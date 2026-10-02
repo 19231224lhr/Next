@@ -19,9 +19,13 @@ precommit. `TestStableHashIdentity` covers aliases, arrival orders and execution
 of the exact committed bytes in an isolated process. See the
 [security connection and evidence](../../docs/research/security-analysis-validation-2026-09-27/hardening.md).
 
-Only an application-committed exact RepairInput can authorize ReviseBlock.
+An application-committed exact RepairInput or RepairBatch authorizes the
+historical representation and its materialization. CompensationDecision first
+executes the monetary change at its own new public height, independently of
+adaptation. Representation and installation do not execute that change again.
 Original bytes are retained for replay; current parts are genuinely rewritten.
-Monetary changes execute at the new repair height, never retrospectively.
+The internal Canonical reader uses a verified application-state snapshot, not
+hash compatibility alone. See the [reader contract](../../docs/design/historical-reader-contract.md).
 
 The cryptographic package is supplied by this application's root module. This
 directory is a patch source bundle, not a standalone Comet distribution.

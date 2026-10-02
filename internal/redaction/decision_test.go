@@ -191,6 +191,14 @@ func TestCompensationBeforeAdaptation(t *testing.T) {
 		if ob.Status != rules.DirectRepaired {
 			t.Fatal("gap not closed")
 		}
+		canonical, revision, err := redaction.Canonical(v, bs, 1)
+		if err != nil || revision.Number != 0 || !bytes.Equal(canonical.Data.Txs[0], childRaw) {
+			t.Fatal("compensation must not imply an installed or logical representation", err)
+		}
+		todo, found, err := state.Load[rules.DirectRepairTodo](v, rules.DirectRepairKey(out))
+		if err != nil || !found || todo.Decision != decision || todo.DecisionHeight != 3 {
+			t.Fatal("unchanged representation lost its independent debit authority", err)
+		}
 		return err
 	}); err != nil {
 		t.Fatal(err)
@@ -227,6 +235,18 @@ func TestCompensationBeforeAdaptation(t *testing.T) {
 		balance, _, err := state.Load[uint64](v, rules.AccountKey(f.Org.Org, protocol.AssetCAL))
 		if balance != 1_000_000_000 {
 			t.Fatalf("late source did not repay: %d", balance)
+		}
+		ob, found, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(out))
+		if err != nil || !found || ob.Status != rules.DirectRecovered {
+			t.Fatal("current obligation does not expose repayment", err)
+		}
+		todo, found, err := state.Load[rules.DirectRepairTodo](v, rules.DirectRepairKey(out))
+		if err != nil || !found || todo.Decision != decision || todo.DecisionHeight != 3 {
+			t.Fatal("repayment rewrote historical debit authority", err)
+		}
+		canonical, revision, err := redaction.Canonical(v, bs, 1)
+		if err != nil || revision.Number != 0 || !bytes.Equal(canonical.Data.Txs[0], childRaw) {
+			t.Fatal("repayment silently revised historical bytes", err)
 		}
 		return err
 	}); err != nil {
