@@ -8,6 +8,8 @@
 
 ## 阅读与源码
 
+2026-10-02 第②项已新增[最终版本 100 跳连续支付重测](../../experiments/final-continuation-2026-10-02/README.md)，以及[中英文替换段落与整合清单](../../experiments/final-continuation-2026-10-02/paper-snippet.md)。这部分尚待与后续代表性故障负载证据一起整合进 TeX；下列 PDF 和 Overleaf 尚未包含本轮新增数字。
+
 | 文件 | 用途 |
 | --- | --- |
 | [英文正文 PDF](pdf/Next-review-English.pdf) | IEEEtran 双栏英文主稿 |

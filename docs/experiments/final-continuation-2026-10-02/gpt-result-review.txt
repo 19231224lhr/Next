@@ -1,0 +1,33 @@
+六轮已完成，并独立重新审计全部原始JSON。最终版721800c，无生产代码改动。三对FastChainMS：4497.997875 / 64626.602792；4739.972416 / 64475.559875；4556.804500 / 64460.699333。fast中位4556.8045ms、wait中位64475.559875ms，相同末跳认证收款终点，比值14.1493，缩短92.9325%。快速组最后一笔公共观察中位5228.051375ms，全100笔成员关闭观察中位5293.857333ms；最后一笔公共观察略早于全部祖先公共观察（如r1为5228.051375 vs5228.983542），我们已单独列max_i FinalOffset。
+297/297快速后继均实际使用父TXCer，构造晚于父Ready，首次发送早于四委员最早应用commit_done记录，也早于驱动第一次观察到钱包已验证公共结果。注意W是驱动轮询，非钱包内部原始验证事件。四委员每筆提交记录均完整，最小提前量224.785ms，不是边缘时间比较。wait相应三个计数全部0。TXCer779B，首请求1979B，后继2766B。快速组300次请求对应300笔成功；wait组149+116+142次尝试对应300笔成功，重试计入首次发送到收款，未声称此轮逐次定位全部重试原因。
+每轮4副本相等，100付款100费用关闭，CAL守恒、FUEL守恒（含报酬/销毁），100付款费用9400FUEL=8400报酬+1000销毁；待投递0，未结义务0，无赔付。快速组三轮实际登记随后自然Fulfilled的缺口3/2/4项，这才是部分子执行先于父的证据，不由发送时间推导。运行配置同上：同步成员，钱包NoSync，足额固定备付，不自动补资，不作资本/TPS论证。
+请据实给出最终简短评审结论，以及可直接放论文实验小节的英文一段（120词左右）和对应中文，主动突出机制收益、定义同终点与配置，不在正文重复一串免责声明。独立模型范围集中在方法中。我们本轮只归档这项与可替换段落，不提前宣称后续混合故障/读者实验已完成。
+…
+Show more
+Worked for 2m 47s
+Analyzed
+Analyzed
+Analyzed
+ChatGPT said:
+简短评审结论
+
+本项可以结项归档：已补足最终版本、同步成员配置下的100跳正常连续支付证据。 依据你提供的六轮结果及独立JSON复审，组中位数之比为 14.15，整链收款耗时缩短 92.93%，计算一致。
+
+证据层次也已清楚：297项证明凭父证书、先于父交易最早应用提交记录发送；3/2/4项实际缺口才证明部分子交易先于父交易执行。W保留“驱动轮询观察”名称；14.15是包含重试的实际路径耗时比，不解释为已单独测出的纯确认等待成本。该项结项不代表后续混合故障或读者实验完成。
+
+英文替换段落
+
+On final build 721800c, three independent wallets constructed 100-hop chains online using nine services on one Mac, synchronous bbolt member commits, NoSync wallets, and user-paid FUEL. Both modes were timed from the first send to the final recipient’s certificate verification and local recording, including retries. With the committee commit setting at 250 ms, three runs per mode yielded median times of 4.557 s for certified continuation versus 64.476 s for inter-hop public-confirmation waits (14.15×; 92.93% reduction). All 297 fast successors used their parent’s TXCer and were sent before the parent’s earliest recorded application-commit completion across all four committee replicas. Nine missing-input obligations were fulfilled by source execution without compensation. All 600 payments passed replica-agreement, CAL/FUEL-conservation, fee-closure, and outbox-drain audits.
+
+对应中文
+
+在最终版本721800c上，三个独立钱包在线构造100跳支付链，采用单台Mac上的九个服务、成员同步bbolt提交、NoSync钱包及用户自付FUEL。两种模式均从首次发送计时至最后收款人完成证书验证和本地记录，重试时间包含在内。委员会commit参数为250 ms，每种模式运行三轮：证书续花的整链耗时中位数为4.557秒，逐跳等待公共确认则为64.476秒，后者为前者的14.15倍，耗时缩短92.93%。快速组全部297个后继均使用父交易的TXCer，并在四个委员会副本中最早记录的父交易应用提交完成之前发送。实际形成的九项缺失输入义务均由源交易执行履行，无需赔付。全部600笔付款通过副本一致性、CAL／FUEL守恒、费用关闭及outbox排空审计。
+
+ChatGPT can make mistakes. Check important info.
+Latest response
+
+
+
+
+Pro
+Response complete
