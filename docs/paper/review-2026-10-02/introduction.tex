@@ -1,121 +1,18 @@
 \section{Introduction}
 \label{sec:introduction}
 
-In a UTXO ledger, a payment spends an output that an earlier transaction
-created. If the recipient must wait until that transaction executes
-publicly, every hop of a payment chain adds a confirmation delay.
-Consider Alice paying Bob 100 CAL, with Bob forwarding the received
-output to Carol. To forward this output before public execution, Bob needs verifiable
-evidence that its value is backed. If Bob's payment then executes first, the ledger has
-consumed an output that Alice's transaction has not yet created, and the
-missing 100 CAL needs an identified source of funds. The accounting must
-also stay correct whether Alice's transaction arrives before Bob's, after
-it, or never.
+In a UTXO ledger, each payment spends outputs of earlier transactions, so if recipients wait for public execution, every hop of a payment chain adds a confirmation delay. Suppose Alice pays Bob 100 CAL and Bob forwards it to Carol before Alice's payment executes. If Bob's payment executes first, the ledger consumes an output that does not yet exist, and the missing 100 CAL needs an identified, funded source, whether Alice's transaction arrives later or never.
 
-Certificate-based payment systems already separate recipient-side
-usability from public processing. FastPay and Zef support low-latency
-certified payments, and Sui Lutris combines broadcast and consensus paths
-for different kinds of state access~\cite{fastpay,zef,lutris}.
-Payment-channel protocols reach rapid transfers through channel
-relationships and their liquidity~\cite{blitz,donner}. Next addresses how certified payments are funded on a native ledger when the source of a spent output has not yet executed. A certified output whose source
-has not yet executed should support a publicly executed successor, and an
-identified party with funds set aside should answer for the missing
-source. Users spend their own routed outputs, registered organizations
-back unresolved sources, and counterparties need no prefunded channel
-path.
+The most direct alternative is to wait for public execution at every hop, which our evaluation uses as a control. Certificate-based systems separate recipient usability from public processing: FastPay and Zef support low-latency certified payments, and Sui Lutris combines broadcast and consensus paths for different kinds of state access~\cite{fastpay,zef,lutris}. Payment channels reach rapid transfers through channel liquidity~\cite{blitz,donner}. Next asks how a native ledger funds a certified payment whose source has not executed, with registered organizations rather than channels standing behind it.
 
-Four coupled problems arise. First, certificates circulate before public
-registration. Accounting that starts from publicly recorded gaps misses commitments that
-already exist, so signing capacity must cover the outstanding CAL liability
-of every certified payment, including payments never published. Second, a source may arrive after the
-committee has compensated its missing value. The late arrival must not pay
-the same value both to the guarantor that advanced it and to the recipient
-who already spent it, or delay itself would move funds. Third, a client
-may hold the material of a source and never submit it. The issuer's own members should be able to resubmit an available source
-before compensation becomes due, while compensation should proceed
-without waiting for the historical adaptation service. Fourth, once a source has been compensated, a reader
-of the stored history should be able to see which reserve funded the
-consumed input. Recording that fact must preserve the owner
-authorization, the output identifiers, and the commitments that
-successors reference. A stable transaction hash alone does not specify
-or authorize such a change.
+Three difficulties are coupled. Certificates circulate before public registration, so accounting from public gaps misses existing commitments. A late source must not pay both the guarantor that advanced the value and the recipient who already spent it. A client may hold a source and never submit it. Certification and public execution also carry different duties: a certificate fixes outputs and assigns liability to its issuer, while public execution decides which payment the ledger accepts.
 
-Next fixes payment rights and assigns unresolved sources to their direct
-issuers. An output certificate (TXCer) binds a payment's outputs to an
-identified issuing organization. After verifying and atomically recording
-an output and its TXCer, the recipient requests a successor through the
-output's designated consumption organization. The request carries certificates for its direct inputs. Owner authorization, spend
-state, fees, and resource limits are checked separately.
+Our insight is that the party answerable for a missing source is already named by the certificate that travels with the output. Next charges the gap to that direct issuer instead of tracing ancestors, bounds every signed certificate's liability by reserve-backed signing capacity, and closes an unresolved obligation by a public decision without changing stored history. The design has three contributions.
 
-If a certified input is still missing from public creation state, the
-committee atomically consumes it, records a direct obligation against the
-issuer, and creates the child outputs. The child outputs are final while
-the obligation is open. The block that carries the child also carries the
-certificate of the payment that created the consumed output. Members of
-the issuing organization that approved that payment rebuild it from their
-stored approvals and resubmit it, without new signatures. If the source
-executes, the obligation is fulfilled. If it remains absent when a compensation decision executes after its
-deadline, that decision debits the issuer's reserve,
-which supplies the missing backing, and the recipient receives no second
-credit. The decision needs no threshold adaptation. A source that arrives
-later repays the compensating issuer in the same transition and creates no
-second output for the recipient. When all sources eventually execute,
-delay changes only the temporary exposure of reserves, and the final
-allocation of principal is the same as without delay.
+\noindent\textbf{C1: A layered architecture for one-round continuation.} Members lock inputs and reserve capacity atomically before signing; one parallel round yields a TXCer. The recipient verifies and records the output and can request a successor at once, carrying only certificates of its direct inputs. Replication and public submission run in the background.
 
-The compensation decision is itself a public record that closes the
-obligation. Representation commands then replace the funding reference of the
-consumed input with the reserve reference, under the existing commitments.
-The stored block names the reserve debit that funded the input and still
-verifies against its original block identity, so a reader can check the
-funding source of a designated historical input in the block itself.
-Wallets, synchronization, and replay continue to read original commands.
-We organize the design into three contributions with distinct
-responsibilities.
+\noindent\textbf{C2: Direct responsibility with source decoupling.} Public execution atomically consumes a missing certified input and records an obligation against its issuer. The successor's block publishes the source's certificate, so the original signers can resubmit the source from stored approvals. After the deadline, a public decision debits the issuer's reserve without threshold adaptation, and a late source repays it. Each approval reserves the full CAL output, change included, until the payment executes. For four-member organizations and a four-validator committee with at most one static Byzantine member each, we prove unique consumption and that signing capacity covers the outstanding CAL liability of every certificate, published or not. For a finite, acyclic, conflict-free payment set that contains the sources of its certified inputs and executes each payment once, all orders of arrival and compensation end with the same CAL holdings and reserve balances.
 
-\noindent\textbf{C1: A layered architecture for one-round continuation.}
-We separate member certification, recipient delivery, evidence
-replication, and public execution. A member locks inputs and reserves
-capacity atomically before it signs. One parallel certification round produces a TXCer. INSTALL replicates
-complete material within the organization, while public submission
-proceeds independently; both run in the background. Registered organizations use one evidence interface within and
-across organizations, and payment principal stays separate from guarantor
-reserves.
+\noindent\textbf{C3: Authorized historical representation.} Restricted chameleon-hash commands replace the funding reference of a compensated input with the reserve reference, preserving owner authorizations, successor references, and the complete BlockID. An honest replica that has executed prefix $H$ can read, at the original coordinates $(h,j,k)$, a checkable funding representation naming the reserve debit. The permanent decision remains the economic basis; a successfully executed Revision and Task authorize the exact bytes. Representation stays off the payment path and costs extra records and local maintenance.
 
-\noindent\textbf{C2: Direct responsibility with funded, delay-neutral
-accounting.} We define the atomic missing-input transition and its closure
-paths: fulfillment by the source, compensation by a public decision, and
-repayment by a late source. For fixed input and certificate shapes, the
-ancestry evidence of a request does not grow with transfer depth. Under
-the fixed-membership Byzantine model, we prove unique consumption and
-asset conservation, and we prove that signing capacity bounds the
-outstanding CAL liability of certificates, including unpublished ones. For a
-finite set of non-conflicting payments whose sources all execute, any
-interleaving of arrivals and compensations ends with the same CAL holdings
-and reserve balances as undelayed execution.
-
-\noindent\textbf{C3: Evidence-driven source resolution with
-identity-preserving representation.} We let the original signers resubmit a source from the certificate that
-its successor publishes, and separate compensation decisions from threshold
-adaptation. Restricted representation commands have no economic effect and
-preserve owner authorizations, output references, and the complete block
-identity, including its part-set header. Commands targeting one block share
-adaptation of the affected parts' final representations, while installation
-advances directly to a committed revision. For a fixed set of decided slots,
-the final body does not depend on how the commands are grouped.
-
-We evaluate two builds on one M4 Max host: the continuation and accounting
-baseline, and the decision-first build that adds resubmission and the
-separate compensation decision. On the baseline, 100-hop chains reach
-their last certified receipt in a three-run median of 158.846\,ms, against
-65.204\,s with public-confirmation waits between hops. Three
-30,000-payment runs complete 1,750--1,887 payments/s including background
-drain, and a nine-run matrix closes 21,600 payments and repays all 216
-compensations. On the decision-first build, three-run functional tests show
-a withheld source executing without compensation while the recipient's
-receipt takes about 14\,ms. Compensation and repayment complete with all
-adaptation services paused, and the per-run receipt P50 and P95 ranges overlap in a six-run
-ordinary-path comparison.
-Sections~\ref{sec:model} and~\ref{sec:protocol} define the design, and
-Sections~\ref{sec:security} and~\ref{sec:evaluation} develop its safety
-argument and evaluation.
+On one M4 Max host with synchronous member commits and unsynchronized wallet stores, a 100-hop chain reaches its last certified receipt in a median 4.557\,s, against 64.476\,s when the same system waits for public execution at each hop. A fourteen-service mixed workload with organization-paid FUEL completes 84,192 payments under bounded concurrency; original signers resolve all 24 sources withheld in the resubmission treatment, and compensation and repayment complete while all adaptation services are paused. In local hot-page reads without object caches, representation lowers point-read P50 by 7.44--12.32\% against an optimized decision index, mainly through block decoding, adding 0.28--2.19\,MiB and one 43--214\,ms maintenance step per repaired block.

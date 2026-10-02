@@ -1,4 +1,4 @@
-\section{Supplementary Experimental Methods}
+\section{Experimental Methods for Archived Builds}
 \label{sec:supp-methods}
 
 \noindent\textbf{Build lineage and deployment.}
@@ -22,12 +22,12 @@ public certificates, the compensation decision, and the separate
 representation commands. It derives from the branch base \texttt{0e7bae5}, a
 documentation-only descendant of \texttt{d99ec92}. The nine functional runs
 use the initial implementation snapshot, whose source-package SHA-256 begins
-\texttt{2c91b0251024322c}. The final snapshot, whose package SHA-256 begins
+\texttt{2c91b0251024322c}. The later snapshot of this series, whose package SHA-256 begins
 \texttt{449b4d4072c99588}, rejects a decision whose position does not match
 committed state before reading any historical block and raises the bounded
 due-decision scan from 8 to 32 entries per round; the ordinary payment path is
 unchanged. The six ordinary-path runs, the full test suite, and the race tests
-use the final snapshot. The audited commit \texttt{f185f73} additionally
+use the later snapshot of this series. The audited commit \texttt{f185f73} additionally
 requires the certificates attached to a payment to correspond one-to-one to
 its certificate inputs, and it does not change the payments accepted in the
 measured workloads. Numbers from the baseline and decision-first builds are
@@ -49,7 +49,7 @@ reported separately.
         short throughput. \\
     Decision-first
       & Base \texttt{0e7bae5}; functional package \texttt{2c91b0251024322c};
-        final snapshot \texttt{449b4d4072c99588}; audited \texttt{f185f73}
+        later series snapshot \texttt{449b4d4072c99588}; audited \texttt{f185f73}
       & Nine functional runs, six ordinary-path runs, regression and race
         tests. \\
     Archived
@@ -86,7 +86,7 @@ configuration from the nine-service results in the main paper.
 \noindent\textbf{Decision-first functional runs.}
 The nine runs use the fourteen-service configuration with 450 initial
 outputs, a disk-backed committee, members in their default NoSync mode, flush
-and gossip settings of 10\,ms, and user-paid FUEL; signatures and all amount
+and gossip settings of 10\,ms, and explicitly authorized organization-funded FUEL; signatures and all amount
 and consumption checks remain enabled. Ordinary-payment stress wallets use the
 NoSync wallet option, and the two-hop fault demonstrations use the default
 wallet mode. In each run, an injected fault prevents the original publisher
@@ -218,7 +218,7 @@ body, and pre-signed successor references. Replay of the original history
 reproduces the application state at every height, and item-wise and
 differently grouped representation of one decided set give the same final
 body and part openings, with 1, 2, 4, and 8 inputs spanning two real parts.
-The full test suite and static checks pass at the final snapshot on Windows
+The full test suite and static checks pass at the later snapshot of this series on Windows
 and macOS, the race detector passes on the member, representation, and
 committee-runtime packages on macOS, and the full suite and static checks pass
 again at the audited commit.

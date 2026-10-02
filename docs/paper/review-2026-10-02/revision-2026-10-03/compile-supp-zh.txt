@@ -1,0 +1,321 @@
+Browser tab: 4, Title: "Next - Review Revision 2026-10-02 - Online LaTeX Editor Overleaf", URL: "https://www.overleaf.com/project/6abeb5a49948f44270284a06#".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 711-724
++						745 button Back to PDF
++							746 text Back to PDF
++								747 text 1
++								748 text Next
++								749 text ：以直接担保实现连续
++								750 text UTXO
++								751 text 支付
++								752 text 补充材料（中文阅读版）
++								753 text Lu Hengrun
++								754 text S1.
++								755 text 原始执行关联的细节
++								756 text 最早的冲突
++								757 text polka
++								758 text 。
++								759 text 固定一个高度，以及第
++								760 text r
++								761 text 轮中针对非空值
++								762 text v
++								763 text 的一份提交证书，并从该证书中选出两名诚
++								764 text 实签署者
++								765 text K
++								766 text 。每名签署者在发出其
++								767 text precommit
++								768 text 之前先锁定
++								769 text v
++								770 text 。证书可以在这些签署者已经推进之后才汇集，
++								771 text 所以它被观察到的时间无关紧要。
++								772 text 假设存在针对不同值的更高轮
++								773 text polka
++								774 text （若
++								775 text nil polka
++								776 text 允许解锁，则也计入）
++								777 text 。取存在这种
++								778 text polka
++								779 text 的最小轮次
++								780 text s > r
++								781 text ，并在
++								782 text s
++								783 text 内取其不同的
++								784 text prevote
++								785 text 全部存在的最早事件
++								786 text τ
++								787 text 。其三名投票者中包含某个
++								788 text m
++								789 text ∈
++								790 text K
++								791 text 。诚实节点
++								792 text 的轮次递增，所以
++								793 text m
++								794 text 在第
++								795 text s
++								796 text 轮的
++								797 text prevote
++								798 text 晚于它在第
++								799 text r
++								800 text 轮的
++								801 text precommit
++								802 text ，而没有解锁理由时，
++								803 text m
++								804 text 必须对其
++								805 text 已锁定的值做
++								806 text prevote
++								807 text 。在中间轮次中重新锁定
++								808 text v
++								809 text ，并不改变这一约束。来自
++								810 text s
++								811 text 以下某一轮的冲突理由，与
++								812 text s
++								813 text 的选取相矛盾；来自第
++								814 text s
++								815 text 轮的冲突理由，必然在
++								816 text m
++								817 text 投出
++								818 text τ
++								819 text 时被计入的那一票之前就已存在，这与
++								820 text τ
++								821 text 的选取
++								822 text 相矛盾。来自
++								823 text s
++								824 text 之上的证据，不可能先于第
++								825 text s
++								826 text 轮中较晚的投票。因此这样的
++								827 text polka
++								828 text 不存在，而更高轮的冲突
++								829 text 提交必然需要它。同一轮中冲突的提交，则需要某个诚实节点做出两次
++								830 text precommit
++								831 text 。这一论证依赖于所述的
++								832 text 锁定转移规则和轮次单调性规则，并不要求及时收到提交证据。
++								833 text 配对、验证与执行。
++								834 text 对候选更新做归纳。本地构造把区块体与其原始分片配对，远程补全则由经检查的分片
++								835 text 重建区块体。在
++								836 text Locked
++								837 text 或
++								838 text Valid
++								839 text 值移动时，二者一并转移；切换目标则清除旧区块体。历史安装不触及这
++								840 text 些活跃候选。非空的
++								841 text precommit
++								842 text 紧随匹配的
++								843 text polka
++								844 text 。诚实的
++								845 text prevote
++								846 text 在实际的提案验证或更早的锁定中有其理
++								847 text 由，追溯后者时锁定轮次逐步降低，直到抵达验证。最后的完整身份守卫在
++								848 text Finalize
++								849 text 之前固定原始交易、高
++								850 text 度、时间和其他应用上下文。同步与重放提供相同的原始材料，所以在这一调用边界之内，同一高度的重试
++								851 text 不会通过稳定哈希缓存引入第二个原始区块体。
++								852 text 写集。
++								853 text 正文中的证明依赖于下列写集。赔付决定写入：签发组织备付金账户、义务状态、
++								854 text Promise
++								855 text 与覆盖记
++								856 text 录（
++								857 text Paid
++								858 text 和
++								859 text Remaining
++								860 text ）
++								861 text 、授权额度用量（
++								862 text Spent
++								863 text ）
++								864 text 、公共缺口、消费方的支付记录（
++								865 text Pending
++								866 text 和费用阶段）
++								867 text 、奖
++								868 text 励与退款余额及费用输出、到期索引条目的移除，以及决定记录及其决定索引条目和待历史表示条目。赔付
++								869 text 之后源交易的执行写入偿还：签发组织备付金账户、义务状态（
++								870 text Recovered
++								871 text ）
++								872 text 、覆盖记录（
++								873 text Recovered
++								874 text ）和授权
++								875 text 额度用量（
++								876 text Spent
++								877 text ）
++								878 text 。它不改变决定记录。补交任务只写入成员本地的
++								879 text outbox
++								880 text 。历史表示命令或批处理写入逻
++								881 text 辑修订、头命令、任务或批处理任务及其逐输出引用、队列条目，以及待历史表示条目的移除。安装只写入
++								882 text 本地区块存储的版本及其自身的进度游标。历史表示和安装的写入都不属于经济投影。
++								883 text 固定目标集合的收敛性。
++								884 text 固定一个原始区块体和一组已决定槽位。每个槽位的替换消息是网络和输出的函数，
++								885 text 因此无论如何打包，都以相同的消息替换相同的槽位。若变色龙关系对每个固定的消息与承诺都有唯一的有
++								886 text 效
++								887 text opening
++								888 text （参数正确生成且公开指数与群的阶互素时即成立）
++								889 text ，则每个槽位
++								890 text opening
++								891 text 和每个分片
++								892 text opening
++								893 text 都
++								894 text 是其关系的唯一解。分片上下文取决于高度和分片索引，与修订计数器无关。因此，只要覆盖该集合，历史
++								895 text 表示命令的任何分组或顺序都得到相同的区块体和分片
++								896 text opening
++								897 text 。单条目命令、单个批处理以及中间规模的
++								898 text 批处理，在命令标识、修订号和应用哈希上各不相同。该陈述针对的是最终字节，并如上所述依赖于参数生
++								899 text 成和编码。
++							900 container
++								901 text 2
++								902 text 跟随者更新。
++								903 text 对于从相同的本地状态、配置和游标出发的跟随者，只要两种表示都能解码，相同的固定支付
++								904 text 字段与经认证的结果就诱导出相同的经济更新。可变的资金引用与
++								905 text opening
++								906 text 不选择任何
++								907 text Paid
++								908 text 、
++								909 text Pending
++								910 text 或费
++								911 text 用效果。决定被完整认证，执行结果承诺则认证其效果和费用输出。因此，经济观察与对最新可变历史区块
++								912 text 体的独立验证保持分离。
++								913 text 分析中使用的关系。
++								914 text 三种关系比较的是不同的对象。历史表示的经济惰性，比较一次历史表示或安装步骤前
++								915 text 后的经济投影，并投影掉命令标识、修订计数器和物化任务。固定目标收敛性，比较不同的历史表示命令分
++								916 text 组与顺序为同一原始区块体和同一已决定集合所产生的最终区块体和分片
++								917 text opening
++								918 text 。重放相等性固定整个原
++								919 text 始命令序列及其区块上下文，确定性执行随后重现每个应用哈希。跨历史比较固定经济命令、公共时间和历
++								920 text 史目标坐标，因此投影相等并不能确定整个应用状态相同，也不允许删除区块或给区块重新编号。这三种关
++								921 text 系都不比较以不同顺序安排父交易到达与赔付的历史；正文的延迟中性定理在其自身的假设下做这一比较，
++								922 text 它等同的是最终的
++								923 text CAL
++								924 text 持有者和备付金余额，而不是应用哈希或修订元数据。
++								925 text S2.
++								926 text 最终版本逐轮证据
++								927 text 本节记录正文使用的生产版本
++								928 text 721800c
++								929 text 。连续支付和混合负载使用相同节点二进制及
++								930 text Comet
++								931 text 源码。以下
++								932 text 历史方法和旧版本表格保留各自构建身份，不作为此版本的吞吐测量。
++								933 text 表
++								934 text S1
++								935 text 最终版本连续支付；各时间自首笔实际发送起计，单位秒。
++								936 text 运行
++								937 text 末跳收款
++								938 text 全链公共观察
++								939 text 成员关闭
++								940 text 尝试
++								941 text 缺口
++								942 text r1-fast
++								943 text 4.497998
++								944 text 5.228984
++								945 text 5.293857
++								946 text 100
++								947 text 3
++								948 text r1-wait
++								949 text 64.626603
++								950 text 65.232083
++								951 text 65.284395
++								952 text 149
++								953 text 0
++								954 text r2-fast
++								955 text 4.739972
++								956 text 5.253720
++								957 text 5.295722
++								958 text 100
++								959 text 2
++								960 text r2-wait
++								961 text 64.475560
++								962 text 65.105699
++								963 text 65.154442
++								964 text 116
++								965 text 0
++								966 text r3-fast
++								967 text 4.556805
++								968 text 5.114055
++								969 text 5.129723
++								970 text 100
++								971 text 4
++								972 text r3-wait
++								973 text 64.460699
++								974 text 65.075768
++								975 text 65.124437
++								976 text 142
++								977 text 0
++								978 text 这些成本来自离线成功执行夹具。表示维护包含顺序适配、组装、
++								979 text Finalize
++								980 text 、同步应用
++								981 text Commit
++								982 text 与物化；
++								983 text 共同赔付决定单列。网络、共识等待、公共块保存和提交签名构造不在此计时内。
++								984 text KV
++								985 text 是真实编码记录的逻
++								986 text 辑增量，不是两种独立部署的物理磁盘空间差。
++								987 text S3.
++								988 text 归档构建的实验方法
++								989 text 版本谱系与部署。
++								990 text 结果来自三类版本（表
++								991 link Description: S4, Value: overleaf.com/project/6abeb5a49948f44270284a06#table.4, ID: pdfjs_internal_id_185R
++								992 text S4
++								993 text ）
++								994 text 。
++								995 text 续花与记账基线
++								996 text 以提交
++								997 text d99ec92
++								998 text 为准，实现分层续花和记账
++								999 text 转换；其赔付与历史表示一并提交。制品记录了每个二进制文件的
++								1000 text SHA-256
++								1001 text 指纹和每次运行的配置。九服务
++								1002 text 的续花、赔付与偿还、存储和短时吞吐各系列使用该版本。最初的十四服务配对运行使用相同的单义务规则，
++								1003 text 其时批处理结果标签尚未与直接结果标签分开，跨类型编解码回归测试覆盖了这一分离。基线的存储、内存
++								1004 text 续花和短时吞吐对照中的成员以
++								1005 text GOGC=200
++								1006 text 和
++								1007 text GOMAXPROCS=16
++								1008 text 运行；该覆盖设置不用于委员会、网关
++								1009 text 或钱包进程。
++								1010 text decision-first
++								1011 text 版本
++								1012 text （记账域
++								1013 text DIRECT_ACCOUNTING_V5_DECISION_FIRST
++								1014 text ）实现基于公共证书的补交、赔付
++								1015 text 决定，以及独立的历史表示命令。它源自分支基点
++								1016 text 0e7bae5
++								1017 text ，后者是
++								1018 text d99ec92
++								1019 text 的仅含文档变更的后代。九次
++								1020 text 功能运行使用初始实现快照，
++								1021 text 其源码包
++								1022 text SHA-256
++								1023 text 以
++								1024 text 2c91b0251024322c
++								1025 text 开头。
++								1026 text 该系列后期快照的包
++								1027 text SHA-256
++					1028 tab group
++						1029 tab (selected, settable, boolean) All logs 3, Value: 1, ID: react-aria5568987028-:r19:-tab-all
++						1030 tab (selectable, settable, boolean) Errors 0, Value: 0, ID: react-aria5568987028-:r19:-tab-errors
++						1031 tab (selectable, settable, boolean) Warnings 0, Value: 0, ID: react-aria5568987028-:r19:-tab-warnings
++						1032 tab (selectable, settable, boolean) Info 3, Value: 0, ID: react-aria5568987028-:r19:-tab-info
++					1033 container Log entry with level: typesetting
++						1034 container
++							1035 button Collapse
++								1036 heading Underfull \hbox (badness 10000) in paragraph at lines 23--25, Value: 3
++									1037 text Underfull \hbox (badness 10000) in paragraph at lines 23--25
++								1038 text ‪./zh-supplement-methods.tex, 23‬
++							1039 button Go to code location
++					1040 container Log entry with level: typesetting
++						1041 container
++							1042 button Expand
++								1043 heading Underfull \hbox (badness 1755) in paragraph at lines 23--25, Value: 3
++									1044 text Underfull \hbox (badness 1755) in paragraph at lines 23--25
++								1045 text ‪./zh-supplement-methods.tex, 23‬
++							1046 button Go to code location
++					1047 container Log entry with level: typesetting
++						1048 container
++							1049 button Expand
++								1050 heading Underfull \hbox (badness 10000) in paragraph at lines 27--30, Value: 3
++									1051 text Underfull \hbox (badness 10000) in paragraph at lines 27--30
++								1052 text ‪./zh-supplement-methods.tex, 27‬
++							1053 button Go to code location
++					1054 container Raw logs from the LaTeX compiler
++						1055 button Expand
++							1056 heading Raw logs, Value: 3
++								1057 text Raw logs
++					1058 button Clear cached files
++						1059 text Clear cached files
++					1060 button (collapsed) Other logs and files, ID: dropdown-files-logs-pane, Secondary Actions: Expand
++						1061 text Other logs and files
+The focused UI element is 0 AXWebArea Next - Review Revision 2026-10-02 - Online LaTeX Editor Overleaf, URL: overleaf.com/project/6abeb5a49948f44270284a06#

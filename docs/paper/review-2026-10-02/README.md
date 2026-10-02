@@ -2,17 +2,21 @@
 
 **Next: Enabling Continuous UTXO Payments with Direct Guarantees**
 
-本版本完整描述公开后继证据触发的来源补交、独立公共赔付决定，以及保持完整区块身份的历史表示。机制实现为 `7a2517e`，公共输入证书校验修正与安全审查对应 `f185f73`。英文正文、中文阅读版和两份补充材料采用同一组定义与状态转换。
+**2026-10-03 第⑤轮集中修订。** 本版本完整描述公开后继证据触发的来源补交、独立公共赔付决定，以及保持完整区块身份的授权历史表示。正文的新实验统一对应冻结生产构建 `721800c7de0a6526f58501fb78823d99426b69cb`。英文正文、中文阅读版和两份补充材料采用同一组定义与状态转换。
 
-实验按实际构建分别呈现：`d99ec92` 来源回收基线、decision-first 补强构建及历史 E1–E8。代码修正没有追溯改变旧实验的版本或数字。参见[安全审查](../../research/c3-security-review-2026-10-02/README.md)、[逐文件修改清单](../../research/c3-security-review-2026-10-02/paper-change-list.md)和[本轮编译检查](build-verification.md)。
+旧构建 `d99ec92`、早期 decision-first 补强与 E1–E8 移入补充材料，保留各自原始配置，未追溯改写数字。参见[本轮写作裁决](revision-2026-10-03/decisions.md)、[最终版本安全边界审查](../../research/review-step1-2026-10-02/README.md)、[读者契约](../../design/historical-reader-contract.md)和[编译检查](build-verification.md)。
 
 ## 阅读与源码
 
-第④项已完成[同授权历史读取与维护成本对照](../../experiments/history-reader-2026-10-02/README.md)，提供[中英文候选段落及图表说明](../../experiments/history-reader-2026-10-02/paper-snippet.md)。该项测量本地读取策略，不改生产机制；与②③一并等待统一整合到下列 TeX/PDF 和 Overleaf。
+正文围绕三组新证据组织，各有明确论证职责：
 
-2026-10-02 第②项已新增[最终版本 100 跳连续支付重测](../../experiments/final-continuation-2026-10-02/README.md)，以及[中英文替换段落与整合清单](../../experiments/final-continuation-2026-10-02/paper-snippet.md)。这部分尚待与后续代表性故障负载证据一起整合进 TeX；下列 PDF 和 Overleaf 尚未包含本轮新增数字。
+| 实验与报告 | 正文结果 | 论证职责 |
+| --- | --- | --- |
+| [② 最终版本 100 跳连续支付](../../experiments/final-continuation-2026-10-02/README.md) | 3 轮中位数 4.557 s，对照逐跳等待 64.476 s；297 个后继均早于父交易最早应用提交完成发出 | 证明在线构造的真实连续续花；采用同步成员写盘、NoSync 钱包 |
+| [③ 混合负载 12 轮](../../experiments/final-mixed-2026-10-02/README.md) | 84,192 笔闭合；24 个扣留来源自动补交；48 次赔付及回款；暂停适配仍完成经济闭合 | 检验正常支付与故障路径共存，并报告并发背压及实际发送跨度 |
+| [④ 同授权历史读取](../../experiments/history-reader-2026-10-02/README.md) | 21,600 次查询；点读 P50 降低 7.44%–12.32%；额外逻辑 KV 0.28–2.19 MiB/块、本地维护 43–214 ms/块 | 说明稳定原坐标下授权资金表示的具体读取收益及代价 |
 
-第③项现已完成[最终版本混合负载十二轮对照](../../experiments/final-mixed-2026-10-02/README.md)，84,192 笔全部完成，并准备[对应英文与中文段落](../../experiments/final-mixed-2026-10-02/paper-snippet.md)。②③使用相同生产节点二进制；普通负载方法和费用模式分别披露。本文档仅增加材料入口，TeX/PDF/Overleaf 仍待统一整合，未将旧图表数字默默覆盖。
+两种网络实验使用相同生产节点二进制，分别披露费用与钱包持久化设置。历史读取实验以已验证并执行前缀的诚实本地副本为对象。正文不把这些有限运行当作持续吞吐或远端无状态认证的测量。
 
 | 文件 | 用途 |
 | --- | --- |
@@ -55,7 +59,7 @@ latexmk -xelatex supplement-main-zh.tex
 
 ## 本轮文字修订
 
-英文写作由侧边栏 Claude 起草和复核，Codex 对照协议、数据与源码审计后落入 TeX。参考 Lutris、Zef、Blitz、Mysticeti 及 TDSC 的 SDR、CryptoMaze、Web3 跨链系统、Escaping 等论文的开篇、机制说明和实验表达；本轮进一步对照 Lutris PDF 第 12–13 页、CryptoMaze 第 13 页、Escaping 第 13–14 页的实现与实验组织。学习的是叙事和句法，不复制原句。
+本轮实验章由侧边栏 GPT 起草，摘要、引言、结论和边界段落由新会话 Claude 起草并再次精简，Codex 对照冻结报告与 CSV 审计后落入 TeX。此前精读的 Lutris、Zef、Blitz、Mysticeti 及 TDSC 的 SDR、CryptoMaze、Web3 跨链系统、Escaping 等论文用于参照叙事与句法，不复制原句。草稿、提示词、回答和采纳裁决保存在 [revision-2026-10-03](revision-2026-10-03/)。
 
 - 引言先给出“收款可续花而来源尚未公开执行”的问题，再分配三项贡献的职责；Alice/Bob 例子保留为具体机制说明。
 - 用明确的主体和动作说明补交、赔付和历史表示，减少抽象名词堆叠、重复对比和章节自我介绍。

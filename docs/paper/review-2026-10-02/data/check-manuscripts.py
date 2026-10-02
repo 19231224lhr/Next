@@ -33,7 +33,7 @@ if any(c[k] for c in checks for k in ['unresolved_references','duplicate_labels'
 
 # A translation may reorder references within a sentence, but must not lose them.
 parity = []
-for stem in ["abstract", "introduction", "related", "model", "protocol", "security", "evaluation", "conclusion", "supplement-security", "supplement-methods", "supplement-tables"]:
+for stem in ["abstract", "introduction", "related", "model", "protocol", "security", "evaluation", "conclusion", "supplement-security", "supplement-methods", "supplement-tables", "supplement-current", "supplement-archived"]:
     en = (root / (stem + ".tex")).read_text(encoding="utf-8")
     zh = (root / ("zh-" + stem + ".tex")).read_text(encoding="utf-8")
     for command in ["label", "ref", "eqref", "cite"]:

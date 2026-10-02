@@ -1,0 +1,678 @@
+- complementary "Sidebar":
+  - button "Show sidebar":
+    - generic: 
+- main:
+  - button "IEEE TDSC论文修订：连续UTXO支付与直接担保机制, rename chat":
+    - generic: IEEE TDSC论文修订：连续UTXO支付与直接担保机制
+  - button "More options for IEEE TDSC论文修订：连续UTXO支付与直接担保机制":
+    - generic: 
+  - button "Files":
+    - generic: 
+  - button "Share":
+    - generic: Share
+  - status: Claude finished the response
+  - feed "Chat messages":
+    - paragraph: Use the up and down arrow keys to move between messages.
+    - article "Message 1 of 2":
+      - 'heading "You said: 这是因旧会话额度耗尽新开的接续对话。请不依赖任何旧记忆，以附件为唯一项目依据。我们正在集中修订英文IEEE TDSC论文 Next: Enabling Continuous UTXO Payments with Direct Guarantees。你负责主要文字起草，网页版GPT独立起草实验章，Codex负责证据、代…" [level=2]'
+      - button "writing-evidence.txt":
+        - generic: writing-evidence.txt
+      - generic: writing-evidence.txt
+      - generic: TXT
+      - paragraph:
+        - text: "这是因旧会话额度耗尽新开的接续对话。请不依赖任何旧记忆，以附件为唯一项目依据。我们正在集中修订英文IEEE TDSC论文 Next: Enabling Continuous UTXO Payments with Direct Guarantees。你负责主要文字起草，网页版GPT独立起草实验章，Codex负责证据、代码语义和LaTeX审核整合。附件writing-evidence.txt包含旧英文正文多个完整TeX章节、最新安全边界审查、读者契约和三组最终版完整实验报告。旧文与新报告冲突时，以明确的新证据为准。当前生产冻结721800c，没有改生产代码也不再扩大实验。旧158ms、2000TPS等保留到补充材料，不再作为当前正文主结果。"
+        - text: "本轮请直接交付：FILE: abstract.tex（150–200英文词）；FILE: introduction.tex（650–850词，可更紧凑）；FILE: conclusion.tex（100–150词）；以上对应中文文件zh-*.tex，标签引用一致。每文件独立LaTeX代码块。再给model/protocol/security精确段落修改建议，标明插入位置与英文/中文。保留原证明，不发明新密码学保证、不新增未核实引文，可沿用附件已有cite keys。"
+        - text: 三个贡献分工：C1面向连续支付的分层担保架构，单轮TXCer后续花、后台复制/公共执行；C2直接责任驱动的来源解耦，公开证书补交、独立赔付、迟到回款和覆盖未公开证书的预算论证；C3授权历史表示，受限变色龙哈希修复保持授权/后继引用/完整BlockID，经济闭合无需等表示。需要充分说明C3具体接口收益与成本，而不是称改写为赔付所必需。
+        - text: 必须准确：IntentID=Digest(INTENT,Network,Subject,Nonce)，跨组织独立输入可有两个QC但公共全局Intent只接受一个TxID，故QC不保证无条件公共执行/回款；用户可恶意。未执行来源全额CAL含找零不释放；部分批准也占额度。固定4成员/3票/每组织及委员会至多1静态拜占庭，超f界限要说明，不能假称证明一般n。CAL延迟中性是有限无环来源闭合无冲突集合在两种执行都成功一次的终态CAL等价，不含FUEL。
+        - text: 历史读者是已验证并执行公共前缀H的诚实本地副本，同一读事务V_H查询原坐标(h,j,k)。永久决定和义务状态是经济依据；Revision/Task的成功执行授权确切表示。CH或BlockID匹配不能独立认证远端数据。OriginalFunding未必未赔；ReserveFunding回款后仍表示历史垫付。请把TxID、共识Tx.Hash、DataHash、完整BlockID分别说明，原始分片revision=0/opening=1与后续授权改写有别。
+        - text: 新结果：同步成员100跳链4.557s，对同系统逐跳等待64.476s，钱包NoSync，297/297后继首发早于四委员最早父应用Commit完成；这是机制内对照。14服务混合N/R/C/P各3轮共84192付款，组织授权代付FUEL，暂停适配仍完成赔付/回款，有背压需如实报告。读取21600本地热页无对象缓存查询，点读7.44–12.32%差异主要布局解码；新增0.28–2.19MiB逻辑记录/块、一次43–214ms本地顺序维护，不含网络共识。
+        - text: 语气要求：专业平实，突出已证实机制，条件准确紧邻主张，不写工作流水账，不用夸张形容词，不重复免责。引言强调问题、最直接替代方案、洞见、三贡献。不要列新实验计划；现在需要可以直接审核落地的正文。
+      - generic: Message collapsed
+      - button "Show more":
+        - generic: Show more
+      - toolbar "Message actions":
+        - time: 8 minutes ago
+        - button "Retry":
+          - generic: 
+        - button "Edit":
+          - generic: 
+        - button "Copy":
+          - generic: 
+        - status
+      - status
+    - article "Message 2 of 2":
+      - 'heading "Claude responded: 我先读取附件，以它作为唯一依据。 正在通读附件（已读到约第640行：旧正文各章与安全分析），接下来读最新安全边界审查、读者契约和三组实验报告，再起草。 Supplement 部分是旧文，以新证据为准；我直接读最新审查、读者契约和三份实验报告（第1650行起）。 材料已读完（旧TeX、安全边界审查、读者契约、三份最终报…" [level=2]'
+      - generic: Ran 18 commands, read a file
+      - button "Ran 18 commands, read a file" [expanded] [active]:
+        - generic: 
+      - status: Ran 18 commands, read a file
+      - generic: 我先读取附件，以它作为唯一依据。
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - button "Read first part of evidence file writing-evidence.txt":
+        - generic: Read first part of evidence file
+        - generic "/mnt/user-data/uploads/writing-evidence.txt": writing-evidence.txt
+        - generic: 
+      - button "Read truncated intro/rest writing-evidence.txt":
+        - generic: Read truncated intro/rest
+        - generic "/mnt/user-data/uploads/writing-evidence.txt": writing-evidence.txt
+        - generic: 
+      - button "Read model middle writing-evidence.txt":
+        - generic: Read model middle
+        - generic "/mnt/user-data/uploads/writing-evidence.txt": writing-evidence.txt
+        - generic: 
+      - button "Continue reading protocol and later writing-evidence.txt":
+        - generic: Continue reading protocol and later
+        - generic "/mnt/user-data/uploads/writing-evidence.txt": writing-evidence.txt
+        - generic: 
+      - button "Read security truncated section writing-evidence.txt":
+        - generic: Read security truncated section
+        - generic "/mnt/user-data/uploads/writing-evidence.txt": writing-evidence.txt
+        - generic: 
+      - generic "正在通读附件（已读到约第640行：旧正文各章与安全分析），接下来读最新安全边界审查、读者契约和三组实验报告，再起草。":
+        - generic: 正在通读附件（已读到约第640行：旧正文各章与安全分析），接下来读最新安全边界审查、读者契约和三组实验报告，再起草。
+        - button "正在通读附件（已读到约第640行：旧正文各章与安全分析），接下来读最新安全边界审查、读者契约和三组实验报告，再起草。":
+          - generic: 
+      - button "Continue reading evidence file writing-evidence.txt":
+        - generic: Continue reading evidence file
+        - generic "/mnt/user-data/uploads/writing-evidence.txt": writing-evidence.txt
+        - generic: 
+      - button "Continue reading evidence file writing-evidence.txt":
+        - generic: Continue reading evidence file
+        - generic "/mnt/user-data/uploads/writing-evidence.txt": writing-evidence.txt
+        - generic: 
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic "Supplement 部分是旧文，以新证据为准；我直接读最新审查、读者契约和三份实验报告（第1650行起）。":
+        - generic: Supplement 部分是旧文，以新证据为准；我直接读最新审查、读者契约和三份实验报告（第1650行起）。
+        - button "Supplement 部分是旧文，以新证据为准；我直接读最新审查、读者契约和三份实验报告（第1650行起）。":
+          - generic: 
+      - button "Read security review and reader contract writing-evidence.txt":
+        - generic: Read security review and reader contract
+        - generic "/mnt/user-data/uploads/writing-evidence.txt": writing-evidence.txt
+        - generic: 
+      - button "Read experiment reports writing-evidence.txt":
+        - generic: Read experiment reports
+        - generic "/mnt/user-data/uploads/writing-evidence.txt": writing-evidence.txt
+        - generic: 
+      - button "Read truncated mixed-load results writing-evidence.txt":
+        - generic: Read truncated mixed-load results
+        - generic "/mnt/user-data/uploads/writing-evidence.txt": writing-evidence.txt
+        - generic: 
+      - generic "Drafting the abstract text and checking its word count.":
+        - generic: Drafting the abstract text and checking its word count.
+        - button "Drafting the abstract text and checking its word count.":
+          - generic: 
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic: Trimming the word count to fit the limit.
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic: Shrinking the character count by trimming spacing.
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic "Counting words while handling tricky numeric and percentage formats.":
+        - generic: Counting words while handling tricky numeric and percentage formats.
+        - button "Counting words while handling tricky numeric and percentage formats.":
+          - generic: 
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic: Trimming the word count to fit the limit.
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic: Trimming the explanation down to fit the word limit.
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic "摘要已压到约196–198词。接下来起草引言和结论并核对字数，随后写中文对应稿和三章修改建议。":
+        - generic: 摘要已压到约196–198词。接下来起草引言和结论并核对字数，随后写中文对应稿和三章修改建议。
+        - button "摘要已压到约196–198词。接下来起草引言和结论并核对字数，随后写中文对应稿和三章修改建议。":
+          - generic: 
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic "Tightening the proof claims and trimming the evaluation details.":
+        - generic: Tightening the proof claims and trimming the evaluation details.
+        - button "Tightening the proof claims and trimming the evaluation details.":
+          - generic: 
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic: Trimming the draft to fit the word limit.
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic "Shortening further sentences while preserving key claims.":
+        - generic: Shortening further sentences while preserving key claims.
+        - button "Shortening further sentences while preserving key claims.":
+          - generic: 
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic: Verifying the count and reworking the closure argument.
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic "撰写中文摘要并核对关键结论表述。":
+        - generic: 撰写中文摘要并核对关键结论表述。
+        - button "撰写中文摘要并核对关键结论表述。":
+          - generic: 
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic: Preparing Chinese file outputs and accompanying suggestions.
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic "Drafting reader-scope limits and planning the Chinese translation.":
+        - generic: Drafting reader-scope limits and planning the Chinese translation.
+        - button "Drafting reader-scope limits and planning the Chinese translation.":
+          - generic: 
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic: Checking word-count discrepancies from punctuation handling.
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic: Recounting word totals across the document's sections.
+      - generic "Ran a command":
+        - generic: Ran a command
+        - button "Ran a command":
+          - generic: 
+      - generic "撰写中文摘要并压缩补充建议内容。":
+        - generic: 撰写中文摘要并压缩补充建议内容。
+        - button "撰写中文摘要并压缩补充建议内容。":
+          - generic: 
+      - paragraph:
+        - text: 三个文件的英文稿和对应中文稿已写好，字数按数学式计1词计：摘要约196词，引言约840词，结论约139词。我没有编译LaTeX，三个文件里的
+        - code: \ref
+        - text: 和
+        - code: \cite
+        - text: 都沿用附件已有的键。
+      - paragraph: "FILE: abstract.tex"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "\\begin{abstract}"
+          - generic: Continuous payments let a recipient spend an output before its creating transaction executes publicly. Next lets a recipient verify a quorum-signed output certificate (TXCer) and request a successor after one certification round; public execution follows asynchronously. If the successor executes first, the committee records an obligation against the issuer. Original signers can resubmit a withheld source; otherwise, after the deadline, a public decision debits the issuer's reserve, and a late source repays it. Restricted chameleon-hash commands record the debit in the stored block, preserving authorizations, successor references, and the complete BlockID. For four-member organizations and a four-validator committee with at most one static Byzantine member each, we prove unique consumption, funding of every certificate's outstanding CAL liability, and, for source-closed, conflict-free payment sets, delay-neutral terminal CAL holdings. A certificate does not guarantee public execution, because one global intent admits one payment. With synchronous member commits on one host, 100 hops reach the last certified receipt in a median 4.557\,s versus 64.476\,s with per-hop waiting. In twelve mixed runs (84,192 payments, bounded concurrency), compensation and repayment complete with adaptation paused. Representation lowers local point-read time by 7.44--12.32\% and adds 0.28--2.19\,MiB per repaired block.
+          - generic: "\\end{abstract}"
+          - generic: "\\begin{IEEEkeywords}"
+          - generic: UTXO payments, payment guarantees, Byzantine fault tolerance, authorized historical representation.
+          - generic: "\\end{IEEEkeywords}"
+      - paragraph: "FILE: introduction.tex"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "\\section{Introduction}"
+          - generic: "\\label{sec:introduction}"
+          - generic: In a UTXO ledger, a payment spends an output that an earlier transaction created. If the recipient must wait for that transaction to execute publicly, every hop of a payment chain adds a confirmation delay. Suppose Alice pays Bob 100 CAL and Bob forwards the output to Carol before Alice's transaction executes. Bob needs verifiable evidence that the value is backed. If Bob's payment executes first, the ledger consumes an output that does not yet exist, and the missing 100 CAL needs an identified source. The accounting must remain correct whether Alice's transaction arrives before Bob's, after it, or never.
+          - generic: "The most direct alternative is to wait for public execution at every hop, which Section~\\ref{sec:evaluation} uses as a control. Certificate-based systems already separate recipient-side usability from public processing: FastPay and Zef support low-latency certified payments, and Sui Lutris combines broadcast and consensus paths for different kinds of state access~\\cite{fastpay,zef,lutris}. Payment channels reach rapid transfers through channel relationships and their liquidity~\\cite{blitz,donner}. Next asks how a native ledger funds a certified payment whose source has not yet executed, with registered organizations, not prefunded channels, standing behind unresolved sources."
+          - generic: "Four difficulties are coupled. Certificates circulate before public registration, so accounting that starts from publicly recorded gaps misses existing commitments. A late source must not pay both the guarantor that advanced the value and the recipient who already spent it. A client may hold a source and never submit it. And a certificate is not a promise of execution: $\\mathsf{IntentID}=\\operatorname{Digest}(\\texttt{INTENT},\\mathit{Network},\\mathit{Subject},\\mathit{Nonce})$ is global for a payer on a network, so a malicious user can obtain quorum certificates (QCs) from two organizations for two payments with independent inputs, although public execution accepts only one TxID for that intent. A certificate thus bounds its issuer's liability without guaranteeing that the source executes or repays."
+          - generic: Our insight is that the party answerable for a missing source is already named by the certificate that travels with the output. Next charges the gap to that direct issuer rather than tracing ancestry, bounds every signed certificate's liability by reserve-backed signing capacity, and closes the obligation by a public decision that needs no rewrite of stored history. We organize the design into three contributions.
+          - generic: "\\noindent\\textbf{C1: A layered architecture for one-round continuation.} A member locks inputs and reserves signing capacity atomically before signing, and one parallel round yields a TXCer. The recipient verifies and records the output atomically and can request a successor at once; the request carries the certificates of its direct inputs, so for fixed shapes its evidence does not grow with depth. Replication within the organization and public submission run in the background, and payment principal stays separate from guarantor reserves."
+          - generic: "\\noindent\\textbf{C2: Direct responsibility with source decoupling.} If a certified input is missing, public execution atomically consumes it and records an obligation against the issuer. The successor's block carries the source's certificate, so original signers can resubmit the source from stored approvals. After the deadline, a public decision debits the issuer's reserve without threshold adaptation, and a late source repays it. An unexecuted source keeps its full CAL amount, including change, reserved in signing capacity, and partial approvals also occupy capacity. For four-member organizations and a four-validator committee with at most one static Byzantine member each, we prove unique consumption and that every certificate's outstanding CAL liability, published or not, is funded. For finite, acyclic, source-closed, conflict-free payment sets in which every payment succeeds once, terminal CAL holdings do not depend on arrival order or compensation timing; FUEL is excluded. We do not claim these proofs for general committee sizes."
+          - generic: "\\noindent\\textbf{C3: Authorized historical representation.} Restricted chameleon-hash commands replace the funding reference of a compensated input with the reserve reference, preserving the owner authorization, successor references, and the complete BlockID. The permanent decision is the economic basis, and a successfully executed Revision and Task authorize the exact representation; matching hashes alone do not. Economic closure neither waits for it nor requires it. Its interface benefit is that an honest replica that has verified and executed prefix $H$ can read, in one transaction at the original coordinates $(h,j,k)$, which reserve funded the input. The costs are additional stored records and a local maintenance step per repaired block."
+          - generic: "On one M4 Max host, mechanism-internal controls on the frozen build give the following results. With synchronous member commits and unsynchronized wallet stores, a 100-hop chain reaches its last certified receipt in a median 4.557\\,s, against 64.476\\,s when each hop waits for public execution, and in all 297 fast-chain successors the first send precedes the earliest committee commit of the parent. A fourteen-service mixed workload with organization-paid FUEL completes 84,192 payments in three runs per treatment under client backpressure, reported in Section~\\ref{sec:evaluation}; original signers resolve all 24 withheld sources, and compensation and repayment complete with adaptation paused. In 21,600 local hot-page queries without object caches, representation lowers point-read P50 by 7.44--12.32\\% against an optimized decision index, mainly through block decoding, at 0.28--2.19\\,MiB of added records per block and one 43--214\\,ms local maintenance step that excludes network and consensus."
+      - paragraph: "FILE: conclusion.tex"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "\\section{Conclusion}"
+          - generic: "\\label{sec:conclusion}"
+          - generic: Next lets a recipient keep spending on certified evidence while the issuing organization answers, from a funded reserve, for a source that has not executed. For four-member organizations and a four-validator committee with at most one static Byzantine member each, we prove unique consumption, funded outstanding CAL liability, and, for source-closed, conflict-free payment sets, delay-neutral terminal CAL holdings. A certificate does not guarantee public execution, since one global intent admits one payment. On one host, a 100-hop chain reaches its last certified receipt in 4.557\,s against 64.476\,s with per-hop waiting, and compensation and repayment complete with adaptation paused. Authorized representation exposes the reserve debit at the original coordinates for honest replicas that executed the prefix, at the cost of added records and maintenance. These results do not cover general committee sizes, untrusted remote readers, or incentives.
+      - paragraph: "FILE: zh-abstract.tex"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "\\begin{abstract}"
+          - generic: 连续支付允许收款方在创建输出的交易公开执行之前花费该输出。Next让收款方验证由法定人数签名的输出证书（TXCer），经一轮认证即可请求后继付款，公开执行异步随后进行。若后继先执行，委员会记录针对发行方的义务。原签发成员可补交被扣留的来源；否则期限届满后由公开决定扣减发行方备付，迟到的来源再偿还该扣减。受限变色龙哈希命令把这笔扣减记录进已存储区块，同时保持授权、后继引用和完整BlockID。对于四成员组织和四验证者委员会（每个组织及委员会至多一个静态拜占庭成员），我们证明唯一消费、每份证书未结CAL负债均有资金覆盖，并证明在来源闭合、无冲突的付款集合上终态CAL持有量对延迟中性。证书并不保证公开执行，因为一个全局Intent只接受一笔付款。在单机、成员同步提交的配置下，100跳到最后一次证书到账的中位时间为4.557\,s，逐跳等待为64.476\,s。十二轮混合负载（84,192笔付款，并发受限）中，适配服务暂停时赔付与回款仍然完成。表示使本地点读时间降低7.44--12.32\%，每个被修复块新增0.28--2.19\,MiB记录。
+          - generic: "\\end{abstract}"
+          - generic: "\\begin{IEEEkeywords}"
+          - generic: UTXO支付，支付担保，拜占庭容错，授权历史表示。
+          - generic: "\\end{IEEEkeywords}"
+      - paragraph: "FILE: zh-introduction.tex"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "\\section{引言}"
+          - generic: "\\label{sec:introduction}"
+          - generic: 在UTXO账本中，付款花费的是更早交易创建的输出。若收款方必须等待该交易公开执行，付款链的每一跳都会增加一次确认延迟。设Alice向Bob支付100 CAL，Bob在Alice的交易执行之前就把该输出转给Carol。Bob需要可验证的证据，证明这笔价值有支撑。若Bob的付款先执行，账本便消费了一个尚不存在的输出，缺失的100 CAL需要一个明确的来源。无论Alice的交易先于Bob的到达、后于Bob的到达还是始终不到达，账目都必须正确。
+          - generic: "最直接的替代方案是在每一跳都等待公开执行，第~\\ref{sec:evaluation}节将其作为对照。基于证书的支付系统已把收款方可用性与公开处理分开：FastPay和Zef支持低延迟的证书化支付，Sui Lutris针对不同类型的状态访问结合广播与共识路径~\\cite{fastpay,zef,lutris}。支付通道依靠通道关系及其流动性实现快速转账~\\cite{blitz,donner}。Next要回答的是：当来源尚未执行时，原生账本如何为一笔已认证的付款提供资金，由注册组织而非预充值通道为未解决的来源担责。"
+          - generic: "四个难点相互耦合。证书在公开登记之前就已流通，因此从公开记录的缺口出发的核算会漏掉已存在的承诺。迟到的来源不能既向垫付价值的担保方付款，又向已花费该输出的收款方付款。客户端可能持有来源却永不提交。并且证书不是执行承诺：$\\mathsf{IntentID}=\\operatorname{Digest}(\\texttt{INTENT},\\mathit{Network},\\mathit{Subject},\\mathit{Nonce})$ 对同一网络上的同一付款人全局有效，因此恶意用户可以就两笔输入相互独立的付款从两个组织分别取得法定人数证书（QC），而公开执行对该Intent只接受一个TxID。证书因此界定了其发行方的负债，却不保证来源会执行或回款。"
+          - generic: 我们的洞见是：对缺失来源负责的一方，已由随输出流通的证书指明。Next把缺口记在该直接发行方名下，而不追溯祖先；用有备付支撑的签发额度约束每份已签证书的负债；并以一个无需改写已存历史的公开决定关闭义务。我们把设计组织为三项贡献。
+          - generic: "\\noindent\\textbf{C1：面向一轮续花的分层担保架构。}成员在签名前原子地锁定输入并预留签发额度，一轮并行请求产生TXCer。收款方验证并原子记录该输出后即可请求后继付款；请求携带其直接输入的证书，因此对固定形状，其证据不随深度增长。组织内的复制与公开提交在后台进行，付款本金与担保方备付相互分离。"
+          - generic: "\\noindent\\textbf{C2：直接责任驱动的来源解耦。}若被认证的输入缺失，公开执行原子地消费它，并记录针对发行方的义务。后继所在区块携带来源的证书，原签发成员可据已存批准补交来源。期限届满后，公开决定扣减发行方备付，无需门限适配，迟到的来源再偿还该扣减。未执行的来源在签发额度中保留其全部CAL金额（含找零），部分批准同样占用额度。对于四成员组织和四验证者委员会（每个组织及委员会至多一个静态拜占庭成员），我们证明唯一消费，并证明每份证书的未结CAL负债无论是否已公开均有资金覆盖。对于有限、无环、来源闭合、无冲突且每笔付款都成功执行一次的付款集合，终态CAL持有量不依赖到达顺序与赔付时点；FUEL不在其内。我们不主张这些证明适用于一般委员会规模。"
+          - generic: "\\noindent\\textbf{C3：授权历史表示。}受限变色龙哈希命令把已赔付输入的资金引用替换为备付引用，同时保持所有者授权、后继引用和完整BlockID。永久决定是经济依据，成功执行的Revision与Task授权确切的表示；仅哈希匹配不构成授权。经济闭合既不等待表示，也不依赖表示。其接口收益是：已验证并执行公共前缀$H$的诚实副本，可在一次读事务中按原坐标$(h,j,k)$读出该输入由哪份备付垫付。代价是每个被修复块额外的存储记录和一次本地维护。"
+          - generic: "在一台M4 Max主机上，以冻结版本做的机制内对照给出以下结果。在成员同步提交、钱包存储不同步的配置下，100跳链到最后一次证书到账的中位时间为4.557\\,s，而每跳等待公开执行的对照为64.476\\,s；快速链的全部297个后继中，首次发送都早于其父付款最早的委员会提交。十四服务混合负载使用组织代付FUEL，每种处理三轮，共完成84,192笔付款，客户端存在背压，见第~\\ref{sec:evaluation}节；原签发成员解决了补交处理中全部24个被扣留来源，适配服务全部暂停时赔付与回款仍然完成。在21,600次不含对象缓存的本地热页查询中，相对优化决定索引，表示使点读P50降低7.44--12.32\\%，主要来自块解码；代价是每块新增0.28--2.19\\,MiB逻辑记录，以及一次43--214\\,ms的本地维护，不含网络与共识。"
+      - paragraph: "FILE: zh-conclusion.tex"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "\\section{结论}"
+          - generic: "\\label{sec:conclusion}"
+          - generic: Next让收款方在已认证证据上继续花费，而由发行组织以有资金的备付为尚未执行的来源担责。对于四成员组织和四验证者委员会（每个组织及委员会至多一个静态拜占庭成员），我们证明唯一消费、未结CAL负债有资金覆盖，并证明在来源闭合、无冲突的付款集合上终态CAL持有量对延迟中性。证书不保证公开执行，因为一个全局Intent只接受一笔付款。在单机上，100跳链到最后一次证书到账用时4.557\,s，逐跳等待为64.476\,s；适配服务暂停时赔付与回款仍然完成。授权表示让已执行该前缀的诚实副本能在原坐标读出备付扣减，代价是额外的记录与维护。这些结果不涵盖一般委员会规模、不可信远端读者或激励问题。
+      - heading "model.tex 修改建议" [level=3]
+      - paragraph:
+        - strong: M1. 位置：
+        - text: §
+        - code: sec:model-participants
+        - text: ，段落 “Faults and cryptography” 末尾，接在 “messages may be delayed arbitrarily.” 之后。新增。
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "The arguments cover exactly this configuration: four members per organization with three signatures, and four validators with three votes, with at most one static Byzantine member in each organization and in the committee. They use that any two three-of-four quorums share at least two members, so one honest member lies in both. They are not proofs for general $n$, and beyond one Byzantine member per organization or in the committee the stated guarantees do not apply. Users may be malicious, and no assumption restricts how they choose nonces."
+          - generic: "% --- ZH ---"
+          - generic: 本文论证只覆盖这一固定配置：每个组织四名成员、三个签名，委员会四名验证者、三票，每个组织及委员会至多一个静态拜占庭成员。论证用到任意两个四取三法定人数至少共享两名成员，因此其中必有一名诚实成员。这些并非一般$n$的证明；任一组织或委员会的拜占庭成员超过一个时，所述保证不再适用。用户可以是恶意的，且没有任何假设限制其选取nonce的方式。
+      - paragraph:
+        - strong: M2. 位置：
+        - text: §
+        - code: sec:model-certificates
+        - text: 第一段，接在 “and the owner authorizes the transaction.” 之后。新增。
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "Each payment carries $\\mathsf{IntentID}=\\operatorname{Digest}(\\texttt{INTENT},\\mathit{Network},\\mathit{Subject},\\mathit{Nonce})$, which names an operation of one payer on one network; it is not a nonce space shared among users. Members keep local intent records per organization, whereas public execution binds an intent to one TxID in the same atomic transition that executes the payment successfully. Two organizations can therefore certify, from independent inputs, two payments with the same subject and nonce and both obtain QCs, but at most one executes publicly."
+          - generic: "% --- ZH ---"
+          - generic: "每笔付款携带$\\mathsf{IntentID}=\\operatorname{Digest}(\\texttt{INTENT},\\mathit{Network},\\mathit{Subject},\\mathit{Nonce})$，它标识同一网络上某一付款人的一次操作，并不是所有用户共享的nonce空间。成员按组织保存本地Intent记录，而公开执行在成功执行该付款的同一原子转换中把Intent绑定到唯一TxID。因此两个组织可以就同一Subject和nonce、输入相互独立的两笔付款各自认证并都取得QC，但至多一笔能公开执行。"
+      - paragraph:
+        - strong: M3. 位置：
+        - text: §
+        - code: sec:model-certificates
+        - text: 第二段（TXCer 段）最后一句，替换 “The certificate authenticates the issuer's guarantee and is neither an asset nor a registered public obligation.”
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: The certificate authenticates the issuer's guarantee and is neither an asset, a registered public obligation, nor an unconditional guarantee of public execution or repayment.
+          - generic: "% --- ZH ---"
+          - text: 证书认证发行方的担保，它既不是资产，也不是已登记的公开义务，更不是公开执行或回款的无条件保证。
+      - paragraph:
+        - strong: M4. 位置：
+        - text: §
+        - code: sec:model-layers
+        - text: “Certification and continuation”，接在 “these overlapping capacities constrain commitments but do not increase the backing funds.” 之后。新增。
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: A source that has not executed keeps its full $a_T$ reserved, change included, and a partial approval with fewer than three signatures also occupies capacity; a timeout never releases it.
+          - generic: "% --- ZH ---"
+          - generic: 尚未执行的来源保留其全部$a_T$（含找零）的占用；不足三个签名的部分批准同样占用额度，超时不会释放它。
+      - paragraph:
+        - strong: M5. 位置：
+        - text: §
+        - code: sec:model-participants
+        - text: ，段落 “Adaptation and progress” 之后新增一个段落，标题为 Historical reader。新增。
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "\\noindent\\textbf{Historical reader.}"
+          - generic: "A reader is an honest replica that has verified and executed public prefix $H$ under the shared network, genesis, organization configuration, rules, and threshold public key; receiving a commit proof for $H$ is not the same as having executed it. Within one read transaction on state $V_H$, it queries original coordinates $(h,j,k)$ with $1\\le h\\le H$: block height, index in the original full transaction list, and input index. It reads three items separately: the logical representation with its revision, the successful decision with its immutable obligation snapshot, and the obligation status as of $H$. The permanent decision and the obligation state are the economic basis; a successfully executed Revision and Task authorize the exact representation. A matching chameleon hash or BlockID does not by itself authenticate data from an untrusted remote source, and this contract defines no external stateless proof."
+          - generic: "% --- ZH ---"
+          - generic: "\\noindent\\textbf{历史读者。}"
+          - generic: 读者是在共同的网络、创世、组织配置、规则和门限公钥下，已验证并执行公共前缀$H$的诚实副本；收到高度$H$的提交证明不等于已执行到$H$。在状态$V_H$的一次读事务内，读者按原坐标$(h,j,k)$查询，其中$1\le h\le H$，分别为区块高度、原始完整交易列表中的索引和输入索引。读者分别读取三项内容：带修订号的逻辑表示、成功决定及其不可变义务快照、截至$H$的义务状态。永久决定和义务状态是经济依据；成功执行的Revision与Task授权确切的表示。变色龙哈希或BlockID匹配本身不能认证来自不可信远端的数据，本契约也未定义外部无状态证明。
+      - paragraph:
+        - strong: M6. 位置：
+        - text: §
+        - code: sec:model-example
+        - text: “Three outcomes follow” 段末，接在 “If Alice's payment never executes,
+        - math:
+          - math:
+            - generic: G
+            - generic: A
+          - text: G
+          - generic: A
+        - text: bears the loss.” 之后。新增。
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: The same holds if Alice's payment cannot execute because its intent is already bound to another TxID; resubmission does not remove such a conflict.
+          - generic: "% --- ZH ---"
+          - text: 若Alice的付款因其Intent已绑定到另一个TxID而无法执行，结果相同；补交不能消除这类冲突。
+      - heading "protocol.tex 修改建议" [level=3]
+      - paragraph:
+        - strong: P1. 位置：
+        - text: §
+        - code: sec:protocol-certification
+        - text: "，接在式~\\eqref{eq:protocol-identities} 之后那一段末尾 “Verification caches therefore key complete command bytes.” 之后。新增。"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: Under one Network and Subject, an honest wallet uses a fresh payment nonce for every new payment, across organizations and instances; a retry resubmits the same payment with its original authorization. A wallet must not change the nonce and reuse an old certificate, and two facts that share an intent are not merged into one guarantee. The experimental drivers derive nonces from input identities, which is not a general multi-device nonce allocation service.
+          - generic: "% --- ZH ---"
+          - text: 在同一Network与Subject下，诚实钱包对每笔新付款使用新的付款nonce，跨组织、跨实例均如此；重试则以原授权重新提交同一笔付款。钱包不得改动nonce后复用旧证书，共享同一Intent的两个Fact也不合并为一份担保。实验驱动程序从输入身份派生nonce，这不是通用的多设备nonce分配服务。
+      - paragraph:
+        - strong: P2. 位置：
+        - text: §
+        - code: sec:protocol-execution
+        - text: "，Figure~\\ref{fig:protocol-payment} 后那一段末尾，接在 “a failure discards the entire transition.” 之后。新增。"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "The intent check belongs to this evaluation: if the intent of $T$ is already bound to a different TxID, the transition returns a conflict. The binding is written in the same atomic transition that executes a payment successfully, and no production path deletes or rebinds it, so resubmitting the same bytes cannot remove the conflict."
+          - generic: "% --- ZH ---"
+          - generic: Intent检查属于这一求值：若$T$的Intent已绑定到不同的TxID，转换返回冲突。该绑定与付款成功执行写在同一原子转换中，生产路径中没有删除或重新绑定它的分支，因此以相同字节重新提交不能消除冲突。
+      - paragraph:
+        - strong: P3. 位置：
+        - text: §
+        - code: sec:protocol-closure
+        - text: ，CAL 释放段，接在 “and work resources wait for fee closure.” 之后。新增。
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: An unexecuted source keeps its full CAL amount, including change, reserved at each approving member. A compensation does not release it, and a partial approval keeps its debit. Spent FUEL is not restored as unspent fee.
+          - generic: "% --- ZH ---"
+          - text: 未执行的来源在每个批准成员处保留其全部CAL金额（含找零）。赔付不会释放它，部分批准也保留其扣留。已支出的FUEL不会作为未花手续费恢复。
+      - paragraph:
+        - strong: P4. 位置：
+        - text: §
+        - code: sec:protocol-resubmission
+        - text: 末段，替换 “The path needs an original signer that holds the approval, follows the chain, and reaches the committee; a source still absent at its deadline falls to compensation.”
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: The path needs an original signer that holds the approval, follows the chain, and reaches the committee, and it needs that no global intent conflict prevents the source from executing; a source still absent at its deadline falls to compensation. It gives no fixed-time guarantee.
+          - generic: "% --- ZH ---"
+          - text: 该路径需要持有批准的原签发成员跟随区块链并能到达委员会，还需要不存在阻止来源执行的全局Intent冲突；截止时仍未到达的来源由赔付处理。它不提供固定时间保证。
+      - paragraph:
+        - strong: P5. 位置：
+        - text: §
+        - code: sec:protocol-installation
+        - text: ，替换第一段 “Input commitments preserve transaction identity…” 整段。
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "Four identities are kept apart. The payment identity $\\mathsf{id}(T)$ fixes the authorization and commitments, and owner signatures bind it; it is not the consensus transaction hash. The consensus $\\mathit{Tx.Hash}$ of a well-formed \\texttt{UTXO4CH} envelope is a SHA-256 over its header and fixed fields and checks no payment validity. $\\mathit{DataHash}$ is the Merkle root over consensus transaction hashes, and an inclusion proof does not grant revision authority. The complete BlockID $(H_b,P_b)$ keeps the block hash and the original part-set header, and execution and installation compare both. Part commitments are chameleon commitments bound to chain, key, height, and part index, and changed parts carry valid openings to their original commitments. Original consensus parts carry revision~0 and opening~1; original validation requires the correct height and these values, and the application verifies the original payment normally. A revised part cannot pass as a new original execution, and only a committed Task authorizes a rewrite. Replay uses the retained original commands and never executes a revised body as a new payment."
+          - generic: "% --- ZH ---"
+          - generic: "四类身份相互分开。付款身份$\\mathsf{id}(T)$固定授权与承诺，所有者签名绑定它，它不等于共识交易哈希。合法\\texttt{UTXO4CH}封装的共识$\\mathit{Tx.Hash}$是对其头部和固定字段的SHA-256，不检查付款合法性。$\\mathit{DataHash}$是共识交易哈希的Merkle根，单个包含证明不赋予修订权限。完整BlockID $(H_b,P_b)$同时保持区块哈希与原始分片集合头，执行与安装均核对二者。分片承诺是绑定chain、key、height和part index的变色龙承诺，被改变的分片携带指向原承诺的有效开口。原始共识分片使用revision~0和opening~1；原始验证要求正确的高度和这些取值，应用层对原付款做正常验证。修订分片不能冒充新的原始执行，只有已提交的Task才授权改写。重放使用保留的原始命令，不会把修订后的正文作为新付款执行。"
+      - paragraph:
+        - strong: P6. 位置：
+        - text: §
+        - code: sec:protocol-installation
+        - text: 末段，替换从 “A compensation decision alone closes the obligation economically…” 到段末 “…compare this representation with the decision index alone.” 的全部句子。
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "A compensation decision alone closes the obligation economically as an append-only public record. Representation adds an interface: at the consumer's original coordinates $(h,j,k)$, the stored block names the reserve debit for the designated input and still verifies against the original BlockID. A reader still reads the permanent decision and the obligation status for the economic state, and the revised field does not replace them. Batching shares representation work within a block and direct installation coalesces historical writes, and neither adds a round to normal certification. Section~\\ref{sec:eval-repair} reports the read benefit and the storage and maintenance cost of this interface against an optimized decision index."
+          - generic: "% --- ZH ---"
+          - generic: "赔付决定本身就以只追加的公开记录在经济上关闭义务。表示增加了一个接口：在消费者的原坐标$(h,j,k)$处，已存储区块指明指定输入的备付扣减，并仍能对原BlockID验证。读者仍需读取永久决定和义务状态来得到经济状态，修订字段不能取代它们。批处理在块内共享表示工作，直接安装合并历史写入，二者都不为正常认证增加轮次。第~\\ref{sec:eval-repair}节报告该接口相对优化决定索引的读取收益，以及存储与维护成本。"
+      - paragraph:
+        - strong: P7. 位置：
+        - text: §
+        - code: sec:protocol-installation
+        - text: 之后新增子节，label 为
+        - code: sec:protocol-reader
+        - text: 。
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "\\subsection{Reading Funding at Original Coordinates}"
+          - generic: "\\label{sec:protocol-reader}"
+          - generic: "A read at $(h,j,k)$ returns $(H,h,j,k,\\mathit{Funding},\\mathit{revision},\\mathit{decision\\text{-}or\\text{-}absent},\\mathit{obligation}_H)$, assembled from existing functions inside one read transaction on $V_H$. It is a logical tuple, not a deployed network interface. The index $j$ counts the original transaction list and is not renumbered after filtering maintenance commands or failed transactions. The logical body comes from the committed revision in $V_H$ and falls back to the original block only when no revision exists, so physical installation progress, or a block store that already holds a later version during replay, does not change the answer. A revision that exists but cannot be decoded is an error and never falls back to the original. Missing history is reported as unavailable and is not read as the absence of compensation; the contract assumes that the relevant history is not pruned. In a complete, verified, unpruned $V_H$, a missing decision means that none exists as of $H$."
+          - generic: "The three results are not interchangeable. \\texttt{OriginalFunding} means that the slot has not been represented; the input may already be compensated or repaid. \\texttt{ReserveFunding} means that an authorized representation records a reserve advance; it remains after repayment and does not imply a current net loss. Repaired means compensated and not yet recovered, and Recovered means that a late source repaid; neither adds balance for the successor's recipient. The pending-representation index is work state that representation deletes, so it cannot show whether a compensation occurred, whereas the successful decision index can."
+          - generic: "% --- ZH ---"
+          - generic: "\\subsection{按原坐标读取资金表示}"
+          - generic: "\\label{sec:protocol-reader}"
+          - generic: "按$(h,j,k)$读取返回$(H,h,j,k,\\mathit{Funding},\\mathit{revision},\\mathit{decision\\text{-}or\\text{-}absent},\\mathit{obligation}_H)$，由现有函数在$V_H$的一次读事务内组合得到。它是逻辑元组，而不是已部署的网络接口。索引$j$按原始交易列表计数，不因过滤维护命令或失败交易而重新编号。逻辑正文取自$V_H$内已提交的修订，仅在没有修订时才回退到原始区块，因此物理安装进度，或重放时已安装较晚版本的块存储，都不会改变答案。存在修订但无法解码时返回错误，绝不回退到原始版本。历史缺失时报告为不可用，不能解读为没有赔付；契约假定相关历史未被裁剪。在完整、已验证、未裁剪的$V_H$中，缺少决定表示截至$H$不存在该决定。"
+          - generic: "三项结果不可互相替代。\\texttt{OriginalFunding}表示该槽尚未被表示，输入可能已经赔付，甚至已经回款。\\texttt{ReserveFunding}表示已授权的表示记录了备付垫付；它在回款后依然保留，也不意味着当前存在净损失。Repaired表示已赔付、尚未回收，Recovered表示迟到来源已偿还；两者都不为后继的收款人增加余额。待表示索引是表示完成后会删除的工作状态，不能用来判断赔付是否发生，成功决定索引可以。"
+      - heading "security.tex 修改建议" [level=3]
+      - paragraph:
+        - strong: S1. 位置：
+        - text: §
+        - code: sec:security
+        - text: "开头段末，接在 “…specializes the Tendermint locking interface~\\cite{tendermint} to complete block identities.” 之后。新增。"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "The arguments hold for the fixed configuration of Section~\\ref{sec:model-participants}. They use that two three-member quorums of an organization share at least two members, so at least one honest signer lies in both, and that the committee tolerates one static Byzantine validator under three votes. We do not prove them for general $n$. With two Byzantine members in one organization or in the committee, the intersection steps fail and no guarantee is claimed."
+          - generic: "% --- ZH ---"
+          - generic: "这些论证适用于第~\\ref{sec:model-participants}节的固定配置。它们用到：一个组织的两个三成员法定人数至少共享两名成员，因此二者中至少有一名诚实签名者；以及委员会在三票规则下容忍一名静态拜占庭验证者。我们不为一般$n$证明。一个组织或委员会内出现两名拜占庭成员时，相交步骤失效，我们不主张任何保证。"
+      - paragraph:
+        - strong: S2. 位置：
+        - text: §
+        - code: sec:security-decision
+        - text: "，Lemma~\\ref{lem:security-resubmission} 之后新增引理，label 为"
+        - code: lem:security-intent
+        - text: 。若序言没有 proposition 环境，用 lemma 即可。新增。
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "\\begin{lemma}[Certificates bound liability, not execution]"
+          - generic: "\\label{lem:security-intent}"
+          - generic: Let $T_1\ne T_2$ be payments with the same Network, Subject, and Nonce, spending disjoint inputs routed to organizations $G_1$ and $G_2$, each valid under its own organization's approval rules. Both payments can obtain QCs, and in every public order at most one executes. A malicious user can cause this, and resubmitting either payment does not remove the conflict. Payments of different Subjects with the same nonce do not conflict.
+          - generic: "\\end{lemma}"
+          - generic: "\\begin{IEEEproof}"
+          - generic: Each organization holds its own local intent record and the approvals concern disjoint inputs, so neither organization observes a conflict, and the owner's authorization covers each payment. At public execution, the evaluation returns a conflict when the intent is already bound to a different TxID. The binding is written in the transition that executes a payment successfully, and no production path deletes or rebinds it, so the other payment stays unexecuted whatever its resubmission. A different Subject yields a different intent.
+          - generic: "\\end{IEEEproof}"
+          - generic: "If $T_2$ cannot execute but a successor of its output has executed, the successor has registered an obligation against $G_2$. After the deadline, the reserve of $G_2$ can be debited, but the source cannot repay by resubmission. Since $z_c=0$, the approving members of $G_2$ keep $r_{m,c}=a_c$ reserved, which Theorem~\\ref{thm:security-coverage} already counts with $w_c=a_c$. The inputs of $T_2$ remain under the original approval locks, so this is not a user recovering and respending the principal. Theorem~\\ref{thm:security-neutrality} excludes the case, because it assumes that every payment succeeds once."
+          - generic: "% --- ZH ---"
+          - generic: "\\begin{lemma}[证书界定负债，而非执行]"
+          - generic: "\\label{lem:security-intent}"
+          - generic: 设$T_1\ne T_2$是Network、Subject和Nonce均相同的两笔付款，花费不相交的输入，分别路由到组织$G_1$与$G_2$，且各自满足本组织的批准规则。两笔付款都可以取得QC，而在任何公开顺序下至多一笔执行。恶意用户可以造成这种情形，且补交任何一笔都不能消除冲突。不同Subject使用相同nonce的付款不冲突。
+          - generic: "\\end{lemma}"
+          - generic: "\\begin{IEEEproof}"
+          - generic: 每个组织保存自己的本地Intent记录，且批准涉及互不相交的输入，因此两个组织都观察不到冲突，所有者授权也覆盖各自的付款。公开执行时，若Intent已绑定到不同的TxID，求值返回冲突。该绑定与付款成功执行写在同一转换中，生产路径中没有删除或重新绑定它的分支，因此无论如何补交，另一笔付款都保持未执行。不同的Subject对应不同的Intent。
+          - generic: "\\end{IEEEproof}"
+          - generic: "若$T_2$不能执行，而其输出的后继已经执行，则该后继已登记针对$G_2$的义务。期限后可扣减$G_2$的备付，但来源不能通过补交回款。由于$z_c=0$，$G_2$的批准成员保留$r_{m,c}=a_c$的占用，定理~\\ref{thm:security-coverage}已按$w_c=a_c$计入。$T_2$的输入仍受原批准锁限制，因此这不是用户取回本金并再次花费。定理~\\ref{thm:security-neutrality}排除该情形，因为它假设每笔付款都成功执行一次。"
+      - paragraph:
+        - strong: S3. 位置：
+        - text: "Lemma~\\ref{lem:security-resubmission} 证明的末句，以及 “Availability and guarantor risk” 的 Progress 与 Economics 段，三处各做一处替换。"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "(1) Lemma proof, last sentence: replace \"a source payment that meets the ordinary execution rules.\" with \"a source payment that meets the ordinary execution rules, including that no global intent conflict (Lemma~\\ref{lem:security-intent}) blocks it.\""
+          - generic: "(2) Economics paragraph: replace \"or through its own execution rules.\" with \"or through its own execution rules, including a global intent conflict that resubmission cannot cure.\""
+          - generic: "% --- ZH ---"
+          - generic: "(1) 引理证明末句：把“并要求来源付款满足普通执行规则。”替换为“并要求来源付款满足普通执行规则，包括不存在阻止其执行的全局Intent冲突（引理~\\ref{lem:security-intent}）。”"
+          - text: (2) Economics段：把“或因其自身执行规则。”替换为“或因其自身执行规则，包括补交无法解除的全局Intent冲突。”
+      - paragraph:
+        - strong: S4. 位置：
+        - text: §
+        - code: sec:security-coverage
+        - text: "，Theorem~\\ref{thm:security-coverage} 的证明之后、“CAL admission consequence” 之前。新增。"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "An unexecuted payment keeps $a_c$, including change, at every approving member, and partial approvals count in $\\mathcal A_{m,g}$ although they never form a QC. This occupancy limits service under finite capital and is not an accounting violation. A compensation raises the net compensation counter but does not release the signing capacity of the unexecuted source; only its own execution does."
+          - generic: "% --- ZH ---"
+          - generic: "未执行的付款在每个批准成员处保留$a_c$（含找零），部分批准虽然永远形成不了QC，也计入$\\mathcal A_{m,g}$。这种占用在有限资本下限制服务能力，不构成会计上的不守恒。赔付会提高净赔付计数，但不释放未执行来源的签发额度，只有该来源自己的执行才会释放。"
+      - paragraph:
+        - strong: S5. 位置：
+        - text: §
+        - code: sec:security-repair
+        - text: "，Lemma~\\ref{lem:security-installation} 之后新增段落。新增。"
+      - group "latex code":
+        - button "Copy to clipboard":
+          - generic: 
+        - status
+        - generic: latex
+        - code:
+          - generic: "% --- EN ---"
+          - generic: "\\noindent\\textbf{Reader scope.}"
+          - generic: "These lemmas concern a replica whose own state ran the guards, so the reader of Section~\\ref{sec:protocol-reader} trusts local state that executed them. A block that carries a \\texttt{RepairBatch} which did not execute successfully confers no representation authority. An inclusion proof, an equal BlockID, or the chameleon relation alone does not show that a representation was authorized as of $H$. Serving untrusted remote readers would need authorization evidence tied to an authenticated state root or to proofs of original execution, which this paper does not define."
+          - generic: "% --- ZH ---"
+          - generic: "\\noindent\\textbf{读者范围。}"
+          - generic: "上述引理针对由自身状态执行过这些守卫条件的副本，因此第~\\ref{sec:protocol-reader}节的读者信任已执行这些检查的本地状态。未成功执行的\\texttt{RepairBatch}，即使被收入区块，也不产生表示授权。包含证明、相同的BlockID或变色龙哈希等式，单独都不能证明截至$H$该表示已获授权。若要服务不可信的远端读者，需要另行定义与认证状态根或原始执行证明相连的授权证据，本文未定义。"
+      - heading "需要 Codex 核对的点" [level=3]
+      - list:
+        - strong: S2、P2、P6：
+        - text: Intent 无删除或重新绑定的生产分支，以及 S2 末段的组合经济后果，依据的是 review-step1 的代码审查和 nonce 回归，没有新增网络实验。正文没有写测试名，已避免暗示新增赔付实验。
+        - strong: P5：
+        - text: “Tx.Hash 为对头部与固定字段的 SHA-256”依据读者契约表。我没有断言资金槽是否落在“固定字段”之内，请 Codex 对
+        - code: redactionTxHash
+        - text: 确认，再决定是否补一句“修订不改变 Tx.Hash”。
+        - strong: 引言和摘要里的“优化决定索引”：
+        - text: 对应读取实验的策略 A。
+        - strong: 混合负载的并发上限：
+        - text: “bounded concurrency/backpressure”对应总未完成 256 和快速并发 64 的上限，N/C 三轮、P 两轮触及 256，P 两轮还触及 64。具体表述需要 GPT 的实验章与此一致。
+        - strong: “最早委员会提交”：
+        - text: 指四副本最小
+        - code: CommittedUnixNS
+        - text: ，不是共识决定形成时间，实验章需保留这一限定。
+        - strong: 标签依赖：
+        - text: 新增标签
+        - code: sec:protocol-reader
+        - text: 和
+        - code: lem:security-intent
+        - text: ，P6 引用了
+        - code: sec:eval-repair
+        - text: 。若 GPT 重写实验章后标签改名，需要同步。
+        - strong: 旧稿删改：
+        - text: 旧引言里“读者在块内直接核对资金来源，而无需经过决定索引”的说法与新证据冲突，P6 已改写。158.846 ms、2,000 TPS 和 21,600 笔基线矩阵没有进入正文。
+      - toolbar "Message actions":
+        - button "Copy":
+          - generic: 
+        - status
+        - button "Read aloud":
+          - generic: 
+        - button "Good response":
+          - generic: 
+        - button "Bad response":
+          - generic: 
+        - button "Retry":
+          - generic: 
+        - time: just now
+  - button "Scroll to bottom":
+    - generic: 
+  - status
+  - status
+  - status
+  - generic: Write a message…
+  - textbox "Write your prompt to Claude":
+    - paragraph
+  - status
+  - button "Add files, connectors, and more":
+    - generic: 
+  - button "Dictate":
+    - generic: 
+  - group "Use voice mode":
+    - button "Use voice mode":
+    - button "Microphone":
+      - generic: 
+  - note
+  - 'button "Model: Opus 5.5 High"':
+    - text: Opus 5.5
+    - generic: High
+  - heading [level=3]: Content
+  - button:
+    - heading [level=3]: writing-evidence.txt
+    - paragraph: txt
+  - status
+- status
+- status
+- region "Notifications"
+- button:
+- button:
+- button:
+- button:
+- button:
+- button:
