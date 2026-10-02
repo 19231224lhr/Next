@@ -8,6 +8,8 @@
 
 ## 阅读与源码
 
+第④项已完成[同授权历史读取与维护成本对照](../../experiments/history-reader-2026-10-02/README.md)，提供[中英文候选段落及图表说明](../../experiments/history-reader-2026-10-02/paper-snippet.md)。该项测量本地读取策略，不改生产机制；与②③一并等待统一整合到下列 TeX/PDF 和 Overleaf。
+
 2026-10-02 第②项已新增[最终版本 100 跳连续支付重测](../../experiments/final-continuation-2026-10-02/README.md)，以及[中英文替换段落与整合清单](../../experiments/final-continuation-2026-10-02/paper-snippet.md)。这部分尚待与后续代表性故障负载证据一起整合进 TeX；下列 PDF 和 Overleaf 尚未包含本轮新增数字。
 
 第③项现已完成[最终版本混合负载十二轮对照](../../experiments/final-mixed-2026-10-02/README.md)，84,192 笔全部完成，并准备[对应英文与中文段落](../../experiments/final-mixed-2026-10-02/paper-snippet.md)。②③使用相同生产节点二进制；普通负载方法和费用模式分别披露。本文档仅增加材料入口，TeX/PDF/Overleaf 仍待统一整合，未将旧图表数字默默覆盖。

@@ -1,0 +1,34 @@
+Extracted from the user-authorized sidebar ChatGPT review.
+
+ChatGPT said:
+独立结论
+④可以结项；我不认为“已解码块缓存”是必要补充实验。
+现有对照已经回答了真正的问题：在
+同一可信前缀、同等授权语义、相同经济返回值
+下，追加式决定索引与Canonical历史表示各自需要什么读取工作和维护代价。论文原本对C3的定位就是“决定索引可以完成经济闭合，而表示让指定历史槽直接呈现垫付来源”，并非声称表示是经济正确性的必要条件。
+结果支持三点：
+功能价值成立 ：Canonical提供稳定坐标下、保持既有身份的已授权资金表示；赔付、表示、物化、迟到回款几个阶段均与索引方案返回相同经济解释。
+存在有限本地读取收益 ：在当前真实布局、热页缓存但无解码对象缓存条件下，已赔槽点读P50降低约  7.44%–12.32% ；整块读取仅  1.49%–3.88% ，不宜宣传为普遍性能优势。
+收益有明确代价 ：额外Revision/Task/BlockStore状态，以及约  43–214 ms  的一次性本地表示工作。C3因此应表述为 读取布局与历史表示的工程取舍 ，而不是“必须改写历史才能正确结算”。这也符合协议中representation本身无经济效果的定义。
+是否补“已解码块缓存”？
+不必。
+ 你已经分别报告了总读取和Resolve段，而且观察到主要差异来自块布局／解码，而非决定关联本身。这足以界定结果适用范围。 只有当论文准备写成“Canonical普遍提高历史查询性能”时，才需要缓存敏感性实验。现在只要明确：
+measurements use warm OS/database pages but no decoded-block or query-result cache.
+即可。若自愿补，最多选
+256/8一个配置
+，A/B都用相同容量和预热规则的已解码块缓存；它只能作为敏感性检查，不应扩矩阵。
+英文实验段落（约130词）
+We compared authorized historical representation with an append-only decision-index design under the same executed prefix and economic query contract. Three independent processes issued 21,600 interleaved queries over real bbolt and BlockStore state, with warm storage pages but no decoded-block or result cache. Both paths returned identical funding source, original input identity, transaction and coordinates, amount, compensation decision, and current obligation state across compensated, represented, materialized, and repaid cases. For compensated-slot point queries, Canonical representation reduced median latency by 7.44–12.32%; whole-block reductions were 1.49–3.88%, with most of the point-query difference arising from block layout and decoding rather than decision resolution. This benefit carries explicit cost: representation adds revision, task, and BlockStore records and required 43–214 ms of one-time local representation work across the tested configurations. We therefore treat representation as a read-layout and historical-interface tradeoff, not an economic necessity.
+中文对应
+我们在相同已执行前缀和相同经济查询契约下，对比了授权历史表示与仅追加决定索引方案。三个独立进程基于真实bbolt与BlockStore状态执行了21600次交错查询；存储页为热缓存，但未使用已解码块或结果缓存。对于已赔付、已表示、已物化及随后回款等状态，两条路径返回的资金来源、原输入身份、交易与坐标、金额、赔付决定及当前义务状态均一致。对已赔付槽位的点查询，Canonical表示使中位延迟降低
+7.44%–12.32%
+；整块读取降低
+1.49%–3.88%
+，点查询差异主要来自块布局与解码，而非决定解析本身。相应代价是额外的Revision、Task和BlockStore记录，以及各配置约
+43–214 ms
+ 的一次性本地表示工作。因此，我们将历史表示定位为读取布局与历史接口的工程取舍，而非经济闭合的必要机制。
+ChatGPT can make mistakes. Check important info.
+Latest response
+entry area (settable) Description: Ask ChatGPT, Value:
+Ask ChatGPT
+Response complete

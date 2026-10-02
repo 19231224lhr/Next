@@ -1,0 +1,13 @@
+{
+  "raw_artifacts": 23,
+  "source_sha256": "43a0fb1449a3272c5e52d61e213e100e15a8b44003d25e9c81fc553b2f00ec70",
+  "mac_commands_passed": 5,
+  "local_checks": [
+    "go test -count=1 -tags=comet_v3 ./internal/redaction: exit 0",
+    "go vet -tags=comet_v3 ./internal/redaction: exit 0",
+    "python py_compile run.py analyze.py plot.py: exit 0",
+    "git diff --check: exit 0"
+  ],
+  "production_package_diff_721800c_to_0d90417": "empty for internal crypto protocol finality",
+  "figures": "PNG visually inspected; PDF vector exported"
+}
