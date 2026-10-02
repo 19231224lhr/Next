@@ -20,11 +20,11 @@
 >
 > **E1–E8 共八组实验及安全分析工作已汇总到 `re` 分支**，包含实验代码、报告、图表、原始证据与安全修正。`main` 保留早期性能基线代码，首页同步展示研究进展；复现实验请使用 [`re`](https://github.com/19231224lhr/Next/tree/re)。
 
-**最新机制实现：** [授权合批修复与直达物化](docs/design/authorized-repair-batching.md)已在 `feat/authorized-repair-batching` 分支完成回归。同块 8 项缺口的局部对照将修复命令和分片适配各从 8 次降为 1 次；Mac 四项真实合批及随后 1,000 笔正常付款通过。后续审查已修复异常份额阻塞与经济预执行缺失，并再次完成真实闭环。[实现与验证报告 →](docs/experiments/authorized-repair-2026-09-29/README.md) · [审查修复与最新结果 →](docs/experiments/authorized-repair-2026-09-29/fix-report.md)
+**历史表示机制：** [授权合批修复与直达物化](docs/design/authorized-repair-batching.md)支持同块合批与跳过中间物理版本。同块 8 项缺口的归档局部对照将修复命令和分片适配各从 8 次降为 1 次；Mac 四项真实合批及随后 1,000 笔正常付款通过。后续版本进一步把公共赔付决定与历史表示分离，见下节。[合批实现与验证 →](docs/experiments/authorized-repair-2026-09-29/README.md) · [审查修复 →](docs/experiments/authorized-repair-2026-09-29/fix-report.md)
 
 ## 本轮评审修订与验证
 
-**当前安全审查：** 已核对来源补交、独立赔付决定和历史表示修复，修正公共提交接受无关输入证书的差异，补充原授权／额度保持、来源先到和回款后重复决定的回归。修复后全项目共识标签测试与静态检查通过。[状态转换与证明](docs/research/c3-security-review-2026-10-02/README.md) · [论文同步修改清单](docs/research/c3-security-review-2026-10-02/paper-change-list.md)。论文 PDF 尚未完成本轮机制同步，C3 补强仍在专用分支。
+**当前安全审查：** 已核对来源补交、独立赔付决定和历史表示修复，修正公共提交接受无关输入证书的差异，补充原授权／额度保持、来源先到和回款后重复决定的回归。修复后全项目共识标签测试与静态检查通过。[状态转换与证明](docs/research/c3-security-review-2026-10-02/README.md) · [论文同步修改清单](docs/research/c3-security-review-2026-10-02/paper-change-list.md)。英文论文、中文阅读版和补充材料已同步这些机制及其版本对应的证据。
 
 **C3 新补强：** 已实现公开后继证据驱动的来源补交，以及“先公共赔付、后历史表示修复”。9 轮独立功能实验、6 轮普通路径对照通过；全部适配服务暂停时，赔付与迟到来源回款仍能完成。新增机制的普通付款快速 P50 为 1.05–1.07 ms（100 TPS 短测），完整条件及版本边界见[补强实验报告](docs/experiments/c3-source-repair-2026-10-02/README.md)与[机制设计](docs/design/evidence-driven-source-repair.md)。
 
@@ -35,13 +35,13 @@
 | 真实 100 跳续花，9 服务内存、用户自付 FUEL | 三轮整链中位 **158.846 ms**；跳间等待公共确认对照 **65.204 s** |
 | 固定 60,000 CAL，0% / 1% / 5% 扣留来源 | 九轮 **21,600 笔、216 次赔付与回收**，最终备付全部恢复 |
 | 正常 / 延迟赔付成对执行 | 最终用户 CAL 分配与组织备付一致，保留修复期尾延迟变化 |
-| 当前构建短吞吐，三轮各 30,000 笔 | 含排空 **1,750–1,887 TPS**；这是短轮测量，单列发送滞后 |
+| 来源回收基线短吞吐，三轮各 30,000 笔 | 含排空 **1,750–1,887 TPS**；这是短轮测量，单列发送滞后 |
 | 同步成员提交的 100 跳续花 | 中位 **4.471 s**；相同提交模式下逐跳等待 **65.013 s**；三轮全部通过 |
 | 永久缺失来源 | 永久不执行的来源保留真实赔付损失，不通过核销恢复未损失资金 |
 
 [评审裁决与修改索引](docs/research/reviewer-revision-2026-10-02/README.md) · [完整实验报告](docs/research/reviewer-revision-2026-10-02/experiment-report.md) · [来源回收设计](docs/design/source-recovery.md)
 
-[英文论文、中文阅读版与补充材料](docs/paper/review-2026-10-02/README.md)包含本轮修订的完整 LaTeX、图表和数据。当前机制及补充实验请使用 `feat/review-source-recovery`；下列 E1–E8 仍以各自报告的冻结版本复现。
+[英文论文、中文阅读版与补充材料](docs/paper/review-2026-10-02/README.md)包含完整 LaTeX、图表和数据；[文字修订记录](docs/paper/review-2026-10-02/editorial-review.md)说明专业论文参照与联合校读。当前研究版本使用 `re`；下列 E1–E8 仍以各自报告的冻结版本复现。
 
 ## 实验总览
 

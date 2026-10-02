@@ -1,51 +1,23 @@
-% GPT-authored independent supplement, retrieved from its source preview.
+% Supplementary details for the security analysis.
 \section{Details of the Original-Execution Connection}
 \label{supp:original-execution}
 
 \noindent\textbf{Earliest conflicting polka.}
-Fix a height and a commit certificate for nonempty value $v$ in round
-$r$. Select two honest signers $K$ of that certificate. Each locks $v$
-before issuing its precommit. The certificate can be assembled after
-these signers have advanced; its observation time is irrelevant.
+Fix a height and a commit certificate for a nonempty value $v$ in round $r$, and select two honest signers $K$ of that certificate. Each locks $v$ before it issues its precommit. The certificate can be assembled after these signers have advanced, so its observation time is irrelevant.
 
-Suppose a higher-round polka for a different value exists, counting nil
-if it permits unlocking. Select the smallest round $s>r$ with such a
-polka and, within $s$, the earliest event $\tau$ at which its distinct
-prevotes exist. Its three voters include a member $m\in K$. Because
-honest rounds increase, $m$'s round-$s$ prevote follows its round-$r$
-precommit. Without an unlocking justification, $m$ must prevote its
-locked value. Relocking on $v$ in intervening rounds preserves this
-restriction. A conflicting justification from a round below $s$
-contradicts the choice of $s$; one from round $s$ must have existed before
-$m$ cast the vote counted at $\tau$, contradicting the choice of $\tau$.
-Evidence from above $s$ cannot precede a subsequent round-$s$ vote.
-Thus no such polka exists. A higher-round conflicting commit would
-require one. Same-round conflicting commits require an honest double
-precommit. This argument depends on the stated lock-transition and
-round-monotonicity rules, not timely receipt of commit evidence.
+Suppose a higher-round polka for a different value exists, counting nil if it permits unlocking. Select the smallest round $s>r$ with such a polka and, within $s$, the earliest event $\tau$ at which its distinct prevotes exist. Its three voters include a member $m\in K$. Honest rounds increase, so the round-$s$ prevote of $m$ follows its round-$r$ precommit, and without an unlocking justification $m$ must prevote its locked value. Relocking on $v$ in intervening rounds preserves this restriction. A conflicting justification from a round below $s$ contradicts the choice of $s$, and one from round $s$ must have existed before $m$ cast the vote counted at $\tau$, which contradicts the choice of $\tau$. Evidence from above $s$ cannot precede a later round-$s$ vote. No such polka exists, and a higher-round conflicting commit would require one. Same-round conflicting commits require an honest double precommit. The argument rests on the stated lock-transition and round-monotonicity rules and does not need timely receipt of commit evidence.
 
 \noindent\textbf{Pairing, validation, and execution.}
-Induct on candidate updates: local construction pairs a body with its
-original parts; remote completion reconstructs the body from checked
-parts. Moving Locked or Valid transfers both; switching targets clears
-the old body. Historical installation does not mutate these active
-candidates. A nonempty precommit follows a matching polka. An honest
-prevote is justified by actual proposal validation or an earlier lock;
-tracing the latter decreases the lock round and terminates at validation.
-The final full-identity guard fixes the original transactions, height,
-time, and other application context before Finalize. Synchronization
-and replay supply the same original material. Hence same-height retries
-cannot introduce a second original body through the stable-hash cache
-within this call boundary.
+Induct on candidate updates. Local construction pairs a body with its original parts, and remote completion rebuilds the body from checked parts. Moving Locked or Valid transfers both, and switching targets clears the old body. Historical installation leaves these active candidates alone. A nonempty precommit follows a matching polka. An honest prevote has a justification in actual proposal validation or an earlier lock, and tracing the latter lowers the lock round until it reaches validation. The final full-identity guard fixes the original transactions, height, time, and other application context before Finalize. Synchronization and replay supply the same original material, so same-height retries cannot introduce a second original body through the stable-hash cache within this call boundary.
 
-\noindent\textbf{Meaning of the two equivalences.}
-Batch refinement compares economic state after a whole batch with the
-state after its specified sequence of single-item steps. It projects
-away command identities, revision counters, and materialization tasks.
-Replay equality instead fixes the entire original command sequence and
-its block contexts; deterministic execution then reproduces each
-application hash. These are different relations. Neither compares histories that order
-parent arrivals and compensations differently. The delay-neutrality
-theorem of the main text makes that comparison under its own hypotheses,
-equating final CAL holders and reserve balances rather than application
-hashes or revision metadata.
+\noindent\textbf{Write sets.}
+The proofs of the main text rely on the following write sets. A compensation decision writes the issuer reserve account, the obligation status, the Promise and coverage record (Paid and Remaining), grant usage (Spent), the public gap, the consumer's payment record (Pending and fee stages), reward and refund balances and fee outputs, the removal of the due-index entry, and the decision record with its decision-index and pending-representation entries. The execution of a source after compensation writes the repayment: the issuer reserve account, the obligation status (Recovered), the coverage record (Recovered), and grant usage (Spent). It leaves the decision record unchanged. A resubmission job writes the member's local outbox only. A representation command or batch writes the logical revision, the head command, the task or batch task with its per-output references, the queue entry, and the removal of pending-representation entries. Installation writes local block-store versions and its own progress cursor only. No representation or installation write belongs to the economic projection.
+
+\noindent\textbf{Convergence for a fixed target set.}
+Fix an original body and a set of decided slots. The replacement message of each slot is a function of the network and the output, so any packaging replaces the same slots by the same messages. If the chameleon relation has a unique valid opening for each fixed message and commitment, as holds for correctly generated parameters with a public exponent coprime to the group order, each slot opening and each part opening is the unique solution of its relation. Part contexts depend on the height and the part index and are independent of the revision counter. Any grouping or order of representation commands that covers the set therefore ends in the same body and part openings. Single-item commands, one batch, and batches of intermediate sizes differ in command identities, revision numbers, and application hashes. The statement concerns final bytes and depends on parameter generation and encoding as stated.
+
+\noindent\textbf{Follower updates.}
+For a follower that starts from the same local state, configuration, and cursor, equal fixed payment fields and authenticated results induce equal economic updates whenever both representations decode. The mutable funding reference and opening select no Paid, Pending, or fee effect. Decisions are authenticated in full, and the execution-result commitments authenticate their effects and fee outputs. Economic observation thus stays separate from the independent verification of the latest mutable historical body.
+
+\noindent\textbf{Relations used in the analysis.}
+Three relations compare different objects. Representation inertness compares the economic projection before and after one representation or installation step, and it projects away command identities, revision counters, and materialization tasks. Fixed-target convergence compares the final body and part openings that different groupings and orders of representation commands produce for one original body and one decided set. Replay equality fixes the entire original command sequence and its block contexts, and deterministic execution then reproduces each application hash. Cross-history comparisons fix the economic commands, public times, and historical target coordinates, so projection equality does not identify entire application states and does not permit deleting or renumbering blocks. None of the three relations compares histories that order parent arrivals and compensations differently; the delay-neutrality theorem of the main text makes that comparison under its own hypotheses and equates final CAL holders and reserve balances, not application hashes or revision metadata.

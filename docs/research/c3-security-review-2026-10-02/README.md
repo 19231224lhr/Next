@@ -145,4 +145,4 @@ Claude 阅读首批九个源码文件后提出五项检查点；补充完整验�
 
 ## 12. 论文写作材料
 
-[security-c3-draft.tex](security-c3-draft.tex) 是 Claude 第二轮草稿经本地代码核验后修订的英文片段，包含本轮校验补丁。它尚未合入主稿、尚未完成整篇交叉引用和排版检查，不是新的论文 PDF。独立讨论原始记录保留在项目外 `claude-review-materials/c3-strengthening-2026-10-02/`；采用与未采用的结论在本页明确记录。
+[security-c3-draft.tex](security-c3-draft.tex) 保留为 Claude 第二轮草稿经代码核验后的历史片段。整篇修订已经将这些结论组合到[主文安全节](../../paper/review-2026-10-02/security.tex)与[补充证明](../../paper/review-2026-10-02/supplement-security.tex)，并同步中文；请以[论文及编译检查](../../paper/review-2026-10-02/README.md)为当前阅读入口，不单独沿用草稿编号。独立讨论原始记录保留在项目外 `claude-review-materials/c3-strengthening-2026-10-02/`；采用与未采用的结论在本页明确记录。

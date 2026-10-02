@@ -1,27 +1,28 @@
 \begin{abstract}
-Continuous payments require recipients to reuse incoming value while
-earlier transactions remain pending. Next supports this in an unspent transaction output (UTXO) ledger through registered guarantor
-organizations. After verifying and recording an output and its
-quorum-signed certificate (TXCer), a recipient can request a successor
-while public execution proceeds asynchronously. If a certified source is
-missing, the committee atomically executes the successor and records an
-obligation backed by the issuer's reserve; the obligation closes when the
-source executes or, after expiry, through a reserve debit, and a
-source arriving after compensation repays the compensating issuer. Under
-fixed membership and Byzantine faults we prove consumption uniqueness,
-coverage of liabilities including hidden certificates, and delay
-neutrality: for finite sets of non-conflicting payments whose sources all
-execute, every successful arrival and compensation order ends with the
-same final CAL holders and reserve balances as undelayed execution.
-Restricted funding revisions preserve complete block identities. On one
-M4 Max host (nine services, in-memory state, NoSync wallets), 100-hop
-chains reach their last certified receipt in a median 158.846\,ms versus
-65.204\,s with inter-hop public-confirmation waits, and three
-30,000-payment runs complete 1,750--1,887 payments/s including drain.
-Nine recovery runs (disk-backed committee) close 21,600 payments and
-repay all 216 compensations.
+Continuous payments require recipients to reuse value before earlier
+transactions execute. Next supports this in an unspent
+transaction output (UTXO) ledger through registered guarantor
+organizations. A recipient verifies a quorum-signed output certificate
+(TXCer) and requests a successor while public execution proceeds
+asynchronously. If the certified source is missing, the committee
+executes the successor and records an obligation backed by the issuer's
+reserve. The successor's block publishes the source's certificate,
+letting the original signers resubmit the payment from stored
+approvals. After the deadline, a public compensation decision closes a
+still-open obligation by debiting the reserve without threshold
+adaptation; a late source repays the compensating issuer. Under fixed
+membership and Byzantine faults, we prove unique consumption, funding of
+all certificates' outstanding CAL liabilities (including unpublished ones),
+and delay neutrality. Restricted representation commands record the
+reserve debit in the stored block, preserving owner authorizations,
+successor references, and the complete block identity. On one M4 Max
+host, 100-hop chains on the baseline build reach the last certified
+receipt in a median 158.846\,ms, against 65.204\,s when each hop awaits
+public confirmation. In the decision-first build, which adds
+resubmission and a separate compensation decision, compensation and
+repayment complete with all adaptation services paused.
 \end{abstract}
 
 \begin{IEEEkeywords}
-UTXO payments, payment guarantees, Byzantine fault tolerance, authorized repair.
+UTXO payments, payment guarantees, Byzantine fault tolerance, authorized historical representation.
 \end{IEEEkeywords}
