@@ -126,7 +126,7 @@ func TestCompensationBeforeAdaptation(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := db.View(func(v state.ReadView) error {
-		for _, name := range []string{"early", "network", "height", "transaction", "input", "amount", "balance", "no-obligation"} {
+		for _, name := range []string{"early", "network", "height", "transaction", "input", "amount", "balance", "no-obligation", "source-first"} {
 			t.Run("guard_"+name, func(t *testing.T) {
 				o := state.NewOverlay(v)
 				c, now := decision, int64(1700000032)
@@ -156,6 +156,16 @@ func TestCompensationBeforeAdaptation(t *testing.T) {
 					}
 				case "no-obligation":
 					o.Delete(rules.DirectObligationKey(out))
+				case "source-first":
+					verified, err := rules.VerifyDirectPayment(protocol.DirectPayment{Tx: parent, Certificate: pc}, p)
+					if err != nil {
+						t.Fatal(err)
+					}
+					tr, err := rules.EvaluateDirectPayment(o, verified, p, now)
+					if err != nil {
+						t.Fatal(err)
+					}
+					o.Apply(tr.Changes)
 				}
 				tr, err := redaction.ExecuteDecision(o, bs, p, c, 3, now)
 				if err == nil || len(tr.Changes) != 0 || len(tr.Data) != 0 {
@@ -199,6 +209,21 @@ func TestCompensationBeforeAdaptation(t *testing.T) {
 	}
 	appendBlock(5, 1700000034, parentRaw)
 	if err := db.View(func(v state.ReadView) error {
+		// Recovery returns real funds but never reopens the debit decision.
+		tr, err := redaction.ExecuteDecision(v, bs, p, decision, 6, 1700000035)
+		if err != nil || len(tr.Changes) != 0 {
+			t.Fatal("decision replay after recovery changed state", err)
+		}
+		result, effects, err := protocol.DecodePublicExecution(f.Org.Network, wire.Data(), tr.Data)
+		if err != nil || result.Applied || len(effects) != 0 || len(result.FeeOutputs) != 0 {
+			t.Fatal("decision replay after recovery repeated economic effects", err)
+		}
+		conflict := decision
+		conflict.Transaction++
+		tr, err = redaction.ExecuteDecision(v, bs, p, conflict, 6, 1700000035)
+		if err == nil || len(tr.Changes) != 0 || len(tr.Data) != 0 {
+			t.Fatal("conflicting location reused an existing decision", err)
+		}
 		balance, _, err := state.Load[uint64](v, rules.AccountKey(f.Org.Org, protocol.AssetCAL))
 		if balance != 1_000_000_000 {
 			t.Fatalf("late source did not repay: %d", balance)

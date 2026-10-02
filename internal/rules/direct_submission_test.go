@@ -50,6 +50,36 @@ func TestPublicSubmissionRetainsSpendAuthorizationWithoutNewTXCer(t *testing.T) 
 	}
 }
 
+func TestPublicSubmissionRejectsUnusedInputCertificates(t *testing.T) {
+	f := newDirectFixture(t)
+	parent := f.payment(t, f.genesis, nil, 1)
+	child := f.payment(t, parent.Certificate.Summary.OutputID(0), &parent.Certificate, 2)
+	unrelated := f.payment(t, f.genesis, nil, 3)
+	for _, tc := range []struct {
+		name    string
+		payment DirectPayment
+	}{{"final-input", parent}, {"certificate-input", child}} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := VerifyDirectSubmission(tc.payment.Submission(), f.policy); err != nil {
+				t.Fatal("unmodified authorized payment rejected", err)
+			}
+			// A relayer can append valid evidence without changing the payment QC.
+			public := tc.payment.Submission()
+			public.InputCertificates = append(append([]InputCertificate(nil), public.InputCertificates...), InputCertificate{Certificate: unrelated.Certificate})
+			if err := unrelated.Certificate.Verify(f.org); err != nil {
+				t.Fatal("fixture certificate is invalid", err)
+			}
+			if _, err := VerifyDirectSubmission(public, f.policy); !errors.Is(err, protocol.ErrRule) {
+				t.Fatal("unused certificate accepted by public verification", err)
+			}
+			tc.payment.InputCertificates = public.InputCertificates
+			if _, err := VerifyDirectPayment(tc.payment, f.policy); !errors.Is(err, protocol.ErrRule) {
+				t.Fatal("unused certificate accepted by installation verification", err)
+			}
+		})
+	}
+}
+
 func TestInputGuaranteeRegistrationHandlesSplitOutputsAndLateConsumer(t *testing.T) {
 	for _, repair := range []bool{false, true} {
 		t.Run(map[bool]string{false: "source_arrives", true: "partial_repair_then_source"}[repair], func(t *testing.T) {

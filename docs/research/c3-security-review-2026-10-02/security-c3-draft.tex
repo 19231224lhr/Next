@@ -1,0 +1,166 @@
+% Integration draft, 2026-10-02. Based on Claude's second review, audited
+% against 7a2517e plus the unused-input-certificate check in this review.
+% This is a section fragment, not a standalone compiled paper.
+% Requires lemma/proposition environments and IEEEproof; reconcile labels
+% with the main manuscript before inclusion. No new benchmark claims.
+
+\subsection{Source Recovery and Decision-First Repair}
+\label{sec:c3-security-draft}
+
+\paragraph{State and assumptions.}
+For an output $x$, let $o_x$ denote its direct obligation and
+$\mathcal D(x)$ its immutable compensation decision. In reachable states
+from a valid initial configuration, a decision exists exactly when the
+obligation is \textsf{Repaired} or \textsf{Recovered}. Here,
+\textsf{Repaired} denotes economic compensation, not physical installation
+of revised historical bytes. Let $\mathcal R$ contain representation
+revisions, tasks, batch references, and installation metadata, and let
+$\pi_E$ retain public balances, spend states, obligations, coverage, grant
+usage, and fee accounting while excluding representation metadata.
+
+We use the fixed-membership fault model, atomic transitions, signature
+unforgeability, and fact binding defined in the system model. Honest members
+retain the payment, admission vector, and direct input certificates recorded
+before signing. Correct committee replicas retain identical original blocks
+and original block metadata required by outstanding obligations,
+representation, and replay. Public verification binds each input certificate
+to its network, organization, fact, and claimed output, rejects duplicates,
+and requires an exact correspondence with certificate inputs. The admission
+vector contains one CAL entry bound to the issuer. These properties are
+enforced by the protocol checks; the arguments below reason over their
+transition semantics.
+
+\begin{lemma}[Recovery preserves authorization]
+\label{lem:c3-recovery-authority}
+A recovery job created by an honest member resubmits an already authorized
+payment. It requires no new owner or member signature and does not reserve
+additional signing capacity. Once a direct obligation is public, at least
+two honest original signers retain the corresponding approved material.
+\end{lemma}
+\begin{IEEEproof}
+The member indexes its stored approval by the fact in the public input QC.
+The stored payment and admission vector must produce that same fact. The
+member combines this material and its retained direct input certificates
+with the exposed QC, then applies ordinary payment verification before
+creating an outbox entry. Fact binding and quorum verification prevent a
+different payment core from satisfying these checks. The transition writes
+only the outbox: it neither signs nor changes the original approval, input
+locks, or grant reservation. Existing outbox and observed-execution marks
+suppress duplicate jobs.
+
+An obligation can arise only from a successfully executed payment consuming
+a certified missing input. Its QC is therefore public. Three distinct
+signers include at least two honest members, each of which stored the
+approved material before returning its signature. Thus withholding the
+complete certificate at the original client alone does not remove the
+materials needed for recovery. Actual execution additionally requires a
+continuing honest follower, fair delivery, and the source payment to satisfy
+the ordinary execution rules.
+\end{IEEEproof}
+
+\begin{lemma}[Compensation takes effect at most once]
+\label{lem:c3-decision-once}
+Each direct obligation incurs at most one reserve debit and its associated
+economic effects. Repeating the same decision has no effect, including
+after repayment; a conflicting decision is rejected.
+\end{lemma}
+\begin{IEEEproof}
+A decision first checks the immutable record $\mathcal D(x)$. An exact
+match returns an unapplied result with no state changes, economic effects,
+or fee outputs; a mismatch is rejected. In the absence of a decision, the
+transition requires an \textsf{Open} obligation, a reached public deadline,
+and a matching historical position, amount, and funding commitment. It
+atomically debits the issuer reserve, closes the gap, updates fees and
+coverage, and records $\mathcal D(x)$.
+
+If the source executes first, the obligation is no longer \textsf{Open} and
+cannot be compensated. If compensation occurs first, subsequent source
+execution returns the corresponding funds to the issuer through the single
+\textsf{Repaired}$\rightarrow$\textsf{Recovered} transition. Repayment does
+not erase $\mathcal D(x)$ or create another user output. Induction over the
+public command order therefore gives at-most-once compensation and
+repayment.
+\end{IEEEproof}
+
+\begin{lemma}[Representation has no economic effect]
+\label{lem:c3-representation-inert}
+For every successful single or batch representation transition $r$,
+$\pi_E(r(S))=\pi_E(S)$. Legal physical installation likewise leaves this
+economic projection unchanged. An effective representation requires a
+committed compensation decision for every modified input slot.
+\end{lemma}
+\begin{IEEEproof}
+Representation checks the immutable decision, current canonical target,
+base revision, preceding digest, and permitted replacement. Its write set
+contains only revisions, representation commands, pending-index removals,
+and task metadata. It does not invoke the accounting transition. Followers
+map the representation result to an empty economic effect. Installation
+verifies the committed task and version before updating historical storage;
+it does not execute payments or compensation again. The write sets prove
+the projection equality for one step and, by induction, for any sequence
+of such steps.
+\end{IEEEproof}
+
+The CAL conservation argument therefore uses the public decision as its
+compensation event: for amount $a$, $\Delta A=\Delta D_{\mathrm{open}}=-a$
+and $\Delta U=0$, preserving $U+A-D_{\mathrm{open}}$. Source resubmission
+does not release signing capacity; representation and installation have
+zero economic increment. The existing coverage argument applies to the
+same economic transitions. Cross-history comparisons fix the economic
+commands, public times, and historical target coordinates; projection
+equality does not identify entire application states or permit arbitrary
+deletion and renumbering of blocks.
+
+\begin{lemma}[Identity preservation and independent installation]
+\label{lem:c3-identity}
+An effective representation preserves existing owner authorizations,
+transaction and output identities, successor references, and the complete
+original BlockID. Installing it does not require successor payments to be
+re-signed or re-executed.
+\end{lemma}
+\begin{IEEEproof}
+The executor constructs the canonical body by changing only the declared
+funding slots and their openings. Fixed authorization fields and input
+commitments remain unchanged, and replacements retain the encoded width.
+It verifies the new openings, recomputes the revised body's block hash and
+part-set header, and accepts only equality with the original BlockID.
+Base and previous-digest checks serialize competing canonical revisions.
+The committed task binds the permitted bytes. An installer advances an
+older local version, checks an equal version, and treats a newer committed
+version as already covering the task. Consequently physical progress
+cannot revise an economic decision or invalidate an unchanged successor
+reference.
+\end{IEEEproof}
+
+For a fixed original body and fixed set of decided slots, representation
+also has a conditional convergence property: if the chameleon relation has
+a unique valid opening for each fixed message and commitment, the final
+body and part openings are independent of grouping and order. Each slot's
+replacement is determined by its decision; part contexts do not depend on
+the revision counter. Revision numbers, command histories, and application
+hashes need not coincide across different groupings. This statement uses
+opening uniqueness under valid cryptographic setup, separately from the
+authorization and at-most-once arguments above.
+
+\begin{proposition}[Economic closure does not wait for adaptation]
+\label{prop:c3-closure}
+An outstanding obligation can be closed by its valid public compensation
+decision once its public deadline is reached and the decision is included,
+provided the required original history, reserve, and fee escrow are
+available. This transition does not require an adaptation contribution.
+Representation completion separately requires valid adaptation material,
+a current canonical revision, and progress of public submission and local
+installation.
+\end{proposition}
+\begin{IEEEproof}
+The decision path validates the obligation and historical slot and performs
+accounting without invoking an adaptation endpoint. The admission rule
+reserves a bounded compensation charge for each certified input, and the
+coverage argument bounds reserve obligations under its stated assumptions.
+Unavailable adaptation therefore prevents neither the economic decision
+nor later repayment. In the configured threshold service, three valid
+contributions suffice; three responding honest holders ensure this even
+when the fourth withholds its contribution. Shared execution resources and
+public ordering still govern latency, so this separates protocol
+dependencies without asserting an unconditional completion-time bound.
+\end{IEEEproof}

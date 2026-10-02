@@ -4,6 +4,8 @@
 
 本版本对应 `feat/review-source-recovery` 分支的来源回收机制，生产代码提交为 `d99ec92`。它保留归档实验，并将当前构建的回收、续花、同步存储和短吞吐证据单独标识。
 
+> **版本提示：** 该 PDF／TeX 尚未全面吸收 `7a2517e` 的公开证据补交与独立赔付决定。当前机制的[安全审查](../../research/c3-security-review-2026-10-02/README.md)和[逐文件修改清单](../../research/c3-security-review-2026-10-02/paper-change-list.md)已经完成；完成英／中文同步和重编译前，本目录仍按上述旧构建阅读。
+
 ## 阅读与源码
 
 | 文件 | 用途 |

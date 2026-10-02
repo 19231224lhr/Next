@@ -4,8 +4,10 @@
 
 | 文档 | 用途与状态 |
 | --- | --- |
+| [当前 C3 安全审查与证明更新](research/c3-security-review-2026-10-02/README.md) | `7a2517e` 来源补交、独立赔付决定、零经济效果表示及新增回归；当前入口 |
+| [论文同步修改清单](research/c3-security-review-2026-10-02/paper-change-list.md) | 英／中文正文、算法、证明和实验的逐文件更新计划；PDF 尚未完成同步 |
 | [系统设计与证明建模基线](design/system.md) | 身份与状态、完整付款及赔付流程、资金与权限公式、假设和待证明性质 |
-| [授权历史修复增强设计](design/authorized-repair-batching.md) | 同块原子合批、已提交版本直达及验证方案；设计定稿，尚未实现 |
+| [授权历史修复增强设计](design/authorized-repair-batching.md) | 已实现的合批／直达机制背景；本分支新增经济与表示分离见[当前设计](design/evidence-driven-source-repair.md) |
 | [工程架构与实现映射](design/architecture.md) | 关键函数、并发和存储边界、共识适配、现有回归测试与模型对应关系 |
 | [完整安全性分析报告](research/security-analysis-complete-wire4.md) | 文献写法、系统与攻击者模型、潜在责任到真实资金的证明、源码审查、实验对应及剩余义务 |
 | [论文第五章：安全性分析](paper/security-analysis-chapter5.md) | 可供论文采用的中文正文：模型、引理、定理、短证明、条件终结性与限制；附参考文献 |
@@ -30,4 +32,4 @@
 
 ## 下一阶段
 
-以[完整报告](research/security-analysis-complete-wire4.md)和[论文正文](paper/security-analysis-chapter5.md)为主入口，旧阶段报告保留版本与原始证据。后续优先补强用户可兑现性质、适配查询下的密码学边界与修改后共识接口精化。安全分析与代码修正现已合并到 `re`；本次整合通过功能、竞态、共识回归、静态检查和构建验证，不代表重新测量了历史性能，也不把测试通过当作全面形式化验证。
+当前分支以 [C3 安全审查](research/c3-security-review-2026-10-02/README.md)和[来源回收论证](research/reviewer-revision-2026-10-02/security-recovery.md)衔接旧阶段报告；后者保留版本与原始证据。按[论文修改清单](research/c3-security-review-2026-10-02/paper-change-list.md)完成英／中文同步、编译和复核后再合并 `re`。历史安全修正已并入 `re`，不代表当前 C3 补强也已合并；测试通过不等于全实现机械证明。

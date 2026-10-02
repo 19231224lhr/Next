@@ -1,6 +1,8 @@
 # 证据驱动的来源恢复与经济／表示分离
 
-2026-10-02 · 分支 `feat/review-source-recovery` · 实现基线 `0e7bae5`。
+2026-10-02 · 分支 `feat/review-source-recovery` · 初始实现 `0e7bae5`，审查基线 `7a2517e`。
+
+代码与状态转换的逐项对应见 [C3 安全审查](../research/c3-security-review-2026-10-02/README.md)；当前论文同步修改见[清单](../research/c3-security-review-2026-10-02/paper-change-list.md)。
 
 本文定义当前分支对第三项贡献的补强。正常付款仍是一轮组织取证后可续花，委员会仍从区块公开结果驱动钱包和成员更新；新增工作只处理来源交付失败及到期责任。
 

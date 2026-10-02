@@ -1,10 +1,12 @@
 package member_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"os"
+	"reflect"
 	"testing"
 
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -139,7 +141,34 @@ func TestExposedSourceReconstructionAcrossOrganizationsAndDepth(t *testing.T) {
 		}
 		previous = block.Hash()
 	}
+	// Publication supplies the missing QC, not a new authorization or budget.
+	approvalKey := state.Key(state.KeyApproval, sc.QC.Fact[:])
+	var originalApproval []byte
+	if err := db.View(func(v state.ReadView) error {
+		var err error
+		originalApproval, err = v.Get(approvalKey)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	quotaBefore, err := m.Quota(f.Genesis.Grants[0].Key, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 	settle(protocol.DirectPayment{Tx: child, Certificate: cc, InputCertificates: []protocol.InputCertificate{{Certificate: sc}}})
+	quotaAfter, err := m.Quota(f.Genesis.Grants[0].Key, 0)
+	if err != nil || !reflect.DeepEqual(quotaBefore, quotaAfter) {
+		t.Fatal("source reconstruction changed the original CAL reservation", err)
+	}
+	if err := db.View(func(v state.ReadView) error {
+		current, err := v.Get(approvalKey)
+		if !bytes.Equal(originalApproval, current) {
+			t.Fatal("source reconstruction changed the original approval")
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
 	load := func(fact protocol.SpendFactID) protocol.DirectPayment {
 		t.Helper()
 		var payment protocol.DirectPayment
@@ -159,6 +188,14 @@ func TestExposedSourceReconstructionAcrossOrganizationsAndDepth(t *testing.T) {
 		return payment
 	}
 	rebuilt := load(sc.QC.Fact)
+	expected, err := (protocol.DirectPayment{Tx: source, Certificate: sc, InputCertificates: parents}).MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual, err := rebuilt.MarshalBinary()
+	if err != nil || !bytes.Equal(expected, actual) {
+		t.Fatal("reconstruction changed the originally authorized payment bytes", err)
+	}
 	if len(rebuilt.InputCertificates) != 1 || rebuilt.InputCertificates[0].Certificate.QC.Fact != rc.QC.Fact {
 		t.Fatal("reconstruction lost direct ancestor witness")
 	}

@@ -1,5 +1,7 @@
 # Next wire 4：完整安全性分析与论文论证依据
 
+> **历史证明基线。** 本文记录 2026-09 的模型，包含已被替换的迟到来源及耦合修复语义。当前分支请联合阅读[来源回收论证](reviewer-revision-2026-10-02/security-recovery.md)与 [C3 决定／表示分离论证](c3-security-review-2026-10-02/README.md)，不得直接将本页作为当前 V5 全流程证明。
+
 > 初始审查基线：`security-analysis@a6ebeb2`；2026-09-27 在 `37edf2a` 基础上补入配置唯一性、完整共识身份加固及组合证明，见[加固记录](security-analysis-validation-2026-09-27/hardening.md)。本文整合协议模型、一般条件推导、源码审查和已有实验。**“完整”指分析范围与证据边界完整列明，不表示已完成密码学、共识实现或全部 Go 代码的机器证明。**
 
 [论文第五章正文](../paper/security-analysis-chapter5.md) · [系统设计](../design/system.md) · [组合证明附录](security-composition-wire4.md) · [修订与共识接口附录](security-redaction-consensus-wire4.md) · [实验索引](../experiments/README.md)

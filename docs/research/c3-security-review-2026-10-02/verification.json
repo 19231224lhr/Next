@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-02T15:06:47.6145177+08:00",
+  "base_commit": "7a2517e9563f422f43eb5e051a6b1d450c300b38",
+  "branch": "feat/review-source-recovery",
+  "platform": "Windows amd64",
+  "go_version": "go version go1.27.1 windows/amd64",
+  "commands": [
+    {
+      "command": "go test -count=1 -tags comet_v3 ./internal/member ./internal/redaction -run 'TestExposedSourceReconstructionAcrossOrganizationsAndDepth|TestCompensationBeforeAdaptation' -v",
+      "result": "PASS",
+      "scope": "targeted regression; run argument was shell-quoted"
+    },
+    {
+      "command": "go test -count=1 -tags comet_v3 ./...",
+      "result": "PASS",
+      "exit_code": 0,
+      "log": "tests-comet.log"
+    },
+    {
+      "command": "go vet -tags comet_v3 ./...",
+      "result": "PASS",
+      "exit_code": 0,
+      "log": "vet-comet.log"
+    },
+    {
+      "command": "go test -count=1 ./internal/rules -run TestPublicSubmissionRejectsUnusedInputCertificates -v",
+      "result": "EXPECTED FAIL before fix",
+      "exit_code": 1,
+      "log": "unused-cert-before.log"
+    },
+    {
+      "command": "go test -count=1 ./internal/rules -run 'TestPublicSubmissionRejectsUnusedInputCertificates|TestPublicSubmissionRetainsSpendAuthorizationWithoutNewTXCer' -v",
+      "result": "PASS after fix",
+      "exit_code": 0,
+      "log": "unused-cert-after.log"
+    },
+    {
+      "command": "go test -count=1 -tags comet_v3 ./...",
+      "result": "PASS after fix",
+      "exit_code": 0,
+      "log": "tests-comet-final.log"
+    },
+    {
+      "command": "go vet -tags comet_v3 ./...",
+      "result": "PASS after fix",
+      "exit_code": 0,
+      "log": "vet-comet-final.log"
+    }
+  ],
+  "production_change": "Reject unused input certificates to match member approval; also correct obsolete compensation comment. No encoding, storage, RPC or configuration changes.",
+  "experiment_change": "None; no new network benchmark",
+  "reviewed_files": [
+    {
+      "path": "internal/member/source_recovery_test.go",
+      "sha256": "6a23a8119e31e6c1e5dfa7c3d12b453b2e4c3b81cc75cec12752fc721a49aa0e"
+    },
+    {
+      "path": "internal/redaction/decision_test.go",
+      "sha256": "00b072310fd6f7e7adecb86db00b10e5597abfcc2633877a25594cf6a2b84220"
+    },
+    {
+      "path": "internal/rules/direct.go",
+      "sha256": "d518232a3a89563a77a27c53b6e9bd3680b298726db8f7ff3e4310ff6ee31bca"
+    },
+    {
+      "path": "internal/rules/direct_submission_test.go",
+      "sha256": "05a127c196641ea6b9caa1a43ac0dd8a587a782a3f612a75fb39560f96f992ca"
+    }
+  ]
+}

@@ -304,6 +304,7 @@ func VerifyDirectSubmission(payment protocol.DirectSubmission, p DirectPolicy) (
 		frozen = append(frozen, parent)
 	}
 	payment.InputCertificates = frozen
+	used := 0
 	for i, in := range tx.Body.Inputs {
 		if in.Kind != protocol.CertificateInput {
 			continue
@@ -312,6 +313,12 @@ func VerifyDirectSubmission(payment protocol.DirectSubmission, p DirectPolicy) (
 		if !ok || in.Evidence != protocol.Hash(parent.Certificate.QC.Fact) || parent.Certificate.VerifyOutput(p.Organizations[parent.Certificate.Summary.Config], parent.Index, tx.Claims[i].Output) != nil {
 			return VerifiedDirectPayment{}, protocol.ErrAuth
 		}
+		used++
+	}
+	// Inputs are unique after PrepareDirectVector. Match the member approval
+	// rule: unrelated certificates must not trigger source-recovery work.
+	if used != len(parents) {
+		return VerifiedDirectPayment{}, protocol.ErrRule
 	}
 	return VerifiedDirectPayment{payment: payment, parents: parents}, nil
 }
@@ -760,9 +767,10 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 	return e.result()
 }
 
-// EvaluateDirectCompensation is the accounting substep of an authenticated
-// RepairInput. The committee must validate its byte-level repair plan first and
-// commit that plan with these changes; this function is not an RPC command.
+// EvaluateDirectCompensation is the accounting substep of a validated
+// CompensationDecision. ExecuteDecision commits these changes together with
+// the immutable decision; later representation commands have no economic effect.
+// This function is not an RPC command.
 func EvaluateDirectCompensation(v state.ReadView, id protocol.OutputID, policy DirectPolicy, now int64) (state.Transition, error) {
 	ob, found, err := state.Load[DirectObligation](v, DirectObligationKey(id))
 	if err != nil {
