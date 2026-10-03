@@ -4,7 +4,7 @@
 
 **2026-10-03 完整大修补证版。** 本版本描述公开后继证据触发的来源补交、独立公共赔付决定，以及保持完整区块身份的授权历史表示。连续支付、混合负载与历史读取主测量仍对应 `721800c`；新增边界、持久化组合与12轮网络补证对应生产快照 `9879f64`，测试/驱动另存源码指纹。两组证据没有混用版本。
 
-**本地交付已更新：** 英文正文18页、中文阅读版19页，英文/中文补充材料20/21页；四份PDF及可移植LaTeX包已重新编译、核对。**Overleaf最后同步待恢复浏览器工具后完成，本地文件是本轮权威副本。** [补证报告](../../experiments/major-revision-2026-10-03/README.md) · [逐项关闭表](../../experiments/major-revision-2026-10-03/review-closure.md) · [编译与交付检查](build-verification.md) · [源码包](Next-review-2026-10-03-LaTeX.zip)
+**本地交付已更新：** 英文正文18页、中文阅读版19页，英文/中文补充材料20/21页；四份PDF及可移植LaTeX包已重新编译、核对。**Overleaf最后同步已完成：56个源码/图表与本地定稿一致，四根在线编译均无错误或警告。** [在线同步记录](overleaf-sync-2026-10-03/README.md) [补证报告](../../experiments/major-revision-2026-10-03/README.md) · [逐项关闭表](../../experiments/major-revision-2026-10-03/review-closure.md) · [编译与交付检查](build-verification.md) · [源码包](Next-review-2026-10-03-LaTeX.zip)
 
 旧构建 `d99ec92`、早期 decision-first 补强与 E1–E8 移入补充材料，保留各自原始配置，未追溯改写数字。参见[本轮写作裁决](revision-2026-10-03/decisions.md)、[最终版本安全边界审查](../../research/review-step1-2026-10-02/README.md)、[读者契约](../../design/historical-reader-contract.md)和[编译检查](build-verification.md)。
 
@@ -43,7 +43,7 @@ Overleaf 修订副本：[Next - Review Revision 2026-10-02](https://www.overleaf
 
 ## 编译
 
-Overleaf推荐英文 **pdfLaTeX + BibTeX**、中文 **XeLaTeX + BibTeX**。本轮最终四份PDF改用本地 Tectonic 0.17.0（XeTeX/BibTeX、bundle v33）编译，因浏览器工具失联无法完成在线交付。英文根显式选择OT1以保持IEEEtran字体；中文按字体文件名选择Fandol和TeX Gyre，避免依赖系统字体族名。图表路径兼容本目录的 `figures/` 和 Overleaf 根目录。
+Overleaf推荐英文 **pdfLaTeX + BibTeX**、中文 **XeLaTeX + BibTeX**。冻结归档的四份PDF使用本地 Tectonic 0.17.0（XeTeX/BibTeX、bundle v33）编译；浏览器恢复后，同一源码又在 Overleaf TeX Live 2026 编译通过，在线产物单独保存在 `overleaf-sync-2026-10-03/`。英文根显式选择OT1以保持IEEEtran字体；中文按字体文件名选择Fandol和TeX Gyre，避免依赖系统字体族名。图表路径兼容本目录的 `figures/` 和 Overleaf 根目录。
 
 ```sh
 latexmk -pdf main.tex
@@ -58,7 +58,7 @@ latexmk -xelatex supplement-main-zh.tex
 
 ## 版本与投稿信息
 
-- `source-checks.json` 检查标签、引用和图表文件；`bilingual-checks.json` 检查两种语言的结构与数字对应；`pdf-checks.json` 检查本轮四份PDF；`measurement-checks.json` 独立核算旧构建主要实测数字；`SHA256.json` 记录新源包和PDF摘要。`overleaf-checks.json` 是上一版在线核查，本轮尚未重新取得在线源包，不可作为最新同步证明。
+- `source-checks.json` 检查标签、引用和图表文件；`bilingual-checks.json` 检查两种语言的结构与数字对应；`pdf-checks.json` 检查本轮四份PDF；`measurement-checks.json` 独立核算旧构建主要实测数字；`SHA256.json` 记录新源包和PDF摘要。`overleaf-checks.json` 已更新为本轮在线源包的56文件核查；在线四PDF及其摘要另见 `overleaf-sync-2026-10-03/pdf-checks.json`，不覆盖冻结的本地编译产物。
 - 英文稿与中文阅读版表达同一组规则和测量结果；中文不作为 IEEE 投稿排版标准。
 - 作者沿用用户提供的 **Lu Hengrun**，单位暂为 **University**。正式投稿前填写真实单位、邮箱与期刊要求的作者信息。
 - 主文给出模型条件下的安全论证；有限模型、代码回归和同机实验分别提供实现证据，不将它们称为全实现机械化证明。

@@ -1,6 +1,6 @@
 # 完整大修：证据与执行记录
 
-实施计划见 [A–G](../../superpowers/plans/2026-10-03-complete-paper-major-revision.md)。本轮定向边界、组合重放与12轮网络实验完成；中英文正文、补充材料及本地源码包已编译核对。Overleaf最后同步因浏览器工具内核路径故障待办，见[交付核查](../../paper/review-2026-10-02/build-verification.md)。本目录保留成功、预期拒绝和夹具调试记录。
+实施计划见 [A–G](../../superpowers/plans/2026-10-03-complete-paper-major-revision.md)。本轮定向边界、组合重放与12轮网络实验完成；中英文正文、补充材料及本地源码包已编译核对。Overleaf最后同步已完成，56个源码/图表核对一致、四根在线编译通过，见[交付核查](../../paper/review-2026-10-02/build-verification.md)。本目录保留成功、预期拒绝和夹具调试记录。
 
 ## A：版本与影响
 
