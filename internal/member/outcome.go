@@ -6,6 +6,7 @@ import (
 )
 
 type Outcome struct {
+	Invalidated                                                    bool `json:",omitempty"`
 	Approved, Installed, PublicObserved, Custody                   bool
 	FuelResidual, PolicyResidual, ExecutionResidual, BytesResidual uint64
 }
@@ -17,6 +18,11 @@ func (m *Member) Outcome(id protocol.SpendFactID) (out Outcome, err error) {
 			return e
 		}
 		out.Approved = found
+		p, _, e := state.Load[LocalProgress](v, ProgressKey(id))
+		if e != nil {
+			return e
+		}
+		out.Invalidated = p.Invalidated
 		applied, e := AppliedDebits(v, approval)
 		if e != nil {
 			return e

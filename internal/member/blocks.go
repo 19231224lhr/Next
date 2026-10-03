@@ -10,19 +10,23 @@ import (
 
 // LocalProgress contains only this member's own signed obligations and fee plan.
 type LocalProgress struct {
-	Settled   bool
-	Pending   uint32
-	Paid      uint64
-	Recovered uint64
-	Fee       rules.Escrow
-	Height    int64
+	Settled           bool
+	Pending           uint32
+	Paid              uint64
+	Recovered         uint64
+	Fee               rules.Escrow
+	Height            int64
+	Invalidated       bool                 `json:",omitempty"`
+	SupersededBy      protocol.SpendFactID `json:",omitempty"`
+	InvalidatedHeight int64                `json:",omitempty"`
 	// Positional entries bind to the immutable Approval.Debits (resource,
 	// grant version, worker and cap). Only this record changes during settlement.
 	Applied []uint64 `json:",omitempty"`
 }
 
-// DirectStoreSchema prevents old member binaries from ignoring split credits.
-const DirectStoreSchema uint64 = 7
+// DirectStoreSchema prevents old binaries from ignoring cumulative credits or
+// invalidated approvals and re-signing after their capacity was reclaimed.
+const DirectStoreSchema uint64 = 8
 
 func localApplied(a state.Approval, p LocalProgress) ([]uint64, error) {
 	values := p.Applied
@@ -61,6 +65,9 @@ func ProgressKey(f protocol.SpendFactID) []byte { return state.Key(122, f[:]) }
 func waitingKey(id protocol.OutputID) []byte    { return state.Key(123, id[:]) }
 
 func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgress) error {
+	if p.Invalidated {
+		return rules.ErrAccounting
+	}
 	var err error
 	p.Applied, err = localApplied(*a, *p)
 	if err != nil {
@@ -333,14 +340,14 @@ func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, r
 		}
 		o.Apply([]state.Change{{Key: state.Key(state.KeyOutbox, fact[:]), Delete: true}})
 		for i, in := range tx.Body.Inputs {
-			if err = state.Put(o, rules.DirectSpendKey(in.Output, tx.Claims[i].Instance), state.Spend{Consumed: fact}); err != nil {
+			if err = m.consumePublicInput(o, pay, in.Output, tx.Claims[i].Instance, height); err != nil {
 				return err
 			}
 		}
 	}
 	if tx.Body.Config == m.cfg.Organization.Hash() {
 		for _, in := range tx.Body.Fee.Inputs {
-			if err = state.Put(o, rules.DirectSpendKey(in.Output, 0), state.Spend{Consumed: fact}); err != nil {
+			if err = m.consumePublicInput(o, pay, in.Output, 0, height); err != nil {
 				return err
 			}
 		}

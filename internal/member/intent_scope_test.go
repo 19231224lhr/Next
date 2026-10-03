@@ -5,10 +5,13 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	abci "github.com/cometbft/cometbft/abci/types"
 	"os"
 	"reflect"
 	"testing"
 	"time"
+	"utxo/finality"
+	"utxo/internal/blockfollow"
 
 	"utxo/internal/committee"
 	"utxo/internal/member"
@@ -75,6 +78,7 @@ func TestDirectIntentScopeAcrossOrganizations(t *testing.T) {
 			}
 			var payments []protocol.DirectPayment
 			var signers [2][]*member.Member
+			var stores [2][]store.Store
 			for orgIndex, f := range []testkit.Fixture{a, b} {
 				tx, err := f.FastTransaction(0, 1, policy)
 				if err != nil {
@@ -108,6 +112,7 @@ func TestDirectIntentScopeAcrossOrganizations(t *testing.T) {
 					certificate.Summary, certificate.QC.Fact = vote.Summary, vote.Summary.Fact()
 					certificate.QC.Votes = append(certificate.QC.Votes, vote.Vote)
 					signers[orgIndex] = append(signers[orgIndex], m)
+					stores[orgIndex] = append(stores[orgIndex], db)
 				}
 				if err := certificate.Verify(f.Org); err != nil {
 					t.Fatal(err)
@@ -124,6 +129,7 @@ func TestDirectIntentScopeAcrossOrganizations(t *testing.T) {
 			if scenario.reverse {
 				first, second = second, first
 			}
+			var publicRaw, publicResult []byte
 			execute := func(payment protocol.DirectPayment, height int64) error {
 				raw, err := payment.Submission().MarshalBinary()
 				if err != nil {
@@ -131,11 +137,26 @@ func TestDirectIntentScopeAcrossOrganizations(t *testing.T) {
 				}
 				return ledger.Update(func(v state.ReadView) ([]state.Change, error) {
 					tr, err := engine.ExecuteAt(v, raw, committee.BlockContext{Height: height, Time: time.Unix(100, 0)})
+					if err == nil {
+						publicRaw, publicResult = raw, tr.Data
+					}
 					return tr.Changes, err
 				})
 			}
 			if err := execute(payments[first], 1); err != nil {
 				t.Fatal(err)
+			}
+			trust, data := testkit.Block("intent-scope", 1, nil, [][]byte{publicRaw}, []*abci.ExecTxResult{{Data: publicResult}})
+			verified, err := finality.VerifyBlock(trust, data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for orgIndex, members := range signers {
+				for i, m := range members {
+					if err := blockfollow.Commit(stores[orgIndex][i], verified, m.PrepareBlock); err != nil {
+						t.Fatal(err)
+					}
+				}
 			}
 			before, err := store.Scan(ledger, nil, nil, 1000)
 			if err != nil || len(before) == 0 || len(before) == 1000 {
@@ -160,6 +181,10 @@ func TestDirectIntentScopeAcrossOrganizations(t *testing.T) {
 			}
 			fixture := []testkit.Fixture{a, b}[second]
 			for _, m := range signers[second] {
+				out, err := m.Outcome(payments[second].Certificate.QC.Fact)
+				if err != nil || out.Invalidated {
+					t.Fatal("independent Intent loser invalidated", out, err)
+				}
 				quota, err := m.Quota(fixture.Genesis.Grants[0].Key, 0)
 				if err != nil || quota.Reserved != 100 {
 					t.Fatal("rejected source lost its original CAL reservation", err)

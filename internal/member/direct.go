@@ -95,6 +95,13 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 		if _, found, err := state.Load[state.Approval](o, key); err != nil {
 			return nil, err
 		} else if found {
+			p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+			if err != nil {
+				return nil, err
+			}
+			if p.Invalidated {
+				return nil, rules.ErrConflict
+			}
 			return nil, nil
 		}
 		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
@@ -223,6 +230,13 @@ func (m *Member) InstallDirectClassified(payment protocol.DirectPayment) (bool, 
 	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
 		key := state.Key(state.KeyInstall, fact[:])
+		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+		if err != nil {
+			return nil, err
+		}
+		if p.Invalidated {
+			return nil, rules.ErrConflict
+		}
 		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
 			return nil, err
 		} else if found {

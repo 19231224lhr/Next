@@ -20,6 +20,13 @@ func (m *Member) recoverExposedSources(o *state.Overlay, inputs []protocol.Input
 			continue
 		}
 		fact := cert.QC.Fact
+		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+		if err != nil {
+			return err
+		}
+		if p.Invalidated {
+			return rules.ErrAccounting
+		}
 		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
 			return err
 		} else if found {
