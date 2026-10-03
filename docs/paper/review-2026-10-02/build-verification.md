@@ -2,6 +2,8 @@
 
 ## 当前交付
 
+本轮交付内容提交：`e99575aa54bc92bed828d3592c488ad4390ac408`。归档标签：`paper-major-revision-2026-10-03`；分支仍为 `fix/partial-approval-reclamation`，未擅自合并 `re`。该提交固定新测试、12轮记录、修改后的论文及四PDF；归档说明的后续提交不改变这些内容。
+
 实验、代码回归和本地双语论文修订完成；**Overleaf最后同步待办**。浏览器CUA内核初始化持续报“failed to write kernel assets / 系统找不到指定的路径”，因此不能将旧在线校验当成本次结果。下方历史记录保留作版本追溯。
 
 | 根文件 | 最终本地引擎 | 页数 | 编译错误 / Overfull / 缺字 |
