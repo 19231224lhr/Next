@@ -29,6 +29,41 @@ execution consumes that instance at most once.
 Binding fixes the certified summary and the owner-authorized transaction, and the fixed route sends competing requests to one organization. Two three-member quorums intersect in at least two members, so an honest member lies in both. Its atomic input lock precedes signing, so it approves only one of two conflicts, and budget release keeps the lock. Final-input and certificate-input execution consult the same spend key. Replaying a fact adds neither a consumption nor a fee charge. A repaid output has no final creation and its instance~0 stays consumed, so a later claim on $(x,i)$ fails.
 \end{IEEEproof}
 
+\begin{lemma}[Superseded partial approval]
+\label{lem:security-superseded}
+Fix one four-member organization with three signatures required and at
+most one Byzantine member.  Let an honest member have approved fact
+$c$ and locked an ordinary or user-funded fee input instance $\xi$.
+If a successfully applied public payment under the same organization
+configuration carries a valid QC for a different fact $c'$ and a different
+transaction identity and consumes $\xi$, then no three matching valid
+member signatures for $c$ can have existed. The honest member may therefore
+restore the residual local debits of $c$ while permanently refusing to
+sign or install $c$.  This conclusion does not apply to two
+QC-bearing facts with disjoint inputs that conflict only through their
+global Intent.
+\end{lemma}
+
+\begin{IEEEproof}
+The public execution of $c'$ has passed the current organization's
+authorization checks and therefore carries a valid three-member QC.
+Assume for contradiction that $c$ also has a valid three-member QC.
+The two signer sets intersect in at least two members.  Since at most
+one member is Byzantine, an honest member belongs to the intersection.
+That member would have signed two different facts that consume the
+same instance $\xi$, although honest members atomically lock ordinary
+and user-funded fee instances before signing and reject a different
+candidate for a locked instance.  This contradicts the approval rule.
+
+Thus no three matching signatures for $c$ can have existed. In the
+notation introduced in Section~\ref{sec:security-coverage}, $c\notin C_g$.
+Restoring one member's residual debits for $c$ cannot remove
+a capacity witness for any term of $Q_g$.  The successful public
+consumption of $\xi$, the immutable approval, and the invalidated
+progress record continue to reject later use of $c$; only its unused
+local resource reservation is restored.
+\end{IEEEproof}
+
 \subsection{Source Resubmission and Compensation Decisions}
 \label{sec:security-decision}
 
@@ -52,7 +87,7 @@ Let $T_1\ne T_2$ be payments with the same Network, Subject, and Nonce, spending
 Each organization holds its own local intent record and the approvals concern disjoint inputs, so neither organization observes a conflict, and the owner's authorization covers each payment. At public execution, the evaluation returns a conflict when the intent is already bound to a different TxID. The binding is written in the transition that executes a payment successfully, and no production path deletes or rebinds it, so the other payment stays unexecuted whatever its resubmission. A different Subject yields a different intent.
 \end{IEEEproof}
 
-If $T_2$ cannot execute but a successor of its output has executed, the successor has registered an obligation against $G_2$. After the deadline, the reserve of $G_2$ can be debited, but the source cannot repay by resubmission. Since $z_c=0$, the approving members of $G_2$ keep $r_{m,c}=a_c$ reserved, which Theorem~\ref{thm:security-coverage} already counts with $w_c=a_c$. The inputs of $T_2$ remain under the original approval locks, so this is not a user recovering and respending the principal. Theorem~\ref{thm:security-neutrality} excludes the case, because it assumes that every payment succeeds once.
+If $T_2$ cannot execute but a successor of its output has executed, the successor has registered an obligation against $G_2$. After the deadline, the reserve of $G_2$ can be debited, but the source cannot repay by resubmission. Since $z_c=0$, the approving members of $G_2$ keep $r_{m,c}=a_c$ reserved, which Theorem~\ref{thm:security-coverage} already counts with $w_c=a_c$. The inputs of $T_2$ remain under the original approval locks, so this is not a user recovering and respending the principal. Theorem~\ref{thm:security-neutrality} excludes the case, because it assumes that every payment succeeds once. The current relay may continue retrying a permanently conflicting source; retry termination is a separate engineering follow-up and cannot release its certified liability.
 
 \begin{lemma}[Compensation takes effect at most once]
 \label{lem:security-decision}
@@ -101,6 +136,7 @@ at every prefix,
 $r_{m,c}\ge w_c$.
 \end{lemma}
 \begin{IEEEproof}
+For $c\in C_g$, Lemma~\ref{lem:security-superseded} excludes invalidation by an honest signer: the triggering conflict would imply $c\notin C_g$.
 Until $m$ observes the successful execution of the payment of $c$, its CAL restoration for $c$ is zero, so $r_{m,c}=a_c\ge w_c$ whatever the compensation state. After it observes that execution, $m$ checks that the reported repayment covers its recorded compensation and sets its recorded repayment equal to it. The restoration target is $a_c$ minus a recorded net compensation of zero, so $r_{m,c}=0$, and $w_c=\bar p_c=0$ by Lemma~\ref{lem:security-recovery}. A member that approved after following a compensation recorded none and restores only its own debit.
 \end{IEEEproof}
 
@@ -110,7 +146,7 @@ For every CAL grant, $Q_g\le B_g$. For each reserve account $x$, its total
 open gap $D_x$ does not exceed its balance $A_x$.
 \end{theorem}
 \begin{IEEEproof}
-Let $\mathcal A_{m,g}$ contain all successful approvals under $g$, including those without a QC, and $L_{m,g}=\sum_{c\in\mathcal A_{m,g}}r_{m,c}$ across Workers. Approval and restoration move capacity between Available and Reserved, and top-ups add the difference in member shares, so $L_{m,g}\le s(B_{m,g})\le s(B_g)$ for the locally observed authorization $B_{m,g}$; grants only increase. Fix any three honest members $H_g$ of the organization. A QC has three distinct signers and at most one member lies outside $H_g$, so the set $\mathsf{Sig}_c$ of members of $H_g$ that signed $c$ has at least two elements. Honest members sign only after approving, so Lemma~\ref{lem:security-witness} gives $r_{m,c}\ge w_c$ for $m\in\mathsf{Sig}_c$, and
+Let $\mathcal A_{m,g}$ contain all successful approvals under $g$, including those without a QC (invalidated approvals contribute zero residual), and $L_{m,g}=\sum_{c\in\mathcal A_{m,g}}r_{m,c}$ across Workers. Approval, ordinary restoration, and superseding invalidation move capacity between Available and Reserved, and top-ups add the difference in member shares, so $L_{m,g}\le s(B_{m,g})\le s(B_g)$ for the locally observed authorization $B_{m,g}$; grants only increase. Fix any three honest members $H_g$ of the organization. A QC has three distinct signers and at most one member lies outside $H_g$, so the set $\mathsf{Sig}_c$ of members of $H_g$ that signed $c$ has at least two elements. Honest members sign only after approving, so Lemma~\ref{lem:security-witness} gives $r_{m,c}\ge w_c$ for $m\in\mathsf{Sig}_c$, and
 \begin{equation}
 \begin{aligned}
   2Q_g
@@ -135,7 +171,13 @@ D_x&\le\sum_{g\in\mathcal G_x}V_g
 Gross Paid and its recovery are each counted once, and $E_g$ is a risk bound rather than available member capacity.
 \end{IEEEproof}
 
-An unexecuted payment keeps $a_c$, including change, at every approving member, and partial approvals count in $\mathcal A_{m,g}$ although they never form a QC. This occupancy limits service under finite capital and is not an accounting violation. A compensation raises the net compensation counter but does not release the signing capacity of the unexecuted source; only its own execution does.
+A partial approval remains charged until either its own payment
+executes or authenticated public history proves that one of its locked
+instances was consumed by a different successfully authorized fact
+under the same configuration.  Time alone never releases it.
+A disjoint-input payment that loses a global Intent conflict may still
+have a valid QC and issuer liability, and therefore retains its input
+locks and signing reservation.
 
 \noindent\textbf{CAL admission consequence.}
 At the execution prestate, including earlier successful block commands, let $N_g$ be the distinct, valid, unregistered parent facts under $g$ that matching, unconsumed missing inputs require. They have $w_c=a_c$ and $p_c=R_c=0$. Every registered fact satisfies $R_c+\bar p_c\le w_c$, and the facts are disjoint, so

@@ -21,3 +21,32 @@ For a follower that starts from the same local state, configuration, and cursor,
 
 \noindent\textbf{Relations used in the analysis.}
 Three relations compare different objects. Representation inertness compares the economic projection before and after one representation or installation step, and it projects away command identities, revision counters, and materialization tasks. Fixed-target convergence compares the final body and part openings that different groupings and orders of representation commands produce for one original body and one decided set. Replay equality fixes the entire original command sequence and its block contexts, and deterministic execution then reproduces each application hash. Cross-history comparisons fix the economic commands, public times, and historical target coordinates, so projection equality does not identify entire application states and does not permit deleting or renumbering blocks. None of the three relations compares histories that order parent arrivals and compensations differently; the delay-neutrality theorem of the main text makes that comparison under its own hypotheses and equates final CAL holders and reserve balances, not application hashes or revision metadata.
+
+\noindent\textbf{Local invalidation write set and replay.}
+Invalidation is evaluated only while applying an authenticated block
+entry whose execution result is successful and applied; \texttt{INSTALL}
+does not trigger it.  Before the follower overwrites a spend record, it
+reads the previous candidate and verifies the immutable approval and
+the exact ordinary or user-fee input instance.  Existing observation,
+installed certificate material, an outbox entry, settlement, pending
+obligations, compensation, recovery, or a fee effect is treated as an
+accounting contradiction rather than as releasable state.
+
+The additional invalidation write set contains only the affected local resource slices
+and the approval's local progress.  For each debit it subtracts
+$\mathsf{Cap}-\mathsf{Applied}$ from Reserved, adds the same amount to
+Available, sets the corresponding cumulative Applied entry to Cap,
+and records Invalidated, the first triggering public fact, and its
+height.  The immutable approval and unrelated input locks remain.
+Overlay visibility makes later conflicting inputs or transactions in
+the same block no-ops for restoration; the follower cursor suppresses
+block replay, and the cumulative Applied vector prevents a second
+credit after restart.  The member-store schema is advanced so that an
+older binary cannot silently ignore the invalidated terminal state. These writes commit with the successful consumption record and follower cursor. Schema 8 rejects earlier member stores; experiments use fresh directories rather than a migration.
+
+A fully certified source that is permanently rejected by the global
+Intent binding while spending disjoint inputs is outside this
+invalidation rule: its QC-backed responsibility, input locks, and
+signing reservation remain.  The current relay may continue retrying
+such a source; terminating those retries is a separate engineering
+follow-up and cannot release the certified liability.

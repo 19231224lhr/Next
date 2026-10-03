@@ -1,6 +1,6 @@
-\section{Per-Run Evidence for the Final Build}
+\section{Per-Run Evidence for the Frozen Experimental Build}
 \label{sec:supp-current}
-This section records production build \texttt{721800c}, used by the main evaluation. Continuation and mixed-load trials share node binaries and Comet sources. The subsequent historical methods and archived tables retain their original build identities and are not throughput measurements of this build.
+This section records frozen evaluation build \texttt{721800c}, used by the main evaluation. Continuation and mixed-load trials share node binaries and Comet sources. The subsequent historical methods and archived tables retain their original build identities and are not throughput measurements of this build.
 
 \begin{table}[htbp]
 \centering\small
@@ -67,3 +67,6 @@ Process & Payments & Compensated & Representation & Net extra KV & Common decisi
 \end{table}
 
 These costs come from offline successful-execution fixtures. Representation work includes sequential adaptation, assembly, Finalize, synchronous application Commit, and materialization; common compensation decisions are reported separately. Network and consensus waits, public-block saving, and commit-signature construction are outside this timer. KV is the logical increase in encoded records, not the physical disk-space difference between two deployments.
+
+\noindent\textbf{Subsequent reclamation regression.}
+Build \texttt{bf71c4d} adds the superseded-partial-approval transition. Directed tests cover exact ordinary and fee-input conflicts, duplicate processing, restart, refusal to re-sign, and the disjoint-input Intent counterexample. A separate fresh-start nine-service run with synchronous member storage completes 1,000 user-funded payments offered at 100 payments/s (9.990-s send span, 10.879-s total), and a 100-hop fast chain reaches its last certified receipt in 4.422 s and closes in 5.014 s. Both runs have matching committee state and empty outboxes. These correctness regressions do not replace the performance measurements of \texttt{721800c}.

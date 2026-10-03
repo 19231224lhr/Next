@@ -1,0 +1,66 @@
+=== RUN   TestInvalidatedApprovalRejectsLateEffects
+=== RUN   TestInvalidatedApprovalRejectsLateEffects/settle
+=== RUN   TestInvalidatedApprovalRejectsLateEffects/compensate
+=== RUN   TestInvalidatedApprovalRejectsLateEffects/recover
+--- PASS: TestInvalidatedApprovalRejectsLateEffects (0.00s)
+    --- PASS: TestInvalidatedApprovalRejectsLateEffects/settle (0.00s)
+    --- PASS: TestInvalidatedApprovalRejectsLateEffects/compensate (0.00s)
+    --- PASS: TestInvalidatedApprovalRejectsLateEffects/recover (0.00s)
+=== RUN   TestDirectIntentScopeAcrossOrganizations
+=== RUN   TestDirectIntentScopeAcrossOrganizations/different_subjects
+=== RUN   TestDirectIntentScopeAcrossOrganizations/same_subject_a_first
+=== RUN   TestDirectIntentScopeAcrossOrganizations/same_subject_b_first
+--- PASS: TestDirectIntentScopeAcrossOrganizations (0.03s)
+    --- PASS: TestDirectIntentScopeAcrossOrganizations/different_subjects (0.01s)
+    --- PASS: TestDirectIntentScopeAcrossOrganizations/same_subject_a_first (0.01s)
+    --- PASS: TestDirectIntentScopeAcrossOrganizations/same_subject_b_first (0.01s)
+=== RUN   TestPartialReclaimMultipleInputs
+=== RUN   TestPartialReclaimMultipleInputs/one_winner
+=== RUN   TestPartialReclaimMultipleInputs/two_winners_same_block
+--- PASS: TestPartialReclaimMultipleInputs (0.03s)
+    --- PASS: TestPartialReclaimMultipleInputs/one_winner (0.02s)
+    --- PASS: TestPartialReclaimMultipleInputs/two_winners_same_block (0.01s)
+=== RUN   TestPartialReclaimRejectsContradictionAtomically
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/observed
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/installed
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/outbox
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/settled
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/paid
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/pending
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/recovered
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/fee
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/missing_approval
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/wrong_input
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/same_tx
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/underflow
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/cross_config
+=== RUN   TestPartialReclaimRejectsContradictionAtomically/other_consumed
+--- PASS: TestPartialReclaimRejectsContradictionAtomically (0.14s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/observed (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/installed (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/outbox (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/settled (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/paid (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/pending (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/recovered (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/fee (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/missing_approval (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/wrong_input (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/same_tx (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/underflow (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/cross_config (0.01s)
+    --- PASS: TestPartialReclaimRejectsContradictionAtomically/other_consumed (0.01s)
+=== RUN   TestPartialReclaimRequiresSuccessfulExecution
+--- PASS: TestPartialReclaimRequiresSuccessfulExecution (0.01s)
+=== RUN   TestPartialReclaimPublicConflict
+=== RUN   TestPartialReclaimPublicConflict/sponsor
+=== RUN   TestPartialReclaimPublicConflict/owner
+=== RUN   TestPartialReclaimPublicConflict/fee_only
+=== RUN   TestPartialReclaimPublicConflict/installed_winner
+--- PASS: TestPartialReclaimPublicConflict (0.08s)
+    --- PASS: TestPartialReclaimPublicConflict/sponsor (0.02s)
+    --- PASS: TestPartialReclaimPublicConflict/owner (0.03s)
+    --- PASS: TestPartialReclaimPublicConflict/fee_only (0.02s)
+    --- PASS: TestPartialReclaimPublicConflict/installed_winner (0.02s)
+PASS
+ok  	utxo/internal/member	1.099s

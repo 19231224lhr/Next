@@ -1,0 +1,258 @@
+Browser tab: 3, Title: "IEEE TDSC期刊论文大修后复审 - Claude", URL: "https://claudez.yuehanxai.com/chat/a61900c9-bd4c-4ba0-ae9c-0b5dfc09566d".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 541, 549, 552-554, 556-559
++						556 text Claude finished the response
+~											517 text 14 minutes ago
++									557 toolbar Message actions
++										558 text 3 minutes ago
++										559 button Retry
++										560 button Edit
++										561 button Copy
+~								550 container Message 8 of 8
++										562 heading Value: 2, Claude responded: 这一轮我读到了 direct.go、blocks.go、source_recovery.go、gateway 的 blocks.go/direct.go、follow.go、records.go 和两个测试。committee 侧的执行、CheckTx 与失败结果是否入块，我没有看到。下面只是计划，没有运行任何东西。
++											563 text Claude responded: 这一轮我读到了 direct.go、blocks.go、source_recovery.go、gateway 的 blocks.go/direct.go、follow.go、records.go 和两个测试。committee 侧的执行、CheckTx 与失败结果是否入块，我没有看到。下面只是计划，没有运行任何东西。
++										564 container Outlining test cases to verify release and audit behavior.
++											565 text Outlining test cases to verify release and audit behavior.
++											566 button (collapsed) Outlining test cases to verify release and audit behavior., Secondary Actions: Expand
+~										555 text Outlining test cases to verify release and audit behavior. 这一轮我读到了
++										567 text direct.go
++										568 text 、
++										569 text blocks.go
++										570 text 、
++										571 text source_recovery.go
++										572 text 、gateway 的
++										573 text blocks.go
++										574 text /
++										575 text direct.go
++										576 text 、
++										577 text follow.go
++										578 text 、
++										579 text records.go
++										580 text  和两个测试。committee 侧的执行、CheckTx 与失败结果是否入块，我没有看到。下面只是计划，没有运行任何东西。
++										581 heading A. 补丁 1：在 applyPayment 中回收被取代的局部批准, Value: 3
++											582 text A. 补丁 1：在 applyPayment 中回收被取代的局部批准
++										583 text 落点。
++										584 text  在
++										585 text applyPayment
++										586 text  的本组织分支里，两个循环用
++										587 text state.Spend{Consumed: fact}
++										588 text  覆盖之前，先
++										589 text Load
++										590 text  旧的 Spend。如果
++										591 text old.Candidate
++										592 text  非零且不等于
++										593 text fact
++										594 text ，把它收入
++										595 text map[SpendFactID]struct{}
++										596 text 。注意：普通输入循环和 Fee.Inputs 循环都要收集，只改第一个是不够的。两个循环结束后，按 fact 排序，调用新的
++										597 text voidSuperseded(o, cands, fact, txid, height)
++										598 text 。这样回收与块游标处在同一个原子事务里。
++										599 text 前置检查（每个候选 T 都要满足）。
++										600 content list
++											601 container
++												602 AXListMarker 1.
++												603 text Approval[T]  存在，且  T.Direct != nil 。
++											604 container
++												605 AXListMarker 2.
++												606 text T.Direct.Body.Config == m.cfg.Organization.Hash() 。如果 T 是旧配置下的批准，跨配置不保证 quorum 相交，此时只跳过，不释放。
++											607 container
++												608 AXListMarker 3.
++												609 text T 的 TxID 与 F′ 的 TxID 不同。如果 TxID 相同而 fact 不同，说明向量的确定性被破坏，应返回  ErrAccounting ，不能释放。
++											610 container
++												611 AXListMarker 4.
++												612 text LocalProgress[T]  满足： !Settled 、 !Void 、 Paid==0 、 Pending==0 。只要 Paid>0，就说明 T 曾以有 QC 的父来源身份被赔付过，与"T 无 QC"相矛盾，应停止 follower，不能释放。
++										613 text 动作。
++										614 content list
++											615 container
++												616 AXListMarker •
++												617 text LocalProgress  新增  Void bool 、 SupersededBy SpendFactID ，并写入 Height。
++											618 container
++												619 AXListMarker •
++												620 text finishLocal  开头新增分支： if p.Void { target = d.Cap } 。这一分支对所有资源种类一律释放  Cap−Applied 。T 从未公共执行，所以它的 FUEL/Policy 预留全部未使用；F′ 的真实费用记在 F′ 自己的批准名下，这里完全不触碰。
++											621 container
++												622 AXListMarker •
++												623 text 不设置 Settled，不调用  Fee.Complete ，不写 Creation，不动 KeyIntent。
++											624 container
++												625 AXListMarker •
++												626 text Approval 的字节保持不变。
++											627 container
++												628 AXListMarker •
++												629 text DirectStoreSchema  提升到 8。理由不是旧二进制会重复释放（Applied 已经持久化），而是旧二进制的幂等快捷路径会重新为 T 签名。
++										630 text 拒签。
++										631 text  在
++										632 text ApproveDirectBytes
++										633 text  中，
++										634 text found
++										635 text  之后、
++										636 text return nil, nil
++										637 text  之前，加载 Progress；若
++										638 text Void
++										639 text  为真，返回
++										640 text ErrConflict
++										641 text 。
++										642 text 其他入口的处理。
++										643 content list
++											644 container
++												645 AXListMarker •
++												646 text recoverExposedSources  遇到 Void 的 approval，返回  ErrAccounting 。被作废的 T 在模型内不可能有 QC 被曝光，出现即说明状态异常。
++											647 container
++												648 AXListMarker •
++												649 text applyPayment  若发现 T 本身被执行且 Void，同样返回错误。
++											650 container
++												651 AXListMarker •
++												652 text Outcome / payctl audit  中的残余口径改为：Void 的批准残余为 0。
++										653 text 对您候选方案的修正。
++										654 content list
++											655 container
++												656 AXListMarker •
++												657 text "不释放输入锁"是安全且保守的做法。被 F′ 消费的输入本来就会被覆盖；T 的其余输入在 m1 上继续保持 Candidate=T。这只影响 m1 一人，用户可以经其他三人花费，所以本轮无需处理。按同一论证，这些锁也可以释放，但不是必需的。
++											658 container
++												659 AXListMarker •
++												660 text 不需要去区分"FUEL 只退未使用部分"。对 T 而言，预留就是全部未使用。只需保证不读 F′ 的任何费用数据。
++											661 container
++												662 AXListMarker •
++												663 text INSTALL 写入的  Consumed  不能作为触发条件。正确：只看  Candidate 。
++										664 heading B. 安全边界与幂等, Value: 3
++											665 text B. 安全边界与幂等
++										666 text 为什么 T 永远无 QC。
++										667 text  触发条件是：同一配置、Code=0、
++										668 text Applied
++										669 text 、DirectSubmission（非决定命令），且对同一
++										670 text DirectSpendKey
++										671 text （普通输入或手续费输入）有一个不同的 fact 完成了公共消费。F′ 有 QC。若 T 也有或将来获得 QC，两个 quorum 必有一名诚实成员同时在两者中，而它的 Candidate 只能是其中之一，矛盾。这个论证与时间无关，所以迟到的签名也拿不到 QC。
++										672 text 不会被误触发的情况。
++										673 text  独立输入、相同 Intent 的情形不共享 spend key，按构造永远不会触发。代码里也不要读 KeyIntent。
++										674 text 幂等性。
++										675 content list
++											676 container
++												677 AXListMarker •
++												678 text 同一个块重放：由  Commit  的游标去重。
++											679 container
++												680 AXListMarker •
++												681 text 同一笔交易的多个输入都指向 T：由 map 去重。
++											682 container
++												683 AXListMarker •
++												684 text 同一块内两笔交易都与 T 冲突：第二次遇到时看到 Void，跳过。
++											685 container
++												686 AXListMarker •
++												687 text 重启：Void 已持久化， Applied  等于 Cap， delta  为 0。
++										688 heading C. 补丁 2：outbox 终止。建议本轮不做，另起一步, Value: 3
++											689 text C. 补丁 2：outbox 终止。建议本轮不做，另起一步
++										690 text 本轮可以只修局部批准。两个补丁的关闭条件互不依赖。
++										691 text 一个关键困难。
++										692 text  终止的唯一可靠证据，是认证块中出现"同一 Intent、不同 TxID、Applied 的付款"。公共 Intent 绑定永久、不会改绑，所以这条证据是可靠的。可以设一个反向索引
++										693 text KeyOutboxIntent[intent]→fact
++										694 text ，与每条 outbox 的创建（
++										695 text InstallDirect
++										696 text 、
++										697 text recoverExposedSources
++										698 text 、gateway
++										699 text persistDirect
++										700 text ）原子写入。成员和 gateway 跟块时，对每笔 Applied 付款（不限配置）做一次 Get；命中且 TxID 不同，就删除 outbox，写入
++										701 text KeySourceBlocked[fact]
++										702 text 。上述三个创建入口都要先检查这条记录。这样不需要扫描。
++										703 text 这个方案的缺口。
++										704 text  它覆盖不了"赢家先执行、outbox 后创建"这一顺序，而这恰恰是攻击者会用的顺序：先执行 W，再去 B 组织认证 L。按 Subject 限定范围也挡不住，攻击者可以事后再把输出路由到 B。要补上这个缺口，只有两条路：
++										705 content list
++											706 container
++												707 AXListMarker •
++												708 text 在每个成员/gateway 上为每一笔公共付款保存一条 Intent 记录。这等于复制 committee 的 Intent 状态，存储随全网交易量线性增长。
++											709 container
++												710 AXListMarker •
++												711 text committee 对永久冲突的提交在块中写入带确定性冲突码的失败结果，作为认证证据。这需要先确认现有代码是否会把失败的 DeliverTx 写入块，还是只在 CheckTx 阶段拒绝。我没有看到这部分代码。
++										712 text 过渡期的处理。
++										713 content list
++											714 container
++												715 AXListMarker •
++												716 text 本轮 outbox 改用指数退避加上限，这是工程措施，不是终局。
++											717 container
++												718 AXListMarker •
++												719 text 论文写明：永久 Intent 冲突时，补交可能以有界频率持续重试；这不产生任何经济效果，也不释放任何担保额度。
++											720 container
++												721 AXListMarker •
++												722 text HTTP 拒绝和 timeout 都不写入任何终态。
++										723 heading D. 定点验收、证明与论文, Value: 3
++											724 text D. 定点验收、证明与论文
++										725 text 测试，全部使用真实的 4 成员签名和 engine 执行。
++										726 content list
++											727 container
++												728 AXListMarker 1.
++												729 text m0 只为 T 签名；m1–m3 为 T′ 签名，T′ 与 T 使用同一输入、不同输出。执行 T′，各成员跟块。
++												730 content list
++													731 container
++														732 AXListMarker •
++														733 text 断言：m0 的 CAL、work、Bytes、FUEL 或 Policy 四类 slice 全部恢复。
++													734 container
++														735 AXListMarker •
++														736 text 断言：Approval 字节不变； ApproveDirect(T)  返回  ErrConflict 。
++													737 container
++														738 AXListMarker •
++														739 text 用 T′ 的输出构造 T″，四人中包括 m0 能签出 3 票，QC 验证通过。
++											740 container
++												741 AXListMarker 2.
++												742 text 仅手续费输入冲突（用户付费模式）时也会释放；组织代付模式下 Policy 被释放。
++											743 container
++												744 AXListMarker 3.
++												745 text 负例：扩展 intent_scope，断言独立输入时  Reserved==100  且没有 Void。
++											746 container
++												747 AXListMarker 4.
++												748 text 幂等：同一块 Commit 两次；同一 F′ 的两个输入指向 T；同块两笔交易冲突 T；关闭再打开数据库；schema 7 打开被拒。每种情况都只释放一次。
++											749 container
++												750 AXListMarker 5.
++												751 text 迟到与交错：
++												752 content list
++													753 container
++														754 AXListMarker •
++														755 text 未跟块的成员先批准 T、后跟块，应被释放。
++													756 container
++														757 AXListMarker •
++														758 text 迟到的  InstallDirect(F′)  先写 Consumed，块到达后只释放一次。
++													759 container
++														760 AXListMarker •
++														761 text Void 之后的重试请求被拒签。
++											762 container
++												763 AXListMarker 6.
++												764 text 异常路径：Void 且 Paid>0；T 本身被执行。两者都应使 follower 报错。
++										765 text 是否需要冒烟。
++										766 text  需要一次 100 TPS×10 s 和一条 100 跳 fast 链，只用于确认没有回归，不报告新数字。热路径只是每个输入多一次 Load。旧矩阵不必重跑。 另加一个计数器，统计"Candidate 被不同 fact 覆盖"的次数。冒烟中应为 0，用来支撑"实测负载从未触发该路径"这一说法。
++										767 text 证明与论文的最小改动。
++										768 content list
++											769 container
++												770 AXListMarker •
++												771 text §V-C 新增一条引理："被同配置冲突消费取代的诚实批准不存在 QC，且将来也不会有。"
++											772 container
++												773 AXListMarker •
++												774 text 在 Theorem "Potential liabilities are funded" 的证明中，把
++												775 container
++													776 text 𝐴
++													777 text 𝑚
++													778 text ,
++													779 text 𝑔
++												780 text  改为排除 Void 的批准。由于
++												781 container
++													782 text 𝑐 ∈
++													783 text 𝐶
++													784 text 𝑔
++												785 text  永远不会被作废，计数不等式不变。
++											786 container
++												787 AXListMarker •
++												788 text §IV-C 加一段释放规则。§V-G 把"局部批准占用容量"细化为两种情况：输入被冲突消费的会释放；输入仍冻结的继续占用。并按交叉评议补上 Intent 预算耗尽路径的累计暴露上界。
++											789 container
++												790 AXListMarker •
++												791 text 评估节写明：721800c 不含此规则；新构建只做了功能验证；被测负载不触发该路径。
++										792 container Suggested actions
++											793 button Create a Word document
++										794 toolbar Message actions
++											795 button Copy
++											796 button Read aloud
++											797 checkbox Description: Good response, Value: 0
++											798 checkbox Description: Bad response, Value: 0
++											799 button Retry
++											800 text just now
++						801 button Scroll to bottom
++									802 container
++										803 button Dictate
++										804 container Use voice mode
++											805 button Use voice mode
++											806 pop up button (collapsed) Description: Microphone, ID: base-ui-_r_16r_, Secondary Actions: Expand
+The focused UI element is 0 AXWebArea IEEE TDSC期刊论文大修后复审 - Claude, URL: claudez.yuehanxai.com/chat/a61900c9-bd4c-4ba0-ae9c-0b5dfc09566d

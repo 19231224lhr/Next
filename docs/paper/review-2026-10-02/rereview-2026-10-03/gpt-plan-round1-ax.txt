@@ -1,0 +1,401 @@
+Browser tab: 5, Title: "Model inquiry", URL: "https://chatgpt.com/c/6abf8dba-7c90-83ec-909e-277092659628".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 1613-1618, 1621-1622
++							1613 button See versions
++							1614 button Edit message
++								1615 image
++							1616 pop up button (collapsed) Description: Regenerate response, ID: radix-_r_1ap_, Secondary Actions: Expand
++							1617 button Edit message
++								1618 image
++							1619 pop up button (collapsed) Description: Regenerate response, ID: radix-_r_1au_, Secondary Actions: Expand
++							1620 button Edit message
++								1621 image
++							1622 pop up button (collapsed) Description: Regenerate response, ID: radix-_r_1b3_, Secondary Actions: Expand
++							1623 button Edit message
++								1624 image
++							1625 container
++								1626 button (collapsed) Worked for 6m 51s, Secondary Actions: Expand
++								1627 text Worked for 6m 51s
++							1628 heading ChatGPT said:, Value: 4
++								1629 text ChatGPT said:
++							1630 heading 小范围大修实施计划, Value: 2
++								1631 text 小范围大修实施计划
++							1632 text 总体分为两个独立补丁：
++							1633 content list
++								1634 container
++									1635 AXListMarker 1.
++									1636 text 同输入冲突后的局部批准释放 ：解决单成员容量永久占用。
++								1637 container
++									1638 AXListMarker 2.
++									1639 text 永久公共冲突后的outbox终止 ：停止无意义重试，但绝不释放仍可能对应QC责任的容量。
++							1640 text 二者可分两个提交实现，但建议在同一轮大修中关闭；无需重跑原性能矩阵。
++							1641 heading A．同输入冲突后的局部批准释放, Value: 2
++								1642 text A．同输入冲突后的局部批准释放
++							1643 heading 现状与落点, Value: 3
++								1644 text 现状与落点
++							1645 text 当前  ApproveDirectBytes  发现已有Approval后会直接成功返回，发生在Observed、Intent及Spend检查之前；因此新增终态必须在该快捷路径中先检查。批准时，普通输入和用户FUEL输入均写入 Spend.Candidate 。
++							1646 button Open preview of Pasted text.txt
++							1647 button Open preview of Pasted text.txt
++							1648 text finishLocal 目前仅在付款 Settled 时释放CAL，在费用 Closed 时释放其他资源；不能伪造这两个状态来释放冲突Approval。
++							1649 button Open preview of Pasted text.txt
++							1650 heading 最小设计, Value: 3
++								1651 text 最小设计
++							1652 text 在  internal/state/records.go  新增：
++							1653 content list
++								1654 container
++									1655 AXListMarker •
++									1656 text KeyFactTerminal
++								1657 container
++									1658 AXListMarker •
++									1659 text FactTerminal{Reason, WinnerFact, WinnerTx, Height, Released}
++								1660 container
++									1661 AXListMarker •
++									1662 text 原因至少区分：
++									1663 content list
++										1664 container
++											1665 AXListMarker ◦
++											1666 text ConflictingSpend
++										1667 container
++											1668 AXListMarker ◦
++											1669 text PublicIntentConflict
++							1670 text Approval保持字节不变。 LocalProgress.Applied 继续作为累计释放量。 在  internal/member/blocks.go::applyPayment  中，
++							1671 text 在覆盖Spend记录之前
++							1672 text ：
++							1673 content list
++								1674 container
++									1675 AXListMarker 1.
++									1676 text 仅处理已验证块中  Code=0 && result.Applied=true  的普通付款。
++								1677 container
++									1678 AXListMarker 2.
++									1679 text 要求执行付款属于本成员配置。
++								1680 container
++									1681 AXListMarker 3.
++									1682 text 扫描其普通输入及用户FUEL输入；FUEL实例固定为0。
++								1683 container
++									1684 AXListMarker 4.
++									1685 text 对每个Spend读取原 Candidate ：
++									1686 content list
++										1687 container
++											1688 AXListMarker ◦
++											1689 text Candidate非零；
++										1690 container
++											1691 AXListMarker ◦
++											1692 text Candidate不同于执行Fact；
++										1693 container
++											1694 AXListMarker ◦
++											1695 text 与执行付款消费的是 同一个OutputID和Instance 。
++								1696 container
++									1697 AXListMarker 5.
++									1698 text 按Candidate Fact去重；一个Candidate即使与多个输入冲突，也只处理一次。
++								1699 container
++									1700 AXListMarker 6.
++									1701 text 加载Candidate Approval并校验：
++									1702 content list
++										1703 container
++											1704 AXListMarker ◦
++											1705 text Approval.Fact 匹配；
++										1706 container
++											1707 AXListMarker ◦
++											1708 text Direct 非空且属于同一配置；
++										1709 container
++											1710 AXListMarker ◦
++											1711 text 原付款确实包含该冲突输入；
++										1712 container
++											1713 AXListMarker ◦
++											1714 text 未Observed、未Settled；
++										1715 container
++											1716 AXListMarker ◦
++											1717 text 无 KeyInstall 及member outbox。若存在完整证书材料，说明与唯一消费假设冲突，应停止Follower，而不是释放。
++								1718 container
++									1719 AXListMarker 7.
++									1720 text 要求没有经济或费用进展：
++									1721 content list
++										1722 container
++											1723 AXListMarker ◦
++											1724 text Pending=Paid=Recovered=0
++										1725 container
++											1726 AXListMarker ◦
++											1727 text Settled=false
++										1728 container
++											1729 AXListMarker ◦
++											1730 text Fee没有Rewards、Burned、Held或已完成阶段。
++								1731 container
++									1732 AXListMarker 8.
++									1733 text 对每个Debit按已有累计值释放：
++									1734 container
++										1735 text Δ
++										1736 text 𝑖
++										1737 text =
++										1738 container
++											1739 text 𝐶 𝑎 𝑝
++										1740 text 𝑖
++										1741 text −
++										1742 container
++											1743 text 𝐴 𝑝 𝑝 𝑙 𝑖 𝑒 𝑑
++										1744 text 𝑖
++									1745 text 仅更新原  SliceKey(d.Key,d.Worker)  的Reserved/Available及 Applied 。
++								1746 container
++									1747 AXListMarker 9.
++									1748 text 写入 FactTerminal(ConflictingSpend) 。
++							1749 text 全部资源类型都可释放剩余预留
++							1750 text ，因为该付款没有执行：CAL、work、Bytes及未使用的FUEL/Policy额度。这里的Bytes是调度额度，不是删除Approval后腾出的精确磁盘字节。不得：
++							1751 content list
++								1752 container
++									1753 AXListMarker •
++									1754 text 调用 FeeClose ；
++								1755 container
++									1756 AXListMarker •
++									1757 text 生成退款或恢复真实已支出FUEL；
++								1758 container
++									1759 AXListMarker •
++									1760 text 删除Approval；
++								1761 container
++									1762 AXListMarker •
++									1763 text 解锁未被公共付款消费的其他输入。
++							1764 text ApproveDirectBytes 发现已有Approval后，应先读终态；存在任何终态均返回 ErrConflict ，不得再次签名。
++							1765 heading 不安全做法, Value: 3
++								1766 text 不安全做法
++							1767 content list
++								1768 container
++									1769 AXListMarker •
++									1770 text 不能用timeout、HTTP拒绝或INSTALL作为释放证据。INSTALL会写 Consumed 并保留Candidate，但不是公共执行。
++									1771 button Open preview of Pasted text.txt
++								1772 container
++									1773 AXListMarker •
++									1774 text 不能因“独立输入但相同Intent”释放容量；两个QC在该情形可以共存。
++								1775 container
++									1776 AXListMarker •
++									1777 text 不能仅凭Candidate字段释放，必须核对Approval确实使用了同一输入实例。
++							1778 heading B．证明边界与幂等性, Value: 2
++								1779 text B．证明边界与幂等性
++							1780 text 新增一个窄引理：
++							1781 container
++								1782 text 在四成员、三签、至多一名恶意成员模型下，若成功公共付款
++								1783 container
++									1784 text 𝑇 ′
++								1785 text  消费了某输入实例，且诚实成员此前为不同付款
++								1786 text 𝑇
++								1787 text  锁定并批准了同一实例，则
++								1788 text 𝑇
++								1789 text  不可能拥有有效QC。
++							1790 text 理由是两个3签QC至少相交两人，其中至少一名诚实成员将为同一输入双签，违反锁定规则。该结论同样适用于使用相同 DirectSpendKey 的用户FUEL输入。 由此，
++							1791 container
++								1792 text 𝑇 ∉
++								1793 text 𝐶
++								1794 text 𝑔
++							1795 text ，释放该成员对
++							1796 text 𝑇
++							1797 text  的剩余本地Debit不会削弱Theorem 1对任何证书责任的覆盖。证明只覆盖：
++							1798 content list
++								1799 container
++									1800 AXListMarker •
++									1801 text 同配置；
++								1802 container
++									1803 AXListMarker •
++									1804 text 同输入实例；
++								1805 container
++									1806 AXListMarker •
++									1807 text 成功且Applied的公共付款；
++								1808 container
++									1809 AXListMarker •
++									1810 text 不同Fact/TxID。
++							1811 text Theorem 1中将局部Approval集合区分为“仍活跃”与“已由冲突消费证明不可能形成QC”；后者残余容量可为0。进展段改为：
++							1812 text partial approval不会因时间流逝释放，但可在认证公共历史证明其冲突输入已由另一有效付款消费后终止。
++							1813 text 多输入及重放幂等：
++							1814 content list
++								1815 container
++									1816 AXListMarker •
++									1817 text 先收集 map[CandidateFact][]SpendKey ，再统一释放；
++								1818 container
++									1819 AXListMarker •
++									1820 text FactTerminal.Released 和 Applied 防止重复退款；
++								1821 container
++									1822 AXListMarker •
++									1823 text 同块多个付款按Overlay顺序处理；
++								1824 container
++									1825 AXListMarker •
++									1826 text blockfollow对同高度同哈希本身也为无效果重放。
++									1827 button Open preview of Pasted text.txt
++							1828 heading C．outbox永久冲突终止, Value: 2
++								1829 text C．outbox永久冲突终止
++							1830 text 当前来源恢复仅检查Observed与现有Outbox；Intent永久冲突不会停止重建。网关也只删除成功Fact自身的outbox，relay则每两秒继续提交。
++							1831 button Open preview of Pasted text.txt
++							1832 button Open preview of Pasted text.txt
++							1833 button Open preview of Pasted text.txt
++							1834 heading 最小索引, Value: 3
++								1835 text 最小索引
++							1836 text 新增本地持久记录：
++							1837 content list
++								1838 container
++									1839 AXListMarker •
++									1840 text KeyPublicIntent(Intent) -> {TxID, Fact, Height}
++								1841 container
++									1842 AXListMarker •
++									1843 text KeyOutboxIntent(Intent) -> Fact
++							1844 text Outbox增加Intent和TxID字段，或通过旁路索引保存；不做逐块全表扫描。 成员和网关在跟随
++							1845 text 成功公共付款
++							1846 text 时，对所有组织的付款记录PublicIntent。若本地outbox具有相同Intent但不同TxID：
++							1847 content list
++								1848 container
++									1849 AXListMarker •
++									1850 text 删除outbox及反向索引；
++								1851 container
++									1852 AXListMarker •
++									1853 text 清理安装重试内存；
++								1854 container
++									1855 AXListMarker •
++									1856 text 写 FactTerminal(PublicIntentConflict) ；
++								1857 container
++									1858 AXListMarker •
++									1859 text 不释放Approval Debit、不释放输入锁、不删除QC责任 。
++							1860 text 以下所有创建入口必须先检查PublicIntent/终态：
++							1861 content list
++								1862 container
++									1863 AXListMarker •
++									1864 text recoverExposedSources
++								1865 container
++									1866 AXListMarker •
++									1867 text InstallDirectClassified
++								1868 container
++									1869 AXListMarker •
++									1870 text persistDirect
++							1871 text 迟到INSTALL、Persist及公开证书再次曝光均不得重建outbox。 该补丁可作为第二提交，但不宜留到下一审稿周期。若只完成局部批准释放，必须在论文中保留“永久Intent冲突可能无限重试”的已知限制。
++							1872 heading D．最小验收集, Value: 2
++								1873 text D．最小验收集
++							1874 heading 必须测试, Value: 3
++								1875 text 必须测试
++							1876 content list
++								1877 container
++									1878 AXListMarker 1.
++									1879 text 1票T / 3票T′
++									1880 content list
++										1881 container
++											1882 AXListMarker ◦
++											1883 text 四名真实成员；
++										1884 container
++											1885 AXListMarker ◦
++											1886 text T与T′消费同一输入；
++										1887 container
++											1888 AXListMarker ◦
++											1889 text T仅成员0批准，T′由成员1–3形成QC并公共执行；
++										1890 container
++											1891 AXListMarker ◦
++											1892 text 成员0全部Debit仅释放一次；
++										1893 container
++											1894 AXListMarker ◦
++											1895 text Approval原字节不变；
++										1896 container
++											1897 AXListMarker ◦
++											1898 text 输入状态为T′已消费；
++										1899 container
++											1900 AXListMarker ◦
++											1901 text 重试T被拒绝；
++										1902 container
++											1903 AXListMarker ◦
++											1904 text 随后新合法付款可再次获得包含成员0的3签。
++								1905 container
++									1906 AXListMarker 2.
++									1907 text 独立输入同Intent负例
++									1908 content list
++										1909 container
++											1910 AXListMarker ◦
++											1911 text 两个QC均有效；
++										1912 container
++											1913 AXListMarker ◦
++											1914 text 公共赢家产生后，输家outbox终止；
++										1915 container
++											1916 AXListMarker ◦
++											1917 text 输家CAL/work容量和输入锁不得释放。
++								1918 container
++									1919 AXListMarker 3.
++									1920 text 幂等与持久化
++									1921 content list
++										1922 container
++											1923 AXListMarker ◦
++											1924 text 重复跟随同块；
++										1925 container
++											1926 AXListMarker ◦
++											1927 text 数据库关闭重启；
++										1928 container
++											1929 AXListMarker ◦
++											1930 text 终态、Applied及Slice不发生二次退款；
++										1931 container
++											1932 AXListMarker ◦
++											1933 text 旧二进制不得忽略终态。
++								1934 container
++									1935 AXListMarker 4.
++									1936 text 多输入去重
++									1937 content list
++										1938 container
++											1939 AXListMarker ◦
++											1940 text 一个Candidate通过多个普通/fee输入与赢家冲突；
++										1941 container
++											1942 AXListMarker ◦
++											1943 text 整个Approval仅释放一次。
++								1944 container
++									1945 AXListMarker 5.
++									1946 text 晚消息
++									1947 content list
++										1948 container
++											1949 AXListMarker ◦
++											1950 text 终态后INSTALL、Persist、证书曝光均不能重建outbox；
++										1951 container
++											1952 AXListMarker ◦
++											1953 text HTTP错误不是终局证据，本地已验证公共记录才是。
++								1954 container
++									1955 AXListMarker 6.
++									1956 text 费用模式
++									1957 content list
++										1958 container
++											1959 AXListMarker ◦
++											1960 text 用户FUEL输入冲突；
++										1961 container
++											1962 AXListMarker ◦
++											1963 text 组织代付模式；
++										1964 container
++											1965 AXListMarker ◦
++											1966 text 不新增余额、不恢复真实费用。
++							1967 heading Schema, Value: 3
++								1968 text Schema
++							1969 text DirectStoreSchema 应升级，并提供窄的v7→v8迁移或明确拒绝旧库；不能让旧二进制忽略终态。现有测试已表明项目重视这种降级保护。
++							1970 button Open preview of Pasted text.txt
++							1971 heading 实验, Value: 3
++								1972 text 实验
++							1973 text 不重跑②③④矩阵。可加一轮现有工具的
++							1974 text 100 TPS、10秒冒烟
++							1975 text ，只作为死锁、排空和状态一致性回归，不写入论文性能结果。
++							1976 heading 论文最小修改, Value: 2
++								1977 text 论文最小修改
++							1978 content list
++								1979 container
++									1980 AXListMarker •
++									1981 text 协议节加入两类终态：
++									1982 content list
++										1983 container
++											1984 AXListMarker ◦
++											1985 text 同输入公共冲突：无QC可能，释放局部容量；
++										1986 container
++											1987 AXListMarker ◦
++											1988 text 独立输入Intent冲突：QC可能存在，只停止重试，不释放责任。
++								1989 container
++									1990 AXListMarker •
++									1991 text 安全节加入上述窄引理，并调整Residual Capacity/Theorem 1对失效局部Approval的定义。
++								1992 container
++									1993 AXListMarker •
++									1994 text 进展节明确timeout永不解锁，只有认证公共事实可终止。
++								1995 container
++									1996 AXListMarker •
++									1997 text 补充材料列出新提交、Schema和定点回归；旧721800c性能数字继续按原构建标注，不静默改称新构建结果。
++							1998 text 停止条件：两类终态不会混用；局部容量仅在“同输入＋成功公共赢家”证据下释放；Intent输家只停重试；重启和重放均无二次退款或outbox复活。
++							1999 button Copy
++								2000 image
++							2001 button Rate response
++								2002 image
++							2003 button Share
++							2004 checkbox Description: Read aloud, Value: 0
++							2005 pop up button (collapsed) Description: Regenerate response, ID: radix-_r_1c1_, Secondary Actions: Expand
++							2006 pop up button (collapsed) Description: More actions, ID: radix-_r_1c5_, Secondary Actions: Expand
++							2007 button Sources
++								2008 button Start Voice
++		2009 text Response complete
+The focused UI element is 0 AXWebArea Model inquiry, URL: chatgpt.com/c/6abf8dba-7c90-83ec-909e-277092659628

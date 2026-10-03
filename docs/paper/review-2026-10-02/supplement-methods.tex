@@ -2,7 +2,7 @@
 \label{sec:supp-methods}
 
 \noindent\textbf{Build lineage and deployment.}
-Results come from three kinds of build (Table~\ref{tab:supp-builds}). The
+Results retain their original build identifiers (Table~\ref{tab:supp-builds}). The
 \emph{continuation and accounting baseline}, committed as \texttt{d99ec92},
 implements the layered continuation and the accounting transitions; its
 compensation commits together with its representation. The artifact records
@@ -52,6 +52,12 @@ reported separately.
         later series snapshot \texttt{449b4d4072c99588}; audited \texttt{f185f73}
       & Nine functional runs, six ordinary-path runs, regression and race
         tests. \\
+    Frozen main-text evidence
+      & \texttt{721800c}
+      & Final 100-hop chains, mixed traffic, and historical-reading controls. \\
+    Partial-approval reclamation
+      & \texttt{bf71c4d}
+      & Conflict and restart regressions; 1,000-payment smoke and 100-hop continuation. \\
     Archived
       & \texttt{e3870e1}/\texttt{a083ff6}, \texttt{f0c0a274},
         \texttt{8e1fb40}/\texttt{5807546}, \texttt{bb65af69}/\texttt{13be856},
@@ -442,13 +448,10 @@ deployment references rather than a normalized acceleration ratio.
         unchanged and verified. \\
     Inspecting a designated historical input
       & Consult the decision index together with the block.
-      & Read the funding source from the block itself, checked against the
-        original commitments. \\
+      & Read the represented source under the original commitments and consult the permanent decision and current obligation state in the same $V_H$. \\
     Readers
-      & Any reader of the command history and decision records.
-      & Representation construction, installation, and local inspection
-        read the revised body; wallets, synchronization, and replay read
-        original commands. \\
+      & An honest local replica that has verified and executed prefix $H$.
+      & The same local replica, reading a committed logical revision in $V_H$; remote untrusted readers need separate authorization evidence. \\
     Storage and replay
       & Original blocks plus decision records; replay runs the original
         commands, including decisions.

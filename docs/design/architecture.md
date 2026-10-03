@@ -146,6 +146,7 @@ Store 后端可选内存或 bbolt，`Group` 合并已经排队的更新：每个
 [member/blocks.go](../../internal/member/blocks.go) 将公共结果映射为：
 
 - `applyPayment`：自己批准的付款记 Settled、MissingInputs 与费用阶段；标记公共输入消费，关闭先前等待当前输出的记录；核对 RecoveredOutputs 后，只更新自身确实记录过的 Paid 对应回收。
+- `consumePublicInput` / `reclaimPartial`：覆盖旧 Candidate 前核对同配置、精确输入实例和不同交易，回收不可能形成 QC 的旧局部批准。只在认证成功公共执行中调用；失效状态、累计 Applied、原 Slice、消费记录与跟块游标一次提交。输入与用户 FUEL 输入使用相同规则，原 Approval 和其他输入锁保留。成员数据库 Schema 8 拒绝旧库，不提供隐式迁移。
 - `applyRepair`：在原发行批准中累计实际 Paid，并处理消费交易的 Pending 与修复费用。
 - `finishLocal`：CAL 在自身 Settled 后恢复 `cap−(Paid−Recovered)`；其余资源等待 Fee.Closed；仅恢复相对 Applied 的新增差额。
 

@@ -1,0 +1,1387 @@
+按照最终裁定实现中。已真实复现并修复4类1票T/3票同输入赢家成功公共执行后局部额度不回收：组织付费、用户付费、仅FUEL输入冲突、赢家INSTALL先到。下面完整新helper和相关文件及现论文。请审查算法与窄引理，指出实质错误；并提供可直接放入英文protocol/security及中文对应的精炼LaTex文字（不重复整章）。补充supplement证明细节和永久Intent冲突outbox边界一句。当前实现用同一Overlay的Invalidated标志去重，不增map，按区块与输入顺序确定执行；没有重做整套实验。schema7到8，已有Approval快捷返回之前拒签，INSTALL和source recovery/finishLocal拒绝Invalidated。请不要声称整套实现或密码学已形式化验证。性能仍归721800c。
+FILE internal/member/partial_reclaim.go
+package member
+
+import (
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// consumePublicInput is called only by the authenticated successful-block path.
+// INSTALL may set Consumed, but cannot invalidate a local approval.
+func (m *Member) consumePublicInput(o *state.Overlay, winner protocol.DirectSubmission, output protocol.OutputID, instance uint8, height int64) error {
+	key := rules.DirectSpendKey(output, instance)
+	s, _, err := state.Load[state.Spend](o, key)
+	if err != nil {
+		return err
+	}
+	fact := winner.Authorization.Fact
+	if s.Candidate != (protocol.SpendFactID{}) && s.Candidate != fact {
+		if err := m.reclaimPartial(o, s.Candidate, winner, output, instance, height); err != nil {
+			return err
+		}
+	}
+	return state.Put(o, key, state.Spend{Consumed: fact})
+}
+
+func (m *Member) reclaimPartial(o *state.Overlay, fact protocol.SpendFactID, winner protocol.DirectSubmission, output protocol.OutputID, instance uint8, height int64) error {
+	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+	if err != nil {
+		return err
+	}
+	if !found || a.Fact != fact || a.Direct == nil {
+		return rules.ErrAccounting
+	}
+	if a.Direct.Body.Config != m.cfg.Organization.Hash() {
+		return nil
+	}
+	if a.Direct.ID() == winner.Tx.ID() {
+		return rules.ErrAccounting
+	}
+	shared := false
+	for i, in := range a.Direct.Body.Inputs {
+		if in.Output == output && i < len(a.Direct.Claims) && a.Direct.Claims[i].Instance == instance {
+			shared = true
+		}
+	}
+	for _, in := range a.Direct.Body.Fee.Inputs {
+		if in.Output == output && instance == 0 {
+			shared = true
+		}
+	}
+	if !shared {
+		return rules.ErrAccounting
+	}
+	p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+	if err != nil {
+		return err
+	}
+	// Overlay visibility makes multiple conflicting inputs/transactions idempotent.
+	if p.Invalidated {
+		return nil
+	}
+	if p.Settled || p.Pending != 0 || p.Paid != 0 || p.Recovered != 0 || p.Fee != (rules.Escrow{}) {
+		return rules.ErrAccounting
+	}
+	for _, prefix := range []byte{state.KeyObserved, state.KeyInstall, state.KeyOutbox} {
+		if _, err := o.Get(state.Key(prefix, fact[:])); err == nil {
+			return rules.ErrAccounting
+		} else if err != state.ErrNotFound {
+			return err
+		}
+	}
+	p.Applied, err = localApplied(a, p)
+	if err != nil {
+		return err
+	}
+	for i, d := range a.Debits {
+		delta := d.Cap - p.Applied[i]
+		if delta == 0 {
+			continue
+		}
+		key := state.SliceKey(d.Key, d.Worker)
+		s, found, err := state.Load[state.Slice](o, key)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return rules.ErrMissing
+		}
+		s.Reserved, err = protocol.Sub(s.Reserved, delta)
+		if err != nil {
+			return err
+		}
+		s.Available, err = protocol.Add(s.Available, delta)
+		if err != nil {
+			return err
+		}
+		if err = state.Put(o, key, s); err != nil {
+			return err
+		}
+		p.Applied[i] = d.Cap
+	}
+	p.Invalidated = true
+	p.SupersededBy = winner.Authorization.Fact
+	p.InvalidatedHeight = height
+	return state.Put(o, ProgressKey(fact), p)
+}
+
+FILE internal/member/blocks.go
+package member
+
+import (
+	"utxo/finality"
+	"utxo/internal/blockfollow"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// LocalProgress contains only this member's own signed obligations and fee plan.
+type LocalProgress struct {
+	Settled           bool
+	Pending           uint32
+	Paid              uint64
+	Recovered         uint64
+	Fee               rules.Escrow
+	Height            int64
+	Invalidated       bool                 `json:",omitempty"`
+	SupersededBy      protocol.SpendFactID `json:",omitempty"`
+	InvalidatedHeight int64                `json:",omitempty"`
+	// Positional entries bind to the immutable Approval.Debits (resource,
+	// grant version, worker and cap). Only this record changes during settlement.
+	Applied []uint64 `json:",omitempty"`
+}
+
+// DirectStoreSchema prevents old member binaries from ignoring split credits.
+const DirectStoreSchema uint64 = 8
+
+func localApplied(a state.Approval, p LocalProgress) ([]uint64, error) {
+	values := p.Applied
+	if values == nil {
+		values = make([]uint64, len(a.Debits))
+		for i, d := range a.Debits {
+			values[i] = d.Applied
+		}
+	}
+	if len(values) != len(a.Debits) {
+		return nil, rules.ErrAccounting
+	}
+	for i, d := range a.Debits {
+		if values[i] < d.Applied || values[i] > d.Cap {
+			return nil, rules.ErrAccounting
+		}
+	}
+	return values, nil
+}
+
+// AppliedDebits is the shared read path for status and offline accounting.
+// Old approvals retain their recorded cumulative amount; it is never reset.
+func AppliedDebits(v state.ReadView, a state.Approval) ([]uint64, error) {
+	var p LocalProgress
+	if a.Direct != nil {
+		var err error
+		p, _, err = state.Load[LocalProgress](v, ProgressKey(a.Fact))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return localApplied(a, p)
+}
+
+func ProgressKey(f protocol.SpendFactID) []byte { return state.Key(122, f[:]) }
+func waitingKey(id protocol.OutputID) []byte    { return state.Key(123, id[:]) }
+
+func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgress) error {
+	if p.Invalidated {
+		return rules.ErrAccounting
+	}
+	var err error
+	p.Applied, err = localApplied(*a, *p)
+	if err != nil {
+		return err
+	}
+	if p.Settled && p.Pending == 0 && !p.Fee.Closed {
+		next, err := p.Fee.Complete(rules.FeeClose)
+		if err != nil {
+			return err
+		}
+		p.Fee = next
+	}
+	for i := range a.Debits {
+		d := &a.Debits[i]
+		target := uint64(0)
+		if d.Key.Kind == protocol.ResourceCAL && p.Settled {
+			net, err := protocol.Sub(p.Paid, p.Recovered)
+			if err != nil {
+				return err
+			}
+			target, err = protocol.Sub(d.Cap, net)
+			if err != nil {
+				return err
+			}
+		}
+		if d.Key.Kind != protocol.ResourceCAL && p.Fee.Closed {
+			target = d.Cap
+			if d.Key.Kind == protocol.ResourceFUEL || d.Key.Kind == protocol.ResourcePolicy {
+				paid, err := protocol.Add(p.Fee.Rewards, p.Fee.Burned)
+				if err != nil {
+					return err
+				}
+				target, err = protocol.Sub(target, paid)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if target < p.Applied[i] || target > d.Cap {
+			return rules.ErrAccounting
+		}
+		delta := target - p.Applied[i]
+		if delta == 0 {
+			continue
+		}
+		key := state.SliceKey(d.Key, d.Worker)
+		slice, found, err := state.Load[state.Slice](o, key)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return rules.ErrMissing
+		}
+		slice.Reserved, err = protocol.Sub(slice.Reserved, delta)
+		if err != nil {
+			return err
+		}
+		slice.Available, err = protocol.Add(slice.Available, delta)
+		if err != nil {
+			return err
+		}
+		p.Applied[i] = target
+		if err = state.Put(o, key, slice); err != nil {
+			return err
+		}
+	}
+	return state.Put(o, ProgressKey(a.Fact), *p)
+}
+func (m *Member) resolveLocal(o *state.Overlay, id protocol.OutputID, paid bool) error {
+	fact, found, err := state.Load[protocol.SpendFactID](o, waitingKey(id))
+	if err != nil || !found {
+		return err
+	}
+	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+	if err != nil {
+		return err
+	}
+	if !found {
+		return rules.ErrMissing
+	}
+	p, found, err := state.Load[LocalProgress](o, ProgressKey(fact))
+	if err != nil {
+		return err
+	}
+	if !found || p.Pending == 0 {
+		return rules.ErrAccounting
+	}
+	p.Pending--
+	if paid {
+		p.Fee.Held, err = protocol.Sub(p.Fee.Held, m.direct.RepairCost)
+		if err != nil {
+			return err
+		}
+		p.Fee.Rewards, err = protocol.Add(p.Fee.Rewards, m.direct.RepairCost)
+		if err != nil {
+			return err
+		}
+	}
+	if err = m.finishLocal(o, &a, &p); err != nil {
+		return err
+	}
+	o.Apply([]state.Change{{Key: waitingKey(id), Delete: true}})
+	return nil
+}
+
+// PrepareBlock decodes and authenticates owned block bytes before entering the writer.
+func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, error) {
+	if m.direct == nil {
+		return nil, protocol.ErrUnsupported
+	}
+	var updates []blockfollow.Apply
+	for _, entry := range b.Transactions() {
+		if entry.Code == 0 && protocol.IsReserveIncrease(entry.Bytes) {
+			c, err := protocol.DecodeReserveIncrease(entry.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			if c.Network != m.cfg.Organization.Network {
+				return nil, protocol.ErrAuth
+			}
+			updates = append(updates, func(o *state.Overlay) error {
+				return rules.ApplyReserveIncrease(o, c, m.cfg.Organization.Hash(), m.cfg.Workers)
+			})
+			continue
+		}
+		if entry.Code != 0 || len(entry.Data) == 0 {
+			continue
+		}
+		result, effects, err := protocol.DecodePublicExecution(m.cfg.Organization.Network, entry.Bytes, entry.Data)
+		if err != nil {
+			return nil, err
+		}
+		if !result.Applied {
+			continue
+		}
+		for _, fee := range result.FeeOutputs {
+			if fee.Output.Recipient.Verify(m.cfg.Organization.Network) != nil {
+				return nil, protocol.ErrAuth
+			}
+			if fee.Output.Recipient.Route.Org != m.cfg.Organization.Org {
+				continue
+			}
+			updates = append(updates, func(o *state.Overlay) error {
+				id := protocol.OutputIdentity(m.cfg.Organization.Network, fee.Transaction, fee.Index)
+				c := state.Creation{Output: fee.Output, Final: true, Fact: protocol.CreationIdentity(m.cfg.Organization.Network, fee.Transaction, fee.Index, 0)}
+				return state.Put(o, rules.DirectCreationKey(id, 0), c)
+			})
+		}
+		if protocol.IsCompensationDecision(entry.Bytes) {
+			for _, effect := range effects {
+				updates = append(updates, func(o *state.Overlay) error { return m.applyRepairEffect(o, effect) })
+			}
+
+		} else {
+			pay, err := protocol.DecodeDirectSubmission(entry.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			updates = append(updates, func(o *state.Overlay) error { return m.applyPayment(o, pay, result, b.Height()) })
+		}
+	}
+	return func(o *state.Overlay) error {
+		for _, apply := range updates {
+			if err := apply(o); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, nil
+}
+
+func (m *Member) applyRepairEffect(o *state.Overlay, effect protocol.RepairEffect) error {
+	if waiting, found, err := state.Load[protocol.SpendFactID](o, waitingKey(effect.Output)); err != nil {
+		return err
+	} else if found && waiting != effect.ConsumerFact {
+		return rules.ErrAccounting
+	}
+	fact := effect.ParentFact
+	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+	if err != nil {
+		return err
+	}
+	if found {
+		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+		if err != nil {
+			return err
+		}
+		p.Paid, err = protocol.Add(p.Paid, effect.Amount)
+		if err != nil {
+			return err
+		}
+		if err = m.finishLocal(o, &a, &p); err != nil {
+			return err
+		}
+	}
+	if err = m.resolveLocal(o, effect.Output, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, result protocol.ExecutionResult, height int64) error {
+	tx := pay.Tx
+	fact := pay.Authorization.Fact
+	if tx.Body.Network != m.cfg.Organization.Network {
+		return protocol.ErrAuth
+	}
+	if err := m.recoverExposedSources(o, pay.InputCertificates); err != nil {
+		return err
+	}
+	recovered := make(map[uint32]bool, len(result.RecoveredOutputs))
+	var returned uint64
+	for _, i := range result.RecoveredOutputs {
+		if int(i) >= len(tx.Body.Outputs) || recovered[i] {
+			return protocol.ErrRule
+		}
+		recovered[i] = true
+		var err error
+		returned, err = protocol.Add(returned, tx.Body.Outputs[i].Amount)
+		if err != nil {
+			return err
+		}
+	}
+	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+	if err != nil {
+		return err
+	}
+	if found {
+		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+		if err != nil {
+			return err
+		}
+		if p.Settled {
+			return rules.ErrConflict
+		}
+		if p.Paid > returned {
+			return rules.ErrAccounting
+		}
+		// A signer joining after compensation never occupied the earlier paid
+		// amount. Restore only its own recorded loss, not another member's.
+		p.Recovered = p.Paid
+		p.Settled = true
+		p.Height = height
+		p.Pending = uint32(len(result.MissingInputs))
+		p.Fee, err = rules.NewEscrow(tx.Body.Fee.Maximum, m.direct.Base.Fee)
+		if err != nil {
+			return err
+		}
+		for _, stage := range []rules.FeeAction{rules.FeeRegister, rules.FeeSettle} {
+			p.Fee, err = p.Fee.Complete(stage)
+			if err != nil {
+				return err
+			}
+		}
+		for _, i := range result.MissingInputs {
+			if int(i) >= len(tx.Body.Inputs) {
+				return protocol.ErrRule
+			}
+			if err = state.Put(o, waitingKey(tx.Body.Inputs[i].Output), fact); err != nil {
+				return err
+			}
+		}
+		if err = m.finishLocal(o, &a, &p); err != nil {
+			return err
+		}
+	}
+	if tx.Body.Config == m.cfg.Organization.Hash() {
+		if err = state.Put(o, state.Key(state.KeyObserved, fact[:]), true); err != nil {
+			return err
+		}
+		o.Apply([]state.Change{{Key: state.Key(state.KeyOutbox, fact[:]), Delete: true}})
+		for i, in := range tx.Body.Inputs {
+			if err = m.consumePublicInput(o, pay, in.Output, tx.Claims[i].Instance, height); err != nil {
+				return err
+			}
+		}
+	}
+	if tx.Body.Config == m.cfg.Organization.Hash() {
+		for _, in := range tx.Body.Fee.Inputs {
+			if err = m.consumePublicInput(o, pay, in.Output, 0, height); err != nil {
+				return err
+			}
+		}
+	}
+	for i, out := range tx.Body.Outputs {
+		id := pay.Summary().OutputID(uint32(i))
+		if err = m.resolveLocal(o, id, false); err != nil {
+			return err
+		}
+		if recovered[uint32(i)] || out.Recipient.Route.Org != m.cfg.Organization.Org {
+			continue
+		}
+		creation := state.Creation{Output: out, Fact: protocol.CreationIdentity(tx.Body.Network, tx.ID(), uint32(i), 0), Source: protocol.Hash(fact), Final: true}
+		if err = state.Put(o, rules.DirectCreationKey(id, 0), creation); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+FILE internal/member/direct.go
+package member
+
+import (
+	"context"
+	"time"
+	"utxo/internal/requesttrace"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// ApproveDirect retains the one-round contract: input locks and applicable
+// resource debits commit atomically before the vote is returned. Crash durability
+// depends on the configured store; the fresh-start member experiment uses NoSync.
+func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest) (protocol.DirectApproval, error) {
+	if m.direct == nil {
+		return protocol.DirectApproval{}, protocol.ErrUnsupported
+	}
+	raw, err := req.MarshalBinary()
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	return m.ApproveDirectBytes(ctx, raw)
+}
+
+// ApproveDirectBytes owns decoding and authentication at the HTTP boundary.
+// Typed callers use the wrapper above; neither entry point trusts parsed input.
+func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.DirectApproval, error) {
+	if m.direct == nil {
+		return protocol.DirectApproval{}, protocol.ErrUnsupported
+	}
+	req, err := protocol.DecodeDirectRequest(raw)
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	requesttrace.Mark(ctx, "request_decoded")
+	tx := req.Tx
+	t := tx.Body
+	cfg := m.cfg.Organization
+	if t.Network != cfg.Network || t.Certifier != cfg.Org || t.Config != cfg.Hash() || t.Epoch != cfg.Epoch {
+		return protocol.DirectApproval{}, protocol.ErrAuth
+	}
+	vector, err := rules.PrepareDirectVector(tx, *m.direct)
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	summary := protocol.SummaryFor(tx, vector)
+	fact := summary.Fact()
+	parents := map[protocol.OutputID]protocol.InputCertificate{}
+	for _, parent := range req.InputCertificates {
+		c := parent.Certificate
+		org, ok := m.peers[c.Summary.Config]
+		if !ok || c.Verify(org) != nil || c.Summary.Rules != m.direct.Rules() || int(parent.Index) >= len(c.Summary.Outputs) {
+			return protocol.DirectApproval{}, protocol.ErrAuth
+		}
+		id := c.Summary.OutputID(parent.Index)
+		if _, exists := parents[id]; exists {
+			return protocol.DirectApproval{}, protocol.ErrRule
+		}
+		parents[id] = parent
+	}
+	var totalIn, totalOut uint64
+	used := map[protocol.OutputID]bool{}
+	for i, in := range t.Inputs {
+		claim := tx.Claims[i]
+		if in.Kind == protocol.CertificateInput {
+			p, ok := parents[in.Output]
+			if !ok || in.Evidence != protocol.Hash(p.Certificate.QC.Fact) || p.Certificate.VerifyOutput(m.peers[p.Certificate.Summary.Config], p.Index, claim.Output) != nil {
+				return protocol.DirectApproval{}, protocol.ErrAuth
+			}
+			used[in.Output] = true
+		}
+		totalIn, err = protocol.Add(totalIn, claim.Output.Amount)
+		if err != nil {
+			return protocol.DirectApproval{}, err
+		}
+	}
+	for _, out := range t.Outputs {
+		totalOut, err = protocol.Add(totalOut, out.Amount)
+		if err != nil {
+			return protocol.DirectApproval{}, err
+		}
+	}
+	if totalIn != totalOut || len(used) != len(parents) {
+		return protocol.DirectApproval{}, protocol.ErrRule
+	}
+	requesttrace.Mark(ctx, "validation_complete")
+	id := tx.ID()
+	worker := uint32(id[0]) % m.cfg.Workers
+	requesttrace.Mark(ctx, "commit_requested")
+	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		requesttrace.Mark(ctx, "update_started")
+		o := state.NewOverlay(v)
+		key := state.Key(state.KeyApproval, fact[:])
+		if _, found, err := state.Load[state.Approval](o, key); err != nil {
+			return nil, err
+		} else if found {
+			p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+			if err != nil {
+				return nil, err
+			}
+			if p.Invalidated {
+				return nil, rules.ErrConflict
+			}
+			return nil, nil
+		}
+		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
+			return nil, err
+		} else if found {
+			return nil, rules.ErrConflict
+		}
+		if old, found, err := state.Load[protocol.TxID](o, state.Key(state.KeyIntent, t.Intent[:])); err != nil {
+			return nil, err
+		} else if found && old != id {
+			return nil, rules.ErrConflict
+		}
+		for i, in := range t.Inputs {
+			claim := tx.Claims[i]
+			key := rules.DirectSpendKey(in.Output, claim.Instance)
+			spend, _, err := state.Load[state.Spend](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if spend.Consumed != (protocol.SpendFactID{}) || (spend.Candidate != (protocol.SpendFactID{}) && spend.Candidate != fact) {
+				return nil, rules.ErrConflict
+			}
+			if in.Kind == protocol.FinalInput {
+				created, found, err := state.Load[state.Creation](o, rules.DirectCreationKey(in.Output, claim.Instance))
+				if err != nil {
+					return nil, err
+				}
+				if !found || !created.Final || created.Fact != in.Evidence || created.Output != claim.Output {
+					return nil, rules.ErrMissing
+				}
+			}
+			spend.Candidate = fact
+			if err = state.Put(o, key, spend); err != nil {
+				return nil, err
+			}
+		}
+
+		if _, err := rules.ValidateDirectFee(o, tx); err != nil {
+			return nil, err
+		}
+		for _, in := range t.Fee.Inputs {
+			key := rules.DirectSpendKey(in.Output, 0)
+			spent, _, err := state.Load[state.Spend](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if spent.Consumed != (protocol.SpendFactID{}) || (spent.Candidate != (protocol.SpendFactID{}) && spent.Candidate != fact) {
+				return nil, rules.ErrConflict
+			}
+			spent.Candidate = fact
+			if err = state.Put(o, key, spent); err != nil {
+				return nil, err
+			}
+		}
+		a := state.Approval{Fact: fact, Direct: &tx, Admission: vector, DirectParents: req.InputCertificates}
+		for i, allocation := range vector {
+			ref := t.Admission[i]
+			g, found, err := state.Load[state.Grant](o, state.Key(state.KeyGrant, allocation.Key.Encode()))
+			if err != nil {
+				return nil, err
+			}
+			if !found || g.ID != ref.Grant || g.Organization != cfg.Hash() || (g.Key.Kind == protocol.ResourcePolicy && g.Subject != t.Subject) {
+				return nil, protocol.ErrAuth
+			}
+			key := state.SliceKey(allocation.Key, worker)
+			slice, found, err := state.Load[state.Slice](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if !found || slice.Available < allocation.Cap {
+				m.budgetLimited[allocation.Key.Kind].Add(1)
+				return nil, rules.ErrLimited
+			}
+			slice.Available -= allocation.Cap
+			slice.Reserved, err = protocol.Add(slice.Reserved, allocation.Cap)
+			if err != nil {
+				return nil, err
+			}
+			if err = state.Put(o, key, slice); err != nil {
+				return nil, err
+			}
+			a.Debits = append(a.Debits, state.Debit{Key: allocation.Key, Cap: allocation.Cap, Worker: worker})
+		}
+		if err := state.Put(o, key, a); err != nil {
+			return nil, err
+		}
+		if err := state.Put(o, state.Key(state.KeyIntent, t.Intent[:]), id); err != nil {
+			return nil, err
+		}
+		requesttrace.Mark(ctx, "update_evaluated")
+		return o.Changes(), nil
+	})
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	requesttrace.Mark(ctx, "commit_returned")
+	vote := protocol.SignSpend(fact, m.cfg.Index, m.cfg.Key)
+	requesttrace.Mark(ctx, "vote_signed")
+	return protocol.DirectApproval{Summary: summary, Vote: vote}, nil
+}
+
+// InstallDirect saves a full relay command in the background. It does not
+// reserve a second budget or make an unvoted local output spendable.
+func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
+	_, err := m.InstallDirectClassified(payment)
+	return err
+}
+
+// InstallDirectClassified reports whether this call saved the full payment
+// material. The result is intended for the E5 experiment observer only.
+func (m *Member) InstallDirectClassified(payment protocol.DirectPayment) (bool, error) {
+	requesttrace.Payment("install_enter", payment.Certificate.QC.Fact)
+	if m.direct == nil || payment.Tx.Body.Config != m.cfg.Organization.Hash() {
+		return false, protocol.ErrAuth
+	}
+	if _, err := rules.VerifyDirectPayment(payment, *m.direct); err != nil {
+		return false, err
+	}
+	raw, err := payment.MarshalBinary()
+	if err != nil {
+		return false, err
+	}
+	fact := payment.Certificate.QC.Fact
+	requesttrace.Payment("install_store_start", fact)
+	alreadyObserved := false
+	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		o := state.NewOverlay(v)
+		key := state.Key(state.KeyInstall, fact[:])
+		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+		if err != nil {
+			return nil, err
+		}
+		if p.Invalidated {
+			return nil, rules.ErrConflict
+		}
+		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
+			return nil, err
+		} else if found {
+			alreadyObserved = true
+			return nil, nil
+		}
+		for i, in := range payment.Tx.Body.Inputs {
+			key := rules.DirectSpendKey(in.Output, payment.Tx.Claims[i].Instance)
+			s, _, err := state.Load[state.Spend](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if s.Consumed != (protocol.SpendFactID{}) && s.Consumed != fact {
+				return nil, rules.ErrConflict
+			}
+			s.Consumed = fact
+			if err = state.Put(o, key, s); err != nil {
+				return nil, err
+			}
+		}
+
+		if _, err := rules.ValidateDirectFee(o, payment.Tx); err != nil {
+			return nil, err
+		}
+		for _, in := range payment.Tx.Body.Fee.Inputs {
+			k := rules.DirectSpendKey(in.Output, 0)
+			spent, _, err := state.Load[state.Spend](o, k)
+			if err != nil {
+				return nil, err
+			}
+			if spent.Consumed != (protocol.SpendFactID{}) && spent.Consumed != fact {
+				return nil, rules.ErrConflict
+			}
+			spent.Consumed = fact
+			if err = state.Put(o, k, spent); err != nil {
+				return nil, err
+			}
+		}
+		o.Set(key, raw)
+		outkey := state.Key(state.KeyOutbox, fact[:])
+		pending, found, err := state.Load[state.Outbox](o, outkey)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			// Give the gateway the first attempt. Persist this once, so repeated
+			// INSTALL and restart cannot postpone member fallback indefinitely.
+			pending = state.Outbox{Fact: fact, Origin: payment.Tx.Body.Certifier,
+				NextSubmitUnixNS: time.Now().Add(2*time.Second + time.Duration(m.cfg.Index)*250*time.Millisecond).UnixNano()}
+		}
+		pending.Certificate = raw
+		if err = state.Put(o, outkey, pending); err != nil {
+			return nil, err
+		}
+		return o.Changes(), nil
+	})
+	if err == nil {
+		requesttrace.Payment("install_store_done", fact)
+	}
+	return err == nil && !alreadyObserved, err
+}
+
+FILE internal/member/source_recovery.go
+package member
+
+import (
+	"time"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// recoverExposedSources runs in the verified block transaction. Only an
+// original signer with matching retained material can create a recovery job.
+// The existing relay performs network work after this transaction commits.
+func (m *Member) recoverExposedSources(o *state.Overlay, inputs []protocol.InputCertificate) error {
+	if m.cfg.DisableSourceRecovery {
+		return nil
+	}
+	for _, input := range inputs {
+		cert := input.Certificate
+		if cert.Summary.Config != m.cfg.Organization.Hash() {
+			continue
+		}
+		fact := cert.QC.Fact
+		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+		if err != nil {
+			return err
+		}
+		if p.Invalidated {
+			return rules.ErrAccounting
+		}
+		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
+			return err
+		} else if found {
+			continue
+		}
+		outkey := state.Key(state.KeyOutbox, fact[:])
+		if _, found, err := state.Load[state.Outbox](o, outkey); err != nil {
+			return err
+		} else if found {
+			continue // Duplicate exposure cannot postpone an existing retry.
+		}
+		a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+		if err != nil {
+			return err
+		}
+		if !found || a.Direct == nil {
+			continue
+		}
+		if a.Fact != fact || protocol.SummaryFor(*a.Direct, a.Admission).Fact() != cert.Summary.Fact() {
+			return protocol.ErrAuth
+		}
+		payment := protocol.DirectPayment{Tx: *a.Direct, Certificate: cert, InputCertificates: a.DirectParents}
+		if _, err := rules.VerifyDirectPayment(payment, *m.direct); err != nil {
+			return err
+		}
+		raw, err := payment.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		// Stagger original signers without waiting for INSTALL or another QC.
+		pending := state.Outbox{Fact: fact, Origin: payment.Tx.Body.Certifier, Certificate: raw,
+			NextSubmitUnixNS: time.Now().Add(time.Duration(m.cfg.Index) * 250 * time.Millisecond).UnixNano()}
+		if err := state.Put(o, outkey, pending); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+FILE docs/paper/review-2026-10-02/protocol.tex
+% Section fragment for the Next manuscript.
+% Requires amsmath, amssymb, and algorithmic in the main preamble.
+% The pseudocode blocks use IEEEtran figure floats, not algorithm floats.
+
+\section{Protocol Design}
+\label{sec:protocol}
+
+Next certifies fixed payment authorizations and outputs and lets their sources stay unresolved. Public execution consumes a missing certified input and records the issuer's direct obligation atomically, and it publishes the source's certificate so that the original signers can resubmit the source. A source still absent at its deadline closes through a public compensation decision without threshold adaptation, and representation commands later replace the funding reference under the existing commitments.
+
+\subsection{Identity, Certification, and Delivery}
+\label{sec:protocol-certification}
+
+Let $K_T$ be the encoded payment body and input claims, $\mathbf{C}_T$ the input commitments, and $\Sigma_T$ the output summary:
+\begin{equation}
+  \begin{aligned}
+    K_T &= \operatorname{Encode}(T.\mathsf{Body},T.\mathsf{Claims}),\\
+    \mathsf{id}(T) &= H(\texttt{TX\_V3},K_T,\mathbf{C}_T),\\
+    c_T &= H(\texttt{DIRECT\_CERT\_V3},\operatorname{Encode}(\Sigma_T)).
+  \end{aligned}
+  \label{eq:protocol-identities}
+\end{equation}
+Owner signatures authenticate $\mathsf{id}(T)$ and stay outside its computation, and each output identifier binds this identity, the network, and the output position. Funding references and openings are encoded separately, so a restricted replacement leaves the authorized claims and outputs unchanged. Initial submission requires \texttt{OriginalFunding} for each claimed input with a valid opening, and a later representation preserves body, claims, commitments, and owner signatures. Verification caches therefore key complete command bytes.
+
+Under one Network and Subject, an honest wallet uses a fresh payment nonce for every new payment, across organizations and instances; a retry resubmits the same payment with its original authorization. A wallet must not change the nonce and reuse an old certificate, and two facts that share an intent are not merged into one guarantee. The experimental drivers derive nonces from input identities, which is not a general multi-device nonce allocation service.
+
+A member checks ownership, routes, direct input certificates, value conservation, and the admission vector. One local transaction rechecks the input locks, final fee inputs, and the designated Worker's resource slices and records the approval with its exact debits; the approval keeps the transaction, admission vector, and direct input certificates of the request (Section~\ref{sec:protocol-resubmission}). CAL reservation equals $a_T$ including change even when every principal input is final, since each certified output may circulate before the payment executes. The member signs after the transaction commits, a retry reuses the approval, and releasing resource capacity keeps the consumption locks.
+
+The collector sends one canonical request to four members and returns after verifying three signatures over the same $c_T$; different valid subsets give the same fact. The recipient checks the TXCer against the output body, index, owner, and trusted configuration, records the coin atomically, and can construct a successor request at once, carrying its direct input certificates in place of the ancestor chain.
+
+Relay material is saved in the background, and bounded early tasks let \texttt{INSTALL} and public submission proceed independently. \texttt{INSTALL} stores complete material at members and records certified consumption locally; it creates neither a new approval nor a budget debit. Public submission proceeds separately. Members schedule backup submission relative to their first \texttt{INSTALL}, and repeated \texttt{INSTALL}s cannot postpone it. HTTP acceptance leaves the outbox entry pending until authenticated public completion removes it. Backup submission requires a retained complete submission; Section~\ref{sec:protocol-resubmission} adds a path from the approvals of the original signers.
+
+The public \texttt{DirectSubmission} carries the transaction, admission vector, organization \texttt{SpendQC}, and direct input certificates. The committee reconstructs $\Sigma_T$ and verifies the same authorization; omitting a separate new-output TXCer wrapper changes the envelope and keeps the requirement. Public verification binds each input certificate to its network, issuing organization, fact, and claimed output and rejects duplicates. It accepts exactly one certificate for each certificate input and rejects any further certificate. The admission vector holds one CAL entry, bound to the issuer.
+
+\subsection{Atomic Execution with Direct Obligations}
+\label{sec:protocol-execution}
+
+Public execution separates certificate-wide coverage from an actual missing-input obligation. On the first missing use of a parent fact $c$, \texttt{register} reserves its entire certified CAL amount and creates a Promise for every output. The coverage record maintains
+\begin{equation}
+  \mathsf{Original}_c=
+  \mathsf{Discharged}_c+\mathsf{Paid}_c+\mathsf{Remaining}_c,
+  \label{eq:protocol-coverage}
+\end{equation}
+where $\mathsf{Paid}_c$ is a gross cumulative counter and $\mathsf{Rec}_c\le\mathsf{Paid}_c$ counts the part repaid by source execution. Grant usage satisfies $\mathsf{Reserved}_g+\mathsf{Spent}_g\le B_g$, where $\mathsf{Spent}_g$ sums $\mathsf{Paid}_c-\mathsf{Rec}_c$ over the certificates under $g$. Registration raises public grant usage and leaves the reserve account untouched; an effective compensation (Section~\ref{sec:protocol-decision}) debits the account and raises $\mathsf{Spent}_g$, and a repayment credits it and lowers $\mathsf{Spent}_g$ by the same amount. Only a missing output that is actually consumed opens a direct obligation and raises the public gap, so consuming one missing 40-CAL output of a 40/60 certificate reserves 100~CAL, opens a 40-CAL gap, and leaves the unused Promise covered.
+
+Figure~\ref{fig:protocol-payment} gives the public transition. Its prestate includes earlier successful commands of the same block; static authorization may be cached, while consumption, balances, grants, and obligations are evaluated against the current state. All changes occur in a private overlay, and a failure discards the entire transition.
+
+The intent check belongs to this evaluation: if the intent of $T$ is already bound to a different TxID, the transition returns a conflict. The binding is written in the same atomic transition that executes a payment successfully, and no production path deletes or rebinds it, so resubmitting the same bytes cannot remove the conflict.
+
+\begin{figure}[t]
+  \small
+  \begin{algorithmic}[1]
+    \REQUIRE Verified submission $T$, current state $S$, public time
+    \STATE If $T$ is already settled, return no new effect
+    \STATE $O\gets\operatorname{Overlay}(S)$
+    \STATE Check intent, grants, and work; fund fee escrow in $O$
+    \FOR{each CAL input $(x,i)$}
+      \STATE Require $(x,i)$ to be unconsumed
+      \IF{a final creation for $(x,i)$ exists}
+        \STATE Check its body and evidence against the claim
+      \ELSE
+        \STATE Require $i=0$ and a matching direct TXCer $c$
+        \STATE Register all of $c$'s coverage if unseen
+        \STATE Create unique $\mathcal{O}_x$; add gap and Pending
+      \ENDIF
+      \STATE Record consumption of $(x,i)$ in $O$
+    \ENDFOR
+    \STATE Require equal total CAL input and output values
+    \STATE Record $T$ settled; advance its fee stages
+    \STATE Resolve each output: fulfill an Open obligation; repay the
+    issuer for a Repaired one and mark it Recovered; otherwise fulfill
+    any registered Promise. Create final instance~0 unless repaid
+    \STATE Return all changes and results as one transition
+  \end{algorithmic}
+  \caption{Public payment execution. Any failed check rejects all
+    provisional changes. Output resolution follows
+    Section~\ref{sec:protocol-closure}.}
+  \label{fig:protocol-payment}
+\end{figure}
+
+An obligation binds the consumed output, parent certificate fact, issuer, amount, consuming transaction, and historical input location, and public block time anchors its deadline. The consuming payment records its Pending input obligations and fee progress. User-funded fees consume authenticated final FUEL, return excess input value as change, and escrow the signed maximum, which covers registration, settlement, closure, and one compensation charge per certified input; unique stage and obligation identities prevent duplicate charging, and unused escrow returns to the payer when the input obligations close. The child outputs are final even while some inputs remain obligations, so a further transaction consumes them under the ordinary final-input checks.
+
+\subsection{Source Closure, Repayment, and Cumulative Reconciliation}
+\label{sec:protocol-closure}
+
+A source transaction arrives through normal payment execution, including validation and consumption of its own inputs, and its outputs resolve within that transition according to their obligations. Arrival closes an Open obligation as Fulfilled: it fulfills the Promise, discharges the coverage, and lowers the consumer's Pending count. An output that no payment consumed fulfills any registered Promise and becomes final instance~0. A Repaired obligation means that a reserve debit funded the consumer, so arrival repays that debit instead of creating a second output: the amount returns to the issuer account that paid it, the obligation becomes Recovered, and the repayment counter and the grant's Spent change together, while the compensation decision stays as recorded. An already consumed instance~0 remains consumed in every branch; a repaid output has no final creation. The source's own inputs may open new obligations against their direct issuers within the same atomic transition.
+
+Members reconstruct progress from authenticated consecutive blocks and results, and only an existing local approval supplies a debit to restore. For its CAL debit, member $m$ computes
+\begin{equation}
+  \begin{aligned}
+    t_{m,T}&=
+    \begin{cases}
+      a_T-\bigl(\widehat{p}_{m,T}-\widehat{\mathsf{Rec}}_{m,T}\bigr),
+        &\text{if settled},\\
+      0,&\text{otherwise},
+    \end{cases}\\
+    \delta_{m,T}&=t_{m,T}-\mathsf{Applied}_{m,T},
+  \end{aligned}
+  \label{eq:protocol-release}
+\end{equation}
+where ``settled'' means that the member has observed its own payment execute successfully, and $\widehat{p}_{m,T}$ and $\widehat{\mathsf{Rec}}_{m,T}$ are the compensation and repayment recorded locally for that approval's outputs. On observing the execution of its payment, the member checks that the repayment in the authenticated result covers $\widehat{p}_{m,T}$ and sets $\widehat{\mathsf{Rec}}_{m,T}=\widehat{p}_{m,T}$, since that execution repays every compensated output of $T$; a member that approved $T$ after following the compensation recorded none. After checking bounds and monotonicity, it moves $\delta_{m,T}$ from Reserved to Available in the original Worker and updates Applied. Pending inputs leave CAL release unaffected, since their issuers carry those liabilities, and work resources wait for fee closure. An unexecuted source keeps its full CAL amount, including change, reserved at each approving member. A compensation does not release it, and a partial approval keeps its debit. Spent FUEL is not restored as unspent fee. Repeated blocks and late material cannot repeat a credit, and an unexecuted source receives a release only through its own execution. A wallet records a repaid output as a terminal observation without certificate, final creation, or balance.
+
+An authorized reserve increase debits an external, unprotected CAL account, credits the reserve, and raises its grant atomically. Each member adds the difference between the new and old $\lfloor2B_g/3\rfloor$ shares while Reserved and its approvals stay in place, and aggregate backing checks cover all grants that share an account.
+
+\subsection{Source Resubmission from Public Certificates}
+\label{sec:protocol-resubmission}
+
+The block that executes a payment carries the quorum certificates authenticating its certified inputs and their creating payments. Each member follows the block in its authenticated block transaction. For every carried certificate of its own organization, it loads the approval indexed by the certificate's fact, unless it has observed the source's public execution or already holds an outbox entry for that fact, and checks that the stored transaction and admission vector reproduce the fact. It then assembles the stored transaction, the stored direct input certificates, and the exposed QC, and applies ordinary payment verification. On success it writes an outbox entry in the same atomic local update, staggering the first attempt by member index; the existing relay submits the entry after commit. Payments of other organizations trigger the same path, and a stored record that fails these checks is corrupted state that stops the follower.
+
+The job resubmits the payment that the organization certified, so it needs no new owner or member signature, creates no approval, keeps input locks unchanged, and reserves no capacity. An existing outbox entry keeps its retry time, and execution of the source removes the entry. The path needs an original signer that holds the approval, follows the chain, and reaches the committee, and it needs that no global intent conflict prevents the source from executing; a source still absent at its deadline falls to compensation. It gives no fixed-time guarantee. Section~\ref{sec:security-decision} shows that at least two honest signers hold the material whenever an obligation is public.
+
+\subsection{Compensation Decisions}
+\label{sec:protocol-decision}
+
+After its deadline, an Open obligation closes through a public \texttt{CompensationDecision} $\delta=(\mathit{net},x,h,j,k)$: the network, the consumed output, and the height, transaction index, and input index of the consuming payment. The fixed-length canonical encoding holds neither a submitter signature nor adaptation data. Authority comes from the public obligation, and committed state fixes the target coordinates, so every submitter forms the same bytes for a given obligation. Committee workers scan the due index and submit due decisions without requesting adaptation shares.
+
+Figure~\ref{fig:protocol-decision} gives the transition. The executor compares the request's network, position, and input slot with the obligation before it reads any historical block, so a mismatching request is rejected without loading history. It then reads the canonical consuming payment at $(h,j)$, checks its identity, fact, input, and claimed amount, and requires \texttt{OriginalFunding} for $x$ with a valid opening and a same-width reserve replacement; it computes no replacement opening and contacts no adapter. One overlay carries every change: the reserve debit, the Repaired status, Paid, Spent, the gap, the consumer's Pending count, the compensation charge (from the consumer's escrow to rewards), and, when no input obligation remains, the consumer's fee closure and refund, together with the immutable decision record $\mathcal D_x$ (obligation snapshot and reserve-debit identity) and the pending-representation entry.
+
+\begin{figure}[t]
+  \small
+  \begin{algorithmic}[1]
+    \REQUIRE Decision $\delta=(\mathit{net},x,h,j,k)$, state $S$,
+    execution height and block time
+    \STATE Require $h$ to be older than the execution height
+    \STATE If $\mathcal D_x$ exists, return no effect when it equals
+    $\delta$; otherwise reject
+    \STATE Require $\mathcal O_x$ Open with consumer position $(h,j,k)$
+    and network $\mathit{net}$
+    \STATE Require the deadline of $\mathcal O_x$ to be reached by block time
+    \STATE Load the canonical consuming payment at $(h,j)$; check its
+    identity, fact, input, and claimed amount; require
+    \texttt{OriginalFunding} for $x$ with a valid opening and a
+    same-width reserve reference
+    \STATE $O\gets\operatorname{Overlay}(S)$
+    \STATE In $O$: debit the issuer reserve; set $\mathcal O_x$ Repaired;
+    move its Promise to Paid; update Spent, the gap, and the consumer's
+    Pending count and fee stages
+    \STATE In $O$: record $\mathcal D_x$ and the pending-representation
+    entry
+    \STATE Return the changes and the compensation result
+  \end{algorithmic}
+  \caption{Compensation decision. The transition reads and requests no
+    adaptation material. Any failed check rejects all provisional
+    changes.}
+  \label{fig:protocol-decision}
+\end{figure}
+
+The result carries the single per-output effect, which names the parent and consumer facts, amount, input position, and debit identity, together with any fee outputs. A repeated identical decision returns an unapplied result with an empty change set, also after the source's repayment, and a decision that differs from the record is rejected; once the source has executed, no new decision for its obligation commits. Members apply the effect from the authenticated result together with their cursor and locate original approvals for the Paid and Pending updates, and wallets apply each fee output once. The compensation credits no principal to the recipient or to an executed successor.
+
+\subsection{Representation Commands and Batches}
+\label{sec:protocol-batch}
+
+A \texttt{RepairBatch} targets one historical block and holds 1--32 items in canonical order, each naming an output, a transaction index, an input index, and a new input opening; outputs and slots are unique. The batch fixes the base revision and the previous and replacement canonical-body digests, carries the part openings, and advances the logical revision from $\mathsf{Base}$ to $\mathsf{Base}+1$. A single \texttt{RepairInput} is the one-item form and carries the replaced transaction bytes. Both commands accept only outputs with a committed compensation decision, take amounts, issuers, and replacement references from the decision record, and write no accounting state.
+
+A constructor reads the latest committed logical representation, independently of physical installation, and selects decided outputs whose slots still hold \texttt{OriginalFunding}; the decision enforced affordability when it committed, so the constructor simulates no economic step. For every item it derives the reserve-debit identity from the network and the consumed output and replaces the slot's \texttt{OriginalFunding} by the reserve reference with its opening, patching slots of one transaction into the same copy. Serialization lengths and all non-target bytes, including earlier authorized replacements, stay unchanged. Input adaptation runs per slot, and each block part that the combined body touches is adapted once while unchanged parts keep their commitments and proofs.
+
+Share endpoints bind to fixed committee identities, and each holder derives the requested replacements from its own committed decisions and refuses a slot without one. The collector tests bounded three-member candidates by actual cryptographic combination and accepts a candidate only when every affected part verifies, so malformed or invalid responses eliminate candidates and leave three valid contributions from other members usable. A successful combination cancels outstanding requests. Openings give commitment compatibility, and the committed decision gives the authorization.
+
+\begin{figure}[t]
+  \small
+  \begin{algorithmic}[1]
+    \REQUIRE Batch $B$, state $S$, execution height
+    \STATE $b\gets\operatorname{BatchID}(B)$; if a successful Task $b$
+    exists, return no new effect
+    \STATE Load Canonical; require an older target height and the stated
+    base and previous digest
+    \STATE Check item order and unique outputs and slots
+    \STATE Require, for each item, a decision $\mathcal D_x$ at the
+    stated location and a canonical slot holding \texttt{OriginalFunding}
+    for $x$
+    \STATE Reconstruct the permitted combined funding replacements and
+    verify their openings
+    \STATE Require the canonical candidate-body digest to equal
+    $B.\mathsf{Next}$
+    \STATE Verify non-target bytes, lengths, and that block hash and
+    part-set header equal the stored original identity
+    \STATE $O\gets\operatorname{Overlay}(S)$; remove the pending entries
+    and record per-output references
+    \STATE Add one logical revision, Task, and queue entry to $O$
+    \STATE Return the transition and a result without economic effect
+  \end{algorithmic}
+  \caption{Atomic representation-batch execution. Failure rejects the
+    whole batch, and only a successful transition commits. Batch
+    identity covers the complete canonical command, including its proof
+    data.}
+  \label{fig:protocol-batch}
+\end{figure}
+
+Public execution repeats all checks against its current state (Fig.~\ref{fig:protocol-batch}). A changed base, an item without a decision, or a slot that no longer holds \texttt{OriginalFunding} rejects the entire batch, and exact successful replays are recognized before base validation. Since every command requires \texttt{OriginalFunding} in its slot, a different batch or the single-item entry cannot replace a slot twice, and command and revision identities stay specific to the chosen packaging. The authenticated result names the command and whether it applied; followers map it to an empty economic effect, and the economic effect of a compensation comes from the decision result alone. A repayment belongs to the source's own execution result.
+
+\subsection{Identity-Preserving Installation and Replay}
+\label{sec:protocol-installation}
+
+Four identities are kept apart. The payment identity $\mathsf{id}(T)$ fixes the authorization and commitments, and owner signatures bind it; it is not the consensus transaction hash. The consensus $\mathit{Tx.Hash}$ of a well-formed \texttt{UTXO4CH} envelope is a SHA-256 over its header and fixed fields and checks no payment validity. $\mathit{DataHash}$ is the Merkle root over consensus transaction hashes, and an inclusion proof does not grant revision authority. The complete BlockID $(H_b,P_b)$ keeps the block hash and the original part-set header, and execution and installation compare both. Part commitments are chameleon commitments bound to chain, key, height, and part index, and changed parts carry valid openings to their original commitments. Original consensus parts carry revision~0 and opening~1; original validation requires the correct height and these values, and the application verifies the original payment normally. A revised part cannot pass as a new original execution, and only a committed Task authorizes a rewrite. Replay uses the retained original commands and never executes a revised body as a new payment.
+
+The public revision and Task authorize an exact new body and its part evidence, which an installer copies from one committed read view before it acquires the physical revision lock. For target revision $r$, a lower physical version is verified and installed, an equal version requires identical material, and a higher version covers the old task without rollback. The original block is retained, and parts and local version metadata are written atomically. Installation may skip intermediate physical versions and keeps every economic command. Queue progress stays global and consecutive: for entries $A_1,B_1,A_2$, installing $A_2$ while handling $A_1$ leaves $B_1$ open. Logical execution reads committed Canonical revisions, so every installation schedule leaves the same economic history. A revision is \emph{materialized} at a replica once its revised body has been physically installed there.
+
+Replay uses the original blocks, whose commands include the compensation decisions, followed by the representation commands, and reconstructs the application hashes of that public command sequence. Existing successors keep their authorizations, output references, and block identities. A compensation decision alone closes the obligation economically as an append-only public record. Representation adds an interface: at the consumer's original coordinates $(h,j,k)$, the stored block names the reserve debit for the designated input and still verifies against the original BlockID. A reader still reads the permanent decision and the obligation status for the economic state, and the revised field does not replace them. Batching shares representation work within a block and direct installation coalesces historical writes, and neither adds a round to normal certification. Section~\ref{sec:eval-reader} reports the read benefit and the storage and maintenance cost of this interface against an optimized decision index.
+
+\subsection{Reading Funding at Original Coordinates}
+\label{sec:protocol-reader}
+
+A read at $(h,j,k)$ returns $(H,h,j,k,F,r,d,s_H)$, assembled from existing functions inside one read transaction on $V_H$. Here $F$ is the funding representation, $r$ its revision, $d$ the decision or an absent marker, and $s_H$ the obligation state. This logical tuple describes local composition, not a deployed network interface. The index $j$ counts the original transaction list and is not renumbered after filtering maintenance commands or failed transactions. The logical body comes from the committed revision in $V_H$ and falls back to the original block only when no revision exists, so physical installation progress, or a block store that already holds a later version during replay, does not change the answer. A revision that exists but cannot be decoded is an error and never falls back to the original. Missing history is reported as unavailable and is not read as the absence of compensation; the contract assumes that the relevant history is not pruned. In a complete, verified, unpruned $V_H$, a missing decision means that none exists as of $H$.
+
+The three results are not interchangeable. \texttt{OriginalFunding} means that the slot has not been represented; the input may already be compensated or repaid. \texttt{ReserveFunding} means that an authorized representation records a reserve advance; it remains after repayment and does not imply a current net loss. Repaired means compensated and not yet recovered, and Recovered means that a late source repaid; neither adds balance for the successor's recipient. The pending-representation index is work state that representation deletes, so it cannot show whether a compensation occurred, whereas the successful decision index can.
+
+FILE docs/paper/review-2026-10-02/security.tex
+\section{Security Analysis}
+\label{sec:security}
+
+We analyze finite executions of the protocol of Section~\ref{sec:protocol} under the model of Section~\ref{sec:model-participants}. The arguments reason over the guards of the transition functions and use, besides the fault and state assumptions, the verification rules of Section~\ref{sec:protocol-certification}: input certificates bind network, organization, fact, and claimed output and correspond one-to-one with certificate inputs, and each admission vector holds one CAL entry bound to the issuer. A representation takes effect only through a committed command whose guards require an existing compensation decision, derive the slot and reserve reference, and verify every non-target byte and the complete block identity, so adaptation output is a candidate whose availability governs representation progress alone. The consensus argument specializes the Tendermint locking interface~\cite{tendermint} to complete block identities.
+
+\subsection{Original Execution and Certified Consumption}
+\label{sec:security-identity}
+
+A \emph{polka} is a same-round quorum of prevotes for a complete block identity or nil.
+
+\begin{lemma}[Original-execution agreement]
+\label{lem:security-original}
+Under the locking and validity rules of the consensus interface, one original block body is admitted per
+committed height, including its application context.
+\end{lemma}
+\begin{IEEEproof}
+With original opening~1, a part leaf hashes its context-bound message representative, so binding and the Merkle proof fix its bytes under the original part-set header. Candidate bodies are rebuilt from parts or paired locally with parts, Locked and Valid transfers preserve the pairing, and proposal, proof-of-lock (POL), lock, and commit comparisons use $(H_b,P_b)$; a change of download target clears the old body, and the round and step guards allow one precommit per round.
+
+Conflicting same-round commits need an honest double precommit. Take a commit of $v$ in round $r$ with its two honest signers, and the smallest later round $s$ with a conflicting polka (nil polkas that authorize unlocking included) at its earliest certificate formation. The quorum meets the two signers, and the vote of that signer needs an earlier unlocking justification, which contradicts the choice of $s$ or of the formation event. Votes for a locked value trace through earlier lock rounds to proposal validation, and Finalize follows a commit that matches the complete block identity. Synchronization and replay preserve body, height, and time, and the supplement expands the argument.
+\end{IEEEproof}
+
+\begin{lemma}[Authenticated, unique consumption]
+\label{lem:security-consumption}
+A TXCer fixes its outputs and issuer. No two valid certificates
+authorize conflicting consumption of the same $(x,i)$, and public
+execution consumes that instance at most once.
+\end{lemma}
+\begin{IEEEproof}
+Binding fixes the certified summary and the owner-authorized transaction, and the fixed route sends competing requests to one organization. Two three-member quorums intersect in at least two members, so an honest member lies in both. Its atomic input lock precedes signing, so it approves only one of two conflicts, and budget release keeps the lock. Final-input and certificate-input execution consult the same spend key. Replaying a fact adds neither a consumption nor a fee charge. A repaid output has no final creation and its instance~0 stays consumed, so a later claim on $(x,i)$ fails.
+\end{IEEEproof}
+
+\subsection{Source Resubmission and Compensation Decisions}
+\label{sec:security-decision}
+
+For an output $x$, $\mathcal O_x$ is its direct obligation, with status Open, Fulfilled, Repaired, or Recovered, and $\mathcal D_x$ is its immutable compensation decision. Repaired means economically compensated, whatever the state of the stored bytes. The decision is written inside the transition from Open to Repaired and is never deleted, so $\mathcal D_x$ exists exactly when $\mathcal O_x$ is Repaired or Recovered. The set $\mathcal R$ holds the representation state (committed revisions, head command, tasks, batch references, queue, pending-representation index), and the projection $\pi_{\mathrm{econ}}$ retains public assets, consumption, coverage, obligations, grant usage, and fee states while omitting $\mathcal D$ and $\mathcal R$.
+
+\begin{lemma}[Resubmission preserves authorization]
+\label{lem:security-resubmission}
+Let an honest member create a resubmission job for a fact $c$. The job submits the payment, admission vector, and direct input certificates that the member stored before it signed $c$, with the public QC of $c$, and public verification and execution treat it as any submission of that payment. It needs no new owner or member signature, creates no approval, keeps input locks unchanged, and reserves no signing capacity. A member holds at most one job per fact, and execution of the payment removes it. Once a direct obligation on an output of $c$ is public, at least two honest signers of $c$ retain the stored material.
+\end{lemma}
+\begin{IEEEproof}
+The member indexes its approval by the fact in the public QC, and the stored payment and admission vector must reproduce that fact. It combines this material and its stored direct input certificates with the exposed QC and applies ordinary payment verification before it creates an outbox entry. Fact binding and quorum verification exclude any other payment core, and the quorum signatures fix the content of the certificate that the exposing party chose to carry. The transition writes the outbox alone, so the approval, input locks, and grant reservation stay as they were, and the existing outbox and observed-execution marks suppress duplicates. A stored record that fails these checks lies outside the fault model.
+
+An obligation arises only from an executed payment that consumes a certified missing input, and public verification requires that input's certificate, which is therefore public. Its three distinct signers include at least two honest members, each of which stored the approved material before it returned a signature. The approvals hold no quorum certificate, which arrives with the block, so a client that withholds the certificate leaves the material for resubmission intact. Execution further needs a continuing honest follower, fair delivery, and a source payment that meets the ordinary execution rules, including the global intent check.
+\end{IEEEproof}
+
+\begin{lemma}[Certificates bound liability, not execution]
+\label{lem:security-intent}
+Let $T_1\ne T_2$ be payments with the same Network, Subject, and Nonce, spending disjoint inputs routed to organizations $G_1$ and $G_2$, each valid under its own organization's approval rules. Both payments can obtain QCs, and in every public order at most one executes. A malicious user can cause this, and resubmitting either payment does not remove the conflict. Payments of different Subjects with the same nonce do not conflict.
+\end{lemma}
+\begin{IEEEproof}
+Each organization holds its own local intent record and the approvals concern disjoint inputs, so neither organization observes a conflict, and the owner's authorization covers each payment. At public execution, the evaluation returns a conflict when the intent is already bound to a different TxID. The binding is written in the transition that executes a payment successfully, and no production path deletes or rebinds it, so the other payment stays unexecuted whatever its resubmission. A different Subject yields a different intent.
+\end{IEEEproof}
+
+If $T_2$ cannot execute but a successor of its output has executed, the successor has registered an obligation against $G_2$. After the deadline, the reserve of $G_2$ can be debited, but the source cannot repay by resubmission. Since $z_c=0$, the approving members of $G_2$ keep $r_{m,c}=a_c$ reserved, which Theorem~\ref{thm:security-coverage} already counts with $w_c=a_c$. The inputs of $T_2$ remain under the original approval locks, so this is not a user recovering and respending the principal. Theorem~\ref{thm:security-neutrality} excludes the case, because it assumes that every payment succeeds once.
+
+\begin{lemma}[Compensation takes effect at most once]
+\label{lem:security-decision}
+Each direct obligation incurs at most one reserve debit and its
+associated economic effects. A decision for $x$ with an existing record
+$\mathcal D_x$ has no effect if it equals the record, including after
+repayment, and is rejected otherwise. A decision without a record is
+rejected once $\mathcal O_x$ is no longer Open.
+\end{lemma}
+\begin{IEEEproof}
+Status changes only along Open$\to$Fulfilled, Open$\to$Repaired (by a decision alone), and Repaired$\to$Recovered (inside the successful execution of the source). A decision first checks $\mathcal D_x$: an exact match returns an unapplied result with an empty change set, and a mismatch is rejected. Without a record, the transition requires an Open obligation, a deadline reached by block time, and a matching historical position, amount, and funding commitment, all re-derived from committed state. It then debits the issuer reserve, closes the gap, updates fees and coverage, and records $\mathcal D_x$ in one atomic step. The status machine is acyclic, so Open is left once and at most one decision takes effect.
+
+If the source executes first, the obligation leaves Open and no decision for it commits. If compensation comes first, the source's execution returns the funds to the issuer through the single Repaired$\to$Recovered transition, keeping $\mathcal D_x$ and creating no user output. Induction over the public command order gives at-most-once compensation and repayment.
+\end{IEEEproof}
+
+\subsection{Covering Public and Hidden Commitments}
+\label{sec:security-coverage}
+
+Every certified fact carries one CAL entry bound to the issuer, because at least two honest signers computed the vector through the admission rules before they signed and the fact binds the summary. For a complete CAL grant $g$, the cumulative authorization $B_g$ gives each member $s(B_g)=\lfloor2B_g/3\rfloor$ capacity. Let $C_g$ contain every distinct fact whose three signatures have existed by the current prefix, including unassembled and hidden certificates and settled facts. The unique CAL allocation binds each fact to one configuration, ResourceKey, and Grant ID. A fact $c$ has output cap $a_c$, the sum of its CAL outputs. For $c\in C_g$, let $p_c$ be the cumulative compensation paid for those outputs, $\mathsf{Rec}_c$ the part repaid by source execution, and $z_c$ indicate that the payment of $c$ has executed successfully. The \emph{net compensation} is $\bar p_c=p_c-\mathsf{Rec}_c$. Define
+\begin{equation}
+  w_c=\begin{cases}a_c,&z_c=0,\\\bar p_c,&z_c=1,\end{cases}
+  \qquad Q_g=\sum_{c\in C_g}w_c.
+  \label{eq:security-risk}
+\end{equation}
+
+\begin{lemma}[Source repayment]
+\label{lem:security-recovery}
+A compensated output leaves the Repaired state only inside the successful
+execution of its source, in the same transition that sets $z_c=1$, and
+the repayment is credited to the account that was debited. Hence
+$0\le\mathsf{Rec}_c\le p_c\le a_c$, $\mathsf{Rec}_c=0$ while $z_c=0$,
+and $\mathsf{Rec}_c=p_c$ once $z_c=1$. In particular $\bar p_c=p_c$ while
+the source is pending and $\bar p_c=0$ afterwards, so no net compensation
+survives the execution of the source.
+\end{lemma}
+\begin{IEEEproof}
+Each registered promise leaves Open at most once, and by Lemma~\ref{lem:security-decision} compensation applies at most once to an output and only while its obligation is Open, so $p_c\le a_c$. The only transition that leaves Repaired is the output-resolution step of a payment whose fact and issuer equal the certificate fact and issuer of the obligation. It runs in the overlay that records the payment as settled, so $z_c$ and the repayment change together. The step resolves every output of the source that has an obligation, turning Open into Fulfilled and Repaired into Recovered, and afterwards every promise of $c$ is closed, so no new compensation arises and a repeated submission is a no-op. Compensation debits and repayment credits use the issuer account stored in the obligation, which is the account of the single CAL allocation of $c$, and the repayment leaves $\mathcal D_x$ untouched.
+\end{IEEEproof}
+
+For any local approval, let $r_{m,c}=a_c-\mathsf{Applied}_{m,c}$, where Applied is its cumulative CAL restoration.
+
+\begin{lemma}[Residual capacity]
+\label{lem:security-witness}
+For every fact $c\in C_g$ and every honest member $m$ that approved $c$,
+at every prefix,
+$r_{m,c}\ge w_c$.
+\end{lemma}
+\begin{IEEEproof}
+Until $m$ observes the successful execution of the payment of $c$, its CAL restoration for $c$ is zero, so $r_{m,c}=a_c\ge w_c$ whatever the compensation state. After it observes that execution, $m$ checks that the reported repayment covers its recorded compensation and sets its recorded repayment equal to it. The restoration target is $a_c$ minus a recorded net compensation of zero, so $r_{m,c}=0$, and $w_c=\bar p_c=0$ by Lemma~\ref{lem:security-recovery}. A member that approved after following a compensation recorded none and restores only its own debit.
+\end{IEEEproof}
+
+\begin{theorem}[Potential liabilities are funded]
+\label{thm:security-coverage}
+For every CAL grant, $Q_g\le B_g$. For each reserve account $x$, its total
+open gap $D_x$ does not exceed its balance $A_x$.
+\end{theorem}
+\begin{IEEEproof}
+Let $\mathcal A_{m,g}$ contain all successful approvals under $g$, including those without a QC, and $L_{m,g}=\sum_{c\in\mathcal A_{m,g}}r_{m,c}$ across Workers. Approval and restoration move capacity between Available and Reserved, and top-ups add the difference in member shares, so $L_{m,g}\le s(B_{m,g})\le s(B_g)$ for the locally observed authorization $B_{m,g}$; grants only increase. Fix any three honest members $H_g$ of the organization. A QC has three distinct signers and at most one member lies outside $H_g$, so the set $\mathsf{Sig}_c$ of members of $H_g$ that signed $c$ has at least two elements. Honest members sign only after approving, so Lemma~\ref{lem:security-witness} gives $r_{m,c}\ge w_c$ for $m\in\mathsf{Sig}_c$, and
+\begin{equation}
+\begin{aligned}
+  2Q_g
+  &\le\sum_{m\in H_g}\sum_{\substack{c\in C_g\\m\in\mathsf{Sig}_c}}r_{m,c}\\
+  &\le\sum_{m\in H_g}L_{m,g}
+  \le3\lfloor2B_g/3\rfloor\le2B_g.
+\end{aligned}
+\label{eq:security-counting}
+\end{equation}
+
+Let $R_c$ and $d_c$ be the registered remaining and discharged coverage, with $p_c=d_c=R_c=0$ before registration. Registered records satisfy $a_c=p_c+d_c+R_c$, and $z_c=1$ implies $R_c=0$. Hence $R_c\le w_c-\bar p_c$: while $z_c=0$ we have $\mathsf{Rec}_c=0$, so $R_c\le a_c-p_c=w_c-\bar p_c$, and once $z_c=1$ both sides vanish. Define $S_g=\sum\bar p_c$, $V_g=\sum R_c$, and $E_g=Q_g-S_g$, with sums over $C_g$. Registration, compensation, repayment, and discharge maintain public Usage.Spent$=S_g$ and Usage.Reserved$=V_g$.
+
+Let $\mathcal G_x$ contain all grants backed by $x$; their certified CAL account is the debited issuer account. Genesis establishes $\sum_{g\in\mathcal G_x}(B_g-S_g)\le A_x$. External, non-protected top-ups raise both sides equally. Compensation raises $S_g$ and lowers $A_x$ by the same amount, repayment lowers $S_g$ and raises $A_x$ by the same amount (Lemma~\ref{lem:security-recovery}), and no other protocol operation withdraws CAL reserves. Each Open obligation corresponds to a distinct remaining promise, so
+\begin{equation}
+\begin{aligned}
+D_x&\le\sum_{g\in\mathcal G_x}V_g
+    \le\sum_{g\in\mathcal G_x}E_g\\
+   &\le\sum_{g\in\mathcal G_x}(B_g-S_g)\le A_x.
+\end{aligned}
+\label{eq:security-backing}
+\end{equation}
+Gross Paid and its recovery are each counted once, and $E_g$ is a risk bound rather than available member capacity.
+\end{IEEEproof}
+
+An unexecuted payment keeps $a_c$, including change, at every approving member, and partial approvals count in $\mathcal A_{m,g}$ although they never form a QC. This occupancy limits service under finite capital and is not an accounting violation. A compensation raises the net compensation counter but does not release the signing capacity of the unexecuted source; only its own execution does.
+
+\noindent\textbf{CAL admission consequence.}
+At the execution prestate, including earlier successful block commands, let $N_g$ be the distinct, valid, unregistered parent facts under $g$ that matching, unconsumed missing inputs require. They have $w_c=a_c$ and $p_c=R_c=0$. Every registered fact satisfies $R_c+\bar p_c\le w_c$, and the facts are disjoint, so
+\begin{equation}
+ V_g+S_g+\sum_{c\in N_g}a_c\le Q_g\le B_g.
+ \label{eq:security-admission}
+\end{equation}
+Repeated uses of one certificate count once, and sequential registration sees earlier reservations, so every partial sum obeys the bound. First registration therefore cannot fail for CAL authorization capacity, even when it precedes a repayment in the same transition, since a repayment only lowers $S_g$. Likewise an Open amount $a\le D_x\le A_x$ has sufficient reserve principal. Other resource and fee checks remain separate.
+
+\subsection{Asset Conservation and Delay Neutrality}
+\label{sec:security-conservation}
+
+\begin{theorem}[CAL conservation]
+\label{thm:security-conservation}
+Let $U$ be the total value of final, unspent CAL instances, $A$ the total
+CAL account balance, and $D$ the total value of Open gaps. Every
+execution prefix satisfies
+\begin{equation}
+ U+A-D=C_0,
+ \label{eq:security-conservation}
+\end{equation}
+where $C_0$ includes genesis outputs and all accounts, including top-up
+sources.
+\end{theorem}
+\begin{IEEEproof}
+A payment consumes final value $F$ and missing value $M$ and produces $F+M$. Let $J$ and $R$ be the total values of its arriving outputs whose obligations were Open and compensated, respectively. The former outputs were already consumed, so they close gaps and add no unspent value; the latter receive no creation record. Hence $\Delta U=M-J-R$, $\Delta D=M-J$, and the repayment gives $\Delta A=R$, so $\Delta(U+A-D)=0$. A compensation decision of amount $a$ gives $\Delta A=\Delta D=-a$ and $\Delta U=0$. Resubmission changes no public state, and by Lemma~\ref{lem:security-representation} representation commands and installation leave $U$, $A$, and $D$ unchanged. Top-ups transfer between included accounts, and other transitions preserve the projection.
+\end{IEEEproof}
+
+FUEL follows separate accounting: each escrow maximum equals Held plus cumulative Rewards, Burned, and Refunded, and the global conserved sum counts unspent FUEL, ordinary accounts, current Held, reward balances, and cumulative burn. Unique stage and obligation identities transfer value once, for user-funded and organization-funded fees alike.
+
+Conservation fixes totals, and the next result fixes the final holders.
+
+\begin{theorem}[CAL delay neutrality]
+\label{thm:security-neutrality}
+Let $\mathcal T$ be a finite set of payments such that (i) no two consume
+the same instance or fee input, (ii) the relation ``consumes an output
+created by'' is acyclic, and (iii) every certificate input of a payment in
+$\mathcal T$ certifies an output of a payment in $\mathcal T$. Let
+$\mathcal U$ be a finite set of authorized reserve increases. Start from a
+clean genesis state with no coverage, promise, or obligation records and
+zero CAL Reserved and Spent. Let $\rho_0$ execute $\mathcal T$ in an order
+consistent with (ii), applying $\mathcal U$, and let $\rho$ be any
+execution consisting of the payments of $\mathcal T$, the increases of
+$\mathcal U$, and compensation decisions of due Open obligations, in any
+order, optionally interleaved with admissible representation commands.
+Suppose every payment and increase succeeds exactly once in both
+executions. Then at the end of $\rho$ and of $\rho_0$:
+\begin{enumerate}
+\item the final, unspent CAL instances coincide, with the same owners and
+amounts;
+\item every reserve account holds the same CAL balance;
+\item every CAL grant has the same authorization and
+Reserved$=$Spent$=0$, every obligation is Fulfilled or Recovered, and
+$\mathsf{Paid}_c=\mathsf{Rec}_c$ for every certificate.
+\end{enumerate}
+Fees and FUEL are not compared.
+\end{theorem}
+\begin{IEEEproof}
+\emph{Holders.} By (i), both executions consume the same instances. In $\rho$, an output consumed before its source executes receives an obligation, and when the source executes the output is either Fulfilled, with a creation record that is already consumed, or Recovered, with no creation record; in both cases it is consumed. Outputs that no payment of $\mathcal T$ consumes are created as final and unspent in both executions. The unspent instances are therefore the genesis outputs and the outputs of $\mathcal T$ that $\mathcal T$ leaves unconsumed.
+
+\emph{Reserves.} For a reserve account $x$, let $\hat A_x$ be its balance plus the amounts of Repaired obligations issued by $x$. Compensation lowers $A_x$ and raises the Repaired total by the same amount, repayment reverses this on the same account (Lemma~\ref{lem:security-recovery}), and creating or fulfilling an obligation changes neither term. As in Theorem~\ref{thm:security-coverage}, only top-ups, compensation, and repayment change reserve balances, so $\hat A_x=A_x(0)+\tau_x$ at every prefix, where $\tau_x$ is the total of increases credited to $x$ so far. An obligation exists only for an output consumed before its source executes, and by (iii) that source executes in $\rho$ and leaves the obligation Fulfilled or Recovered. At the end no obligation is Open or Repaired, so $A_x=A_x(0)+\tau_x$, which is also the value in $\rho_0$.
+
+\emph{Usage.} Every registered certificate is used by a missing input, so by (iii) its source executes in $\rho$. That execution closes all of its promises, so Remaining$=0$, and Lemma~\ref{lem:security-recovery} gives $\mathsf{Paid}_c=\mathsf{Rec}_c$. Hence Reserved$=\sum$Remaining$=0$ and Spent$=\sum(\mathsf{Paid}_c-\mathsf{Rec}_c)=0$, and authorizations change only through $\mathcal U$.
+
+\emph{Representation.} By Lemma~\ref{lem:security-representation}, an interleaved representation command leaves every compared quantity and the result of a later payment or decision at the same height and time unchanged.
+\end{IEEEproof}
+
+Intermediate states differ: a compensated source's issuer holds less until the source executes, which Theorem~\ref{thm:security-coverage} covers, and the compared projection omits the decision records and representation state that exist only in $\rho$. A source that never executes leaves its compensated amount as a net loss of its issuer, and incentives lie outside the theorem.
+
+\subsection{Authorized Representation and Independence}
+\label{sec:security-repair}
+
+\begin{lemma}[Decision-gated representation authority]
+\label{lem:security-repair}
+Every effective representation item refers to an existing compensation
+decision, including one whose obligation has since been repaid, and to a
+canonical slot that still holds \texttt{OriginalFunding}. A successful
+representation changes no transaction bytes outside its authorized
+funding slots, even when adaptation outputs are adversarial.
+\end{lemma}
+\begin{IEEEproof}
+Let $N$ be the RSA modulus, $e$ its public exponent, and $r$ an opening in $\mathbb Z_N^*$. The domain-separated representative $\mathsf{FDH}(ctx,m)$ binds the message and its repair context. The relation
+\begin{equation}
+ C=\mathsf{FDH}(ctx,m)r^e=\mathsf{FDH}(ctx,m')r'^e\pmod N
+\end{equation}
+gives compatibility and carries no fresh approval, and a published opening ratio can be reused for the same message relation. Public guards read the decision record, which holds the obligation snapshot and the reserve-debit identity, and derive the slot and the replacement reference from it. They check the current base and body digests and verify all non-target bytes and the complete block commitments. Reading the snapshot keeps a decided slot representable after repayment. Invalid candidates leave no changes, exact successful replays are no-ops, and a repackaged command meets a slot that no longer holds \texttt{OriginalFunding} or an existing task. The decision committed the economic effect, so the command supplies no amount, issuer, or account change, and the adapter writes no ledger state; the argument rests on the verified output alone.
+\end{IEEEproof}
+
+\begin{lemma}[Representation is economically inert]
+\label{lem:security-representation}
+For every successful single or batch representation command $r$ and
+state $S$, $\pi_{\mathrm{econ}}(r(S))=\pi_{\mathrm{econ}}(S)$. A payment
+or decision executed at the same height and time yields the same
+result in $r(S)$ as in $S$, and the projections of the two successor states
+agree.
+\end{lemma}
+\begin{IEEEproof}
+A representation command checks the decision, the canonical target, the base revision, the preceding digest, and the permitted replacement. Its write set holds revisions, the head command, task and batch-reference records, the queue, and pending-index removals; it skips the accounting transition and writes no account, obligation, coverage, usage, spend, or fee record. Followers map its result to an empty economic effect. The projection is therefore unchanged for one step and, by induction, for any sequence of such steps.
+
+A decision for an output $y$ reads the canonical body only through the transaction identity, the authorization fact, the inputs, claims, and amounts, the encoded length, and the slot of $y$. If $\mathcal D_y$ exists, the decision is a no-op that reads no history. Otherwise the slot of $y$ still holds \texttt{OriginalFunding}, since replacement requires $\mathcal D_y$, and replacing other fixed-width slots leaves the remaining fields unchanged. Payment execution never reads the canonical body.
+\end{IEEEproof}
+
+\begin{lemma}[Identity preservation and installation independence]
+\label{lem:security-installation}
+An effective representation preserves the owner authorizations,
+transaction and output identities, claims, successor references, and the
+complete original BlockID $(H_b,P_b)$. For the same public history, legal
+physical installation schedules have identical economic projections.
+Moreover, if the chameleon relation has a unique valid opening for each
+fixed message and commitment, then for a fixed original body and a fixed
+set of decided slots the final body and part openings do not depend on
+the grouping or order of representation commands. Revision numbers,
+command histories, and application hashes may differ.
+\end{lemma}
+\begin{IEEEproof}
+The executor builds the canonical body by changing only the declared funding slots and their openings. Transaction identity, claims, and input commitments stay fixed by the identity encoding of Eq.~\eqref{eq:protocol-identities}, and replacements keep the encoded width. The executor verifies the new openings, recomputes the block hash and part-set header of the revised body, and accepts only equality with the original BlockID. Base and Previous serialize competing canonical revisions, and the committed Task binds the permitted bytes. Successors reference transaction and output identities, so they need neither re-signing nor re-execution.
+
+Canonical reads the committed logical revision $\rho_\ell$, and an exact Task authorizes body and parts at revision $r\le\rho_\ell$. Installation advances if $\rho_p<r$, checks exact equality if $\rho_p=r$, and treats $\rho_p>r$ as covered without rollback. It writes no economic state and reads only the committed revision and task records, and queue progress crosses only completed entries. For legal schedules $\mu_1,\mu_2$ over one public prefix this gives
+\begin{equation}
+ \pi_{\mathrm{econ}}(S_{\mu_1})=\pi_{\mathrm{econ}}(S_{\mu_2}).
+ \label{eq:security-installation}
+\end{equation}
+The convergence statement follows from the uniqueness of each slot and part opening and the independence of part contexts from the revision counter. The supplement gives this argument and the comparison of follower updates and histories.
+\end{IEEEproof}
+
+\noindent\textbf{Reader scope.}
+These lemmas concern a replica whose own state ran the guards, so the reader of Section~\ref{sec:protocol-reader} trusts local state that executed them. A block that carries a \texttt{RepairBatch} which did not execute successfully confers no representation authority. An inclusion proof, an equal BlockID, or the chameleon relation alone does not show that a representation was authorized as of $H$. Serving untrusted remote readers would need authorization evidence tied to an authenticated state root or to proofs of original execution, which this paper does not define.
+
+\subsection{Protected Continuation and Progress}
+\label{sec:security-composition}
+
+Let $\mathsf{FreshRecv}(w,o,c)$ denote authenticated receipt by an honest owner who has not previously authorized consumption of that instance. Freshness is a history predicate and does not follow from successful receipt alone.
+
+\begin{theorem}[Protected continuation]
+\label{thm:security-continuation}
+Following FreshRecv, the certified output cannot be reinterpreted or
+consumed without owner authorization. A certified, publicly executed
+successor consumes a final source or atomically establishes a funded
+direct obligation. Source closure, compensation, and representation
+preserve its established principal effects without successor re-signing
+or re-execution.
+\end{theorem}
+\begin{IEEEproof}
+Lemma~\ref{lem:security-consumption} fixes ownership and excludes conflicting consumption, and atomic execution couples each missing consumption with its obligation and outputs. Theorem~\ref{thm:security-coverage} supplies funding, Theorem~\ref{thm:security-conservation} accounts for closure and late sources, Lemma~\ref{lem:security-original} identifies the executed history, Lemma~\ref{lem:security-resubmission} bounds resubmission, Lemma~\ref{lem:security-decision} bounds compensation, and Lemmas~\ref{lem:security-repair}--\ref{lem:security-installation} restrict later changes. Induction over the joint local and public transitions composes these properties. \texttt{INSTALL} retains local consumption effects and leaves public assets unchanged. A compensation decision may change Pending, fees, and reserve balances without repeating successor principal, and representation and physical installation change none of them.
+\end{IEEEproof}
+
+Continuation requires responsive honest quorums, available evidence, sufficient fees and Worker or work capacity, and fair delivery and inclusion. Partial approvals and unused promises can retain capacity, and timeouts never authorize unlocking. These are progress conditions without a universal completion deadline. Three conditions are separate: resubmission of a source, economic closure of an obligation, and completion of its representation.
+
+\begin{lemma}[Economic closure does not wait for adaptation]
+\label{lem:security-closure}
+An outstanding direct obligation can be closed by its public
+compensation decision once its public deadline is reached and the
+decision is included, provided the original history at its location, the
+issuer's reserve, and the consumer's fee escrow are available. This
+transition requires no adaptation contribution. Completion of the
+representation separately requires valid adaptation material, a current
+canonical revision, and progress of public submission and local physical
+installation.
+\end{lemma}
+\begin{IEEEproof}
+The decision path validates the obligation and the historical slot and performs accounting without an adaptation endpoint. The reserve suffices by Theorem~\ref{thm:security-coverage}, and the admission rule reserves one compensation charge per certified input within the consumer's escrow. Unavailable adaptation therefore blocks neither the decision nor a later repayment. The threshold service needs three valid contributions from the four fixed holders; three responding honest holders suffice, and a Byzantine holder may also supply a valid contribution. Shared execution resources and public ordering still govern latency, so the statement separates protocol dependencies and gives no completion-time bound.
+\end{IEEEproof}
+
+\noindent\textbf{Availability and guarantor risk.}
+Safety, progress, and economics are separate questions.
+
+\emph{Safety.} Theorem~\ref{thm:security-coverage} bounds the outstanding CAL liability
+of all certified payments, including unpublished ones.
+
+\emph{Progress.} A source advances when an honest relay holds its
+submission material (transaction, admission vector, organization
+authorization, direct input certificates) and the fee, capacity,
+quorum, and scheduling conditions hold; delivery time is unbounded. By
+Lemma~\ref{lem:security-resubmission}, at least two honest signers hold
+this material once an obligation is public. A deadline can still pass
+under congestion or a short outage. If the source is still absent when
+the compensation decision executes, the decision closes the obligation
+without adaptation (Lemma~\ref{lem:security-closure}); the issuer
+advances the missing principal, and the source repays it on execution.
+Representation completes when adaptation contributions are available.
+
+\emph{Economics.} When all sources of a payment set execute,
+Theorem~\ref{thm:security-neutrality} gives unchanged final holders and
+reserves. The approval endpoint authenticates owner, budget, and inputs
+and ignores the caller's role, so any client can act as collector.
+Because the original signers resubmit, a collector that withholds the
+certificate cannot by itself keep a source unexecuted once its successor
+has executed. A source stays unexecuted, and its compensated amount
+stays a loss of its issuer, only when the resubmitted payment fails to
+execute through unavailable followers, delivery, or inclusion, or
+through its own execution rules. Reserve sizing reflects the expected
+rate of such sources, and fees do not insure against them.

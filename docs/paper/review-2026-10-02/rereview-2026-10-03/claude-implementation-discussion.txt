@@ -1,0 +1,255 @@
+IEEE TDSC期刊论文大修后复审
+
+
+Share
+Claude finished the response
+
+Use the up and down arrow keys to move between messages.
+
+Load earlier messages
+Claude responded: 先更正一处我上一轮的判断：另一位评审给出的 Intent 两轮轨迹是对的。我原先认为"恶意方冻结的本金不少于所获赔付，因此无法获利"，这低估了问题。在那条轨迹里，攻击者每一轮的可花本金都保持不变，被冻结的输入随后由赔付资金"补回"成新的 final 输出。组织备付每轮真实减少 $v$，攻击者每轮只付手续费。这仍然受 …
+Settling disagreement scope between minor and major revisions.
+
+Settling disagreement scope between minor and major revisions.
+
+先更正一处我上一轮的判断：另一位评审给出的 Intent 两轮轨迹是对的。我原先认为"恶意方冻结的本金不少于所获赔付，因此无法获利"，这低估了问题。在那条轨迹里，攻击者每一轮的可花本金都保持不变，被冻结的输入随后由赔付资金"补回"成新的 final 输出。组织备付每轮真实减少
+𝑣
+v，攻击者每轮只付手续费。这仍然受
+𝐵
+𝑔
+B
+g
+	​
+
+ 和备付余额约束，所以定性为"有界、以费用为成本的备付耗尽型 griefing"比较准确，不是盗取或增发。这一更正会影响下面第 1 点和最终结论。
+
+1. 局部批准与释放规则的边界
+
+我确认您列出的这组边界。
+
+措辞更正："本金和 FUEL 都能取回，接近零成本"应改为：每轮付一笔真实的公共手续费（
+𝑇
+′
+T
+′
+ 的费用），
+𝑇
+T 从未执行所以不收费；CAL 本金和被
+𝑚
+1
+m
+1
+	​
+
+ 锁定的 FUEL 输入可以经其他三名成员复用。已支出的费用不可回收。
+触发条件：释放只能由一件事触发，即已验证的公共成功执行中，有一笔不同 TxID 的付款消费了
+𝑇
+T 的同一输入实例
+(
+𝑥
+,
+𝑖
+)
+(x,i)。安全性来自 Lemma "Authenticated, unique consumption"：
+𝑇
+′
+T
+′
+ 有 QC，因此
+𝑇
+T 永远不可能有 QC，
+𝑇
+∉
+𝐶
+𝑔
+T∈
+/
+C
+g
+	​
+
+。
+释放内容：只释放容量、Worker 切片和费用预留。批准记录和拒签状态必须永久保留，防止成员日后再为
+𝑇
+T 签名。
+𝑇
+T 其余未被消费输入上的锁按同一论证本可释放，但不是必需的，保守起见可以保留。
+不适用的情形：不能扩展到"不同输入、同一 Intent"的双 QC 冲突，因为该证书可能已经存在且背后有担保责任，Theorem "Potential liabilities are funded" 需要按
+𝑤
+𝑐
+=
+𝑎
+𝑐
+w
+c
+	​
+
+=a
+c
+	​
+
+ 计入。也不能因超时、停止 outbox 或赔付而释放。
+证据性质：以上全部按文档推导，我没有审过代码。
+
+2. C3 的需求
+
+我接受把标准从"无替代方案"改为"明确的用户任务，以及相对简单替代方案的价值"，也同意不应虚构监管需求，也不应把诚实本地读者包装成无状态远端证明。
+
+在保留三项贡献的前提下，我认为最小可接受的处理如下：
+
+(i) 把 C3 的贡献定位为一种机制及其已证明的性质：决定授权的表示、经济惰性、完整 BlockID 保持、安装独立性。它的价值在于安全性质，而不是性能。
+(ii) 写明具体任务：诚实副本的本地工具在原坐标读取区块正文时，正文本身就反映出闭合结果，无需重签、无需重执行，也不拖延经济闭合。
+(iii) 坦白说明索引给出等价答案，存储便宜两到三个数量级。
+(iv) 列出只有 C3 才需要的信任和实现成本：离线 dealer 和 Comet overlay。说明 C1/C2 不依赖这些。
+
+做到以上四点，我不再要求降级。保留的分歧是：我仍然认为 C3 是三项中最弱的一项，它的实际效用是否够得上"贡献"，应交编辑判断。我只把它记为审稿意见，不作为阻断项。
+
+3. A′ 是否必须
+
+不必须，前提有两个。第一，评估明确写成"本实现布局下的接口成本对照"，不宣称 CH 机制带来加速。第二，摘要和引言删去"representation lowers point-read P50 … mainly through block decoding"这类收益表述，或者改成带布局限定并与成本并列的表述。现稿正文已经写明 layout/reconstruction，误导风险主要在引言，改写即可。
+
+4. outbox 无限重试
+
+同意您的区分。本次实验中所有来源最终都已执行，outbox 排空的结论成立，与永久冲突轨迹并不矛盾。我上一轮称之为"与审计口径矛盾"，用词过重，撤回。它属于工程活性和资源问题，建议补一条终止条件：公共状态显示 Intent 已绑定到其他 TxID，或输入已被他人消费。终止重试不撤销任何责任：
+𝑎
+𝑐
+a
+c
+	​
+
+ 继续占用，义务照常走赔付。这也与第 1 点的"不因停止 outbox 而释放"一致。
+
+5. 密码学前提
+
+同意。我的评审并没有提出"少于门限者绝不可能适配"这一前提，也不需要它。公开的 opening ratio 本来就可以复用，授权来自成功执行的 Decision 和绑定确切字节的 Task。所需的最小接口可以按另一位评审的列法写：参数与编码正确；opening=1 下的原始承诺依赖上下文绑定 FDH 的抗碰撞性，因此即使 dealer 持有陷门也不影响原始执行的唯一性；合法适配可组合、可公开验证；唯一 opening 只用于证明不同分组得到相同结果；三名有效持有者足以保证可用性。我提到 dealer，只是把它作为 C3 的部署信任成本，不是安全前提。
+
+最终结论
+
+第 3、4、5 点已经收敛。第 2 点在作者按上述最小改写后不再阻断。
+
+真正保留的分歧在 C-1。它需要一条新的协议规则、配套引理和回归测试，而且作者尚未确认实现中不存在等价的释放路径。再加上 Intent 路径需要补充累计暴露上界和部署层准入说明，我维持轻度大修。
+
+我也明确给出转为小修的条件：作者确认实现已有等价释放路径，或者加入上述规则并补引理和回归；同时补两条预算耗尽路径的上界说明。满足这些，我就同意小修。两位评审之间的差距本质上只在 C-1 应该"修"还是"披露"。我的理由是这里存在一个安全、局部、很便宜的修复，而攻击者付出的只是手续费。
+
+
+
+
+
+
+22 minutes ago
+Load later messages
+Claude responded: 结论： 这条极小路径足以关闭我列为 major 的 C-1，前提是下面"必须做"的各项全部落实。做到之后，我按上一轮的承诺改判为小修。outbox 留作已披露的工程限制，Intent 留作有界预算耗尽的披露项，两者都不再阻断。Invalidated、SupersededBy、Height 加独立回收函数的设计是合适的。
+Drawing the lines between fixed, optional, and unclaimed guarantees.
+
+Drawing the lines between fixed, optional, and unclaimed guarantees.
+
+结论： 这条极小路径足以关闭我列为 major 的 C-1，前提是下面"必须做"的各项全部落实。做到之后，我按上一轮的承诺改判为小修。outbox 留作已披露的工程限制，Intent 留作有界预算耗尽的披露项，两者都不再阻断。Invalidated、SupersededBy、Height 加独立回收函数的设计是合适的。
+
+表述更正。 我说的"F′ 有 QC"不够准确，应改为：委员会成功执行（Code=0 且 Applied）的 DirectSubmission，其执行前验证已经要求该付款携带同配置组织 SpendQC，即该配置下 3 名不同成员对 F′ 的 fact 的有效签名。这不涉及 TXCer 正文。
+
+"T 永无组织授权"的证明前提是以下五条：
+
+该配置的 4 名成员中至多 1 名是 Byzantine，签名不可伪造。
+诚实成员在签名前原子写入 Candidate。对同一个 DirectSpendKey，只要 Candidate 指向别的 fact，或 Consumed 非空，就拒签；签名状态不遗忘、不回滚。
+除公共执行时覆盖为 Consumed 之外，任何路径都不清除 Candidate。我只看了你给出的文件，快照恢复和旧入口需要你们自查。
+成员信任的委员会结果是经认证块给出的（VerifyBlock 加上 Lemma "Original-execution agreement"）。
+T 与 F′ 属于同一配置，并且有一个共享的 spend key，可以是普通输入，也可以是手续费输入。
+
+由此可得：T 的任何法定授权都会与 F′ 的签名者相交于至少一名诚实成员，而这名成员不可能为同一个 key 签两个 fact。这一结论与时间先后无关。
+
+必须做
+
+在 applyPayment 两个覆盖循环之前，先读出旧 Candidate，按 fact 去重。
+前置检查：同配置；TxID 不同；T 处于 Unsettled 且未失效，Paid==0，Pending==0。若出现 TxID 相同而 fact 不同，或 Paid>0，返回错误，不做释放。
+回收时复用 localApplied 的边界，单调写入 Applied=Cap，不触碰 Fee。
+在 ApproveDirectBytes 的幂等快捷路径之前检查 Invalidated。recoverExposedSources 遇到已失效的 T，或 T 本身被执行，都报错。
+DirectStoreSchema 升到 8；更新 audit 与 Outcome 的口径。
+新增一条引理，说明被取代的批准不存在组织授权；Theorem "Potential liabilities are funded" 中的
+𝐴
+𝑚
+,
+𝑔
+A
+m,g
+	​
+
+ 排除已失效批准。
+测试：1 票 T 对 3 票 T′ 的正例与后续 3 签；仅手续费输入冲突；两种付费模式；独立输入同 Intent 的负例；同块、多输入、重启、旧 schema 的幂等；迟到 INSTALL 与迟到批准。
+论文：在 §IV-C、§V-C、§V-G 中写明规则与范围；评估节说明 721800c 不含这一规则；补 Intent 的累计暴露上界；写明永久冲突时 outbox 会持续重试。
+
+建议但不必须： 在失效分支本地复验 F′ 的 SpendQC（3 次签名验证，只发生在触发路径上），从而不依赖第 4 条前提。
+
+不必做： outbox 终止或退避，以及网关 Early 任务；释放剩余输入锁；在 Intent 冲突时释放；以 INSTALL 作为触发；改网关；重跑矩阵。冒烟只用作回归检查，不报告数字。
+
+不能过度声称的三条边界
+
+这只关闭"输入随后被同配置冲突付款成功消费"的局部批准占用。对于输入仍处于冻结状态的局部批准（例如两人已锁），以及 Intent 冲突导致的预算耗尽，系统依然暴露，最多耗尽
+𝐵
+𝑔
+B
+g
+	​
+
+ 与备付余额。不能声称系统抗 griefing。
+证明只在上述前提下成立，限于同一配置，不覆盖跨 epoch 或跨配置，也不是完整的实现精化证明。
+已报告的性能数字来自不含此规则的 721800c。新构建只做了功能验证，不能声称"性能不变"，也不能声称"负载下已验证该路径"。永久冲突的补交任务（含 Early 内存任务）可能无限重试；这没有经济效果，但也不是终局。
+
+
+
+
+
+6 minutes ago
+You said: GPT已回复：它也支持同输入局部回收、原Slice的Cap-Applied、无FeeClose/余额改变、旧批准保留；额外强调核对Approval确实含冲突输入，未Observed/无Install及member outbox/无经济费用进展。它初版希望本轮另做PublicIntent全网镜像+outbox终态。我已…
+
+GPT已回复：它也支持同输入局部回收、原Slice的Cap-Applied、无FeeClose/余额改变、旧批准保留；额外强调核对Approval确实含冲突输入，未Observed/无Install及member outbox/无经济费用进展。它初版希望本轮另做PublicIntent全网镜像+outbox终态。我已把你提出的范围与全网状态成本反馈给它，建议本轮保留披露而不扩展。我的裁定采用你们共同的核心，LocalProgress.Invalidated即可，独立回收函数，Shared Applied；不同输入同Intent不回收。另更正一点：本地再验SpendQC不能替代可信公共成功执行证据，本轮不加重复验签。请确认无遗漏的关键反例即可。
+
+1 minute ago
+
+
+
+Claude responded: 确认：在你们裁定的范围内，我没有发现会破坏回收安全性的关键反例。关于本地再验 SpendQC，我上一轮只是把它当作附加防御提出，从来不是替代；本轮不做，我同意。释放的前提仍然是认证块中那次成功的同配置公共消费。
+Checking that accounting failures close safely by default.
+
+Checking that accounting failures close safely by default.
+
+确认：在你们裁定的范围内，我没有发现会破坏回收安全性的关键反例。关于本地再验 SpendQC，我上一轮只是把它当作附加防御提出，从来不是替代；本轮不做，我同意。释放的前提仍然是认证块中那次成功的同配置公共消费。
+
+下面几项请写进实现和测试，避免遗漏：
+
+矛盾一律报错，不能只跳过。 GPT 提出的几项核对我同意，命中任何一项都说明 T 已有组织授权或已执行，与引理矛盾，应直接停止 follower：
+T 的 Approval 中并不含该 spend key（检查须同时覆盖普通输入和手续费输入的 key）；
+存在 Observed[T]；
+存在 KeyInstall[T]；
+成员 outbox 中有 T 的条目；
+Settled、Paid、Pending 中任一不为零。
+相反，配置不同的情况应当跳过、不释放：旧 epoch 下的批准继续占用额度，不报错。
+另外两个入口要显式拒绝 Invalidated。
+applyRepairEffect：它会按 ParentFact 加载 Approval。
+applyPayment：T 本身被执行时。
+如果 finishLocal 保持不变，这两条路径在 target < Applied 时其实已经会以 ErrAccounting 失败关闭。但仍建议写成显式检查，不要依赖这个副作用，以后改动 finishLocal 时才不会被打开。
+幂等以 Invalidated 为准。
+回收函数先检查 Invalidated，已失效则直接返回。
+回收量 delta = Cap − localApplied，回到原 SliceKey(d.Key, d.Worker)。这样旧 Debit.Applied 的累计值也能正确处理。
+同块多次命中、多输入指向同一 T、重放、重启这几种情况都要有测试覆盖。
+同 TxID、不同 fact 时报错。 这既不是释放条件，也不应静默跳过。
+
+此外两个已确认的点：Gateway 不需要改，因为 T 没有 QC，就不会有 KeyCollected。"不同输入、同 Intent"保持不回收，论文中按有界预算耗尽予以披露即可。
+
+以上落实后，我对 C-1 的关闭判断不变，整体建议为小修。
+
+
+
+
+
+
+just now
+
+Write a message…
+
+
+
+
+
+
+
+Opus 5.5 High

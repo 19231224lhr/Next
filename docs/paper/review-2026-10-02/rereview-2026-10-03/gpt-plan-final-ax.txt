@@ -1,0 +1,65 @@
+Browser tab: 5, Title: "Model inquiry", URL: "https://chatgpt.com/c/6abf8dba-7c90-83ec-909e-277092659628".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 2017, 2021-2022
++							2021 button See versions
++							2022 button Edit message
++								2023 image
++							2024 pop up button (collapsed) Description: Regenerate response, ID: radix-_r_1dq_, Secondary Actions: Expand
++							2025 button Edit message
++								2026 image
++							2027 pop up button (collapsed) Description: Regenerate response, ID: radix-_r_1dv_, Secondary Actions: Expand
++							2028 button Edit message
++								2029 image
++							2030 pop up button (collapsed) Description: Regenerate response, ID: radix-_r_1e4_, Secondary Actions: Expand
++							2031 button Edit message
++								2032 image
++							2033 pop up button (collapsed) Description: Regenerate response, ID: radix-_r_1e9_, Secondary Actions: Expand
++							2034 button Edit message
++								2035 image
++							2036 container
++								2037 button (collapsed) Worked for 1m 20s, Secondary Actions: Expand
++								2038 text Worked for 1m 20s
++							2039 heading ChatGPT said:, Value: 4
++								2040 text ChatGPT said:
++							2041 heading 最终裁定, Value: 2
++								2042 text 最终裁定
++							2043 text 接受本轮仅修C1局部批准回收，将outbox终止列为独立后续项。
++							2044 text  outbox涉及成员持久队列、网关 directPending/Early 内存及“赢家先执行、任务后创建”的竞态，范围明显更大；永久Intent冲突持续重试可作为已披露工程限制，不再构成当前major blocker。成功实验的outbox排空也不与该限制矛盾。 LocalProgress 方案可行，但必须满足以下边界：
++							2045 content list
++								2046 container
++									2047 AXListMarker 1.
++									2048 text 不得合并两类语义。 Invalidated/SupersededBy 只能表示“同配置、同一输入实例已被另一成功公共付款消费”。独立输入、相同Intent的失败QC不得置为Invalidated，更不得释放责任或容量。
++								2049 container
++									2050 AXListMarker 2.
++									2051 text 建议使用 InvalidatedHeight ，不要复用现有 Height ；后者已有付款结算高度语义。若坚持复用，必须以 Settled 与 Invalidated 互斥作为持久化不变量。
++								2052 container
++									2053 AXListMarker 3.
++									2054 text 触发点应位于 applyPayment 覆盖旧 Spend.Candidate 之前；仅接受已验证、 Code=0 、 Applied=true 、当前组织SpendQC、不同Fact/TxID及相同 OutputID+Instance 。当前代码确实会直接覆盖Spend，且已有Approval的幂等快捷返回早于冲突检查。
++									2055 button Open preview of Pasted text.txt
++									2056 button Open preview of Pasted text.txt
++								2057 container
++									2058 AXListMarker 4.
++									2059 text 必须重新加载原Approval并核对其正文确实包含该实例；普通输入与用户FUEL输入均覆盖，按Candidate Fact去重。若已Observed、Settled、存在Pending/Paid/Recovered、费用效果、Install或outbox，应视为状态矛盾并停止Follower，不能释放。
++								2060 container
++									2061 AXListMarker 5.
++									2062 text 仅将每个Debit的 Cap-Applied 退回原 ResourceKey/Grant/Worker ，并令 Applied=Cap ；不伪造Settled、不调用FeeClose、不改Approval、不清除其他输入锁。
++								2063 container
++									2064 AXListMarker 6.
++									2065 text ApproveDirectBytes 在“已有Approval直接成功”前必须检查Invalidated并永久拒签。
++								2066 container
++									2067 AXListMarker 7.
++									2068 text Schema升级和重启幂等测试不可省略。  最小回归包括1票T/3票T′、独立输入同Intent负例、多输入去重、普通/FUEL输入、重复跟块及重启后不二次退款。
++							2069 text 本轮无需重跑性能实验。论文只需新增窄引理：成功公共赢家证明同输入局部Approval不可能形成有效QC，因此可释放本地容量；timeout仍不授权释放。永久Intent冲突的QC责任、输入锁和容量继续保留。
++							2070 button Copy
++								2071 image
++							2072 button Rate response
++								2073 image
++							2074 button Share
++							2075 checkbox Description: Read aloud, Value: 0
++							2076 pop up button (collapsed) Description: Regenerate response, ID: radix-_r_1ep_, Secondary Actions: Expand
++							2077 pop up button (collapsed) Description: More actions, ID: radix-_r_1et_, Secondary Actions: Expand
++							2078 button Sources
+~								2020 button Dictate
++								2079 button Start Voice
++		2080 text Response complete
+The focused UI element is 0 AXWebArea Model inquiry, URL: chatgpt.com/c/6abf8dba-7c90-83ec-909e-277092659628

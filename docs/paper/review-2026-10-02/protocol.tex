@@ -23,7 +23,7 @@ Owner signatures authenticate $\mathsf{id}(T)$ and stay outside its computation,
 
 Under one Network and Subject, an honest wallet uses a fresh payment nonce for every new payment, across organizations and instances; a retry resubmits the same payment with its original authorization. A wallet must not change the nonce and reuse an old certificate, and two facts that share an intent are not merged into one guarantee. The experimental drivers derive nonces from input identities, which is not a general multi-device nonce allocation service.
 
-A member checks ownership, routes, direct input certificates, value conservation, and the admission vector. One local transaction rechecks the input locks, final fee inputs, and the designated Worker's resource slices and records the approval with its exact debits; the approval keeps the transaction, admission vector, and direct input certificates of the request (Section~\ref{sec:protocol-resubmission}). CAL reservation equals $a_T$ including change even when every principal input is final, since each certified output may circulate before the payment executes. The member signs after the transaction commits, a retry reuses the approval, and releasing resource capacity keeps the consumption locks.
+A member checks ownership, routes, direct input certificates, value conservation, and the admission vector. One local transaction rechecks the input locks, final fee inputs, and the designated Worker's resource slices and records the approval with its exact debits; the approval keeps the transaction, admission vector, and direct input certificates of the request (Section~\ref{sec:protocol-resubmission}). CAL reservation equals $a_T$ including change even when every principal input is final, since each certified output may circulate before the payment executes. The member signs after the transaction commits, a retry reuses a non-invalidated approval, and releasing resource capacity keeps the consumption locks.
 
 The collector sends one canonical request to four members and returns after verifying three signatures over the same $c_T$; different valid subsets give the same fact. The recipient checks the TXCer against the output body, index, owner, and trusted configuration, records the coin atomically, and can construct a successor request at once, carrying its direct input certificates in place of the ancestor chain.
 
@@ -97,9 +97,35 @@ Members reconstruct progress from authenticated consecutive blocks and results, 
   \end{aligned}
   \label{eq:protocol-release}
 \end{equation}
-where ``settled'' means that the member has observed its own payment execute successfully, and $\widehat{p}_{m,T}$ and $\widehat{\mathsf{Rec}}_{m,T}$ are the compensation and repayment recorded locally for that approval's outputs. On observing the execution of its payment, the member checks that the repayment in the authenticated result covers $\widehat{p}_{m,T}$ and sets $\widehat{\mathsf{Rec}}_{m,T}=\widehat{p}_{m,T}$, since that execution repays every compensated output of $T$; a member that approved $T$ after following the compensation recorded none. After checking bounds and monotonicity, it moves $\delta_{m,T}$ from Reserved to Available in the original Worker and updates Applied. Pending inputs leave CAL release unaffected, since their issuers carry those liabilities, and work resources wait for fee closure. An unexecuted source keeps its full CAL amount, including change, reserved at each approving member. A compensation does not release it, and a partial approval keeps its debit. Spent FUEL is not restored as unspent fee. Repeated blocks and late material cannot repeat a credit, and an unexecuted source receives a release only through its own execution. A wallet records a repaid output as a terminal observation without certificate, final creation, or balance.
+where ``settled'' means that the member has observed its own payment execute successfully, and $\widehat{p}_{m,T}$ and $\widehat{\mathsf{Rec}}_{m,T}$ are the compensation and repayment recorded locally for that approval's outputs. On observing the execution of its payment, the member checks that the repayment in the authenticated result covers $\widehat{p}_{m,T}$ and sets $\widehat{\mathsf{Rec}}_{m,T}=\widehat{p}_{m,T}$, since that execution repays every compensated output of $T$; a member that approved $T$ after following the compensation recorded none. After checking bounds and monotonicity, it moves $\delta_{m,T}$ from Reserved to Available in the original Worker and updates Applied. Pending inputs leave CAL release unaffected, since their issuers carry those liabilities, and work resources wait for fee closure. An unexecuted certified source keeps its full CAL amount, including change, reserved at each approving member; compensation alone does not release it. Spent FUEL is not restored as unspent fee. Repeated blocks and late material cannot repeat a credit. A wallet records a repaid output as a terminal observation without certificate, final creation, or balance.
 
 An authorized reserve increase debits an external, unprotected CAL account, credits the reserve, and raises its grant atomically. Each member adds the difference between the new and old $\lfloor2B_g/3\rfloor$ shares while Reserved and its approvals stay in place, and aggregate backing checks cover all grants that share an account.
+
+\noindent\textbf{Superseded partial approvals.}
+Equation~\eqref{eq:protocol-release} governs normal settlement and
+repayment.  A separate local terminal transition applies when an
+authenticated, successfully applied public payment under the same
+organization configuration consumes an ordinary or user-funded fee
+input instance that the member had locked for a different fact.
+Before replacing the local spend candidate, the follower reloads the
+immutable approval and checks the exact output instance, the distinct
+fact and transaction, and the absence of observed execution, installed
+or queued certificate material, pending obligations, compensation,
+recovery, or any fee effect.
+
+The member then returns, for every recorded local debit $d$, exactly
+$d.\mathsf{Cap}-\mathsf{Applied}$ from Reserved to Available in the
+original resource slice and records the approval as invalidated by the
+first successful conflicting fact and height.  It does not set
+\textsf{Settled}, close a fee escrow, modify the approval, clear other
+input locks, or change public state.  The cumulative
+$\mathsf{Applied}$ vector makes the transition idempotent when several
+inputs of one approval conflict or a block is replayed. Retries and late
+\texttt{INSTALL} are rejected. Exposure of an invalidated fact as a
+purported certified source is treated as an accounting contradiction
+and stops the follower under the stated fault model.
+A timeout, \texttt{INSTALL} alone, or a global Intent
+conflict between disjoint inputs does not authorize this release.
 
 \subsection{Source Resubmission from Public Certificates}
 \label{sec:protocol-resubmission}

@@ -1,0 +1,901 @@
+- link "Skip to content":
+  - /url: "#_R_3ndjqctdbntccged79l75_"
+- main:
+  - button "Show sidebar":
+  - button "New chat":
+  - button "Share":
+    - text: Share
+  - button "More":
+  - button "Toggle summary":
+  - status:
+    - generic: Loading older messages…
+  - heading "You said:" [level=4]
+  - button "Pasted text(1).txt"
+  - generic "Pasted text(1).txt"
+  - generic: Document
+  - generic: 请阅读附件中的当前真实代码与A—D问题，独立制定小范围大修实施计划。此轮不要求写业务代码，也不扩大实验。
+  - button "Copy message":
+  - button "Share prompt":
+  - button "Edit message":
+  - button "Worked for 6m 51s"
+  - generic: Worked for 6m 51s
+  - heading "ChatGPT said:" [level=4]
+  - heading "小范围大修实施计划" [level=2]
+  - paragraph: 总体分为两个独立补丁：
+  - list:
+    - strong: 同输入冲突后的局部批准释放
+    - text: ：解决单成员容量永久占用。
+    - strong: 永久公共冲突后的outbox终止
+    - text: ：停止无意义重试，但绝不释放仍可能对应QC责任的容量。
+  - paragraph: 二者可分两个提交实现，但建议在同一轮大修中关闭；无需重跑原性能矩阵。
+  - separator
+  - heading "A．同输入冲突后的局部批准释放" [level=2]
+  - heading "现状与落点" [level=3]
+  - paragraph:
+    - text: 当前 ApproveDirectBytes 发现已有Approval后会直接成功返回，发生在Observed、Intent及Spend检查之前；因此新增终态必须在该快捷路径中先检查。批准时，普通输入和用户FUEL输入均写入Spend.Candidate。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - paragraph:
+    - text: finishLocal目前仅在付款Settled时释放CAL，在费用Closed时释放其他资源；不能伪造这两个状态来释放冲突Approval。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - heading "最小设计" [level=3]
+  - paragraph: 在 internal/state/records.go 新增：
+  - list:
+    - listitem: KeyFactTerminal
+    - listitem: "FactTerminal{Reason, WinnerFact, WinnerTx, Height, Released}"
+    - text: 原因至少区分：
+    - list:
+      - listitem: ConflictingSpend
+      - listitem: PublicIntentConflict
+  - paragraph: Approval保持字节不变。LocalProgress.Applied继续作为累计释放量。
+  - paragraph:
+    - text: 在 internal/member/blocks.go::applyPayment 中，
+    - strong: 在覆盖Spend记录之前
+    - text: ：
+  - list:
+    - listitem: 仅处理已验证块中 Code=0 && result.Applied=true 的普通付款。
+    - listitem: 要求执行付款属于本成员配置。
+    - listitem: 扫描其普通输入及用户FUEL输入；FUEL实例固定为0。
+    - text: 对每个Spend读取原Candidate：
+    - list:
+      - listitem: Candidate非零；
+      - listitem: Candidate不同于执行Fact；
+      - text: 与执行付款消费的是
+      - strong: 同一个OutputID和Instance
+      - text: 。
+    - listitem: 按Candidate Fact去重；一个Candidate即使与多个输入冲突，也只处理一次。
+    - text: 加载Candidate Approval并校验：
+    - list:
+      - listitem: Approval.Fact匹配；
+      - listitem: Direct非空且属于同一配置；
+      - listitem: 原付款确实包含该冲突输入；
+      - listitem: 未Observed、未Settled；
+      - listitem: 无KeyInstall及member outbox。若存在完整证书材料，说明与唯一消费假设冲突，应停止Follower，而不是释放。
+    - text: 要求没有经济或费用进展：
+    - list:
+      - listitem: Pending=Paid=Recovered=0
+      - listitem: Settled=false
+      - listitem: Fee没有Rewards、Burned、Held或已完成阶段。
+    - text: 对每个Debit按已有累计值释放：
+    - math:
+      - generic: Δ
+      - generic: i
+      - generic: =
+      - generic: C
+      - generic: a
+      - generic: p
+      - generic: i
+      - generic: −
+      - generic: A
+      - generic: p
+      - generic: p
+      - generic: l
+      - generic: i
+      - generic: e
+      - generic: d
+      - generic: i
+    - text: Δ
+    - generic: i
+    - text: =
+    - generic: Cap
+    - generic: i
+    - text: −
+    - generic: Applied
+    - generic: i
+    - text: 仅更新原 SliceKey(d.Key,d.Worker) 的Reserved/Available及Applied。
+    - listitem: 写入FactTerminal(ConflictingSpend)。
+  - paragraph:
+    - strong: 全部资源类型都可释放剩余预留
+    - text: ，因为该付款没有执行：CAL、work、Bytes及未使用的FUEL/Policy额度。这里的Bytes是调度额度，不是删除Approval后腾出的精确磁盘字节。不得：
+  - list:
+    - listitem: 调用FeeClose；
+    - listitem: 生成退款或恢复真实已支出FUEL；
+    - listitem: 删除Approval；
+    - listitem: 解锁未被公共付款消费的其他输入。
+  - paragraph: ApproveDirectBytes发现已有Approval后，应先读终态；存在任何终态均返回ErrConflict，不得再次签名。
+  - heading "不安全做法" [level=3]
+  - list:
+    - text: 不能用timeout、HTTP拒绝或INSTALL作为释放证据。INSTALL会写Consumed并保留Candidate，但不是公共执行。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - listitem: 不能因“独立输入但相同Intent”释放容量；两个QC在该情形可以共存。
+    - listitem: 不能仅凭Candidate字段释放，必须核对Approval确实使用了同一输入实例。
+  - separator
+  - heading "B．证明边界与幂等性" [level=2]
+  - paragraph: 新增一个窄引理：
+  - blockquote:
+    - paragraph:
+      - text: 在四成员、三签、至多一名恶意成员模型下，若成功公共付款
+      - math:
+        - generic: T
+        - generic: ′
+      - text: T
+      - generic: ′
+      - text: 消费了某输入实例，且诚实成员此前为不同付款
+      - math:
+        - generic: T
+      - generic: T
+      - text: 锁定并批准了同一实例，则
+      - math:
+        - generic: T
+      - generic: T
+      - text: 不可能拥有有效QC。
+  - paragraph: 理由是两个3签QC至少相交两人，其中至少一名诚实成员将为同一输入双签，违反锁定规则。该结论同样适用于使用相同DirectSpendKey的用户FUEL输入。
+  - paragraph:
+    - text: 由此，
+    - math:
+      - generic: T
+      - generic: ∉
+      - generic: C
+      - generic: g
+    - text: T
+    - generic: ∈
+    - generic: /
+    - text: C
+    - generic: g
+    - text: ，释放该成员对
+    - math:
+      - generic: T
+    - generic: T
+    - text: 的剩余本地Debit不会削弱Theorem 1对任何证书责任的覆盖。证明只覆盖：
+  - list:
+    - listitem: 同配置；
+    - listitem: 同输入实例；
+    - listitem: 成功且Applied的公共付款；
+    - listitem: 不同Fact/TxID。
+  - paragraph: Theorem 1中将局部Approval集合区分为“仍活跃”与“已由冲突消费证明不可能形成QC”；后者残余容量可为0。进展段改为：
+  - blockquote:
+    - paragraph: partial approval不会因时间流逝释放，但可在认证公共历史证明其冲突输入已由另一有效付款消费后终止。
+  - paragraph: 多输入及重放幂等：
+  - list:
+    - listitem: 先收集map[CandidateFact][]SpendKey，再统一释放；
+    - listitem: FactTerminal.Released和Applied防止重复退款；
+    - listitem: 同块多个付款按Overlay顺序处理；
+    - text: blockfollow对同高度同哈希本身也为无效果重放。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - separator
+  - heading "C．outbox永久冲突终止" [level=2]
+  - paragraph:
+    - text: 当前来源恢复仅检查Observed与现有Outbox；Intent永久冲突不会停止重建。网关也只删除成功Fact自身的outbox，relay则每两秒继续提交。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - heading "最小索引" [level=3]
+  - paragraph: 新增本地持久记录：
+  - list:
+    - listitem: "KeyPublicIntent(Intent) -> {TxID, Fact, Height}"
+    - listitem: KeyOutboxIntent(Intent) -> Fact
+  - paragraph: Outbox增加Intent和TxID字段，或通过旁路索引保存；不做逐块全表扫描。
+  - paragraph:
+    - text: 成员和网关在跟随
+    - strong: 成功公共付款
+    - text: 时，对所有组织的付款记录PublicIntent。若本地outbox具有相同Intent但不同TxID：
+  - list:
+    - listitem: 删除outbox及反向索引；
+    - listitem: 清理安装重试内存；
+    - listitem: 写FactTerminal(PublicIntentConflict)；
+    - strong: 不释放Approval Debit、不释放输入锁、不删除QC责任
+    - text: 。
+  - paragraph: 以下所有创建入口必须先检查PublicIntent/终态：
+  - list:
+    - listitem: recoverExposedSources
+    - listitem: InstallDirectClassified
+    - listitem: persistDirect
+  - paragraph: 迟到INSTALL、Persist及公开证书再次曝光均不得重建outbox。
+  - paragraph: 该补丁可作为第二提交，但不宜留到下一审稿周期。若只完成局部批准释放，必须在论文中保留“永久Intent冲突可能无限重试”的已知限制。
+  - separator
+  - heading "D．最小验收集" [level=2]
+  - heading "必须测试" [level=3]
+  - list:
+    - paragraph:
+      - strong: 1票T / 3票T′
+    - list:
+      - listitem: 四名真实成员；
+      - listitem: T与T′消费同一输入；
+      - listitem: T仅成员0批准，T′由成员1–3形成QC并公共执行；
+      - listitem: 成员0全部Debit仅释放一次；
+      - listitem: Approval原字节不变；
+      - listitem: 输入状态为T′已消费；
+      - listitem: 重试T被拒绝；
+      - listitem: 随后新合法付款可再次获得包含成员0的3签。
+    - paragraph:
+      - strong: 独立输入同Intent负例
+    - list:
+      - listitem: 两个QC均有效；
+      - listitem: 公共赢家产生后，输家outbox终止；
+      - listitem: 输家CAL/work容量和输入锁不得释放。
+    - paragraph:
+      - strong: 幂等与持久化
+    - list:
+      - listitem: 重复跟随同块；
+      - listitem: 数据库关闭重启；
+      - listitem: 终态、Applied及Slice不发生二次退款；
+      - listitem: 旧二进制不得忽略终态。
+    - paragraph:
+      - strong: 多输入去重
+    - list:
+      - listitem: 一个Candidate通过多个普通/fee输入与赢家冲突；
+      - listitem: 整个Approval仅释放一次。
+    - paragraph:
+      - strong: 晚消息
+    - list:
+      - listitem: 终态后INSTALL、Persist、证书曝光均不能重建outbox；
+      - listitem: HTTP错误不是终局证据，本地已验证公共记录才是。
+    - paragraph:
+      - strong: 费用模式
+    - list:
+      - listitem: 用户FUEL输入冲突；
+      - listitem: 组织代付模式；
+      - listitem: 不新增余额、不恢复真实费用。
+  - heading "Schema" [level=3]
+  - paragraph:
+    - text: DirectStoreSchema应升级，并提供窄的v7→v8迁移或明确拒绝旧库；不能让旧二进制忽略终态。现有测试已表明项目重视这种降级保护。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - heading "实验" [level=3]
+  - paragraph:
+    - text: 不重跑②③④矩阵。可加一轮现有工具的
+    - strong: 100 TPS、10秒冒烟
+    - text: ，只作为死锁、排空和状态一致性回归，不写入论文性能结果。
+  - separator
+  - heading "论文最小修改" [level=2]
+  - list:
+    - text: 协议节加入两类终态：
+    - list:
+      - listitem: 同输入公共冲突：无QC可能，释放局部容量；
+      - listitem: 独立输入Intent冲突：QC可能存在，只停止重试，不释放责任。
+    - listitem: 安全节加入上述窄引理，并调整Residual Capacity/Theorem 1对失效局部Approval的定义。
+    - listitem: 进展节明确timeout永不解锁，只有认证公共事实可终止。
+    - listitem: 补充材料列出新提交、Schema和定点回归；旧721800c性能数字继续按原构建标注，不静默改称新构建结果。
+  - paragraph:
+    - strong: 停止条件：两类终态不会混用；局部容量仅在“同输入＋成功公共赢家”证据下释放；Intent输家只停重试；重启和重放均无二次退款或outbox复活。
+  - button "Copy":
+  - button "Rate response":
+  - button "Share":
+  - button "Read aloud":
+  - button "Regenerate response":
+  - button "More actions":
+  - button "Sources":
+  - heading "You said:" [level=4]
+  - generic: 交叉评议并最终裁定（请简答约600字，不重新全面推演）：Claude读了同一代码后同意局部释放，建议本轮只修C1，不动outbox。理由：全网PublicIntent复制给每成员/网关增加随全网流量增长的永久存储；反向索引又漏掉赢家先执行、outbox后创建。它接受永久冲突持续重试作为已披露工程限制，不再作为major blocker。你是否接受把outbox列为独立后续项，以符合用户明确“范围较窄、针对额度回收”？实际优化gateway.directPending还会回退Early内存，不止持久outbox，所以终止补丁范围更大。选定方案倾向LocalProgress.Invalidated/SupersededBy/Height，不新建通用FactTerminal并合并两类语义；Applied仍唯一回收计数。我们会采纳你的原Approval输入核对、无经济进展、原Slice退款、schema升级及负例。已核实VerifyDirectSubmission验证当前组织SpendQC，所以证明前提是同配置组织授权，不是新TXCer正文。请给出是否接受此最小边界及必须额外补的点；不需重新重复方案。
+  - generic: …
+  - button "Show more":
+    - generic: Show more
+  - button "Copy message":
+  - button "Share prompt":
+  - button "Edit message":
+  - button "Worked for 1m 20s"
+  - generic: Worked for 1m 20s
+  - heading "ChatGPT said:" [level=4]
+  - heading "最终裁定" [level=2]
+  - paragraph:
+    - strong: 接受本轮仅修C1局部批准回收，将outbox终止列为独立后续项。
+    - text: outbox涉及成员持久队列、网关directPending/Early内存及“赢家先执行、任务后创建”的竞态，范围明显更大；永久Intent冲突持续重试可作为已披露工程限制，不再构成当前major blocker。成功实验的outbox排空也不与该限制矛盾。
+  - paragraph: LocalProgress方案可行，但必须满足以下边界：
+  - list:
+    - strong: 不得合并两类语义。
+    - text: Invalidated/SupersededBy只能表示“同配置、同一输入实例已被另一成功公共付款消费”。独立输入、相同Intent的失败QC不得置为Invalidated，更不得释放责任或容量。
+    - listitem: 建议使用InvalidatedHeight，不要复用现有Height；后者已有付款结算高度语义。若坚持复用，必须以Settled与Invalidated互斥作为持久化不变量。
+    - text: 触发点应位于applyPayment覆盖旧Spend.Candidate之前；仅接受已验证、Code=0、Applied=true、当前组织SpendQC、不同Fact/TxID及相同OutputID+Instance。当前代码确实会直接覆盖Spend，且已有Approval的幂等快捷返回早于冲突检查。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - listitem: 必须重新加载原Approval并核对其正文确实包含该实例；普通输入与用户FUEL输入均覆盖，按Candidate Fact去重。若已Observed、Settled、存在Pending/Paid/Recovered、费用效果、Install或outbox，应视为状态矛盾并停止Follower，不能释放。
+    - listitem: 仅将每个Debit的Cap-Applied退回原ResourceKey/Grant/Worker，并令Applied=Cap；不伪造Settled、不调用FeeClose、不改Approval、不清除其他输入锁。
+    - listitem: ApproveDirectBytes在“已有Approval直接成功”前必须检查Invalidated并永久拒签。
+    - strong: Schema升级和重启幂等测试不可省略。
+    - text: 最小回归包括1票T/3票T′、独立输入同Intent负例、多输入去重、普通/FUEL输入、重复跟块及重启后不二次退款。
+  - paragraph: 本轮无需重跑性能实验。论文只需新增窄引理：成功公共赢家证明同输入局部Approval不可能形成有效QC，因此可释放本地容量；timeout仍不授权释放。永久Intent冲突的QC责任、输入锁和容量继续保留。
+  - button "Copy":
+  - button "Rate response":
+  - button "Share":
+  - button "Read aloud":
+  - button "Regenerate response":
+  - button "More actions":
+  - button "Sources":
+  - separator "Today 10:58 AM":
+    - time: Today 10:58 AM
+  - heading "You said:" [level=4]
+  - button "Pasted text(2).txt"
+  - generic "Pasted text(2).txt"
+  - generic: Document
+  - generic: 请按附件完整代码审查局部批准回收，并给出对应英文/中文 LaTex 修订段落和引理；重点检查是否影响资金覆盖证明。
+  - button "Copy message":
+  - button "Share prompt":
+  - button "Edit message":
+  - button "Worked for 5m 13s"
+  - generic: Worked for 5m 13s
+  - heading "ChatGPT said:" [level=4]
+  - heading "审查结论" [level=2]
+  - paragraph:
+    - text: 局部批准回收的
+    - strong: 核心算法正确
+    - text: ：释放只由认证公共块中成功执行的、同组织配置的冲突付款触发；按精确输入实例定位旧 Candidate，重新核对原 Approval，无经济进展时仅退回原 Slice 的 Cap-Applied，并用 Invalidated 和累计 Applied 保证幂等。普通输入与用户 FUEL 输入均已覆盖，INSTALL、超时及独立输入的 Intent 冲突均不会触发释放。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - paragraph:
+    - text: 该修改
+    - strong: 不削弱资金覆盖定理
+    - text: 。关键原因是：被释放的事实不可能具有三签QC，因此不属于风险集合
+    - math:
+      - generic: C
+      - generic: g
+    - text: C
+    - generic: g
+    - text: ；Theorem 1只需要为
+    - math:
+      - generic: C
+      - generic: g
+    - text: C
+    - generic: g
+    - text: 中的证书维持剩余容量见证。旧路径确实会直接覆盖本地 Candidate 而不回收旧批准，新实现补上了这个缺口。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - paragraph: 但当前代码有两处应在合并前修正。
+  - heading "必须修正" [level=3]
+  - list:
+    - strong: 检查已有 Consumed。
+    - text: consumePublicInput目前只检查 Candidate，随后直接写入赢家事实。如果已有非零且不同于当前赢家的Consumed，这表示本地曾INSTALL另一个QC事实；再观察到当前赢家成功意味着两个冲突QC共存，应停止Follower，而不能静默覆盖：
+  - generic: Go
+  - button "Enable word wrap":
+  - button "Copy":
+  - code: "if s.Consumed != (protocol.SpendFactID{}) && s.Consumed != fact { return rules.ErrAccounting }"
+  - button:
+  - paragraph:
+    - text: 当前代码缺少此检查。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - text: 它同时允许已验证的“赢家INSTALL先到”情形，因为此时 s.Consumed == fact。
+  - list:
+    - strong: 配置不匹配不能静默返回。
+    - text: a.Direct.Body.Config != m.cfg.Organization.Hash()目前返回nil。本成员数据库中的Candidate只能来自本配置的Approval；不匹配属于状态损坏。静默返回后仍会清除Candidate，却既不回收也不留下失效记录。应改为rules.ErrAccounting。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - heading "建议补强" [level=3]
+  - list:
+    - listitem: p.Invalidated的幂等分支至少检查SupersededBy非零及InvalidatedHeight>0；不必要求后续冲突赢家与首次赢家相同，因为一个多输入付款可能被不同公共付款分别覆盖。
+    - text: SupersededBy应在文档中定义为
+    - strong: 首个触发失效的公共事实
+    - text: ，不是所有冲突事实列表。
+    - listitem: 附件未展示Schema 7→8迁移代码和新回归源码。若升级策略是拒绝旧库而非迁移，应在部署说明中明确；本次不能仅凭说明确认“四类回归均已运行”。
+  - paragraph:
+    - text: ApproveDirectBytes已在已有Approval的快捷返回前拒绝失效事实，INSTALL、来源恢复和正常结算也拒绝Invalidated，这些入口处理正确。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - separator
+  - heading "对资金覆盖证明的影响" [level=1]
+  - paragraph: 现有定义为：
+  - math:
+    - generic: r
+    - generic: m
+    - generic: ","
+    - generic: c
+    - generic: =
+    - generic: a
+    - generic: c
+    - generic: −
+    - generic: A
+    - generic: p
+    - generic: p
+    - generic: l
+    - generic: i
+    - generic: e
+    - generic: d
+    - generic: m
+    - generic: ","
+    - generic: c
+    - generic: ","
+  - text: r
+  - generic: m,c
+  - text: =
+  - text: a
+  - generic: c
+  - text: −
+  - generic: Applied
+  - generic: m,c
+  - text: ","
+  - paragraph:
+    - text: 并仅对
+    - math:
+      - generic: c
+      - generic: ∈
+      - generic: C
+      - generic: g
+    - generic: c ∈
+    - text: C
+    - generic: g
+    - text: ——即实际已经存在三签QC的事实——要求
+  - math:
+    - generic: r
+    - generic: m
+    - generic: ","
+    - generic: c
+    - generic: ≥
+    - generic: w
+    - generic: c
+    - generic: .
+  - text: r
+  - generic: m,c
+  - text: ≥
+  - text: w
+  - generic: c
+  - text: .
+  - paragraph:
+    - text: 局部失效会令该成员对事实
+    - math:
+      - generic: c
+    - generic: c
+    - text: 的CAL残余容量变为零，但新引理证明这种
+    - math:
+      - generic: c
+      - generic: ∉
+      - generic: C
+      - generic: g
+    - text: c
+    - generic: ∈
+    - generic: /
+    - text: C
+    - generic: g
+    - text: 。因此：
+  - list:
+    - text: Lemma “Residual capacity”对
+    - math:
+      - generic: C
+      - generic: g
+    - text: C
+    - generic: g
+    - text: 中事实的结论不变；
+    - text: Theorem 1中的计数式
+    - math:
+      - generic: "2"
+      - generic: Q
+      - generic: g
+      - generic: ≤
+      - generic: ∑
+      - generic: m
+      - generic: ∈
+      - generic: H
+      - generic: g
+      - generic: ∑
+      - generic: c
+      - generic: ∈
+      - generic: C
+      - generic: g
+      - generic: m
+      - generic: ∈
+      - generic: S
+      - generic: i
+      - generic: g
+      - generic: c
+      - generic: r
+      - generic: m
+      - generic: ","
+      - generic: c
+    - text: "2"
+    - text: Q
+    - generic: g
+    - text: ≤
+    - text: m∈
+    - text: H
+    - generic: g
+    - generic: ∑
+    - text: c∈
+    - text: C
+    - generic: g
+    - text: m∈
+    - generic: Sig
+    - generic: c
+    - generic: ∑
+    - text: r
+    - generic: m,c
+    - text: 不会使用任何已失效事实；
+    - text: 释放只在本地Slice中等量减少Reserved、增加Available，不改变
+    - math:
+      - generic: B
+      - generic: g
+    - text: B
+    - generic: g
+    - text: 、公共Usage、备付账户或任何义务；
+    - listitem: Theorem 2的公共CAL守恒完全不受影响，因为该操作没有公共经济写集；
+    - listitem: 独立输入、相同Intent的失败证书仍可能拥有QC，故不得应用本引理，也不得释放容量。
+  - paragraph:
+    - text: 现有Residual Capacity证明必须补一句，否则原文“未执行前恢复量恒为零”已不再普遍成立。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - separator
+  - heading "英文 LaTeX：protocol.tex" [level=2]
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "% Insert after the discussion of Eq.~\\eqref{eq:protocol-release}."
+    - generic: "\\noindent\\textbf{Superseded partial approvals.}"
+    - generic: "Equation~\\eqref{eq:protocol-release} governs normal settlement and"
+    - text: repayment. A separate local terminal transition applies when an authenticated, successfully applied public payment under the same organization configuration consumes an ordinary or user-funded fee input instance that the member had locked for a different fact. Before replacing the local spend candidate, the follower reloads the immutable approval and checks the exact output instance, the distinct fact and transaction, and the absence of observed execution, installed or queued certificate material, pending obligations, compensation, recovery, or any fee effect.
+    - generic: The member then returns, for every recorded local debit $d$, exactly
+    - generic: "$d.\\mathsf{Cap}-\\mathsf{Applied}$ from Reserved to Available in the"
+    - text: original resource slice and records the approval as invalidated by the first successful conflicting fact and height. It does not set
+    - generic: "\\textsf{Settled}, close a fee escrow, modify the approval, clear other"
+    - text: input locks, or change public state. The cumulative
+    - generic: "$\\mathsf{Applied}$ vector makes the transition idempotent when several"
+    - text: inputs of one approval conflict or a block is replayed. Retries, late
+    - generic: "\\texttt{INSTALL}, and source recovery for an invalidated fact are"
+    - generic: "rejected. A timeout, \\texttt{INSTALL} alone, or a global Intent"
+    - text: conflict between disjoint inputs does not authorize this release.
+  - heading "中文 LaTeX：协议段落" [level=2]
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "% 插入公式~\\eqref{eq:protocol-release} 的说明之后。"
+    - generic: "\\noindent\\textbf{被公共冲突取代的局部批准。}"
+    - generic: "公式~\\eqref{eq:protocol-release}处理正常结算与回款。"
+    - text: 另有一条仅作用于成员本地状态的终止路径：同一组织配置下， 一个经认证且成功应用的公共付款消费了某个普通输入或用户 FUEL输入实例，而该成员此前已为另一个事实锁定了该实例。 在覆盖本地候选事实之前，Follower重新读取不可变Approval， 核对精确的输出实例、不同的事实与交易，并要求该旧事实没有 已观察执行、已安装或已排队的证书材料，也没有Pending、赔付、 回款或任何费用效果。
+    - text: 随后，对Approval记录的每项本地Debit，成员仅将
+    - generic: "$d.\\mathsf{Cap}-\\mathsf{Applied}$从原资源Slice的Reserved退回"
+    - text: Available，并记录首个使其失效的成功公共事实及高度。
+    - generic: "该转换不设置\\textsf{Settled}，不关闭费用托管，不修改Approval，"
+    - text: 不清除其他输入锁，也不改变公共状态。累计
+    - generic: "$\\mathsf{Applied}$向量保证同一Approval的多个输入发生冲突或"
+    - text: 区块重放时至多回收一次。失效事实的重试、迟到
+    - generic: "\\texttt{INSTALL}和来源恢复均被拒绝。仅有超时、"
+    - generic: "\\texttt{INSTALL}，或独立输入之间的全局Intent冲突，都不授权"
+    - text: 这一回收。
+  - separator
+  - heading "英文 LaTeX：新增安全引理" [level=2]
+  - paragraph: 建议插入Authenticated, unique consumption之后。
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "\\begin{lemma}[Superseded partial approval]"
+    - generic: "\\label{lem:security-superseded}"
+    - text: Fix one four-member organization with three signatures required and at most one Byzantine member. Let an honest member have approved fact
+    - generic: $c$ and locked an ordinary or user-funded fee input instance $\xi$.
+    - text: If a successfully applied public payment under the same organization
+    - generic: configuration carries a valid QC for a different fact $c'$ and consumes
+    - generic: $\xi$, then $c$ has no valid QC. The honest member may therefore
+    - generic: restore the residual local debits of $c$ while permanently refusing to
+    - generic: sign or install $c$. This conclusion does not apply to two
+    - text: QC-bearing facts with disjoint inputs that conflict only through their global Intent.
+    - generic: "\\end{lemma}"
+    - generic: "\\begin{IEEEproof}"
+    - generic: The public execution of $c'$ has passed the current organization's
+    - text: authorization checks and therefore carries a valid three-member QC.
+    - generic: Assume for contradiction that $c$ also has a valid three-member QC.
+    - text: The two signer sets intersect in at least two members. Since at most one member is Byzantine, an honest member belongs to the intersection. That member would have signed two different facts that consume the
+    - generic: same instance $\xi$, although honest members atomically lock ordinary
+    - text: and user-funded fee instances before signing and reject a different candidate for a locked instance. This contradicts the approval rule.
+    - generic: Thus $c\notin C_g$, the set of facts whose three signatures have
+    - generic: existed. Restoring one member's residual debits for $c$ cannot remove
+    - generic: a capacity witness for any term of $Q_g$. The successful public
+    - generic: consumption of $\xi$, the immutable approval, and the invalidated
+    - generic: progress record continue to reject later use of $c$; only its unused
+    - text: local resource reservation is restored.
+    - generic: "\\end{IEEEproof}"
+  - heading "Residual capacity证明替换句" [level=3]
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "For a fact $c\\in C_g$, Lemma~\\ref{lem:security-superseded}"
+    - text: "rules out invalidation by an honest signer: such an invalidation would require a conflicting successfully applied fact and would imply"
+    - generic: $c\notin C_g$. Therefore, until the member observes the successful
+    - generic: execution of $c$, its CAL restoration for $c$ remains zero and
+    - generic: "$r_{m,c}=a_c\\ge w_c$. After that execution, the original repayment"
+    - text: "argument applies unchanged: the recorded net compensation is zero,"
+    - generic: "$r_{m,c}=0$, and $w_c=0$."
+  - heading "Theorem 1证明中的容量句" [level=3]
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - text: Approval, ordinary settlement, and superseding invalidation move local capacity monotonically between Available and Reserved, while top-ups increase the member share. Hence
+    - generic: "$L_{m,g}\\le s(B_{m,g})\\le s(B_g)$. By"
+    - generic: "Lemma~\\ref{lem:security-superseded}, invalidation can reduce"
+    - generic: "$L_{m,g}$ only for a fact outside $C_g$; consequently the counting"
+    - generic: lower bound over the signers of facts in $C_g$ is unchanged.
+  - heading "Theorem 1后的限制说明" [level=3]
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: A partial approval remains charged until either its own payment executes or authenticated public history proves that one of its locked instances was consumed by a different successfully authorized fact under the same configuration. Time alone never releases it. A disjoint-input payment that loses a global Intent conflict may still have a valid QC and issuer liability, and therefore retains its input locks and signing reservation.
+  - separator
+  - heading "中文 LaTeX：安全引理及证明修订" [level=2]
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "\\begin{lemma}[被公共冲突取代的局部批准]"
+    - generic: "\\label{lem:security-superseded-zh}"
+    - text: 考虑一个固定四成员、三签生效且至多一名成员为拜占庭的组织。
+    - generic: 设诚实成员已经为事实$c$批准并锁定普通输入或用户FUEL输入实例
+    - generic: $\xi$。若同一组织配置下，一个成功应用的公共付款携带不同事实
+    - generic: $c'$的有效QC并消费$\xi$，则$c$不可能拥有有效QC。
+    - generic: 因此，该诚实成员可以回收$c$尚未使用的本地资源扣留，同时永久
+    - generic: 拒绝再次签署或安装$c$。该结论不适用于输入互不相交、仅因全局
+    - text: Intent冲突而不能同时执行的两个已获证事实。
+    - generic: "\\end{lemma}"
+    - generic: "\\begin{IEEEproof}"
+    - generic: 事实$c'$的公共执行已经通过当前组织的授权检查，因此携带有效的
+    - generic: 三成员QC。反设$c$也拥有三成员QC。两个三成员签名集合至少相交
+    - text: 两名成员，而组织中至多一名为拜占庭成员，故交集中至少有一名
+    - generic: 诚实成员。该成员将为两个消费同一实例$\xi$的不同事实签名；
+    - text: 但诚实成员在签名前原子锁定普通输入和用户FUEL输入，并拒绝为 已锁实例的不同候选事实签名，矛盾。
+    - generic: 因此$c\notin C_g$，其中$C_g$是已经存在三份签名的事实集合。
+    - generic: 回收成员为$c$保留的剩余本地Debit，不会删除$Q_g$中任何事实的
+    - generic: 容量见证。实例$\xi$的成功公共消费、不可变Approval及失效进度
+    - generic: 记录仍会拒绝$c$的后续使用；被恢复的仅是尚未使用的本地资源额度。
+    - generic: "\\end{IEEEproof}"
+  - paragraph: Residual capacity证明替换为：
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "对任意$c\\in C_g$，引理~\\ref{lem:security-superseded-zh}排除了诚实"
+    - text: 签名者将其标记为失效的可能：这种失效需要一个成功应用的冲突事实，
+    - generic: 并会推出$c\notin C_g$。因此，在成员观察到$c$成功执行之前，
+    - generic: "其对$c$的CAL恢复量仍为零，故$r_{m,c}=a_c\\ge w_c$。"
+    - text: 成功执行之后，原有回款论证保持不变：记录的净赔付为零，
+    - generic: "$r_{m,c}=0$且$w_c=0$。"
+  - paragraph: Theorem 1容量段补为：
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - text: 批准、正常结算和冲突失效只会单调地在本地Available与Reserved之间 移动容量，而补资增加成员份额，因此
+    - generic: "$L_{m,g}\\le s(B_{m,g})\\le s(B_g)$。"
+    - generic: "由引理~\\ref{lem:security-superseded-zh}，失效只能降低不属于$C_g$"
+    - generic: 的事实所占容量，故针对$C_g$中证书签名者的计数下界保持不变。
+  - separator
+  - heading "补充材料：英文证明细节" [level=2]
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "\\noindent\\textbf{Local invalidation write set and replay.}"
+    - text: Invalidation is evaluated only while applying an authenticated block
+    - generic: "entry whose execution result is successful and applied; \\texttt{INSTALL}"
+    - text: does not trigger it. Before the follower overwrites a spend record, it reads the previous candidate and verifies the immutable approval and the exact ordinary or user-fee input instance. Existing observation, installed certificate material, an outbox entry, settlement, pending obligations, compensation, recovery, or a fee effect is treated as an accounting contradiction rather than as releasable state.
+    - text: The atomic write set contains only the affected local resource slices and the approval's local progress. For each debit it subtracts
+    - generic: "$\\mathsf{Cap}-\\mathsf{Applied}$ from Reserved, adds the same amount to"
+    - text: Available, sets the corresponding cumulative Applied entry to Cap, and records Invalidated, the first triggering public fact, and its height. The immutable approval and unrelated input locks remain. Overlay visibility makes later conflicting inputs or transactions in the same block no-ops for restoration; the follower cursor suppresses block replay, and the cumulative Applied vector prevents a second credit after restart. The member-store schema is advanced so that an older binary cannot silently ignore the invalidated terminal state.
+  - heading "永久Intent冲突的outbox边界句" [level=3]
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "A fully certified source that is permanently rejected by the global Intent binding while spending disjoint inputs is outside this invalidation rule: its QC-backed responsibility, input locks, and signing reservation remain. The current relay may continue retrying such a source; terminating those retries is a separate engineering follow-up and cannot release the certified liability."
+  - heading "补充材料：中文对应" [level=2]
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "\\noindent\\textbf{本地失效的写集与重放。}"
+    - text: 失效判断仅发生在应用认证区块中执行成功且确实生效的付款记录时；
+    - generic: "\\texttt{INSTALL}不能触发失效。在Follower覆盖Spend记录之前，"
+    - text: 它读取原Candidate，并核对不可变Approval以及精确的普通输入或 用户费用输入实例。若旧事实已经被观察、已有安装证书材料或outbox， 或已经发生结算、Pending、赔付、回款或费用效果，则将其视为会计 状态矛盾并停止处理，而不是释放容量。
+    - text: 该原子转换只写入受影响的本地资源Slice和Approval的LocalProgress。 对每项Debit，它从Reserved减去
+    - generic: "$\\mathsf{Cap}-\\mathsf{Applied}$，向Available增加同量，将累计"
+    - text: Applied置为Cap，并记录Invalidated、首个触发失效的公共事实及高度。 不可变Approval和其他输入锁保持不变。同一Overlay使同一区块中后续 冲突输入或交易不再重复回收；Follower游标抑制区块重放，累计 Applied向量防止重启后再次入账。成员存储Schema相应升级，避免旧 二进制忽略新的失效终态。
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: 独立输入上已经形成QC、但因全局Intent绑定而永久被拒绝的来源不适用 上述失效规则：其QC责任、输入锁和签发容量继续保留。当前Relay可能 持续重试该来源；终止此类重试属于独立的工程后续工作，并不得因此 释放已获证责任。
+  - paragraph: 完成前建议至少补两项定向回归：一是Spend.Consumed已为第三事实时必须停止Follower；二是本地Candidate指向异配置Approval时必须报会计错误。其余性能实验无需重跑。
+  - button "Copy":
+  - button "Rate response":
+  - button "Share":
+  - button "Read aloud":
+  - button "Regenerate response":
+  - button "More actions":
+  - button "Sources":
+  - heading "You said:" [level=4]
+  - button "Pasted text(3).txt"
+  - generic "Pasted text(3).txt"
+  - generic: Document
+  - generic: 请完成附件中修复及论文的最终一致性审查。
+  - button "Copy message":
+  - button "Share prompt":
+  - button "Edit message":
+  - button "Worked for 3m 43s"
+  - generic: Worked for 3m 43s
+  - heading "ChatGPT said:" [level=4]
+  - heading "最终结论" [level=2]
+  - paragraph:
+    - strong: 在附件覆盖的相关代码路径内，局部批准回收已经形成闭环，未发现其削弱资金覆盖证明。
+    - text: 两项此前必须修正的问题——第三事实已消费、原Approval配置不符——均已改为会计错误并有原子回滚负例。回收仅由认证公共区块中的成功执行触发，精确核对同一输入实例，按 Cap-Applied 退回原Slice，并以Invalidated和累计Applied保证多输入、同块、重放及重启幂等。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - paragraph:
+    - text: 测试覆盖也与实现目标相符：普通输入、用户FUEL、组织代付、仅费用输入、INSTALL先到、多输入、两个赢家同块、失败公共结果、状态矛盾、重启和旧Schema拒绝均有对应检查；短回归只被表述为功能冒烟，没有冒充性能不变性实验。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - heading "对资金覆盖证明的判断" [level=2]
+  - paragraph: 新引理的核心论证正确：
+  - list:
+    - listitem: 赢家具有同组织配置下的三签公共授权；
+    - listitem: 若旧事实也曾存在三份有效签名，两个3/4签名集合至少相交两人，其中至少一名诚实成员将为同一普通或用户费用输入双签；
+    - text: 因此旧局部批准不可能属于
+    - math:
+      - generic: C
+      - generic: g
+    - text: C
+    - generic: g
+    - text: ；
+    - text: 回收该成员的本地剩余Debit不会删除
+    - math:
+      - generic: Q
+      - generic: g
+    - text: Q
+    - generic: g
+    - text: 中任何证书的容量见证。
+  - paragraph:
+    - text: Invalidation只修改成员本地Slice与进度，不修改公共账户、Usage、义务、Promise或备付余额，因此Theorem 1的计数和Theorem 2的CAL投影均保持不变。独立输入、同Intent的两个QC仍不适用该规则，正文对此区分正确。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - heading "定稿前必须修改的五处" [level=2]
+  - heading "1．缩窄新引理，使其与代码完全一致" [level=3]
+  - paragraph:
+    - text: 代码要求
+    - strong: 不同Fact且不同TxID
+    - text: ；当前引理只写“different fact”。应改为：
+  - blockquote:
+    - paragraph:
+      - text: carries a valid QC for a different fact
+      - math:
+        - generic: c
+        - generic: ′
+      - text: c
+      - generic: ′
+      - strong: and a different transaction identity
+  - paragraph: 同时将“has no valid QC”改为更精确的：
+  - blockquote:
+    - paragraph:
+      - text: no three matching valid member signatures for
+      - math:
+        - generic: c
+      - generic: c
+      - text: can have existed
+  - paragraph:
+    - text: 因为
+    - math:
+      - generic: C
+      - generic: g
+    - text: C
+    - generic: g
+    - text: 按“三份签名曾存在”定义，而不只按已组装QC定义。
+  - paragraph:
+    - text: 新引理在
+    - math:
+      - generic: C
+      - generic: g
+    - text: C
+    - generic: g
+    - text: 正式定义前引用它也略显倒置。建议改成：
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code: "Thus no three matching signatures for $c$ can have existed. Consequently, once $C_g$ is defined in Section~\\ref{sec:security-coverage}, $c\\notin C_g$."
+  - heading "2．修正引言中已经失效的绝对表述" [level=3]
+  - paragraph: 旧引言C2写过：
+  - blockquote:
+    - paragraph: Each approval reserves the full CAL output ... until the payment executes.
+  - paragraph: 加入局部失效后，该句不再普遍成立。应改为：
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code: Each approval reserves the full CAL output, change included, while it remains potentially certifiable. An authenticated conflicting public spend may invalidate a non-certified local approval and release only its unused local reservation.
+  - paragraph: 全文还应检索并修正以下绝对措辞：
+  - list:
+    - listitem: a partial approval keeps its debit
+    - listitem: only its own execution releases
+    - listitem: an unexecuted payment keeps ... at every approving member
+  - paragraph:
+    - text: 应统一限定为
+    - strong: 已获证来源
+    - text: ，或补充“除非局部批准被认证的同输入公共消费证明为不可获证”。
+  - heading "3．解决论文机制与实验构建的版本错位" [level=3]
+  - paragraph:
+    - text: 当前主评估仍称721800c为“production build”，但局部回收实际位于bf71c4d；而721800c并未包含该机制。此前主文明确将三个核心实验归于721800c。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph: 必须改成：
+  - list:
+    - strong: 721800c：frozen evaluation build
+    - text: ，保留②③④全部既有数字；
+    - strong: bf71c4d：current narrow patch
+    - text: ，仅由定点测试和短功能回归验证；
+    - listitem: 主实验没有刻意触发局部回收分支，因此不得把721800c结果重新标成bf71c4d结果；
+    - listitem: supplement构建谱系表增加bf71c4d、Schema 8及“不提供7→8原地迁移，实验使用新目录”。
+  - paragraph: 这项是当前最重要的一致性修改。
+  - heading "4．精确描述失效后的来源恢复行为" [level=3]
+  - paragraph: 协议现写：
+  - blockquote:
+    - paragraph: source recovery for an invalidated fact is rejected.
+  - paragraph:
+    - text: 代码实际是：重签和INSTALL返回冲突；公开证书再次暴露失效事实时，recoverExposedSources返回ErrAccounting，Follower停止，而不是作为普通无害请求跳过。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - paragraph: 建议改为：
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code: "Retries and late \\texttt{INSTALL} are rejected. Exposure of an invalidated fact as a purported certified source is treated as an accounting contradiction and stops the follower under the stated fault model."
+  - paragraph: 永久Intent冲突outbox持续重试的边界保留为独立后续项即可，不应与局部失效合并。
+  - heading "5．验证声明必须按实际平台区分" [level=3]
+  - paragraph: 补充材料不得写成“bf71c4d全套测试在Windows和macOS均通过”。准确口径应为：
+  - list:
+    - listitem: Mac：带comet_v3完整应用测试、race、vet及相关Comet回归通过；
+    - listitem: Windows：目标成员测试、race/vet等已完成，但完整protocol测试程序被系统拒绝启动；
+    - listitem: 这不是整体形式化验证，也不是独立复现实验。
+  - heading "建议但非阻断项" [level=2]
+  - paragraph: 可以在p.Invalidated幂等分支增加状态自检：SupersededBy非零、InvalidatedHeight>0且所有Applied[i]=Cap，异常则返回ErrAccounting。现有原子写入和Schema约束下并非证明必需，但与其他状态矛盾守卫风格一致。
+  - heading "最终裁定" [level=2]
+  - paragraph:
+    - strong: 修复本身可以通过；资金覆盖证明保持成立。
+    - text: 完成上述五项文字和版本归属修正后，这一窄范围大修可结项。无需重跑原100跳、混合负载或历史读取矩阵，也不应将bf71c4d的短回归解释为新的性能结果。
+  - button "Copy":
+  - button "Rate response":
+  - button "Share":
+  - button "Read aloud":
+  - button "Regenerate response":
+  - button "More actions":
+  - button "Sources":
+  - generic: ChatGPT can make mistakes. Check important info.
+  - button "Scroll to bottom":
+  - heading "Latest response" [level=4]
+  - status
+  - textbox "Ask ChatGPT":
+    - paragraph: Ask ChatGPT
+  - button "Add files and more":
+  - button "Select ChatGPT model":
+    - generic: 5.6 Pro
+  - button "Dictate":
+  - button "Start Voice":
+- status
+- status: Response complete
+- status
+- status

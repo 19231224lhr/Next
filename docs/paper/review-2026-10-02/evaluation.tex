@@ -11,12 +11,16 @@
 \label{sec:evaluation}
 
 We evaluate certified continuation, source resolution during ordinary
-traffic, and local historical reading on production build
+traffic, and local historical reading on frozen evaluation build
 \texttt{721800c}. It integrates independent compensation decisions,
 public-certificate source recovery, and one-to-one input-certificate
 checks. The two network experiments use identical node binaries and
 Comet sources; additions are confined to observation and offline test
 tools. Artifacts retain source/overlay/binary fingerprints and per-run records.
+The local invalidation transition was added in patch \texttt{bf71c4d};
+its targeted tests and short functional regressions are reported separately
+in the supplement. The measurements below retain their original build
+and do not measure that transition.
 
 \noindent\textbf{Setup and measurement.}
 Experiments use one Mac Studio M4 Max with 16 CPU cores, 64\,GiB RAM,
@@ -169,7 +173,7 @@ matching final balances.
 \noindent\textbf{Shared-resource costs and audit.}
 Table~\ref{tab:eval-mixed} reports admitted receipt latency alongside
 actual send spans and drain. All N/C runs and two P runs reach the
-256-outstanding limit; two P runs also reach 64 fast requests.
+256-outstanding limit; two C runs and two P runs also reach 64 fast requests.
 Dispatch lag, measured from scheduled to actual send, reaches a
 run-level P95 of 895.88\,ms. The P run-1 tail after 70\,s contains
 89 payments with receipt P95 282.61\,ms; it is not a full ten-second
@@ -177,7 +181,7 @@ window. Thus lower aggregate quantiles do not establish a performance
 improvement or zero interference. All runs drain 0.815--1.356\,s after
 the last ordinary send.
 
-All 84,192 payments close. Each run's four replicas agree at the same
+All 84,192 payments across the twelve runs close. Each run's four replicas agree at the same
 height; CAL/FUEL conservation, fees, identities, obligations, and
 outboxes pass audit. Final user CAL allocations coincide across
 treatments, reserves recover, and CAL/work reservations clear without

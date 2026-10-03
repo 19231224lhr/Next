@@ -364,6 +364,8 @@ Register 和 Close 的相应报酬计入发行组织，Settle 与 Repair 计入�
 
 ### 8.4 部分使用证书的例子
 
+**局部批准的冲突回收（2026-10-03）。** 尚未形成有效 QC 的局部批准 T，只有在认证公共区块证明同配置的另一付款 T′ 成功消费其某个普通或用户 FUEL 输入实例时，才能回收原批准的剩余资源预留。每项 Debit 的 `Cap-Applied` 退回原 ResourceKey/Grant/Worker，记录永久 `Invalidated`、首个触发的 `SupersededBy` 和独立 `InvalidatedHeight`，与消费记录、块游标原子提交。原 Approval、其余输入锁及 Intent 绑定保留；旧请求、迟到 INSTALL 和来源恢复不得复活该批准。该转换不记 Settled，不关闭费用，不恢复已花本金或 FUEL，不改变公共账本。仅 INSTALL、超时或独立输入之间的 Intent 冲突都不能触发回收。实现、正反例和短回归见[回收验证报告](../experiments/partial-reclaim-2026-10-03/README.md)。
+
 P 签发三个输出 40、30、30 CAL，但暂未上链。C 只消费第一个缺失输出：
 
 | 时点 | Coverage.Remaining | 实际 Open 缺口 | 解释 |

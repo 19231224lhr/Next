@@ -1,27 +1,28 @@
-# 第⑤轮编译与交付核查（2026-10-03）
+# 局部批准回收修订：编译与交付核查（2026-10-03）
 
-本轮统一整合冻结生产构建 `721800c` 的连续支付、混合负载与历史读取实验；生产代码未修改。
+本轮代码补丁为 `bf71c4d`。论文增加局部批准失效转换及窄引理，修正引言与剩余容量论证，保留主实验冻结评估构建 `721800c` 的所有测量。新回归与旧性能结果分开。
 
 ## 编译
 
-在现有 Overleaf 修订副本 `6abeb5a49948f44270284a06`，使用 TeX Live 2026 分别编译并下载四份 PDF。
+在现有 Overleaf 修订副本 `6abeb5a49948f44270284a06` 使用 TeX Live 2026，选择并载入每个根文件后分别编译、下载四份 PDF。
 
-| 根文件 | 引擎 | 页数 | Errors / Warnings | 栏宽溢出 |
+| 根文件 | 引擎 | 页数 | Errors / Warnings | Overfull |
 | --- | --- | ---: | --- | --- |
-| main.tex | pdfLaTeX + BibTeX | 17 | 0 / 0 | 0 |
-| main-zh.tex | XeLaTeX + BibTeX | 18 | 0 / 0 | 0 |
-| supplement-main.tex | pdfLaTeX | 15 | 0 / 0 | 0 |
-| supplement-main-zh.tex | XeLaTeX | 16 | 0 / 0 | 0 |
+| main.tex | pdfLaTeX + BibTeX | 18 | 0 / 0 | 0 |
+| main-zh.tex | XeLaTeX + BibTeX | 19 | 0 / 0 | 0 |
+| supplement-main.tex | pdfLaTeX | 16 | 0 / 0 | 0 |
+| supplement-main-zh.tex | XeLaTeX | 17 | 0 / 0 | 0 |
 
-日志保存在 `revision-2026-10-03/compile-*.txt`。各文档仍有少量 Underfull 排版提示；初次英文编译的读者返回值溢出已通过短符号元组及正文释义修正。未改字号、栏宽或页面尺寸来压缩页数。
+本轮日志在 `rereview-2026-10-03/compile-*.txt`。仍有 Underfull 排版提示；没有通过缩小字号、栏宽或页面尺寸压缩篇幅。此项确认编译与版面，不等于期刊篇幅和投稿资格审查。
 
-## 证据与源码
+## 源码与证据
 
-- 从冻结 CSV 独立重算连续支付中位数、混合负载统计、读取改善率与成本，见 `measurement-checks.json`。
-- 四个根文件均无悬空引用、重复标签、未知文献键或缺图；双语引用、公式、证明数量与表内数字对应，见 `source-checks.json` 和 `bilingual-checks.json`。
-- 下载在线源码逐项比较 51 个 TeX、BibTeX 与图表文件，换行与行末空白规范化后均与本地一致，见 `overleaf-checks.json`。
-- PDF 全部为 US Letter（612 × 792 pt），未发现未解析引用、空白页或越出页面的文字。逐页联系表已目视检查，正文首页、实验跨栏表和公式重点页面另外检查。见 `pdf-checks.json` 与 `revision-2026-10-03/*-sheet-*.png`。
+- `rereview-2026-10-03/check_artifacts.py` 重新展开四个根文件核对标签、引用、文献和图表，未发现悬空引用、重复标签、未知文献键或缺图，见 `source-checks.json`。
+- 双语的标签、引用、文献及证明环境对应，见 `bilingual-checks.json`；新增引理页逐段目视核对。
+- 下载在线源包，规范化换行与行末空白后比较 52 个 TeX、BibTeX、类文件和图表，全部一致，见 `overleaf-checks.json`。
+- 四份 PDF 均为 US Letter（612 × 792 pt），无空白页、未解析问号或越出页面的文字，均可检索到新增回收规则及 `bf71c4d` 版本。逐页联系表和中英引理页面已目视检查，见 `pdf-checks.json` 与 `rereview-2026-10-03/*-sheet-*.png`。
+- 原实验数据未修改，上一轮独立重算结果继续见 `measurement-checks.json`。新短回归另见 `docs/experiments/partial-reclaim-2026-10-03/`，不据此主张旧性能在新构建上不变。
 
-四份 PDF 已同步到 `pdf/`。Overleaf 恢复为英文 `main.tex`、pdfLaTeX 并显示新主稿。可移植源码包为 `Next-review-2026-10-03-LaTeX.zip`。
+Overleaf 已恢复英文 `main.tex`、pdfLaTeX。四份 PDF 位于 `pdf/`；可移植源码包为 `Next-review-2026-10-03-LaTeX.zip`，摘要由 `SHA256.json` 标识。
 
-这些检查确认本轮整合和交付的一致性，不等同于新的协议安全证明或期刊录用判断。作者真实单位和通讯信息仍按原约定留待投稿时填写。
+GPT 两轮代码与论文复核已完成；五项最终文字修正已落实。Claude 服务过期，未取得实施后的新意见，旧计划评议单独保留。作者单位与通讯信息仍按原约定留待正式投稿填写。
