@@ -106,10 +106,13 @@ func chainDirect(args []string) error {
 	prepare := f.Bool("prepare", false, "authorize three wallets before starting the laboratory")
 	auditOnly := f.Bool("audit", false, "audit the completed chain against stopped committee stores")
 	e5 := f.Bool("e5-owner-fuel", false, "E5: each wallet pays with its own final FUEL")
+	originIndex := f.Int("origin-index", -1, "experiment: select the owner's CAL origin by index; -1 keeps the default")
+	fuelOffset := f.Int("fuel-offset", 0, "experiment: skip additional owner FUEL origins")
+	payerFuelOffset := f.Int("payer-fuel-offset", 0, "experiment: extra FUEL origins reserved for the first payer's independent load")
 	if err := f.Parse(args); err != nil {
 		return err
 	}
-	if *dir == "" || *length < 1 || *length > 100 {
+	if *dir == "" || *length < 1 || *length > 100 || *originIndex < -1 || *fuelOffset < 0 || *payerFuelOffset < 0 {
 		return protocol.ErrRule
 	}
 	var lab cfg.Lab
@@ -135,11 +138,10 @@ func chainDirect(args []string) error {
 	if *auditOnly {
 		return auditChain(*dir, lab)
 	}
-	return runChain(*dir, lab, n, *length, *waitFinal, *trace, *e5)
+	return runChain(*dir, lab, n, *length, *waitFinal, *trace, *e5, *originIndex, *fuelOffset, *payerFuelOffset)
 }
 
-func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, trace bool, ownerFuel ...bool) (err error) {
-	e5 := len(ownerFuel) > 0 && ownerFuel[0]
+func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, trace, e5 bool, originIndex, fuelOffset, payerFuelOffset int) (err error) {
 	var e5Samples []faultSample
 	if e5 {
 		defer func() {
@@ -192,10 +194,15 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		}
 	}
 	var origin *state.OriginOutput
+	calIndex := 0
 	for i := range n.Genesis.Outputs {
 		if n.Genesis.Outputs[i].Output.Asset == protocol.AssetCAL && n.Genesis.Outputs[i].Output.Recipient.Owner == descriptors[0].Owner {
+			if originIndex >= 0 && calIndex != originIndex {
+				calIndex++
+				continue
+			}
 			origin = &n.Genesis.Outputs[i]
-			if !e5 {
+			if !e5 || originIndex >= 0 {
 				break
 			} // E5's last CAL is separate from its first 100 warmup inputs.
 		}
@@ -262,6 +269,10 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 	if e5 {
 		fuelIndex[0] = 100
 	} // The independent warmup pays with the first 100 user FUEL inputs.
+	for i := range fuelIndex {
+		fuelIndex[i] += fuelOffset
+	}
+	fuelIndex[0] += payerFuelOffset
 	if e5 {
 		for _, o := range n.Genesis.Outputs {
 			if o.Output.Asset == protocol.AssetFUEL {

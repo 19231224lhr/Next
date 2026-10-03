@@ -1,0 +1,595 @@
+- link "Skip to content":
+  - /url: "#_r_au_"
+- main:
+  - button "Show sidebar":
+  - button "New chat":
+  - button "Share":
+    - text: Share
+  - button "More":
+  - button "Toggle summary":
+  - heading "You said:" [level=4]
+  - button "Next-review-English(2).pdf"
+  - generic "Next-review-English(2).pdf"
+  - generic: PDF
+  - button "Next-review-supplement-English(2).pdf"
+  - generic "Next-review-supplement-English(2).pdf"
+  - generic: PDF
+  - generic: 请以第一次收到此稿的 IEEE Transactions on Dependable and Secure Computing (TDSC) 外审专家身份，独立评审所附英文正文 Next-review-English.pdf 和英文补充材料 Next-review-supplement-English.pdf。请只依据本次附件和能够核实的相关文献，不使用其他对话、记忆或既往评审结论；我不提供旧意见，也不预设接受或修改的结论。 请完整阅读两份附件后，用中文给出专业审稿报告： 1. 用你自己的理解概述研究问题、核心方法及主要贡献，并评价期刊适配性与创新性；区分架构组合、具体新机制、已有技术和实证贡献，结合文中最接近的工作判断差异，勿虚构外部文献。 2. 审查系统模型、威胁假设、协议流程、安全论证和实现边界是否自洽。若提出安全问题，请给出成立所需条件、具体轨迹及受影响的结论；区分已能从文中推出的反例、需要代码确认的疑点和单纯表述不清。 3. 审查实验能否支撑各项主张，测量口径、对照公平性、成本及适用范围是否清楚；明确哪些证据已经充分，哪些缺口确实影响结论。 4. 评价论文结构、术语、图表、英文表达与主线是否达到专业期刊要求。 5. 列出主要优点、必须处理的问题与次要建议。每个关键意见尽量定位到章节、定理、图表或页码，并解释其重要性，不为凑数量增加问题。 6. 给出独立建议（接受／小修／大修／拒稿）、置信度及决定的关键依据。如果需要修改，请给出足以改变判断的最小修改集合，区分文字澄清、补充验证和机制改动。 这是论文评审，不要求你改写文章或代码。请直言有证据支撑的优点与问题。如果附件无法读取或部分内容未检查，请明确说明，不要推测其内容。
+  - generic: …
+  - button "Show more":
+    - generic: Show more
+  - button "Copy message":
+  - button "Share prompt":
+  - button "Edit message":
+  - button "Worked for 20m 30s"
+  - generic: Worked for 20m 30s
+  - heading "ChatGPT said:" [level=4]
+  - heading "审稿报告" [level=1]
+  - paragraph:
+    - strong: 审稿建议：大修（Major Revision）。置信度：中高，约 0.8。
+  - paragraph:
+    - text: 已完整阅读英文正文
+    - strong: 18 页
+    - text: 及英文补充材料
+    - strong: 16 页
+    - text: ，包括证明、算法框、图表和分版本实验记录。本次材料不包含源代码、可执行工件或原始日志，因此下文对实现的评价属于“文稿与所报告验证是否相互支持”的审查，不是独立代码审计或实验复现。
+  - paragraph:
+    - text: 总体判断是：
+    - strong: 本文有实质性的系统设计贡献，核心资金覆盖论证在所声明的模型下较为完整；我没有发现能够据文稿直接推翻唯一消费、CAL 覆盖或限定版延迟中立性的反例。
+    - text: 大修建议主要来自有限额度下的服务可用性边界、最新实现的组合验证，以及关键实验配置与成本证据仍不充分，而不是要求推翻现有会计机制。
+  - heading "一、研究问题、贡献与期刊适配性" [level=2]
+  - heading "1. 对论文的理解" [level=3]
+  - paragraph:
+    - text: 本文研究的不是一般意义上的“怎样更快确认交易”，而是一个更具体的问题：
+    - strong: 允许用户在父交易尚未公开执行时继续花费其认证输出，那么已经执行的后继交易究竟由谁出资，父交易迟到或永不到达又如何结账？
+  - paragraph:
+    - text: Next 的答案是把三个事件分开：组织成员通过签名前的原子锁定和额度预留，给出可用于后续支付的 TXCer；公共委员会允许消费尚未创建的认证输入，同时登记其直接发行组织的责任；责任到期未解除时，公共决定扣减组织储备，迟到的源交易则在自身执行中偿还该储备。之后的历史表示修改只是把已经发生的储备垫付写入原交易位置，不再承担经济结算功能。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - text: 这里最有价值的区分是：
+    - strong: 认证承诺、公开负债、经济结清和历史表示不是同一个对象。
+    - text: 论文没有把证书直接当作资产，也没有把修改历史当作补偿成立的前提。这使其核心问题与一般支付加速或可编辑区块链有所区别。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - heading "2. 创新性需要分层评价" [level=3]
+  - paragraph:
+    - strong: C1 主要是架构组合和关键路径设计，不宜单独作为强原创性依据。
+    - text: 法定人数认证、接收与后台处理分离，以及不等待所有前序状态到齐，均有明确先例。FastPay 的可兑现性分析已经允许某些入账尚未在本地确认；Zef 使用认证请求与确认阶段；Sui Lutris 则组合广播和共识路径。因此，“一轮认证后可继续”和“避免完整祖先依赖”本身不是足够的创新区分。Next 的差异应落在这些技术如何与其直接责任和原生 UTXO 执行语义结合。
+    - 'link "arXiv: https://arxiv.org/pdf/2003.11506, https://arxiv.org/pdf/2003.11506, 2 additional sources"':
+      - /url: https://arxiv.org/pdf/2003.11506
+      - generic: arXiv
+      - generic: "+2"
+  - paragraph:
+    - strong: C2 是论文最强的贡献，但其中的基础额度技术已有非常接近的先例。
+    - text: Stingray §4.2 明确采用每验证者预算比例
+  - math:
+    - generic: η
+    - generic: =
+    - generic: f
+    - generic: +
+    - generic: "1"
+    - generic: "2"
+    - generic: f
+    - generic: +
+    - generic: "1"
+    - generic: ","
+  - generic: η =
+  - generic: 2f + 1
+  - generic: f + 1
+  - text: ","
+  - paragraph:
+    - text: 并通过每张证书至少消耗
+    - math:
+      - generic: f
+      - generic: +
+      - generic: "1"
+    - generic: f +
+    - generic: "1"
+    - text: 个诚实验证者预算来证明安全；在
+    - math:
+      - generic: f
+      - generic: =
+      - generic: "1"
+    - generic: f =
+    - generic: "1"
+    - text: 时就是
+    - math:
+      - generic: "2"
+      - generic: /
+      - generic: "3"
+    - generic: 2/3
+    - text: 。因此，Next 式（5）的基本重复计数结构不是新的数学技巧。正文已经承认 Stingray 的接近性，但建议更直接区分“已有重叠签名预算”与“本文针对持续责任、补偿和恢复建立的动态不变量”。
+    - 'link "arXiv: https://arxiv.org/html/2501.06531v1, https://arxiv.org/html/2501.06531v1"':
+      - /url: https://arxiv.org/html/2501.06531v1
+      - generic: arXiv
+  - paragraph:
+    - text: Next 真正增加的是：把所有可能已经形成的证书纳入责任集合；按全部 CAL 输出、包括找零预留；将证书级覆盖与实际消费产生的逐输出义务分开；再把补偿、迟到偿还和本地累计额度恢复连接起来。原签名成员利用后继区块公开的 QC 重建被扣留源交易，也是一项具体而非口号式的机制贡献。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - text: 此外，Snappy 已经使用客户和商户／状态维护者保证金支持快速接受支付，不能把“第三方抵押支持快速付款”视为 Next 独有。Next 更明确的区别是：
+    - strong: 对原生账本中已经执行的后继交易维持本金效果，并向缺失来源的直接发行者结算责任
+    - text: ，而不是简单地向受损商户补发一笔付款。
+    - 'link "NDSS Symposium: Snappy: Fast On-chain Payments with Practical Collaterals - NDSS Symposium, https://www.ndss-symposium.org/ndss-paper/snappy-fast-on-chain-payments-with-practical-collaterals/"':
+      - /url: https://www.ndss-symposium.org/ndss-paper/snappy-fast-on-chain-payments-with-practical-collaterals/
+      - generic: NDSS Symposium
+  - paragraph:
+    - strong: C3 是受限历史表示协议及其实现贡献，不是新的变色龙哈希原语。
+    - text: Reparo 等工作已经研究可公开验证的修复层；Next 的特定价值在于保持固定支付授权、输出引用和完整 BlockID，同时以已执行的决定与 Revision/Task 授权精确替换字节。这个组合具有技术内容，但它在整篇论文中的必要性和权重仍需比目前更有说服力。
+    - 'link "arXiv: https://arxiv.org/pdf/2001.00486, https://arxiv.org/pdf/2001.00486"':
+      - /url: https://arxiv.org/pdf/2001.00486
+      - generic: arXiv
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - strong: 实证贡献成立于明确、有限的范围。
+    - text: 本文提供的是一个真实实现中的连续支付、缺失源恢复、适配暂停和历史读取权衡的实验，而不是相对现有支付系统的全面性能领先证明。正文总体没有越过这一界线。
+  - heading "3. TDSC 适配性" [level=3]
+  - paragraph:
+    - text: 从选题看，拜占庭支付服务、持久化安全状态、资金覆盖、故障恢复及授权历史修改，都适合可靠与安全计算方向。我的疑问不是“题目是否属于 TDSC”，而是：
+    - strong: 在已有认证支付和重叠预算技术的基础上，本文是否充分证明了新增责任机制的可靠运行价值。
+  - paragraph: 目前，C2 已达到值得进一步审理的程度；C1 的创新主要依赖与 C2 的结合；C3 应定位为有明确附加性质、但非经济必需的扩展，而不宜与 C2 平分主线。
+  - heading "二、安全论证与协议自洽性" [level=2]
+  - heading "1. 主要优点：核心证明链条没有停留在抽象承诺" [level=3]
+  - paragraph:
+    - strong: 第一，唯一消费和局部额度回收之间的关系处理得较严谨。
+    - text: Lemma 2 使用固定路由、签名前原子输入锁和三签名法定人数交集排除冲突证书；Lemma 3 则要求一个已经成功公开执行的、同配置下的冲突 QC，才能证明旧局部批准不可能曾经形成有效 QC。这不是按超时猜测“应该没有证书”，也没有把额度释放误当作输入解锁。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - text: IV-C 对累计 Applied、原资源切片、不可变批准记录以及迟到 INSTALL 的处理，也与这一证明方向一致。
+    - strong: 按本文规则，我接受这种受限局部回收不会删去有效证书所需的资金覆盖见证。
+    - text: 这一接受以文稿描述的检查确实在实现中完整执行为前提。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - strong: 第二，Theorem 1 不只是证明一个责任数字上界，而是进一步连接到真实储备余额。
+    - text: 其关键在于：未执行源交易的完整金额一直占用签名容量，补偿本身不释放它；源交易执行时又同时偿还已补偿输出。于是诚实签名者的剩余预留能够覆盖相应
+    - math:
+      - generic: w
+      - generic: c
+    - text: w
+    - generic: c
+    - text: ，得到
+  - math:
+    - generic: "2"
+    - generic: Q
+    - generic: g
+    - generic: ≤
+    - generic: "3"
+    - generic: ⌊
+    - generic: "2"
+    - generic: B
+    - generic: g
+    - generic: /
+    - generic: "3"
+    - generic: ⌋
+    - generic: ≤
+    - generic: "2"
+    - generic: B
+    - generic: g
+    - generic: .
+  - text: "2"
+  - text: Q
+  - generic: g
+  - text: ≤
+  - text: 3⌊2
+  - text: B
+  - generic: g
+  - text: /3⌋ ≤
+  - text: "2"
+  - text: B
+  - generic: g
+  - text: .
+  - paragraph:
+    - text: 随后通过各 grant 的公共 Reserved/Spent 与账户余额不变量，推出开放缺口不超过实际储备。隐藏或尚未组装的证书也进入
+    - math:
+      - generic: C
+      - generic: g
+    - text: C
+    - generic: g
+    - text: ，避免了只看公共登记而漏算承诺的问题。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - strong: 第三，迟到源交易的处理没有明显的重复本金漏洞。
+    - text: Open→Fulfilled 与 Open→Repaired→Recovered 的分支、已消费实例保持已消费、偿还分支不再创建第二个输出，与 Theorem 2 的
+    - math:
+      - generic: U
+      - generic: +
+      - generic: A
+      - generic: −
+      - generic: D
+      - generic: =
+      - generic: C
+      - generic: "0"
+    - generic: U +
+    - generic: A −
+    - generic: D =
+    - text: C
+    - generic: "0"
+    - text: 相匹配。Theorem 3 又明确要求支付集合源闭合、无冲突、无环且每笔成功一次，并排除 FUEL 比较；它证明的是条件化的最终 CAL 持有人及储备一致性，而非任意交易最终成功或所有成本与延迟无关。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - strong: 第四，历史表示的授权边界定义得比“哈希不变所以安全”强得多。
+    - text: 论文明确区分兼容开口与修改授权，要求成功执行的决定和 Task 绑定精确字节，检查完整
+    - math:
+      - generic: (
+      - generic: H
+      - generic: b
+      - generic: ","
+      - generic: P
+      - generic: b
+      - generic: )
+    - text: (
+    - text: H
+    - generic: b
+    - text: ","
+    - text: P
+    - generic: b
+    - text: )
+    - text: ，保留原始命令用于回放，也明确指出仅有区块包含证明或相同 BlockID 不能证明修改已授权。这些都是重要优点。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - heading "2. 必须处理的问题 M1：有限额度下，局部批准可能造成整个组织停止认证" [level=3]
+  - paragraph:
+    - strong: 定位：III-C、IV-A、IV-C、V-F；补充材料 S3 的资本实验。
+  - paragraph:
+    - text: 论文已经披露 partial approvals 会保留容量，但这一限制的实际强度需要更明确展示。根据所写协议，可以构造以下
+    - strong: 模型层轨迹
+    - text: ；这不是我已在代码中复现的结果。
+  - paragraph:
+    - text: 设一个组织的四个成员均诚实，只有一个 CAL grant，
+    - math:
+      - generic: B
+      - generic: =
+      - generic: "300"
+    - generic: B =
+    - generic: "300"
+    - text: ，每成员一个 Worker，因此各有 200 的签名容量。四笔付款
+    - math:
+      - generic: T
+      - generic: "1"
+      - generic: ","
+      - generic: …
+      - generic: ","
+      - generic: T
+      - generic: "4"
+    - text: T
+    - generic: "1"
+    - text: ", … ,"
+    - text: T
+    - generic: "4"
+    - text: 各输出 100 CAL，使用互不冲突的本金与手续费输入、不同 Intent，其余资源均充足。四个客户端并发请求，消息按下表顺序到达：
+  - table:
+    - rowgroup:
+      - row "成员 容量耗尽前批准的付款 已预留容量":
+        - columnheader "成员"
+        - columnheader "容量耗尽前批准的付款"
+        - columnheader "已预留容量"
+    - rowgroup:
+      - row "200":
+        - cell:
+          - math:
+            - generic: M
+            - generic: "1"
+          - text: M
+          - generic: "1"
+        - cell:
+          - math:
+            - generic: T
+            - generic: "1"
+            - generic: ","
+            - generic: T
+            - generic: "2"
+          - text: T
+          - generic: "1"
+          - text: ","
+          - text: T
+          - generic: "2"
+        - cell "200"
+      - row "200":
+        - cell:
+          - math:
+            - generic: M
+            - generic: "2"
+          - text: M
+          - generic: "2"
+        - cell:
+          - math:
+            - generic: T
+            - generic: "2"
+            - generic: ","
+            - generic: T
+            - generic: "3"
+          - text: T
+          - generic: "2"
+          - text: ","
+          - text: T
+          - generic: "3"
+        - cell "200"
+      - row "200":
+        - cell:
+          - math:
+            - generic: M
+            - generic: "3"
+          - text: M
+          - generic: "3"
+        - cell:
+          - math:
+            - generic: T
+            - generic: "3"
+            - generic: ","
+            - generic: T
+            - generic: "4"
+          - text: T
+          - generic: "3"
+          - text: ","
+          - text: T
+          - generic: "4"
+        - cell "200"
+      - row "200":
+        - cell:
+          - math:
+            - generic: M
+            - generic: "4"
+          - text: M
+          - generic: "4"
+        - cell:
+          - math:
+            - generic: T
+            - generic: "4"
+            - generic: ","
+            - generic: T
+            - generic: "1"
+          - text: T
+          - generic: "4"
+          - text: ","
+          - text: T
+          - generic: "1"
+        - cell "200"
+  - button "Copy table":
+  - button "Expand table":
+  - paragraph:
+    - text: 此时每笔只有两份签名，均没有 QC；随后到达的请求都因容量不足被拒绝。按照签名前预留、重试复用批准以及禁止超时释放的规则，这一状态是可能的。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - text: 它也没有文中已有机制可自动触发的释放条件：没有 QC 就没有正常公开执行；没有成功执行的冲突 QC 就不能触发局部 invalidation；没有公开缺失输入义务，也就不能靠补偿路径处理。
+    - strong: 在没有额外充值或未描述恢复机制的情况下，储备未损失、公共负债为零，但组织无法继续认证。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph: 这个轨迹的意义必须准确界定：
+  - list:
+    - text: 它
+    - strong: 不是 Theorem 1 的反例
+    - text: ：没有 QC，
+    - math:
+      - generic: Q
+      - generic: g
+      - generic: =
+      - generic: "0"
+    - text: Q
+    - generic: g
+    - text: =
+    - generic: "0"
+    - text: ，资金安全仍成立。
+    - text: 它
+    - strong: 不是对 Theorem 4 明文条件的逻辑反驳
+    - text: ：该节要求有足够容量，并承认局部批准可能滞留。
+    - text: 它是一个重要的
+    - strong: 可用性与部署边界
+    - text: ：初始资金足够完成若干单笔付款，并不等于并发请求之后仍能完成任何一笔。局部批准回收只解决其中有公开赢家的情形，不能被理解为一般的额度僵局恢复。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - text: 这也与最接近工作有关：Stingray §5.3 明确讨论不同诚实验证者把预算用于不同交易、导致没有交易形成证书的停顿，并提供相应恢复设计。因此，两者的差异不应只按“可交换工作负载与支付链”划分，还应比较预算耗尽后的进展保障。
+    - 'link "arXiv: Stingray: Fast Concurrent Transactions Without Consensus, https://arxiv.org/html/2501.06531v1, 1 additional source"':
+      - /url: https://arxiv.org/html/2501.06531v1
+      - generic: arXiv
+      - generic: "+1"
+  - paragraph:
+    - strong: 最低处理要求
+    - text: 是：在当前实现上验证这类状态或说明哪条实际准入规则排除了它；给出有限额度与并发量下的运行条件，并说明停止后的恢复手段和资本代价。补充材料中的旧版本固定低额度实验只完成 46/6000 个双跳单元，并报告部分批准滞留，说明这个问题不是纯粹脱离工作负载的担忧；但它不能替代当前版本验证。
+    - button "Open preview of Next-review-supplement-English.pdf":
+      - generic: Next-review-supplement-English
+  - paragraph: 我不要求直接加入“不安全的超时解锁”。如果作者只主张有条件的服务可用性，可以通过明确运行约束及验证处理；如果希望主张突发并发后能自主恢复，则需要安全的准入或恢复机制及相应证明。
+  - heading "3. 已披露的 Intent 冲突不应被误判为新发现的资金安全漏洞" [level=3]
+  - paragraph:
+    - text: Lemma 5 已经明确给出跨组织、不同输入、相同 payer intent 的双 QC 情形，并说明其中一笔永久不能执行、其发行者可能承担补偿损失。这里不能因为“有两个 QC”就认定破坏唯一消费，因为消费的不是同一输入；也不能因为源交易不能偿还，就认定 Theorem 1 错误，因为该责任与预留仍被计入。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - text: 不过，这意味着系统提供的是
+    - strong: 有覆盖上界的保证，而不是对恶意客户无损的担保业务
+    - text: 。正文在经济风险段落已经承认这一点。论文应维持此界线，不应在应用讨论中把“本金有覆盖”进一步解释为“组织无需承担战略性损失”。永久冲突源的重复重试是已披露工程限制，我不把它单独列为推翻本文的主要问题。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - heading "4. 必须处理的问题 M2：最新实现对证明接口的组合验证仍不充分" [level=3]
+  - paragraph:
+    - strong: 定位：IV-G、Lemma 1、Lemmas 10–11、VI 开头；补充材料 S1–S3。
+  - paragraph:
+    - text: 本文不是仅调用原封不动的共识库。它改变了交易哈希、分片承诺及历史安装语义，因此“完整 BlockID 在候选体、POL、Locked/Valid、提交、同步和回放过程中始终正确配对”是关键安全接口。正文和 S1 对这一接口的描述是自洽的；
+    - strong: 我没有依据宣称该接口已被错误实现
+    - text: 。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+    - button "Open preview of Next-review-supplement-English.pdf":
+      - generic: Next-review-supplement-English
+  - paragraph: 需要确认的具体场景是：
+  - blockquote:
+    - paragraph: 一个后继先执行并产生义务，随后补偿、历史表示和源交易偿还依次发生；与此同时，一个落后副本重启或通过网络追赶，而且其物理历史版本与所回放的逻辑前缀暂时不同。
+  - paragraph:
+    - text: 这时必须验证：原始执行下载的是原始材料；经济命令不因读取修订体而重复或改变；补偿与偿还各计一次；在前缀
+    - math:
+      - generic: H
+    - generic: H
+    - text: 的读操作不会泄露较晚物理版本。
+    - strong: 若
+    - text: 同步路径误把修订分片当作原始块提供，按文中 revision/opening 检查至少可能导致追赶失败；是否存在这种情况需要代码或集成测试确认，不能从 PDF 推定已经发生。
+  - paragraph:
+    - text: 补充材料报告了真实阈值适配、分组表示、逐高度回放和 race tests，这是积极证据。但这些较完整记录主要属于较早构建；主实验是 721800c，局部 invalidation 为后续 bf71c4d，后者报告了定向重启测试及短功能回归。作者对版本的区分是诚实的，旧性能数字也不因此自动失效；不足在于
+    - strong: 最新组合系统的证据尚未连成一条完整链
+    - text: 。
+    - button "Open preview of Next-review-supplement-English.pdf":
+      - generic: Next-review-supplement-English
+    - button "Open preview of Next-review-supplement-English.pdf":
+      - generic: Next-review-supplement-English
+  - paragraph: 最低要求不是重跑所有历史表格，而是在同一个最新构建上补充少量关键组合测试：上述同步／历史版本场景，以及批准持久化、本地额度恢复和 follower cursor 在重启边界上的一致性；报告关键状态与断言，而不只是最终“测试通过”。
+  - heading "三、实验能支持什么，尚缺什么" [level=2]
+  - heading "1. 连续支付实验：对所声明结论有较强支持" [level=3]
+  - paragraph:
+    - text: VI-A 的对照是合理的同系统策略对照：两种模式都结束于最后一次认证接收，等待模式只增加 99 次跳间公开执行等待；成员签名前采用同步提交，两组均在线构造后续交易。这足以支持“在该部署中，取消逐跳公开执行等待显著缩短认证支付链完成时间”。4.557 s 对 64.476 s 是这个实验端点下的有效比较，而不是与另一系统不同终点的拼接。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - text: 尤其值得肯定的是，作者记录了所有 297 个后继请求相对于父交易应用提交的先后关系，而不只是相对于较晚的轮询观察。这加强了“确实在公开执行完成前继续请求”的证据。与此同时，实际形成的 child-before-source 缺口只有各轮 3、2、4 个，因此本实验主要验证连续认证路径，不能单独承担大规模乱序责任处理的证据。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph: 这里不需要强制加入 FastPay 或 Lightning 吞吐对比才能证明该结论。若要主张优于这些系统，则另需语义与持久化条件对齐的比较；当前正文没有提供这种证据，也总体没有作这种主张。
+  - heading "2. 混合负载与适配暂停：功能分离的证据充分，但不是零干扰证明" [level=3]
+  - paragraph:
+    - text: R 处理中 24 个被扣留源均通过公开证据恢复；C/P 中补偿与偿还完成；P 又要求所有副本确认偿还、且表示尚未完成后才恢复适配服务。这样的事件顺序能够支撑“经济结清不依赖适配服务”，比仅比较最终余额更有说服力。C/P 人为关闭自动恢复是合理的消融，不应因其不是默认配置而否定实验。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - text: 但这不等于适配或补偿对支付性能没有干扰。正文正确报告了并发上限命中、调度滞后及发送窗口变化，并拒绝把较低汇总分位数解释为性能改进。图 6 的区间也明确不是置信区间。84,192 笔完成和一致性审计是有价值的有限运行证据，不是持续吞吐或长期稳定性结果。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - heading "3. 历史读取：测量口径清楚，但不能据此归因于“修改历史本身更快”" [level=3]
+  - paragraph:
+    - text: VI-C 为两个策略规定了等价回答语义，并且明确限定为可信本地副本、热页、无解码对象缓存。把独立授权重检排除在这种可信读取端点之外，不构成不公平；远端不可信服务器认证也已明确不在范围内。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - text: 7.44–12.32% 的点读 P50 改善、0.28–2.19 MiB 的附加逻辑记录以及 43–214 ms 的本地维护成本，都有对应数据。作者还通过读取路径和分配量说明收益主要来自布局与重建，而非读取更少字节或密码学加速，这种解释是适当的。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - strong: 需要进一步说明的是 C3 的研究价值，而不只是补一个更漂亮的性能百分比。
+    - text: 两种策略仍然都要读取永久决定与义务状态，也都保留原始历史。那么，什么使用方必须获得“在原完整 BlockID 下可验证的替换字节”，而非“原块加经过认证的资金来源视图”？补充材料表 S8 清楚列出了两种接口，但尚未充分说明哪类实际需求值得承担这部分复杂度。
+    - button "Open preview of Next-review-supplement-English.pdf":
+      - generic: Next-review-supplement-English
+  - paragraph:
+    - text: 最低修改可以二选一：给出明确的接口使用需求，将 C3 定位为可选的历史表示能力；或者，若继续强调查询效率价值，增加尽量匹配存储布局和缓存策略的物化视图对照。
+    - strong: 我不把当前读取实验判为错误，也不要求 C3 必须在所有查询上获胜。
+  - heading "4. 必须处理的问题 M3：关键配置和实际认证／共识路径的运行证据不足" [level=3]
+  - paragraph:
+    - text: 正文主试验使用“足够的固定资金”，明确不测最低资本。这一范围限制可以接受，但
+    - strong: 实际使用了多少储备和 grant、每成员如何划分 Worker 资源、峰值预留多少，其中多少是局部批准而非已公开义务，仍应报告
+    - text: 。这些不是额外的经济学研究，而是解释延迟、拒绝和可用性的必要配置。仅给出“没有预算拒绝”不足以重建实验条件。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph: 还应提供实际密码学实例的关键参数，包括签名与阈值适配方案、RSA 模数位数及参数生成方式。抽象安全论证可以以正确参数为前提，但报告具体适配成本时，读者必须知道测量对象。
+  - paragraph:
+    - text: 网络方面，当前主实验全部在单机；旧版跨组织延迟实验只对 HTTP 跨站路径注入延迟，明确没有延迟组织内认证和委员会 P2P，因此不能用它替代对实际法定人数路径的验证。
+    - button "Open preview of Next-review-supplement-English.pdf":
+      - generic: Next-review-supplement-English
+  - paragraph: 最低补充应是一组当前构建的受控实验：在实际成员认证通信和委员会通信上施加非零延迟，并加入一个允许范围内的慢／不可用节点，观察认证延迟、公开完成、调度积压和额度恢复。可以使用受控网络仿真，不必扩展为大规模全球部署或最大吞吐竞赛。
+  - heading "四、结构、术语、图表和英文表达" [level=2]
+  - paragraph:
+    - strong: 整体英文已达到专业审稿可读水平，不需要全面重写。
+    - text: 图 1 能有效表达前台与后台的分离；图 2–4 的原子转移框有助于对应证明；主实验图表基本注明了端点、聚合方式和范围，尤其没有把三轮最小—最大值包装成统计置信区间。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph:
+    - text: 主要表达问题是
+    - strong: 信息分配和术语负担
+    - text: 。
+  - paragraph:
+    - text: Settled 可以同时存在 Pending，Repaired 表示经济补偿而非已修改历史，ReserveFunding 在偿还之后仍然保留。正文分别解释过，不能说这些概念完全未定义；但读者仍要跨多个章节反复校准含义。建议增加一张紧凑的状态表，对照“公开执行、经济义务、逻辑表示、物理安装”四个维度，而不是继续增加散落的限定句。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+  - paragraph: 主线方面，C2 是最强贡献，但大量篇幅转向历史修改、版本安装和不同构建沿革，使文章后半部接近两个系统论文的并置。补充材料对旧构建的诚实标注值得保留，但 S3–S5 重复描述较多。建议把最新构建的证明接口和验证结果置于最容易找到的位置，旧性能资料保留必要对照，其余放入清晰索引的工件档案。
+  - paragraph:
+    - text: 次要编辑问题包括：正文第 1 页的 “Lu Hengrun is with University.” 尚未完成；第 4 页 IntentID 公式附近标点衔接异常；补充材料第 13 页 S4-D 将资源和 LND 资料指向 S2，而相关内容实际位于 S3。正文图 7 出现在结论之后、末页参考文献及补充末页存在较大空白，也可在最终排版时整理。这些均不是决定性问题。
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+    - button "Open preview of Next-review-English.pdf":
+      - generic: Next-review-English
+    - button "Open preview of Next-review-supplement-English.pdf":
+      - generic: Next-review-supplement-English
+    - button "Open preview of Next-review-supplement-English.pdf":
+      - generic: Next-review-supplement-English
+  - heading "五、决定依据与足以改变判断的最小修改集合" [level=2]
+  - paragraph:
+    - text: 本文的主要优点可以归纳为：
+    - strong: 覆盖隐藏证书的动态资金不变量、保持后继本金效果的补偿与迟到偿还、公开 QC 驱动的源恢复，以及把历史表示权限与经济结算彻底分开的实现设计。
+    - text: 这些使我不倾向直接拒稿。
+  - paragraph: 但目前还不足以小修接收。关键差距不是再润色几个句子，而是有限额度下的运行边界与最新组合实现缺少直接验证。建议将修改控制在以下集合：
+  - table:
+    - rowgroup:
+      - row "问题 修改类型 最低完成标准":
+        - columnheader "问题"
+        - columnheader "修改类型"
+        - columnheader "最低完成标准"
+    - rowgroup:
+      - row "M1：部分批准造成认证停顿 文字澄清＋补充验证 验证上述或等价轨迹；说明实际准入限制、有限额度运行条件及停止后的恢复方式。不能仅再次声明“需要足够容量”。":
+        - cell "M1：部分批准造成认证停顿"
+        - cell "文字澄清＋补充验证":
+          - strong: 文字澄清＋补充验证
+        - cell "验证上述或等价轨迹；说明实际准入限制、有限额度运行条件及停止后的恢复方式。不能仅再次声明“需要足够容量”。"
+      - row "M2：最新实现与证明接口的对应 补充验证 同一最新构建完成关键重启、网络追赶、补偿—偿还—表示交错测试；展示输入锁、累计恢复、经济状态、完整 BlockID 与回放结果。无需重跑全部旧实验。":
+        - cell "M2：最新实现与证明接口的对应"
+        - cell "补充验证":
+          - strong: 补充验证
+        - cell "同一最新构建完成关键重启、网络追赶、补偿—偿还—表示交错测试；展示输入锁、累计恢复、经济状态、完整 BlockID 与回放结果。无需重跑全部旧实验。"
+      - row "M3：可复现配置与分布式路径 配置补全＋小规模实验 给出实际储备、grant、Worker、密码学参数和可获取的工件入口；补充实际认证／委员会路径上的延迟及单故障验证。":
+        - cell "M3：可复现配置与分布式路径"
+        - cell "配置补全＋小规模实验":
+          - strong: 配置补全＋小规模实验
+        - cell "给出实际储备、grant、Worker、密码学参数和可获取的工件入口；补充实际认证／委员会路径上的延迟及单故障验证。"
+      - row "创新性与 C3 定位 文字澄清；对照实验视主张而定 明确 Stingray 预算技术与本文动态责任证明的边界；说明 C3 的额外接口需求。若主要卖点仍是查询效率，再增加布局匹配对照。":
+        - cell "创新性与 C3 定位"
+        - cell "文字澄清；对照实验视主张而定":
+          - strong: 文字澄清；对照实验视主张而定
+        - cell "明确 Stingray 预算技术与本文动态责任证明的边界；说明 C3 的额外接口需求。若主要卖点仍是查询效率，再增加布局匹配对照。"
+  - button "Copy table":
+  - button "Expand table":
+  - paragraph:
+    - strong: 机制改动不是我根据现有材料作出的无条件要求。
+    - text: 若作者接受“有限资本、受控准入条件下的连续支付服务”这一定位，明确边界并补充验证即可继续评估；只有在主张并发额度僵局后的自主恢复时，才需要新增安全恢复机制。已经形成 QC 的责任不能因为超时、全局 Intent 失败或重试终止而直接释放。
+  - paragraph: 我也不把泛化到任意规模、支持动态成员重配置、实现远端轻客户端证明，或与所有支付系统全面跑分列为本轮必要条件。
+  - paragraph:
+    - strong: 最终建议仍为大修：保留核心机制和主要证明，补齐可靠运行边界及最新实现的关键证据。
+    - text: 若修订能够完成上述最小集合，且未在验证中暴露新的资金或身份一致性问题，本文有转为小修或接受的合理基础。
+  - button "Copy":
+  - button "Rate response":
+  - button "Share":
+  - button "Read aloud":
+  - button "Regenerate response":
+  - button "More actions":
+  - button "Sources":
+  - generic: ChatGPT can make mistakes. Check important info.
+  - button:
+  - heading "Latest response" [level=4]
+  - status
+  - textbox "Ask ChatGPT":
+    - paragraph: Ask ChatGPT
+  - button "Add files and more":
+  - button "Select ChatGPT model":
+    - generic: Pro
+  - button "Dictate":
+  - button "Start Voice":
+- status
+- status
+- status
+- status
+- status
+- status: Response complete

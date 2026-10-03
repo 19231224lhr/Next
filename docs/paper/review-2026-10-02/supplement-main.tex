@@ -1,5 +1,6 @@
+\RequirePackage[OT1]{fontenc}
 \documentclass[letterpaper,11pt,onecolumn,journal]{IEEEtran}
-\usepackage{amsmath,amssymb,booktabs,array,graphicx}
+\usepackage{amsmath,amssymb,booktabs,array,graphicx,algorithmic}
 \graphicspath{{figures/}{./}}
 \usepackage[hidelinks]{hyperref}
 \hypersetup{pdftitle={Supplementary Material for Next: Enabling Continuous UTXO Payments with Direct Guarantees},pdfauthor={Lu Hengrun}}
@@ -13,9 +14,12 @@
 \maketitle
 \input{supplement-security}
 \input{supplement-current}
+\input{supplement-revision}
 \input{supplement-methods}
 \input{supplement-archived}
 \clearpage
 \section{Per-Run Experimental Records}
 \input{supplement-tables}
+\bibliographystyle{IEEEtran}
+\bibliography{references}
 \end{document}

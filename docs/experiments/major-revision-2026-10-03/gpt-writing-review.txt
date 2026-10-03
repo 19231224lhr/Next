@@ -1,0 +1,313 @@
+核查结论
+
+B1/B2 的主要夹具问题已修正，支持按“确定性回归”口径落稿；目前未见需要修改生产协议的新反例。 实际保留的空继块认证前块，FinalizeBlock/Commit、重载校验及完整 BlockID 衔接均已进入源码；失败 Intent 命令也真实入块，其认证失败结果不会释放原签署者的额度。
+Pasted text
+ 
+Pasted text
+
+独立 Gap／Coverage／Usage 核算、补资资金来源、锁保留及完整 10,000 FUEL 输入检查已经补上。既有补偿负例和赢家回收正对照可以复用，不要求重复造测试。
+Pasted text
+ 
+Pasted text
+ 
+Pasted text
+
+仍有两个证据限定，而非新增研究要求：零／两票探针可能在编码器处就被拒绝，因此不能单凭该循环证明公共接收端拒绝；B0 还应挂接既有接收端验签测试和命令入口守卫。附件实际只附了 B 源码，没有 C 源码、decision_test 或 D2 原始记录；下述 C、D2 段落依据本次结果报告起草，不代表我已独立复跑或完成 C 的源码验收。C 所声明的本地持久重启与 Original 材料追赶范围可以接受，不要求改成网络下载演示。
+Pasted text
+ 
+Pasted text
+
+下面保留已有 section、定理和 label；新增公式及两张概览表不编号。
+
+1. security.tex
+替换 lem:security-intent 证明后的整段
+
+避免把“旧输入不能重花”误写成“后继价值不能循环使用”，同时保留证书责任和局部批准回收的区别。
+Pasted text
+ 
+Pasted text
+
+LaTeX
+If $T_2$ cannot execute but a consumer of its certified output does,
+the consumer registers an obligation against $G_2$. Compensation
+debits that issuer without making $T_2$ executable. Its approving
+members retain $r_{m,c}=a_c$, and its liability remains $w_c=a_c$.
+The original inputs stay locked, but a user controlling the consumer's
+output may use that new value in a later request. Repetition requires
+fresh paired Intents, usable routes, certification capacity, and fees;
+the final descendant must also retain a usable route. This reuses
+descendant value rather than unlocking the rejected source inputs.
+In user-funded mode, the rejected source retains locks on its complete
+FUEL inputs, not merely its signed escrow maximum.
+Theorem~\ref{thm:security-neutrality} excludes this case because not
+every payment succeeds. Terminating repeated submissions of the
+conflicting source would not authorize release of its certified
+liability.
+替换 thm:security-continuation 证明后的 Continuation requires... 段
+
+这里的充分条件只排除指定切片上的 CAL 容量拒绝，不冒充完整活性定理。
+
+LaTeX
+\noindent\textbf{Conditional progress.}
+Fix a CAL grant. For member $m$ and Worker $w$, let $C_{m,w}$ be
+the locally observed total slice capacity, Available plus Reserved.
+Let $L_{m,w}$ bound residual reservations outside a designated request
+set, and let $N_{m,w}\ge1$ bound its distinct requests that may
+simultaneously acquire or retain reservations, including the candidate.
+If each request reserves at most $a_{\max}$ CAL, including change, then
+\[
+  C_{m,w}\ge L_{m,w}+N_{m,w}a_{\max}
+\]
+excludes a CAL-capacity refusal for that candidate: other reservations
+occupy at most $L_{m,w}+(N_{m,w}-1)a_{\max}$. All competing reservations
+must be counted exactly once, including partial or abandoned approvals,
+certified but unreleased payments, and payments awaiting local
+reconciliation.
+
+The condition must hold at the relevant debit steps and slices of a
+responsive honest quorum. It is a workload condition, not a bound
+enforced across collectors. Input and Intent compatibility, sufficient
+fees and other resources, available evidence, and fair delivery and
+inclusion remain separate requirements. Source execution, economic
+closure, and representation have distinct progress conditions; none
+implies a universal completion deadline or timeout-based unlocking.
+替换末尾整个 Availability and guarantor risk 段
+LaTeX
+\noindent\textbf{Availability and guarantor risk.}
+Once a consumer exposes the source QC, at least two honest source
+signers retain its submission material
+(Lemma~\ref{lem:security-resubmission}). With fair delivery and
+inclusion, this supports resubmission of an executable source, but
+does not remove a permanent Intent conflict. A due obligation can
+instead close without adaptation
+(Lemma~\ref{lem:security-closure}).
+
+At every prefix,
+\[
+  0\le S_g=\sum_{c\in C_g}
+       \bigl(p_c-\mathsf{Rec}_c\bigr)\le Q_g\le B_g .
+\]
+For a fixed grant without further funding, this bounds unrepaid
+compensation, not lifetime gross Paid or the availability of individual
+signing slices. Certification can stop while reserve principal remains.
+When the hypotheses of Theorem~\ref{thm:security-neutrality} hold,
+terminal CAL holdings and reserves coincide; permanently unexecuted
+sources fall outside that comparison. Open deployment therefore accepts
+adversarial reserve losses and retained capacity, rather than merely
+an expected rate of accidental source failures. FUEL fees do not insure
+these losses, and no CAL--FUEL exchange value is assumed.
+2. protocol.tex
+在 sec:protocol-closure 末尾、下一小节之前加入 retention 表
+
+原有详细 invalidation 守卫保留；表中被回收的是不可能形成 QC 的旧局部批准。
+Pasted text
+
+LaTeX
+\noindent\textbf{Local retention cases.}
+The following cases distinguish resource restoration from input
+unlocking. Elapsed time alone authorizes neither.
+
+\par\smallskip
+{\small
+\setlength{\tabcolsep}{3pt}
+\noindent
+\begin{tabular}{@{}p{0.27\columnwidth}p{0.67\columnwidth}@{}}
+\toprule
+Approval state & Consequence under the existing rules \\
+\midrule
+Independent partial approvals without QCs &
+Capacity may be fragmented without public liabilities. Funded increases
+can enable completion but do not erase existing locks. \\
+
+All-honest same-input 2/2 split &
+Neither candidate can obtain a third signature. Additional capacity
+does not resolve the conflicting input locks. \\
+
+Superseded uncertified approval &
+A successfully executed conflicting QC under the same configuration
+proves that the old approval could not have formed a QC. The guarded
+invalidation restores only its residual local debits. \\
+
+QC-bearing Intent loser &
+Disjoint-input Intent rejection does not permit invalidation.
+The unexecuted source retains its signing reservation even after
+compensation. \\
+\bottomrule
+\end{tabular}
+\par}
+替换 sec:protocol-reader 最后一段，以四维表集中解释状态
+
+这里不把公共付款执行、义务关闭、逻辑表示及物理安装混成一条状态链。
+Pasted text
+ 
+Pasted text
+
+LaTeX
+\noindent\textbf{Four state dimensions.}
+These dimensions describe different objects and advance separately.
+
+\par\smallskip
+{\small
+\setlength{\tabcolsep}{3pt}
+\noindent
+\begin{tabular}{@{}p{0.24\columnwidth}p{0.70\columnwidth}@{}}
+\toprule
+Dimension & Meaning \\
+\midrule
+Public payment &
+\texttt{Settled} records successful execution. Its outputs are final
+even when its input-obligation count \texttt{Pending} is nonzero. \\
+
+Direct obligation &
+Open$\to$Fulfilled, or Open$\to$Repaired$\to$Recovered.
+Repaired denotes compensation; Recovered denotes subsequent repayment.
+The compensation decision persists. \\
+
+Logical representation &
+The revision in $V_H$ determines the slot.
+\texttt{OriginalFunding} does not imply absence of compensation.
+\texttt{ReserveFunding} records a historical advance and remains
+after repayment. \\
+
+Physical installation &
+$\rho_p$ records the installed block-store version.
+Installation progress does not determine the logical answer at $H$
+or change economic state. \\
+\bottomrule
+\end{tabular}
+\par}
+
+The reader therefore consults the permanent decision and obligation
+state together with the funding representation. A pending-representation
+entry is removable work state, not durable evidence that compensation
+occurred. None of these representation or installation changes credits
+a second principal amount to the consumer.
+3. model.tex
+
+在参与者段落之后、Faults and cryptography 之前加入以下段落；无需改动既有故障假设或增加准入机制。
+Pasted text
+ 
+Pasted text
+
+LaTeX
+\noindent\textbf{Collector access and deployment conditions.}
+Any client may relay an owner-authorized request; acting as collector
+grants neither spending authority nor organization-funded fees.
+Members still enforce ownership, input locks, resource grants, and
+the applicable fee policy. These per-request guards do not enforce
+a system-wide bound on unfinished approvals across collectors, and
+a gateway concurrency limit is not such a bound. The capacity condition
+in Section~\ref{sec:security-composition} therefore describes a
+controlled workload or an external deployment restriction. Without
+that restriction, an organization accepts the retained-capacity and
+reserve-loss boundaries analyzed there.
+4. evaluation.tex
+版本及测量范围衔接
+
+将开头从 The local invalidation transition... 起的四行替换为下段。9879f64 的生产快照称谓沿用上一附件的明确说明，不给新增测试虚构提交号。
+Pasted text
+
+LaTeX
+The local invalidation transition was introduced in patch
+\texttt{bf71c4d}. Separate deterministic boundary and replay regressions
+exercise candidate production snapshot \texttt{9879f64}, with additions
+confined to tests. These functional results do not replace the
+performance measurements of \texttt{721800c}.
+
+将 setup 末尾的 These finite single-host trials... 改为：
+
+LaTeX
+The timing trials do not measure restart recovery, sustainable
+throughput, or minimum capital. The persistent restart checks below
+are separate functional regressions.
+B：在 Archived evidence 之前加入
+
+结论限于实际测试：循环复用 A 侧返回价值，B 侧赢家使用不同初始输入；不声称已测出固定双侧本金循环或补偿前循环速率。
+Pasted text
+ 
+Pasted text
+
+LaTeX
+\noindent\textbf{Finite-capacity and Intent boundaries.}
+Deterministic regressions obtain actual member approvals, execute
+blocks through \texttt{FinalizeBlock}/\texttt{Commit}, and authenticate
+their results with retained empty successor blocks before member
+following. The harness fixes ordering and block time.
+
+With $B_g=300$ and one Worker per member, four independent 100-CAL
+requests each obtain two approvals, exhausting all four members'
+200-CAL capacities without a QC. A 150-CAL external reserve increase
+adds 100 capacity per member without deleting locks; the same requests
+then complete, leaving Available$=300$ and Reserved$=0$ per member.
+An all-honest same-input 2/2 split remains blocked after the same increase.
+
+Two cross-organization Intent-conflict rounds run under both user-funded
+and authorized organization-funded fees. Organization A's reserve falls
+from 300 to 200 and then 100 CAL; public Spent reaches 200 and Reserved
+returns to zero. The same three source signers each retain 200 locally,
+while the fourth retains its unused capacity; new requests cannot obtain
+a quorum from this slice. Authenticated failure results do not release
+the rejected approvals. Their original inputs remain publicly unspent
+and locally locked. User-funded runs additionally retain two complete
+10,000-FUEL inputs, distinct from their 1,000-FUEL escrow maxima.
+
+The first descendant funds the second A-side request, and the final
+descendant is successfully spent through B. Each B-side winner uses a
+different initial input, and the harness completes compensation before
+the next round. Independent sums check Open gaps, certificate coverage,
+grant usage, and CAL/FUEL conservation at every committed prefix.
+Repeated compensation produces no new changes, effects, or fee outputs.
+These results demonstrate finite reserve loss and conservative
+certification stoppage, not a network attack rate.
+C：紧接 B 段加入
+
+这一段只陈述本次提供的 C 结果，不增加未报告的网络下载、跨历史根相等或崩溃注入结论。
+Pasted text
+
+LaTeX
+\noindent\textbf{State-preserving restart and original-history replay.}
+With real threshold adaptation, regressions cover both
+compensation--representation--repayment and
+compensation--repayment--representation. A replay replica stops at
+height 2, reopens its retained persistent ledger, and catches up using
+\texttt{Original} material from a BlockStore that already contains
+revised bodies. Within each fixed command history, application roots
+and ledger rows match the reference at every replayed height.
+This exercises local persistent restart and original-history access,
+not network downloading or equality of application roots across
+different command orders.
+D2：加入 sec:eval-continuation，放在现有逐跳 commit 证据段之后
+
+D2 可以关闭原轮询设置与观测口径问题；保留端到端模式比，不新增基线。下面将两组数值写作配对观测区间，不把它们未经验证地拼成互不重叠的时延分解。
+Pasted text
+
+LaTeX
+\noindent\textbf{Inter-hop observation cost.}
+The driver polls every 5\,ms and the block follower every 25\,ms;
+250\,ms is the commit setting, not either polling interval.
+Matching the original 600 payment records to all four replicas'
+application-commit records identifies 99 inter-hop waits per waiting
+run. Receipt-to-public-observation intervals total
+56.851, 58.921, and 57.031\,s.
+For the same hops, earliest-replica-commit-to-driver-observation
+intervals total 29.542, 29.681, and 29.347\,s, with per-hop
+P50 approximately 297\,ms. The latter interval spans successor-header
+authentication, fetching and verification, local recording, observation,
+and replica differences; missing wallet-internal timestamps prevent
+further separation. Observation-to-next-build handoffs total only
+0.273, 0.314, and 0.315\,ms per run.
+
+The 14.15-fold ratio consequently compares the two measured
+end-to-end modes in this configuration. It is neither a pure consensus
+speedup nor a polling-only penalty, and these intervals do not establish
+a counterfactual event-driven result.
+
+D1 仍在执行，本次不加入其结果。B0 的接收端守卫证据和 C 源码核实尚不能据当前附件宣告完成，但不妨碍以上有明确来源、范围受限的正文修改。
+
+ChatGPT can make mistakes. Check important info.
+Latest response
+
+
+
+
+Pro

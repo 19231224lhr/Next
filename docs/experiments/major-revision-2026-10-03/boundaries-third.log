@@ -1,0 +1,19 @@
+=== RUN   TestRevisionCapacityFragmentationAndFunding
+    revision_boundaries_test.go:356: BOUNDARY {"height":0,"label":"four_independent_requests_two_votes_each","money":[1000002300,2000400000],"org0_CAL":300,"org0_FUEL":1000000000,"org0_member_CAL":[{"Available":0,"Reserved":200,"Generation":1},{"Available":0,"Reserved":200,"Generation":1},{"Available":0,"Reserved":200,"Generation":1},{"Available":0,"Reserved":200,"Generation":1}],"org0_usage":{"Reserved":0,"Spent":0},"org1_CAL":1000000000,"org1_FUEL":1000000000,"org1_member_CAL":[{"Available":666666666,"Reserved":0,"Generation":1},{"Available":666666666,"Reserved":0,"Generation":1},{"Available":666666666,"Reserved":0,"Generation":1},{"Available":666666666,"Reserved":0,"Generation":1}],"org1_usage":{"Reserved":0,"Spent":0},"public_records":null}
+    revision_boundaries_test.go:367: public h=1: invalid protocol rule
+--- FAIL: TestRevisionCapacityFragmentationAndFunding (0.01s)
+=== RUN   TestRevisionSplitInputNotUnlockedByFunding
+    revision_boundaries_test.go:401: BOUNDARY {"height":0,"label":"before_funding","money":[1000002300,2000400000],"org0_CAL":300,"org0_FUEL":1000000000,"org0_member_CAL":[{"Available":100,"Reserved":100,"Generation":1},{"Available":100,"Reserved":100,"Generation":1},{"Available":100,"Reserved":100,"Generation":1},{"Available":100,"Reserved":100,"Generation":1}],"org0_usage":{"Reserved":0,"Spent":0},"org1_CAL":1000000000,"org1_FUEL":1000000000,"org1_member_CAL":[{"Available":666666666,"Reserved":0,"Generation":1},{"Available":666666666,"Reserved":0,"Generation":1},{"Available":666666666,"Reserved":0,"Generation":1},{"Available":666666666,"Reserved":0,"Generation":1}],"org1_usage":{"Reserved":0,"Spent":0},"public_records":null}
+    revision_boundaries_test.go:390: public h=1: invalid protocol rule
+--- FAIL: TestRevisionSplitInputNotUnlockedByFunding (0.01s)
+=== RUN   TestRevisionIntentTwoRoundCompensation
+=== RUN   TestRevisionIntentTwoRoundCompensation/owner_fee_true
+    revision_boundaries_test.go:418: public h=1: invalid protocol rule
+=== RUN   TestRevisionIntentTwoRoundCompensation/owner_fee_false
+    revision_boundaries_test.go:418: public h=1: invalid protocol rule
+--- FAIL: TestRevisionIntentTwoRoundCompensation (0.02s)
+    --- FAIL: TestRevisionIntentTwoRoundCompensation/owner_fee_true (0.01s)
+    --- FAIL: TestRevisionIntentTwoRoundCompensation/owner_fee_false (0.01s)
+FAIL
+FAIL	utxo/internal/redaction	0.896s
+FAIL

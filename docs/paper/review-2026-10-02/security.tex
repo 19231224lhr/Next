@@ -87,7 +87,21 @@ Let $T_1\ne T_2$ be payments with the same Network, Subject, and Nonce, spending
 Each organization holds its own local intent record and the approvals concern disjoint inputs, so neither organization observes a conflict, and the owner's authorization covers each payment. At public execution, the evaluation returns a conflict when the intent is already bound to a different TxID. The binding is written in the transition that executes a payment successfully, and no production path deletes or rebinds it, so the other payment stays unexecuted whatever its resubmission. A different Subject yields a different intent.
 \end{IEEEproof}
 
-If $T_2$ cannot execute but a successor of its output has executed, the successor has registered an obligation against $G_2$. After the deadline, the reserve of $G_2$ can be debited, but the source cannot repay by resubmission. Since $z_c=0$, the approving members of $G_2$ keep $r_{m,c}=a_c$ reserved, which Theorem~\ref{thm:security-coverage} already counts with $w_c=a_c$. The inputs of $T_2$ remain under the original approval locks, so this is not a user recovering and respending the principal. Theorem~\ref{thm:security-neutrality} excludes the case, because it assumes that every payment succeeds once. The current relay may continue retrying a permanently conflicting source; retry termination is a separate engineering follow-up and cannot release its certified liability.
+If $T_2$ cannot execute but a consumer of its certified output does,
+the consumer registers an obligation against $G_2$. Compensation
+debits that issuer without making $T_2$ executable. Its approving
+members retain $r_{m,c}=a_c$, and its liability remains $w_c=a_c$.
+The original inputs stay locked, but a user controlling the consumer's
+output may use that new value in a later request. Repetition requires
+fresh paired Intents, usable routes, certification capacity, and fees;
+the final descendant must also retain a usable route. This reuses
+descendant value rather than unlocking the rejected source inputs.
+In user-funded mode, the rejected source retains locks on its complete
+FUEL inputs, not merely its signed escrow maximum.
+Theorem~\ref{thm:security-neutrality} excludes this case because not
+every payment succeeds. Terminating repeated submissions of the
+conflicting source would not authorize release of its certified
+liability.
 
 \begin{lemma}[Compensation takes effect at most once]
 \label{lem:security-decision}
@@ -324,7 +338,62 @@ or re-execution.
 Lemma~\ref{lem:security-consumption} fixes ownership and excludes conflicting consumption, and atomic execution couples each missing consumption with its obligation and outputs. Theorem~\ref{thm:security-coverage} supplies funding, Theorem~\ref{thm:security-conservation} accounts for closure and late sources, Lemma~\ref{lem:security-original} identifies the executed history, Lemma~\ref{lem:security-resubmission} bounds resubmission, Lemma~\ref{lem:security-decision} bounds compensation, and Lemmas~\ref{lem:security-repair}--\ref{lem:security-installation} restrict later changes. Induction over the joint local and public transitions composes these properties. \texttt{INSTALL} retains local consumption effects and leaves public assets unchanged. A compensation decision may change Pending, fees, and reserve balances without repeating successor principal, and representation and physical installation change none of them.
 \end{IEEEproof}
 
-Continuation requires responsive honest quorums, available evidence, sufficient fees and Worker or work capacity, and fair delivery and inclusion. Partial approvals and unused promises can retain capacity, and timeouts never authorize unlocking. These are progress conditions without a universal completion deadline. Three conditions are separate: resubmission of a source, economic closure of an obligation, and completion of its representation.
+\noindent\textbf{Local retention cases.}
+The following cases distinguish resource restoration from input
+unlocking. Elapsed time alone authorizes neither.
+
+\par\smallskip
+{\small
+\setlength{\tabcolsep}{3pt}
+\noindent
+\begin{tabular}{@{}p{0.27\columnwidth}p{0.67\columnwidth}@{}}
+\toprule
+Approval state & Consequence under the existing rules \\
+\midrule
+Independent partial approvals without QCs &
+Capacity may be fragmented without public liabilities. Funded increases
+can enable completion but do not erase existing locks. \\
+
+All-honest same-input 2/2 split &
+Neither candidate can obtain a third signature. Additional capacity
+does not resolve the conflicting input locks. \\
+
+Superseded uncertified approval &
+A successfully executed conflicting QC under the same configuration
+proves that the old approval could not have formed a QC. The guarded
+invalidation restores only its residual local debits. \\
+
+QC-bearing Intent loser &
+Disjoint-input Intent rejection does not permit invalidation.
+The unexecuted source retains its signing reservation even after
+compensation. \\
+\bottomrule
+\end{tabular}
+\par}
+
+\noindent\textbf{Conditional progress.}
+Fix a CAL grant. For member $m$ and Worker $w$, let $C_{m,w}$ be
+the locally observed total slice capacity, Available plus Reserved.
+Let $L_{m,w}$ bound residual reservations outside a designated request
+set, and let $N_{m,w}\ge1$ bound its distinct requests that may
+simultaneously acquire or retain reservations, including the candidate.
+If each request reserves at most $a_{\max}$ CAL, including change, then
+\[
+  C_{m,w}\ge L_{m,w}+N_{m,w}a_{\max}
+\]
+excludes a CAL-capacity refusal for that candidate: other reservations
+occupy at most $L_{m,w}+(N_{m,w}-1)a_{\max}$. All competing reservations
+must be counted exactly once, including partial or abandoned approvals,
+certified but unreleased payments, and payments awaiting local
+reconciliation.
+
+The condition must hold at the relevant debit steps and slices of a
+responsive honest quorum. It is a workload condition, not a bound
+enforced across collectors. Input and Intent compatibility, sufficient
+fees and other resources, available evidence, and fair delivery and
+inclusion remain separate requirements. Source execution, economic
+closure, and representation have distinct progress conditions; none
+implies a universal completion deadline or timeout-based unlocking.
 
 \begin{lemma}[Economic closure does not wait for adaptation]
 \label{lem:security-closure}
@@ -342,31 +411,25 @@ The decision path validates the obligation and the historical slot and performs 
 \end{IEEEproof}
 
 \noindent\textbf{Availability and guarantor risk.}
-Safety, progress, and economics are separate questions.
+Once a consumer exposes the source QC, at least two honest source
+signers retain its submission material
+(Lemma~\ref{lem:security-resubmission}). With fair delivery and
+inclusion, this supports resubmission of an executable source, but
+does not remove a permanent Intent conflict. A due obligation can
+instead close without adaptation
+(Lemma~\ref{lem:security-closure}).
 
-\emph{Safety.} Theorem~\ref{thm:security-coverage} bounds the outstanding CAL liability
-of all certified payments, including unpublished ones.
-
-\emph{Progress.} A source advances when an honest relay holds its
-submission material (transaction, admission vector, organization
-authorization, direct input certificates) and the fee, capacity,
-quorum, and scheduling conditions hold; delivery time is unbounded. By
-Lemma~\ref{lem:security-resubmission}, at least two honest signers hold
-this material once an obligation is public. A deadline can still pass
-under congestion or a short outage. If the source is still absent when
-the compensation decision executes, the decision closes the obligation
-without adaptation (Lemma~\ref{lem:security-closure}); the issuer
-advances the missing principal, and the source repays it on execution.
-Representation completes when adaptation contributions are available.
-
-\emph{Economics.} When all sources of a payment set execute,
-Theorem~\ref{thm:security-neutrality} gives unchanged final holders and
-reserves. The approval endpoint authenticates owner, budget, and inputs
-and ignores the caller's role, so any client can act as collector.
-Because the original signers resubmit, a collector that withholds the
-certificate cannot by itself keep a source unexecuted once its successor
-has executed. A source stays unexecuted, and its compensated amount
-stays a loss of its issuer, only when the resubmitted payment fails to
-execute through unavailable followers, delivery, or inclusion, or
-through its own execution rules. Reserve sizing reflects the expected
-rate of such sources, and fees do not insure against them.
+At every prefix,
+\[
+  0\le S_g=\sum_{c\in C_g}
+       \bigl(p_c-\mathsf{Rec}_c\bigr)\le Q_g\le B_g .
+\]
+For a fixed grant without further funding, this bounds unrepaid
+compensation, not lifetime gross Paid or the availability of individual
+signing slices. Certification can stop while reserve principal remains.
+When the hypotheses of Theorem~\ref{thm:security-neutrality} hold,
+terminal CAL holdings and reserves coincide; permanently unexecuted
+sources fall outside that comparison. Open deployment therefore accepts
+adversarial reserve losses and retained capacity, rather than merely
+an expected rate of accidental source failures. FUEL fees do not insure
+these losses, and no CAL--FUEL exchange value is assumed.

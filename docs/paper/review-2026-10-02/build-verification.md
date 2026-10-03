@@ -1,4 +1,31 @@
-# 局部批准回收修订：编译与交付核查（2026-10-03）
+# 完整大修补证：编译与交付核查（2026-10-03）
+
+## 当前交付
+
+实验、代码回归和本地双语论文修订完成；**Overleaf最后同步待办**。浏览器CUA内核初始化持续报“failed to write kernel assets / 系统找不到指定的路径”，因此不能将旧在线校验当成本次结果。下方历史记录保留作版本追溯。
+
+| 根文件 | 最终本地引擎 | 页数 | 编译错误 / Overfull / 缺字 |
+|---|---|---:|---|
+| main.tex | Tectonic 0.17.0 XeTeX/BibTeX | 18 | 0 / 0 / 0 |
+| main-zh.tex | 同上 | 19 | 0 / 0 / 0 |
+| supplement-main.tex | 同上 | 20 | 0 / 0 / 0 |
+| supplement-main-zh.tex | 同上 | 21 | 0 / 0 / 0 |
+
+使用bundle v33。英文显式OT1；中文Fandol/TeX Gyre使用字体文件名。仍有Underfull及捆绑algorithmic源文件编码提示，没有未定义引用、PDF替换字符、空白页或页面外文字；未通过缩小字体/页边距挤页。正文18页不是投稿接受或当前收费政策的保证。
+
+- [本轮检查程序](../../experiments/major-revision-2026-10-03/check_delivery.py)检查四PDF与编译日志、生成逐页联系表和可复现源码ZIP；全部页面联系表已目视核对。
+- `data/check-manuscripts.py` 四根引用/图片检查及双语公式、证明、表内数字检查通过；两处已人工核对的公式条件文字允许忠实翻译，其余公式结构仍严格匹配。
+- `data/check-current-measurements.py`、新网络及提案覆盖分析从记录重算通过。原 `721800c` 与新 `9879f64` 证据独立归属。
+- `pdf-checks.json`、`source-checks.json`、`bilingual-checks.json`、`SHA256.json` 是本轮结果。四PDF及 `Next-review-2026-10-03-LaTeX.zip` 为最新本地交付。
+- 原Overleaf英文补充预览曾因缺algorithmic报错；已在本地两种补充根文件修正并成功编译。旧 `compile-supplement.txt` 保留错误轨迹；以 `compile-local-*.log` 为最终日志。
+- Claude起草/精简英文和主要中文章节；GPT复核数学、状态与测量口径并翻译安全和新增补充章节；Codex核对源码与记录、校对并编译。双方不被描述为独立执行实验。
+- 投稿前仍需用户提供真实单位和通讯信息，当前University占位按既定要求保留。官方格式与AI披露核对见 [submission-check.md](../../experiments/major-revision-2026-10-03/submission-check.md)。
+
+恢复浏览器后只需上传当前源包、分别用既定引擎编译四根、下载在线源包作逐文件对照并恢复英文main.tex；不需要重跑实验。
+
+---
+
+## 上一轮局部批准回收修订（历史记录，非本轮交付状态）
 
 本轮代码补丁为 `bf71c4d`。论文增加局部批准失效转换及窄引理，修正引言与剩余容量论证，保留主实验冻结评估构建 `721800c` 的所有测量。新回归与旧性能结果分开。
 

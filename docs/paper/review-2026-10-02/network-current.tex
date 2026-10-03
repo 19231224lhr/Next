@@ -1,0 +1,44 @@
+\subsection{Injected Latency and Single-Fault Runs}
+\label{sec:eval-faults}
+On \texttt{9879f64}, four conditions run three times each in alternating
+order. H uses the injection proxies without added delay; L adds 25\,ms
+per direction to member RPC and committee P2P traffic. L-M and L-C
+add that delay and suspend member~3 or committee validator~3,
+respectively, from 15 to 45\,s. Each run sends 100 warm-up payments,
+1,200 ordinary payments at 20/s, and two 10-hop chains starting inside
+the fault window. The actual health-RPC RTT rises from 1.17 to
+52.20\,ms; both RPC and P2P mean holds are about 25.2\,ms per direction.
+The supplement specifies the FIFO injection, fixed resources and per-run results.
+
+All 15,840 payments close, with equal committee states, empty outboxes
+and zero public gap. No compensation is needed.
+Table~\ref{tab:eval-faults} separates receipt, public observation and
+observation of all four members. With one member suspended, new QCs
+use the other three members and public completion continues, while
+the absent member's observation creates a peak of 630--641 outstanding
+tasks. With a validator suspended, receipt P95 remains 108--111\,ms
+and 400--510 payments reach public observation inside each fault
+window, but public P95 rises to 9.5--12.6\,s. Retained commit
+certificates verify five paused-validator round-0 proposer opportunities
+per run; each commits in round~1 without that validator's signature.
+Both chains finish certification within each fault window, and every
+run drains within 1.25\,s of its last ordinary send. These are
+single-host injected-delay results, separate from the fast/wait comparison.
+
+\begin{table}[t]
+\caption{Injected latency and single faults: medians of three run-level
+statistics over all 1,200 ordinary payments per run; warm-up and chains are excluded. Public and member columns are send-to-observation P95;
+the member column waits for all four members.}
+\label{tab:eval-faults}
+\centering\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Condition & Receipt P50/P95 (ms) & Public (s) & Members (s)\\
+\midrule
+H   & 41.56/83.20  & 1.28 & 1.36\\
+L   & 81.91/118.22 & 1.32 & 1.41\\
+L-M & 77.71/112.85 & 1.30 & 29.00\\
+L-C & 77.41/109.32 & 10.02 & 10.04\\
+\bottomrule
+\end{tabular}
+\end{table}

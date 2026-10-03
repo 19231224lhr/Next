@@ -14,13 +14,12 @@ We evaluate certified continuation, source resolution during ordinary
 traffic, and local historical reading on frozen evaluation build
 \texttt{721800c}. It integrates independent compensation decisions,
 public-certificate source recovery, and one-to-one input-certificate
-checks. The two network experiments use identical node binaries and
+checks. The continuation and mixed-load experiments on that build use identical node binaries and
 Comet sources; additions are confined to observation and offline test
 tools. Artifacts retain source/overlay/binary fingerprints and per-run records.
-The local invalidation transition was added in patch \texttt{bf71c4d};
-its targeted tests and short functional regressions are reported separately
-in the supplement. The measurements below retain their original build
-and do not measure that transition.
+The local invalidation transition was introduced in patch
+\texttt{bf71c4d}. Boundary/replay regressions and the injected-latency study use production snapshot \texttt{9879f64}. Their test and driver additions are fingerprinted separately; node paths are unchanged. These functional results do not replace the
+performance measurements of \texttt{721800c}.
 
 \noindent\textbf{Setup and measurement.}
 Experiments use one Mac Studio M4 Max with 16 CPU cores, 64\,GiB RAM,
@@ -37,8 +36,9 @@ and atomic local recording. Public and member observations include
 block following and driver polling; the chain experiment separately records
 application-commit completion. Unless stated otherwise, summaries take
 the median of three run-level statistics, not pooled transaction
-quantiles; ranges describe runs, not confidence intervals. These finite single-host trials do not measure crash recovery,
-sustainable throughput, or minimum capital.
+quantiles; ranges describe runs, not confidence intervals. The timing trials do not measure restart recovery, sustainable
+throughput, or minimum capital. The persistent restart checks below
+are separate functional regressions.
 
 \subsection{Continuous Spending Without Per-Hop Settlement}
 \label{sec:eval-continuation}
@@ -64,7 +64,7 @@ every retry or the entire difference to consensus waiting.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{continuation-final.pdf}
-  \caption{Final-build 100-hop chains: three runs per mode, synchronous
+  \caption{Build-721800c 100-hop chains: three runs per mode, synchronous
     members and NoSync wallets. Both modes end at the last certified
     receipt; only wait mode requires public observation between hops.}
   \label{fig:continuation}
@@ -77,6 +77,16 @@ The minimum lead is 224.785\,ms. These records timestamp database commit, not co
 Later driver observations are not original wallet-validation timestamps. Actual missing-input records, rather than send
 ordering, establish 3, 2, and 4 child-before-source executions, all
 fulfilled without compensation.
+
+The driver polls every 5\,ms and the follower every 25\,ms; 250\,ms
+is the commit setting. Across the 99 inter-hop waits per waiting run,
+earliest-replica application commit to driver observation totals
+29.542, 29.681, and 29.347\,s. This joint interval includes
+successor-header availability, fetching, verification, local recording,
+and replica differences. Wallet-internal timestamps do not separate these
+terms. Thus 14.15 is the measured end-to-end mode ratio, not a pure
+consensus speedup or polling penalty. The supplement gives the matched
+intervals and observation-to-next-build times.
 
 Fast medians are 5.228\,s for last-payment public observation,
 5.229\,s for all-payment public observation, and 5.294\,s for all-payment
@@ -189,6 +199,8 @@ budget rejection. N/R spend 659,504\,FUEL per run; C/P spend 659,544,
 including eight additional 5-FUEL compensation fees. Actual fee
 expenditure is not restored as available funding.
 
+The archived scheduled-to-receipt P95s, computed per payment before aggregation, are 304/140/475/667\,ms for N/R/C/P. This includes pre-send backpressure; the supplement records the timestamp convention and small wall-clock anomalies separately from actual-send receipt latency.
+
 \subsection{Historical Reading: Equivalent Answers and Explicit Costs}
 \label{sec:eval-reader}
 
@@ -259,11 +271,6 @@ BlockStore Gets returning 622,183\,B; B performs none but reads
 benefit, not fewer total bytes or cryptographic acceleration.
 Decoded-object caching could change that tradeoff.
 
-From already decoded $(256,8)$ run-1 objects, separate authorization
-rechecks cost about 26.3\,ms per block on both paths, input-CH
-checks 10.3\,ms, and complete BlockID reconstruction 0.67\,ms.
-These independent rechecks are excluded from trusted-reader timings.
-
 Representation adds 0.28--2.19\,MiB of net logical KV per repaired
 block, for revisions, tasks, and backup/history records, net of deleted Pending. The $(256,8)$ 5,056-B batch is already
 included. Local sequential adaptation, assembly, Finalize, synchronous
@@ -271,15 +278,7 @@ application Commit, and materialization total 43--214\,ms.
 It excludes network/consensus waits, public-block saving, and
 commit-signature construction. Common compensation costs are reported separately.
 
-\begin{figure*}[t]
-  \centering
-  \includegraphics[width=\textwidth]{reader-cost.pdf}
-  \caption{Reader tradeoffs. (a,b) Medians and min--max ranges of three
-    run-level P50s. (c) Mean major logical-record bytes. (d) Mean
-    sequential stage costs, not the median total work in
-    Table~\ref{tab:eval-reader}.}
-  \label{fig:reader-cost}
-\end{figure*}
+
 
 Equivalence checks cover compensation before representation,
 representation before materialization, and repayment preserving the
@@ -291,6 +290,21 @@ Canonical offers authorized funding representation at stable
 historical coordinates, with measured maintenance costs, rather
 than an economically necessary or universally faster alternative
 to indexed history.
+
+\input{network-current}
+
+\subsection{Current-Build Boundary and Composition Checks}
+\label{sec:eval-boundaries}
+Deterministic tests on \texttt{9879f64} use actual member approvals,
+ABCI execution, and authenticated follower updates. They reproduce
+no-QC capacity fragmentation, a same-input 2/2 split, and two
+Intent-conflict compensation rounds with complete CAL/FUEL accounting.
+An external top-up resolves the first case but not the second. Real
+threshold adaptation covers both representation/repayment orders;
+retained-state restart reproduces each original command history.
+A commit-before-signature interruption preserves locks and reservations
+and permits an idempotent retry. The supplement gives the per-prefix
+ledgers, negative-entry tests, and restart assertions.
 
 \noindent\textbf{Archived evidence.}
 The supplement retains earlier continuation, throughput, capital,

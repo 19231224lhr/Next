@@ -1,7 +1,24 @@
 \begin{abstract}
-Continuous payments let a recipient spend an output before its creating transaction executes publicly. In the Next UTXO ledger, a recipient verifies a quorum-signed output certificate (TXCer) after one certification round and can then request a successor, while replication and public execution proceed in the background. If the successor executes first, the committee consumes the missing input and records a direct obligation against its issuer. The issuer's original signers can resubmit the source from the certificate that the successor's block publishes. If the source is still absent at its deadline, a public decision debits the issuer's reserve, and a late source repays it. Restricted chameleon-hash commands later record the debit in the stored block, preserving owner authorizations, successor references, and the complete BlockID; economic closure does not wait for them. For four-member organizations and a four-validator committee, each requiring three votes and containing at most one static Byzantine member, we prove unique consumption, funding of every certificate's outstanding CAL liability, and delay-neutral terminal CAL holdings for source-closed, conflict-free payment sets. On one host with synchronous member commits, a 100-hop chain reaches its last certified receipt in a median 4.557\,s, versus 64.476\,s with per-hop waiting.
+Continuous payments let a recipient spend an output before its creating
+transaction executes publicly. Next is a native UTXO ledger in which a
+recipient verifies a quorum-signed output certificate (TXCer) after one
+certification round and can request a successor while public processing
+continues. If the successor executes first, the committee records a funded
+obligation against the direct issuer. Original signers can resubmit the
+source from its publicly exposed certificate. A deadline-triggered decision
+debits the issuer's reserve, and a late source repays it. Optional authorized
+history commands then record the reserve reference at the original
+coordinates while preserving owner authorizations, successor references,
+and the complete BlockID. For four-member organizations and a four-validator
+committee, each requiring three votes with at most one static Byzantine
+member, we prove unique consumption, coverage of outstanding certificate
+liability, and delay-neutral terminal CAL holdings for source-closed,
+conflict-free payment sets. On one host with synchronous member commits,
+a 100-hop chain reaches its last certified receipt in a median 4.557\,s,
+versus 64.476\,s with per-hop waiting. Targeted boundary and restart tests
+validate the conditions on capacity, economic closure, and historical reads.
 \end{abstract}
-
 \begin{IEEEkeywords}
-UTXO payments, payment guarantees, Byzantine fault tolerance, authorized historical representation.
+Blockchain, certified payments, collateral, Byzantine fault tolerance,
+chameleon hash.
 \end{IEEEkeywords}

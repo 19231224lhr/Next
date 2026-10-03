@@ -30,6 +30,18 @@ Next operates a native UTXO ledger. CAL carries payment value and FUEL pays proc
 
 Each organization has four fixed members and a replaceable collector. Members validate requests independently and authorize payments, while the collector distributes requests, assembles certificates, and coordinates propagation without spending authority. A separate committee $\mathcal C$ of four equally weighted validators, with three votes required, orders public commands and maintains accounts, outputs, obligations, and compensation decisions.
 
+\noindent\textbf{Collector access and deployment conditions.}
+Any client may relay an owner-authorized request; acting as collector
+grants neither spending authority nor organization-funded fees.
+Members still enforce ownership, input locks, resource grants, and
+the applicable fee policy. These per-request guards do not enforce
+a system-wide bound on unfinished approvals across collectors, and
+a gateway concurrency limit is not such a bound. The capacity condition
+in Section~\ref{sec:security-composition} therefore describes a
+controlled workload or an external deployment restriction. Without
+that restriction, an organization accepts the retained-capacity and
+reserve-loss boundaries analyzed there.
+
 \noindent\textbf{Faults and cryptography.}
 The adversary corrupts statically at most one member per organization and one committee validator throughout an execution; users and collectors behave arbitrarily. Honest participants share the network configuration, genesis, rules, and organization registry, and each route names one active configuration and one consumption-lock domain. Signatures are unforgeable, canonical digests and original block commitments are binding, and messages may be delayed arbitrarily.
 
@@ -50,9 +62,9 @@ A TXCer pairs a summary with a quorum certificate (QC): three distinct member si
 Each payment carries
 \[\begin{aligned}
 \mathsf{IntentID}=\operatorname{Digest}(&\texttt{INTENT},\mathit{Network},\\
-&\mathit{Subject},\mathit{Nonce}).
+&\mathit{Subject},\mathit{Nonce}),
 \end{aligned}\]
-, which names an operation of one payer on one network; it is not a nonce space shared among users. Members keep local intent records per organization, whereas public execution binds an intent to one TxID in the same atomic transition that executes the payment successfully. Two organizations can therefore certify, from independent inputs, two payments with the same subject and nonce and both obtain QCs, but at most one executes publicly.
+which names an operation of one payer on one network; it is not a nonce space shared among users. Members keep local intent records per organization, whereas public execution binds an intent to one TxID in the same atomic transition that executes the payment successfully. Two organizations can therefore certify, from independent inputs, two payments with the same subject and nonce and both obtain QCs, but at most one executes publicly.
 
 Three events recur: \emph{certified receipt}, where the wallet verifies and records an output locally; \emph{public execution}, where a committed command consumes inputs and creates outputs; and \emph{liability closure}, where a missing source is fulfilled or compensated. Compensation closes a liability economically, and representation records the closure later in stored history. Receipt supplies evidence for a successor request, which undergoes its own authorization and resource checks. Throughout, the \emph{source} of an output (also its parent) is the payment that creates it, and its \emph{consumer} (also its successor or child) is the payment that spends it. Child outputs are the outputs that the consumer creates. Source arrival means successful public execution of the source transaction, which the implementation's \texttt{Settled} flag marks and which may coexist with nonzero \texttt{Pending}.
 
@@ -74,5 +86,3 @@ Representation commands then replace the funding reference of a decided input wi
 Alice pays Bob 100 CAL through $G_A$, creating output $x$ routed to $G_B$. Bob verifies its TXCer and obtains a certificate for a payment to Carol. If Bob's payment executes first, the committee consumes $(x,0)$, records a 100-CAL obligation against $G_A$, and creates Bob's outputs. Carol continues from Bob's payment without Alice's transaction body, and the block that carries Bob's payment also carries the certificate of Alice's payment, so members of $G_A$ that approved it can resubmit it when Alice's wallet does not.
 
 Three outcomes follow. If Alice's payment executes before compensation, it closes the obligation and instance~0 stays consumed. Once the deadline passes, a compensation decision can close an obligation that remains Open by debiting $G_A$ by 100~CAL; Carol receives no second principal credit, Bob's payment does not re-execute, and the stored block keeps the original funding reference until a representation command replaces it with the reserve reference. If Alice's payment executes after compensation, it consumes its own inputs under the same rules and repays $G_A$ the 100~CAL; the decision stays recorded, Bob receives no second output, and $(x,0)$ stays consumed. If Alice's payment never executes, $G_A$ bears the loss.
-
-Next aims at continuation before public execution, funded direct obligations, source resubmission from public evidence, and preserved successors across source resolution. Economic closure uses a public committee decision; representation follows outside the fast path.

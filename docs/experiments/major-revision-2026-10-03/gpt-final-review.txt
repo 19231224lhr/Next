@@ -1,0 +1,411 @@
+- heading "ChatGPT said:" [level=4]
+  - paragraph:
+    - strong: 结论：D1 已满足既定的小型网络验证目标；当前材料没有给出推翻唯一消费、覆盖或守恒的新反例。剩余主要是局部语义、密码规格和实验呈现修正，不需要新增机制或实验。
+  - paragraph: 我已完整阅读本次附件，并从十二行 CSV 重新计算各条件的运行级中位数。测试通过、账本一致等结论依据你提供的结果报告；本轮没有独立运行测试，也没有检查尚未提供的提案覆盖记录或新编译 PDF。
+  - heading "一、闭合判断与四项必须修改" [level=2]
+  - paragraph:
+    - strong: C1/C2/C3 的定位可以保留。
+    - text: C1 现在解释职责分离而非泛称性能领先；C2 明确承认预算技术先例，并将贡献放在动态责任与恢复；C3 的可执行本地导出消费者满足此前约定的接口需求，不必再证明 CH 普遍不可替代。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text(7).txt":
+      - generic: Pasted text(7)
+  - paragraph:
+    - strong: 残留额度与条件性进展也已基本闭合。
+    - text: 有效 QC 的残留见证
+    - math:
+      - generic: r
+      - generic: m
+      - generic: ","
+      - generic: c
+      - generic: ≥
+      - generic: w
+      - generic: c
+    - text: r
+    - generic: m,c
+    - text: ≥
+    - text: w
+    - generic: c
+    - text: 不受局部 invalidation 破坏；
+    - math:
+      - generic: S
+      - generic: g
+      - generic: ≤
+      - generic: Q
+      - generic: g
+      - generic: ≤
+      - generic: B
+      - generic: g
+    - text: S
+    - generic: g
+    - text: ≤
+    - text: Q
+    - generic: g
+    - text: ≤
+    - text: B
+    - generic: g
+    - text: 限制未偿还补偿，不等同于成员可用额度。新增容量条件只排除相应切片的 CAL 容量拒绝，并明确保留输入、费用、法定人数与交付条件，这个范围是正确的。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text(7).txt":
+      - generic: Pasted text(7)
+  - heading "1. 四维状态表不能笼统写“所有输出都是 final”" [level=3]
+  - paragraph:
+    - text: 表中 Settled 行写
+    - strong: “Its outputs are final”
+    - text: ，但源交易执行时，带 Repaired 义务的输出用于偿还储备，
+    - strong: 不再创建 final 输出
+    - text: 。这是文字层面的直接不一致，不是新发现的实现漏洞。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - paragraph: 该单元格改为：
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "\\texttt{Settled} records successful execution. Newly created outputs"
+    - generic: "are final even when \\texttt{Pending} is nonzero; outputs with Repaired"
+    - text: obligations are repaid rather than recreated.
+  - heading "2. 回放顺序与截止期措辞需要消除歧义" [level=3]
+  - paragraph:
+    - text: IV-G 的
+    - strong: “original blocks … followed by the representation commands”
+    - text: 容易被读成先重放全部经济命令，再统一执行表示命令；这不符合两种交错历史分别重现应用状态的要求。应明确是
+    - strong: 原始命令的已提交顺序
+    - text: 。结论中的 “closes any obligation still open at its deadline” 也应避免暗示截止时刻自动、无条件闭合。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+    - button "Open preview of Pasted text(7).txt":
+      - generic: Pasted text(7)
+    - button "Open preview of Pasted text(7).txt":
+      - generic: Pasted text(7)
+  - paragraph: 分别使用：
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code: Replay executes retained original blocks in their committed order, including payments, compensation decisions, and representation commands.
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code: a public decision can close a due Open obligation under the stated protocol conditions
+  - heading "3. 密码关系式正确，但须准确区分两个私有指数" [level=3]
+  - paragraph:
+    - text: 我核对了 CIRCL
+    - strong: v1.6.5
+    - text: 的版本源码：GenerateKey 确实生成不同安全素数，并检查
+    - math:
+      - generic: e
+    - generic: e
+    - text: 与
+    - math:
+      - generic: φ
+      - generic: (
+      - generic: "N"
+      - generic: )
+    - generic: φ(N)
+    - text: 互素；但 Deal 实际分片的是
+  - math:
+    - generic: d
+    - generic: ~
+    - generic: =
+    - generic: e
+    - generic: −
+    - generic: "1"
+    - generic: (
+    - generic: m
+    - generic: o
+    - generic: d
+    - generic: μ
+    - generic: )
+    - generic: ","
+    - generic: μ
+    - generic: =
+    - generic: (
+    - generic: p
+    - generic: −
+    - generic: "1"
+    - generic: )
+    - generic: (
+    - generic: q
+    - generic: −
+    - generic: "1"
+    - generic: )
+    - generic: /
+    - generic: "4"
+    - generic: ","
+  - generic: d
+  - text: =
+  - text: e
+  - generic: −1
+  - text: (
+  - generic: mod
+  - text: μ), μ =
+  - generic: (p −
+  - generic: 1)(q −
+  - generic: 1)/4,
+  - paragraph:
+    - text: 而不是直接分片前文按完整群阶定义的
+    - math:
+      - generic: d
+    - generic: d
+    - text: 。因此，补充材料的
+    - strong: “splits the exponent”
+    - text: 应明确这个区别，同时把安全素数生成条件写入正文规格，而不只留在本次工作报告中。
+    - 'link "GitHub: circl/tss/rsa/rsa_threshold.go at v1.6.5 · cloudflare/circl · GitHub, https://github.com/cloudflare/circl/blob/v1.6.5/tss/rsa/rsa_threshold.go"':
+      - /url: https://github.com/cloudflare/circl/blob/v1.6.5/tss/rsa/rsa_threshold.go
+      - generic: GitHub
+    - button "Open preview of Pasted text(7).txt":
+      - generic: Pasted text(7)
+  - paragraph:
+    - text: 这
+    - strong: 不否定适配公式或唯一开口论证
+    - text: 。对比率
+    - math:
+      - generic: u
+      - generic: ∈
+      - generic: Z
+      - generic: "N"
+      - generic: ∗
+    - generic: u ∈
+    - text: Z
+    - generic: "N"
+    - generic: ∗
+    - text: ，令
+    - math:
+      - generic: Δ
+      - generic: =
+      - generic: "4"
+      - generic: "!"
+    - generic: Δ =
+    - generic: 4!
+    - text: ，诚实份额插值得到的组合值满足
+  - math:
+    - generic: W
+    - generic: e
+    - generic: =
+    - generic: u
+    - generic: "4"
+    - generic: Δ
+    - generic: "2"
+    - generic: .
+  - text: W
+  - generic: e
+  - text: =
+  - text: u
+  - text: "4"
+  - text: Δ
+  - generic: "2"
+  - text: .
+  - paragraph:
+    - text: 由
+    - math:
+      - generic: gcd
+      - generic: ⁡
+      - generic: (
+      - generic: "4"
+      - generic: Δ
+      - generic: "2"
+      - generic: ","
+      - generic: e
+      - generic: )
+      - generic: =
+      - generic: gcd
+      - generic: ⁡
+      - generic: (
+      - generic: "2304"
+      - generic: ","
+      - generic: "65537"
+      - generic: )
+      - generic: =
+      - generic: "1"
+    - generic: gcd
+    - text: (4
+    - text: Δ
+    - generic: "2"
+    - text: ", e) ="
+    - generic: gcd
+    - text: (2304, 65537) =
+    - generic: "1"
+    - text: ，取
+    - math:
+      - generic: α
+      - generic: "4"
+      - generic: Δ
+      - generic: "2"
+      - generic: +
+      - generic: β
+      - generic: e
+      - generic: =
+      - generic: "1"
+    - text: α4
+    - text: Δ
+    - generic: "2"
+    - text: +
+    - generic: βe =
+    - generic: "1"
+    - text: ，则
+  - math:
+    - generic: z
+    - generic: =
+    - generic: W
+    - generic: α
+    - generic: u
+    - generic: β
+    - generic: ","
+    - generic: z
+    - generic: e
+    - generic: =
+    - generic: u
+    - generic: ","
+    - generic: r
+    - generic: ′
+    - generic: =
+    - generic: r
+    - generic: z
+    - generic: .
+  - generic: z =
+  - text: W
+  - generic: α
+  - text: u
+  - generic: β
+  - text: ","
+  - text: z
+  - generic: e
+  - text: =
+  - text: u,
+  - text: r
+  - generic: ′
+  - text: =
+  - generic: rz.
+  - paragraph:
+    - text: 这就是补充材料所需的简短原始群元素接口正确性说明；
+    - strong: 不应把最终关系验证称为原始比率签名的不可伪造性证明
+    - text: 。账本授权仍来自决定、精确 Task 和完整身份守卫。
+    - 'link "GitHub: circl/tss/rsa/keyshare.go at v1.6.5 · cloudflare/circl · GitHub, https://github.com/cloudflare/circl/blob/v1.6.5/tss/rsa/keyshare.go, 1 additional source"':
+      - /url: https://github.com/cloudflare/circl/blob/v1.6.5/tss/rsa/keyshare.go
+      - generic: GitHub
+      - generic: "+1"
+  - heading "4. D1 插入后，版本和统计端点必须同步修改" [level=3]
+  - paragraph:
+    - text: VI 开头的 “The two network experiments” 应限定为
+    - strong: 721800c 的连续支付与混合负载实验
+    - text: ；D1 单独标为 9879f64。原图注 “Final-build” 改为明确构建号，避免新旧测量混同。
+    - button "Open preview of Pasted text(7).txt":
+      - generic: Pasted text(7)
+    - button "Open preview of Pasted text(7).txt":
+      - generic: Pasted text(7)
+  - paragraph:
+    - text: D1 的分位数来自
+    - strong: 每轮全部 1,200 笔普通付款
+    - text: ，不是故障窗口分位数，也不包含暖机及链式付款。public 应注明现有驱动的公开完成观察端点，不能解释成暂停期间四委员均已响应；members 应写清等待的成员集合。提案覆盖尚未核实，不归因到具体提案者超时。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - heading "二、可直接使用的 D1 英文正文与四行表" [level=2]
+  - paragraph:
+    - text: 可放在当前构建验证小节中，Archived evidence 之前。下表均为
+    - strong: 三个运行级分位数的中位数
+    - text: ；保留 member 列，避免掩盖 L-M 的约 29 秒成员跟随尾延迟。数值由所附 CSV 复算。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "\\noindent\\textbf{Controlled delay and separate fault domains.}"
+    - generic: "On unchanged production snapshot \\texttt{9879f64}, a same-host matrix"
+    - text: uses three runs per condition. FIFO proxies cover member RPCs and all
+    - generic: committee peer addresses, adding zero delay in H and 25\,ms per direction
+    - text: in L. L-M and L-C retain that delay and separately suspend organization
+    - generic: "member 3 or committee validator 3 using \\texttt{SIGSTOP} during seconds"
+    - text: 15--45 of the ordinary-load window. Each run contains 100 warm-up
+    - generic: payments, 1,200 ordinary payments offered at 20/s for 60\,s, and two
+    - text: ten-hop chains.
+    - generic: "Table~\\ref{tab:eval-delay-faults} distinguishes member reconciliation"
+    - text: from public completion. In L-M, the audited request cohort forms QCs from members 0--2, and both chains finish during the pause. Member-closure
+    - generic: P95 reaches 29.002\,s, while public-observation P95 is 1.304\,s.
+    - generic: In L-C, public-observation P95 reaches 10.018\,s, while receipt P95 is
+    - generic: 109.32\,ms; 400--510 ordinary public-completion observations occur
+    - text: during the pause in each run. These counts describe events observed within the fault window, not a cohort completion fraction.
+    - text: All 1,320 payments close in every run. Final audits find matching committee states and no remaining pending payments, outbox entries, or gaps. These finite runs demonstrate progress and subsequent reconciliation under the specified pauses and delay; lower receipt quantiles in a fault treatment do not establish a performance benefit.
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - generic: "\\begin{table}[t]"
+    - generic: "\\caption{Controlled-delay and pause experiments."
+    - text: "Entries are medians of three run-level quantiles over the 1,200 ordinary payments per run, excluding warm-up and chain payments. Public and member completion are driver observations, not internal commit timestamps.}"
+    - generic: "\\label{tab:eval-delay-faults}"
+    - generic: \centering
+    - generic: \small
+    - generic: "\\setlength{\\tabcolsep}{3pt}"
+    - generic: "\\begin{tabular}{@{}lrrrr@{}}"
+    - generic: \toprule
+    - generic: Case &
+    - generic: "\\shortstack{Receipt\\\\P50 (ms)} &"
+    - generic: "\\shortstack{Receipt\\\\P95 (ms)} &"
+    - generic: "\\shortstack{Public\\\\P95 (s)} &"
+    - generic: "\\shortstack{Member\\\\P95 (s)} \\\\"
+    - generic: \midrule
+    - generic: H & 41.56 & 83.20 & 1.277 & 1.361 \\
+    - generic: L & 81.91 & 118.22 & 1.315 & 1.410 \\
+    - generic: L-M & 77.71 & 112.85 & 1.304 & 29.002 \\
+    - generic: L-C & 77.41 & 109.32 & 10.018 & 10.042 \\
+    - generic: \bottomrule
+    - generic: "\\end{tabular}"
+    - generic: "\\end{table}"
+  - heading "三、补充材料的必要说明" [level=2]
+  - paragraph:
+    - text: 以下可直接补入，保留十二行运行记录，不需要增加实验。健康 RPC RTT、计划发送口径及排空时间均可从现有数据给出。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - generic: LaTeX
+  - button "Enable word wrap":
+  - button "Copy":
+  - code:
+    - text: All matrix runs use a file-descriptor limit of 16,384. Preliminary runs at a limit of 256 are retained separately as tooling-contaminated pilots and are excluded from the matrix.
+    - generic: Run-level median health-RPC RTTs are 1.14--1.24\,ms in H and
+    - generic: 51.92--52.43\,ms in the delayed conditions, whose target additional
+    - generic: RTT is 50\,ms.
+    - text: For H, L, L-M, and L-C respectively, the medians of run-level scheduled-to-receipt P95s are 84.142, 118.584, 113.689, and
+    - generic: 109.810\,ms. Each scheduled latency is computed from that payment's
+    - text: timestamps before quantile aggregation; dispatch and receipt quantiles are not added. Post-send drain is measured from the last ordinary send, not from fault removal. Final four-replica agreement is a separate post-recovery audit. No attribution to particular proposer rounds is made.
+  - paragraph:
+    - text: 还需在补充材料中用现有驱动定义补清
+    - strong: 未注入的路径、member 完成端点的等待集合，以及 QC 审计请求窗口
+    - text: 。尤其开头“故障后 1s 内开始”与“故障后至少 1s 才开始”不能混用；CSV 的 fault_clean_qcs 数量本身不足以确定筛选条件。这里只需核对已有配置／筛选代码，不补运行。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - heading "四、收尾判断" [level=2]
+  - paragraph:
+    - text: 按报告新增的接收端验签测试与持久提交后中断测试，已经针对性补上此前 B0 和成员提交边界的疑点；不应再要求重复造同类测试。
+    - button "Open preview of Pasted text.txt":
+      - generic: Pasted text
+  - paragraph:
+    - strong: 完成上述局部修订后，技术内容可以转入既定 F/G 收尾。
+    - text: 18 页约束优先通过把与主表重复的 reader-cost 图和详细测试说明移入补充材料解决，保留 C2 证明、关键边界及 D1 四行表，不靠压小字号。当前没有最新 PDF，不能确认压缩后的实际页数；artifact 目录名也仍需在最终交付时对应到真实获取入口。无需再扩展实验矩阵。
+  - button "Copy":
+  - button "Rate response":
+  - button "Share":
+  - button "Read aloud":
+  - button "Regenerate response":
+  - button "More actions":
+  - button "Sources":
+  - generic: ChatGPT can make mistakes. Check important info.
+  - button:
+  - heading "Latest response" [level=4]
+  - status
+  - button "Add files and more":
+  - textbox "Ask ChatGPT":
+    - paragraph: Ask ChatGPT
+  - button "Select ChatGPT model":
+    - generic: Pro
+  - button "Dictate":
+  - button "Start Voice":
+- status
+- status: Response complete
+- status
+- status

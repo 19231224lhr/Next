@@ -2,7 +2,9 @@
 
 **Next: Enabling Continuous UTXO Payments with Direct Guarantees**
 
-**2026-10-03 第⑤轮集中修订。** 本版本完整描述公开后继证据触发的来源补交、独立公共赔付决定，以及保持完整区块身份的授权历史表示。正文的新实验统一对应冻结评估构建 `721800c7de0a6526f58501fb78823d99426b69cb`。英文正文、中文阅读版和两份补充材料采用同一组定义与状态转换。
+**2026-10-03 完整大修补证版。** 本版本描述公开后继证据触发的来源补交、独立公共赔付决定，以及保持完整区块身份的授权历史表示。连续支付、混合负载与历史读取主测量仍对应 `721800c`；新增边界、持久化组合与12轮网络补证对应生产快照 `9879f64`，测试/驱动另存源码指纹。两组证据没有混用版本。
+
+**本地交付已更新：** 英文正文18页、中文阅读版19页，英文/中文补充材料20/21页；四份PDF及可移植LaTeX包已重新编译、核对。**Overleaf最后同步待恢复浏览器工具后完成，本地文件是本轮权威副本。** [补证报告](../../experiments/major-revision-2026-10-03/README.md) · [逐项关闭表](../../experiments/major-revision-2026-10-03/review-closure.md) · [编译与交付检查](build-verification.md) · [源码包](Next-review-2026-10-03-LaTeX.zip)
 
 旧构建 `d99ec92`、早期 decision-first 补强与 E1–E8 移入补充材料，保留各自原始配置，未追溯改写数字。参见[本轮写作裁决](revision-2026-10-03/decisions.md)、[最终版本安全边界审查](../../research/review-step1-2026-10-02/README.md)、[读者契约](../../design/historical-reader-contract.md)和[编译检查](build-verification.md)。
 
@@ -16,11 +18,12 @@
 
 | 实验与报告 | 正文结果 | 论证职责 |
 | --- | --- | --- |
+| [当前构建的网络与故障补证](../../experiments/major-revision-2026-10-03/network-report.md) | H/L/L-M/L-C各三轮，15,840笔闭合、四副本一致；注入每方向25 ms并分别暂停一个成员或委员30 s | 区分认证进展、公共等待和全成员观察；实际覆盖故障委员提案机会 |
 | [② 最终版本 100 跳连续支付](../../experiments/final-continuation-2026-10-02/README.md) | 3 轮中位数 4.557 s，对照逐跳等待 64.476 s；297 个后继均早于父交易最早应用提交完成发出 | 证明在线构造的真实连续续花；采用同步成员写盘、NoSync 钱包 |
 | [③ 混合负载 12 轮](../../experiments/final-mixed-2026-10-02/README.md) | 84,192 笔闭合；24 个扣留来源自动补交；48 次赔付及回款；暂停适配仍完成经济闭合 | 检验正常支付与故障路径共存，并报告并发背压及实际发送跨度 |
 | [④ 同授权历史读取](../../experiments/history-reader-2026-10-02/README.md) | 21,600 次查询；点读 P50 降低 7.44%–12.32%；额外逻辑 KV 0.28–2.19 MiB/块、本地维护 43–214 ms/块 | 说明稳定原坐标下授权资金表示的具体读取收益及代价 |
 
-两种网络实验使用相同生产节点二进制，分别披露费用与钱包持久化设置。历史读取实验以已验证并执行前缀的诚实本地副本为对象。正文不把这些有限运行当作持续吞吐或远端无状态认证的测量。
+原连续支付与混合负载使用相同 `721800c` 节点二进制；新增网络补证独立标记 `9879f64`。各自披露费用与持久化设置。历史读取实验以已验证并执行前缀的诚实本地副本为对象；有限运行不作为持续吞吐或远端无状态认证测量。
 
 | 文件 | 用途 |
 | --- | --- |
@@ -40,7 +43,7 @@ Overleaf 修订副本：[Next - Review Revision 2026-10-02](https://www.overleaf
 
 ## 编译
 
-英文使用 **pdfLaTeX + BibTeX**；中文使用 **XeLaTeX + BibTeX**。本轮在 Overleaf TeX Live 2026 编译。字体与包由 TeX Live 提供，图表搜索路径兼容本目录的 `figures/` 和 Overleaf 根目录。
+Overleaf推荐英文 **pdfLaTeX + BibTeX**、中文 **XeLaTeX + BibTeX**。本轮最终四份PDF改用本地 Tectonic 0.17.0（XeTeX/BibTeX、bundle v33）编译，因浏览器工具失联无法完成在线交付。英文根显式选择OT1以保持IEEEtran字体；中文按字体文件名选择Fandol和TeX Gyre，避免依赖系统字体族名。图表路径兼容本目录的 `figures/` 和 Overleaf 根目录。
 
 ```sh
 latexmk -pdf main.tex
@@ -55,7 +58,7 @@ latexmk -xelatex supplement-main-zh.tex
 
 ## 版本与投稿信息
 
-- `source-checks.json` 检查标签、引用和图表文件；`bilingual-checks.json` 检查两种语言的结构与数字对应；`pdf-checks.json` 检查最终 PDF；`measurement-checks.json` 独立核算主要实测数字；`overleaf-checks.json` 核对下载的在线源码与本地版本；`SHA256.json` 记录包内文件摘要。
+- `source-checks.json` 检查标签、引用和图表文件；`bilingual-checks.json` 检查两种语言的结构与数字对应；`pdf-checks.json` 检查本轮四份PDF；`measurement-checks.json` 独立核算旧构建主要实测数字；`SHA256.json` 记录新源包和PDF摘要。`overleaf-checks.json` 是上一版在线核查，本轮尚未重新取得在线源包，不可作为最新同步证明。
 - 英文稿与中文阅读版表达同一组规则和测量结果；中文不作为 IEEE 投稿排版标准。
 - 作者沿用用户提供的 **Lu Hengrun**，单位暂为 **University**。正式投稿前填写真实单位、邮箱与期刊要求的作者信息。
 - 主文给出模型条件下的安全论证；有限模型、代码回归和同机实验分别提供实现证据，不将它们称为全实现机械化证明。

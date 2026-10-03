@@ -70,3 +70,8 @@
 - `TestRealBlockStoreRewriteAndOriginalReplay`：真实重写保持完整 BlockID、提交证据和交易包含关系，并保留原始重放字节。
 
 后续读者微基准应比较同一 V_H 下的优化决定索引与规范表示，使用相同授权前提。这里固定了评价对象，尚未产生新的读取性能数据。
+# 2026-10-03：可执行导出示例与状态对齐
+
+本轮新增 `internal/redaction/history_export_test.go::TestHistoricalExportConsumer`。可设 `UTXO_HISTORY_EXPORT` 输出 JSON，包含读取前缀、原始 `(height, transaction, input)` 坐标、完整 BlockID、Revision/Task、原始与授权 block body、历史资金表示及当前义务。实际断言精确 Task 字节、部件承诺、所有者授权、QC、输入 CH 和迟到回款前后差异，见 `docs/experiments/major-revision-2026-10-03/history-export.json`。这是已验证且保留历史的本地副本上的示例消费者，不是新远程轻客户端协议。
+
+公开付款 `Settled` 表示成功执行；其中正常新建输出最终可用，已赔付输出改为偿还储备而不重建。义务 `Repaired` 表示已赔付，`Recovered` 表示后来已偿还。逻辑 `ReserveFunding` 仍表示当时的历史垫付，回款不会把它改回；物理安装进度不决定同一公共前缀的逻辑读取结果。永久决定及义务记录在两条读取路径中仍然必要。

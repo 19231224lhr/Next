@@ -28,6 +28,16 @@ import (
 )
 
 func TestPaymentRepairMonetaryReplay(t *testing.T) {
+	for _, repayBefore := range []bool{false, true} {
+		name := "representation-before-repayment"
+		if repayBefore {
+			name = "repayment-before-representation"
+		}
+		t.Run(name, func(t *testing.T) { paymentRepairMonetaryReplay(t, repayBefore) })
+	}
+}
+
+func paymentRepairMonetaryReplay(t *testing.T, repayBefore bool) {
 	pub, signers, vals, keys := committee(t)
 	f := testkit.NewFixture(chain, "direct-org", 1)
 	f.EnableDirect()
@@ -52,8 +62,11 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	}
 	defer disk.Close()
 	blocks := cmtstore.NewBlockStore(disk)
-	newApp := func(memory bool) (appstore.Store, *apppkg.App, *apppkg.Engine) {
+	newApp := func(memory bool, retainedPath ...string) (appstore.Store, *apppkg.App, *apppkg.Engine) {
 		path := filepath.Join(t.TempDir(), "committee.db")
+		if len(retainedPath) != 0 {
+			path = retainedPath[0]
+		}
 		id := appstore.Identity{Network: cfg.Network.String(), Role: "committee", Node: "test", Schema: 4}
 		var db appstore.Store
 		var err error
@@ -242,6 +255,14 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	}
 	appendBlock(3, 1700000032, decisionRaw)
 	heightOffset = 1
+	parentRaw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).Submission().MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repayBefore {
+		appendBlock(3, 1700000032, parentRaw)
+		heightOffset++
+	}
 	var command protocol.RepairInput
 	var payment protocol.DirectSubmission
 	var inputShares []chameleon.Contribution
@@ -383,10 +404,6 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	parentRaw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).Submission().MarshalBinary()
-	if err != nil {
-		t.Fatal(err)
-	}
 	for _, repairFirst := range []bool{false, true} {
 		name := "same-block-parent-first"
 		if repairFirst {
@@ -451,7 +468,7 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if !s.Committed || s.Materialized != materialized || !s.IdentityStable || s.BytesChanged != materialized || s.CommitHeight != 4 || s.TargetHeight != 1 {
+			if !s.Committed || s.Materialized != materialized || !s.IdentityStable || s.BytesChanged != materialized || s.CommitHeight != 3+heightOffset || s.TargetHeight != 1 {
 				t.Fatalf("incorrect repair observation: %+v", s)
 			}
 			return nil
@@ -590,8 +607,9 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 	// Start the application from genesis with an already-redacted block store.
 	// Replay into the experimental backend: every historical state hash,
 	// ledger row and the single debit must reproduce exactly.
-	replayDB, replay, _ := newApp(true)
-	defer replayDB.Close()
+	replayPath := filepath.Join(t.TempDir(), "retained-replica.db")
+	replayDB, replay, _ := newApp(false, replayPath)
+	defer func() { replayDB.Close() }()
 	for i := int64(1); i <= int64(len(roots)); i++ {
 		original, err := blocks.LoadOriginalBlock(i)
 		if err != nil {
@@ -602,6 +620,18 @@ func TestPaymentRepairMonetaryReplay(t *testing.T) {
 		}
 		if !reflect.DeepEqual(ledgers[i-1], snapshot(replayDB)) {
 			t.Fatalf("storage backend changed ledger at height %d", i)
+		}
+		if i == 2 {
+			// The lagging replica retains its committed prefix across restart.
+			// Its source block store already serves revised historical bytes;
+			// catch-up must still execute the original commands at every height.
+			if err := replayDB.Close(); err != nil {
+				t.Fatal(err)
+			}
+			replayDB, replay, _ = newApp(false, replayPath)
+			if !reflect.DeepEqual(ledgers[i-1], snapshot(replayDB)) {
+				t.Fatal("retained prefix changed across restart")
+			}
 		}
 		if i == 1 {
 			// A verified older state prefix must not borrow a later physical

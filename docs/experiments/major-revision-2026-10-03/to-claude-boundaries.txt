@@ -1,0 +1,904 @@
+这是Next论文完整大修的执行接续。请作为独立技术审稿者，先核查以下B工作包的实现证据，再提供可用于英文论文的条件性进展/经济边界文字。不是要求重新审整篇，不新增研究目标。旧Claude会话额度耗尽，所以本对话没有之前记忆；以本消息材料为准。三项贡献为C1分层认证/公开执行架构、C2直接担保责任下来源解耦与后继执行、C3经济赔付之后的受限授权历史表示/完整BlockID保持。固定四成员三签、最多一恶意、原子不回滚签名状态，公开collector不强制并发准入。A–G完整计划附后。
+前一位GPT检查测试后发现Next header夹具不连续（这是测试夹具问题，不是生产漏洞）；现在已修正：每条命令后建立并执行真实保留的空继块认证其结果，下一条命令再认证前一空块，使用真实parts和完整BlockID，连续LastBlockID/LastResultsHash验证，全部重跑通过。还独立汇总Open义务==Gap、按唯一证书汇总Remaining/净Paid==公开Usage；失败源原CAL/FUEL的存在与final状态、输入锁、各轮成员预留、每次补资资金来源/目标/grant及重复赔付零效果均加显式断言。两轮结果仍成立：A备付300→200→100，三位签署者Reserved200/Available0、新独立请求ErrLimited，最后输出在B实际消费成功。只循环A侧返回本金，B每轮使用不同初始输入；下一轮在本轮赔付后启动，不声称零本金或无需等待期限循环。用户FUEL失败源每笔完整10000输入锁定，与Maximum1000及已执行手续费分开。
+请从代码审计是否还有影响这一解释的实质问题；不要为通过而认可。最后提供2–3段可用英语，区分四类资源保留：无QC碎片化、同输入2/2、成功公共赢家局部回收、跨组织Intent失败却有QC并已赔付。容量条件 C_mw≥L_mw+N_mw*a_max，其中N含全部尚未释放不同请求，L含其他残留，三个诚实切片均需满足；这不是网络入口强制的防DoS保证。
+当前测试完整源码:
+//go:build comet_v3
+
+package redaction_test
+
+import (
+	"context"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"errors"
+	"fmt"
+	"os"
+	"reflect"
+	"testing"
+	"time"
+
+	dbm "github.com/cometbft/cometbft-db"
+	abci "github.com/cometbft/cometbft/abci/types"
+	cmted "github.com/cometbft/cometbft/crypto/ed25519"
+	cmtstore "github.com/cometbft/cometbft/store"
+	"github.com/cometbft/cometbft/types"
+	"utxo/finality"
+	"utxo/internal/blockfollow"
+	apppkg "utxo/internal/committee"
+	"utxo/internal/member"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/internal/store"
+	"utxo/internal/testkit"
+	"utxo/protocol"
+)
+
+// This is a deterministic protocol experiment, not a network benchmark. Votes
+// come from real Member.ApproveDirect calls; public commands use Engine.ExecuteAt
+// and authenticated execution results are applied through blockfollow.Commit.
+type boundaryLab struct {
+	f           [2]testkit.Fixture
+	p           rules.DirectPolicy
+	m           [2][4]*member.Member
+	db          [2][4]store.Store
+	ledger      store.Store
+	engine      *apppkg.Engine
+	blocks      *cmtstore.BlockStore
+	vals        *types.ValidatorSet
+	keys        map[string]cmted.PrivKey
+	last        *types.Commit
+	pending     *types.Block
+	lastResults []*abci.ExecTxResult
+	height      int64
+	fees        [2][]state.OriginOutput
+	baseline    [2]int64
+}
+
+func newBoundaryLab(t *testing.T, denySponsor ...bool) *boundaryLab {
+	t.Helper()
+	_, _, vals, keys := committee(t)
+	x := &boundaryLab{vals: vals, keys: keys, last: &types.Commit{}}
+	x.f[0], x.f[1] = testkit.NewFixture(chain, "boundary-a", 5), testkit.NewFixture(chain, "boundary-b", 5)
+	x.f[1].Owner = x.f[0].Owner
+	raw, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pb, _ := pem.Decode(raw)
+	rsa, err := x509.ParsePKCS1PrivateKey(pb.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := rules.DirectSettings{Modulus: rsa.N.Bytes(), TimeoutSeconds: 30, RepairCost: 5}
+	genesis := state.Genesis{Network: x.f[0].Org.Network}
+	var accounts []apppkg.GenesisAccount
+	for j := range x.f {
+		f := &x.f[j]
+		desc := protocol.NewDescriptor(f.Org.Network, protocol.Route{Kind: protocol.OrgRoute, Org: f.Org.Org}, f.Owner)
+		for i := range f.Genesis.Outputs {
+			f.Genesis.Outputs[i].Output.Recipient = desc
+		}
+		for i := range f.Genesis.Grants {
+			f.Genesis.Grants[i].Subject = desc.Owner
+			if j == 0 && len(denySponsor) > 0 && denySponsor[0] && f.Genesis.Grants[i].Key.Kind == protocol.ResourcePolicy {
+				other := testkit.NewFixture(chain, "unauthorized-policy-subject", 1)
+				f.Genesis.Grants[i].Subject = other.Genesis.Outputs[0].Output.Recipient.Owner
+			}
+		}
+		f.EnableDirect()
+		if j == 0 {
+			f.Genesis.Grants[0].Amount = 300
+		}
+		for i := 0; i < 20; i++ {
+			fee := state.OriginOutput{ID: protocol.OutputID(protocol.Digest("boundary-fee", f.Org.Org[:], []byte(fmt.Sprint(i)))), Fact: protocol.Digest("boundary-fee-fact", f.Org.Org[:], []byte(fmt.Sprint(i))), Output: protocol.Output{Asset: protocol.AssetFUEL, Amount: 10000, Recipient: desc}}
+			x.fees[j] = append(x.fees[j], fee)
+			f.Genesis.Outputs = append(f.Genesis.Outputs, fee)
+		}
+		genesis.Outputs = append(genesis.Outputs, f.Genesis.Outputs...)
+		genesis.Grants = append(genesis.Grants, f.Genesis.Grants...)
+		accounts = append(accounts, apppkg.GenesisAccount{Owner: f.Org.Org, Asset: protocol.AssetCAL, Balance: f.Genesis.Grants[0].Amount}, apppkg.GenesisAccount{Owner: f.Org.Org, Asset: protocol.AssetFUEL, Balance: 1000000000})
+	}
+	accounts = append(accounts, apppkg.GenesisAccount{Owner: protocol.ReserveFundingAccount(genesis.Network, genesis.Grants[0].Subject), Asset: protocol.AssetCAL, Balance: 1000})
+	orgs := []protocol.OrgConfig{x.f[0].Org, x.f[1].Org}
+	x.p, err = settings.Policy(x.f[0].Schedule, orgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	x.ledger = store.NewMemory()
+	x.engine, err = apppkg.NewEngine(apppkg.EngineConfig{Network: genesis.Network, Organizations: orgs, Genesis: genesis, Schedule: x.f[0].Schedule, Direct: &settings, Accounts: accounts}, x.ledger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blockDB := dbm.NewMemDB()
+	x.blocks = cmtstore.NewBlockStore(blockDB)
+	if err = x.engine.EnableRepair(x.blocks); err != nil {
+		t.Fatal(err)
+	}
+	for j := range x.m {
+		for i := range x.m[j] {
+			x.db[j][i] = store.NewMemory()
+			x.m[j][i], err = member.New(member.Config{Organization: x.f[j].Org, Index: uint16(i), Key: x.f[j].Keys[i], Peers: orgs, Schedule: x.f[j].Schedule, Workers: 1, Direct: &settings}, x.db[j][i], genesis)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	t.Cleanup(func() {
+		for j := range x.db {
+			for _, db := range x.db[j] {
+				db.Close()
+			}
+		}
+		x.ledger.Close()
+		blockDB.Close()
+	})
+	x.baseline = x.money(t)
+	return x
+}
+
+func (x *boundaryLab) tx(t *testing.T, org, index int, nonce uint64, ownerFee bool, feeIndex int, parent *protocol.DirectPayment, dest int) protocol.DirectRequest {
+	t.Helper()
+	f := x.f[org]
+	tx, err := f.FastTransaction(index, nonce, x.p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := tx.Body
+	claims := tx.Claims
+	var parents []protocol.InputCertificate
+	if parent != nil {
+		b.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: parent.Certificate.Summary.OutputID(0), Evidence: protocol.Hash(parent.Certificate.QC.Fact)}}
+		claims = []protocol.InputClaim{{Output: parent.Tx.Body.Outputs[0]}}
+		parents = []protocol.InputCertificate{{Certificate: parent.Certificate, Index: 0}}
+	}
+	b.Outputs[0].Recipient = protocol.NewDescriptor(f.Org.Network, protocol.Route{Kind: protocol.OrgRoute, Org: x.f[dest].Org.Org}, f.Owner)
+	if ownerFee {
+		fee := x.fees[org][feeIndex]
+		b.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: 1000, Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: fee.ID, Evidence: fee.Fact}}, Refund: fee.Output.Recipient}
+		b.Admission = nil
+		for _, g := range f.Genesis.Grants {
+			if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+				b.Admission = append(b.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
+			}
+		}
+	}
+	b.Intent = b.IntentID()
+	tx, err = protocol.NewFastTx(b, claims, x.p.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.Owner)}
+	return protocol.DirectRequest{Tx: tx, InputCertificates: parents}
+}
+
+func (x *boundaryLab) approve(t *testing.T, org int, r protocol.DirectRequest, indices ...int) protocol.DirectPayment {
+	t.Helper()
+	p := protocol.DirectPayment{Tx: r.Tx, InputCertificates: r.InputCertificates}
+	for _, i := range indices {
+		v, err := x.m[org][i].ApproveDirect(context.Background(), r)
+		if err != nil {
+			t.Fatalf("approve org=%d member=%d: %v", org, i, err)
+		}
+		p.Certificate.Summary = v.Summary
+		p.Certificate.QC.Fact = v.Summary.Fact()
+		p.Certificate.QC.Votes = append(p.Certificate.QC.Votes, v.Vote)
+	}
+	if len(indices) >= 3 {
+		if err := p.Certificate.Verify(x.f[org].Org); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return p
+}
+
+func boundaryWire(t *testing.T, p protocol.DirectPayment) []byte {
+	t.Helper()
+	b, e := p.Submission().MarshalBinary()
+	if e != nil {
+		t.Fatal(e)
+	}
+	return b
+}
+
+func (x *boundaryLab) append(t *testing.T, raw []byte) int64 {
+	h := x.appendOne(t, raw)
+	x.appendOne(t, nil) // The actual retained empty successor authenticates h.
+	return h
+}
+
+func (x *boundaryLab) appendOne(t *testing.T, raw []byte) int64 {
+	t.Helper()
+	h := x.height + 1
+	b := block(t, h, raw, x.last, x.vals)
+	if raw == nil {
+		b.Data = types.Data{}
+		b.Header.DataHash = nil
+	}
+	b.Time = time.Unix(1700000000+40*h, 0).UTC()
+	b.LastResultsHash = types.NewResults(x.lastResults).Hash()
+	parts, err := b.MakePartSet(types.BlockPartSizeBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := types.BlockID{Hash: b.Hash(), PartSetHeader: parts.Header()}
+	var tr state.Transition
+	err = x.ledger.Update(func(v state.ReadView) ([]state.Change, error) {
+		o := state.NewOverlay(v)
+		ctx := apppkg.BlockContext{Height: h, Time: b.Time}
+		start, e := x.engine.BeginBlock(v, ctx)
+		if e != nil {
+			return nil, e
+		}
+		o.Apply(start.Changes)
+		if raw != nil {
+			tr, e = x.engine.ExecuteAt(o, raw, ctx)
+			if e != nil {
+				return nil, e
+			}
+			o.Apply(tr.Changes)
+		}
+		return o.Changes(), nil
+	})
+	if err != nil {
+		t.Fatalf("public h=%d: %v", h, err)
+	}
+	x.last = commit(t, h, id, x.vals, x.keys)
+	x.blocks.SaveBlock(b, parts, x.last)
+	if x.pending != nil {
+		prev := x.blocks.LoadBlockMeta(h - 1).BlockID
+		if !b.LastBlockID.Equals(prev) || !x.last.BlockID.Equals(x.blocks.LoadBlockMeta(h).BlockID) {
+			t.Fatal("authenticated history does not match retained blocks")
+		}
+		proof, e := finality.VerifyBlock(finality.Trust{ChainID: chain, Network: x.f[0].Org.Network, Validators: x.vals}, finality.BlockData{Block: x.pending, Results: x.lastResults, Next: types.SignedHeader{Header: &b.Header, Commit: x.last}})
+		if e != nil {
+			t.Fatal(e)
+		}
+		for j := range x.m {
+			for i, m := range x.m[j] {
+				if err = blockfollow.Commit(x.db[j][i], proof, m.PrepareBlock); err != nil {
+					t.Fatalf("follow org=%d member=%d h=%d: %v", j, i, h-1, err)
+				}
+			}
+		}
+	}
+	x.pending = b
+	x.lastResults = nil
+	if raw != nil {
+		x.lastResults = []*abci.ExecTxResult{{Data: tr.Data}}
+	}
+	x.height = h
+	if got := x.money(t); got != x.baseline {
+		t.Fatalf("money changed at h=%d: initial=%v got=%v", h, x.baseline, got)
+	}
+	return h
+}
+
+func boundaryLoad[T any](t *testing.T, db store.Store, key []byte) (value T) {
+	t.Helper()
+	if err := db.View(func(v state.ReadView) error { var e error; value, _, e = state.Load[T](v, key); return e }); err != nil {
+		t.Fatal(err)
+	}
+	return
+}
+
+func boundaryRequire[T any](t *testing.T, db store.Store, key []byte) (value T) {
+	t.Helper()
+	if err := db.View(func(v state.ReadView) error {
+		var found bool
+		var e error
+		value, found, e = state.Load[T](v, key)
+		if e == nil && !found {
+			return state.ErrNotFound
+		}
+		return e
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return
+}
+
+func boundaryRows(t *testing.T, db store.Store) []state.Entry {
+	t.Helper()
+	rows, e := store.Scan(db, nil, nil, 1000)
+	if e != nil || len(rows) == 1000 {
+		t.Fatal("fixture snapshot", e)
+	}
+	return rows
+}
+
+func (x *boundaryLab) quota(t *testing.T, i int, available, reserved uint64) {
+	t.Helper()
+	q, e := x.m[0][i].Quota(x.f[0].Genesis.Grants[0].Key, 0)
+	if e != nil || q.Available != available || q.Reserved != reserved {
+		t.Fatal("quota", q, e)
+	}
+}
+
+// CAL projection subtracts open source gaps. FUEL includes all UTXOs, accounts,
+// held escrow, rewards and burn. Frozen owner inputs remain assets, not spendable
+// liquidity; snapshots below record their local locks separately.
+func (x *boundaryLab) money(t *testing.T) (totals [2]int64) {
+	t.Helper()
+	rows, err := store.Scan(x.ledger, nil, nil, 1000)
+	if err != nil || len(rows) == 1000 {
+		t.Fatal("unbounded fixture", err)
+	}
+	var gap uint64
+	coverage := make(map[protocol.ResourceKey]rules.PublicUsage)
+	for _, r := range rows {
+		if r.Key[2] == 102 {
+			ob := boundaryLoad[rules.DirectObligation](t, x.ledger, r.Key)
+			if ob.Status == rules.DirectOpen {
+				gap += ob.Amount
+			}
+		}
+		if r.Key[2] == 100 {
+			c := boundaryLoad[struct {
+				Summary protocol.OutputSummary
+				Credit  rules.CoverageBalance
+			}](t, x.ledger, r.Key)
+			if c.Credit.Original != c.Credit.Paid+c.Credit.Discharged+c.Credit.Remaining || c.Credit.Recovered > c.Credit.Paid {
+				t.Fatal("certificate coverage conservation")
+			}
+			for _, a := range c.Summary.Admission {
+				if a.Key.Kind == protocol.ResourceCAL {
+					u := coverage[a.Key]
+					u.Reserved += c.Credit.Remaining
+					u.Spent += c.Credit.Paid - c.Credit.Recovered
+					coverage[a.Key] = u
+				}
+			}
+		}
+	}
+	if gap != boundaryLoad[uint64](t, x.ledger, rules.DirectGapKey()) {
+		t.Fatal("gap differs from independently summed obligations")
+	}
+	for _, r := range rows {
+		switch r.Key[2] {
+		case state.KeyCreation:
+			c := boundaryLoad[state.Creation](t, x.ledger, r.Key)
+			key := append([]byte(nil), r.Key...)
+			key[2] = state.KeySpend
+			s := boundaryLoad[state.Spend](t, x.ledger, key)
+			if c.Final && s.Consumed == (protocol.SpendFactID{}) {
+				totals[int(c.Output.Asset)-1] += int64(c.Output.Amount)
+			}
+		case state.KeyAccount:
+			totals[int(r.Key[len(r.Key)-1])-1] += int64(boundaryLoad[uint64](t, x.ledger, r.Key))
+		case state.KeyReward, state.KeyBurned:
+			totals[1] += int64(boundaryLoad[uint64](t, x.ledger, r.Key))
+		case 103:
+			p := boundaryLoad[rules.DirectPaymentState](t, x.ledger, r.Key)
+			if p.Fee.Held+p.Fee.Rewards+p.Fee.Burned+p.Fee.Refunded != p.Fee.Maximum {
+				t.Fatal("fee conservation")
+			}
+			totals[1] += int64(p.Fee.Held)
+		case state.KeyGrant:
+			g := boundaryLoad[state.Grant](t, x.ledger, r.Key)
+			if g.Key.Kind == protocol.ResourceCAL {
+				u := boundaryLoad[rules.PublicUsage](t, x.ledger, state.Key(state.KeyUsage, g.Key.Encode()))
+				if u != coverage[g.Key] {
+					t.Fatal("grant usage differs from unique certificate coverage", u, coverage[g.Key])
+				}
+				bal := boundaryLoad[uint64](t, x.ledger, rules.AccountKey(g.Key.Account, protocol.AssetCAL))
+				if u.Reserved+u.Spent > g.Amount || bal < g.Amount-u.Spent {
+					t.Fatal("coverage/backing violated", g, u, bal)
+				}
+			}
+		}
+	}
+	totals[0] -= int64(boundaryLoad[uint64](t, x.ledger, rules.DirectGapKey()))
+	return
+}
+
+func (x *boundaryLab) snapshot(t *testing.T, label string) {
+	t.Helper()
+	v := map[string]any{"label": label, "height": x.height, "money": x.money(t)}
+	for j := range x.f {
+		v[fmt.Sprintf("org%d_CAL", j)] = boundaryLoad[uint64](t, x.ledger, rules.AccountKey(x.f[j].Org.Org, protocol.AssetCAL))
+		v[fmt.Sprintf("org%d_FUEL", j)] = boundaryLoad[uint64](t, x.ledger, rules.AccountKey(x.f[j].Org.Org, protocol.AssetFUEL))
+		v[fmt.Sprintf("org%d_usage", j)] = boundaryLoad[rules.PublicUsage](t, x.ledger, state.Key(state.KeyUsage, x.f[j].Genesis.Grants[0].Key.Encode()))
+		var slices []state.Slice
+		for _, m := range x.m[j] {
+			q, e := m.Quota(x.f[j].Genesis.Grants[0].Key, 0)
+			if e != nil {
+				t.Fatal(e)
+			}
+			slices = append(slices, q)
+		}
+		v[fmt.Sprintf("org%d_member_CAL", j)] = slices
+		local, err := store.Scan(x.db[j][0], nil, nil, 1000)
+		if err != nil || len(local) == 1000 {
+			t.Fatal(err)
+		}
+		var locks []map[string]any
+		for _, r := range local {
+			if r.Key[2] == state.KeySpend || r.Key[2] == 122 {
+				locks = append(locks, map[string]any{"key": fmt.Sprintf("%x", r.Key), "value": json.RawMessage(r.Value)})
+			}
+		}
+		v[fmt.Sprintf("org%d_member0_locks_progress", j)] = locks
+	}
+	rows, err := store.Scan(x.ledger, nil, nil, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var records []map[string]any
+	for _, r := range rows {
+		if r.Key[2] == 100 || r.Key[2] == 101 || r.Key[2] == 102 || r.Key[2] == 103 {
+			records = append(records, map[string]any{"key": fmt.Sprintf("%x", r.Key), "value": json.RawMessage(r.Value)})
+		}
+	}
+	v["public_records"] = records
+	v["ledger_rows"] = rows
+	b, e := json.Marshal(v)
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Log("BOUNDARY", string(b))
+}
+
+func (x *boundaryLab) increase(t *testing.T, delta uint64) {
+	t.Helper()
+	g := boundaryLoad[state.Grant](t, x.ledger, state.Key(state.KeyGrant, x.f[0].Genesis.Grants[0].Key.Encode()))
+	c := protocol.ReserveIncrease{Network: x.f[0].Org.Network, Organization: x.f[0].Org.Hash(), Key: g.Key, Grant: g.ID, Previous: g.Amount, Amount: delta}
+	c.Sign(x.f[0].Owner)
+	b, e := c.MarshalBinary()
+	if e != nil {
+		t.Fatal(e)
+	}
+	source := rules.AccountKey(protocol.ReserveFundingAccount(x.f[0].Org.Network, g.Subject), protocol.AssetCAL)
+	target := rules.AccountKey(x.f[0].Org.Org, protocol.AssetCAL)
+	beforeSource := boundaryRequire[uint64](t, x.ledger, source)
+	beforeTarget := boundaryRequire[uint64](t, x.ledger, target)
+	x.append(t, b)
+	if boundaryRequire[uint64](t, x.ledger, source) != beforeSource-delta || boundaryRequire[uint64](t, x.ledger, target) != beforeTarget+delta {
+		t.Fatal("funding conservation")
+	}
+	if boundaryRequire[state.Grant](t, x.ledger, state.Key(state.KeyGrant, g.Key.Encode())).Amount != g.Amount+delta {
+		t.Fatal("funding grant")
+	}
+}
+
+func TestRevisionCapacityFragmentationAndFunding(t *testing.T) {
+	x := newBoundaryLab(t)
+	reqs := make([]protocol.DirectRequest, 4)
+	for i := range reqs {
+		reqs[i] = x.tx(t, 0, i, uint64(i+1), true, i, nil, 0)
+		x.approve(t, 0, reqs[i], i, (i+3)%4)
+	}
+	x.snapshot(t, "four_independent_requests_two_votes_each")
+	for i := range x.m[0] {
+		x.quota(t, i, 0, 200)
+	}
+	for i, r := range reqs {
+		for m := 0; m < 4; m++ {
+			if m == i || m == (i+3)%4 {
+				continue
+			}
+			if _, e := x.m[0][m].ApproveDirect(context.Background(), r); !errors.Is(e, rules.ErrLimited) {
+				t.Fatalf("expected capacity refusal tx%d m%d: %v", i, m, e)
+			}
+		}
+	}
+	x.increase(t, 150)
+	x.snapshot(t, "funded_150_no_locks_deleted")
+	for i := range x.m[0] {
+		x.quota(t, i, 100, 200)
+	}
+	for _, r := range reqs {
+		p := x.approve(t, 0, r, 0, 1, 2)
+		x.append(t, boundaryWire(t, p))
+	}
+	for _, m := range x.m[0] {
+		q, e := m.Quota(x.f[0].Genesis.Grants[0].Key, 0)
+		if e != nil || q.Reserved != 0 || q.Available != 300 {
+			t.Fatal("capacity did not circulate", q, e)
+		}
+	}
+	x.snapshot(t, "all_four_closed")
+}
+
+func TestRevisionSplitInputNotUnlockedByFunding(t *testing.T) {
+	x := newBoundaryLab(t)
+	a := x.tx(t, 0, 0, 1, true, 0, nil, 0)
+	b := x.tx(t, 0, 0, 2, true, 1, nil, 0)
+	x.approve(t, 0, a, 0, 1)
+	x.approve(t, 0, b, 2, 3)
+	for _, phase := range []string{"before_funding", "after_funding"} {
+		if phase == "after_funding" {
+			x.increase(t, 150)
+		}
+		for i := 0; i < 4; i++ {
+			r := a
+			if i < 2 {
+				r = b
+			}
+			if _, e := x.m[0][i].ApproveDirect(context.Background(), r); !errors.Is(e, rules.ErrConflict) {
+				t.Fatalf("input lock lost: %v", e)
+			}
+		}
+		x.snapshot(t, phase)
+	}
+}
+
+func TestRevisionIntentTwoRoundCompensation(t *testing.T) {
+	for _, owner := range []bool{true, false} {
+		t.Run(fmt.Sprintf("owner_fee_%t", owner), func(t *testing.T) {
+			x := newBoundaryLab(t)
+			var returned *protocol.DirectPayment
+			for round := 0; round < 2; round++ {
+				nonce := uint64(100 + round)
+				losingReq := x.tx(t, 0, 0, nonce, owner, round, returned, 1)
+				loser := x.approve(t, 0, losingReq, 0, 1, 2)
+				winner := x.approve(t, 1, x.tx(t, 1, round, nonce, owner, round, nil, 1), 0, 1, 2)
+				if loser.Tx.Body.Intent != winner.Tx.Body.Intent {
+					t.Fatal("fixture must collide in global Intent")
+				}
+				x.append(t, boundaryWire(t, winner))
+				raw := boundaryWire(t, loser)
+				before := boundaryRows(t, x.ledger)
+				err := x.ledger.Update(func(v state.ReadView) ([]state.Change, error) {
+					tr, e := x.engine.ExecuteAt(v, raw, apppkg.BlockContext{Height: x.height + 1, Time: time.Unix(1700000000+40*(x.height+1), 0)})
+					return tr.Changes, e
+				})
+				after := boundaryRows(t, x.ledger)
+				if !errors.Is(err, rules.ErrConflict) || !reflect.DeepEqual(before, after) {
+					t.Fatal("Intent loser affected public state", err)
+				}
+				dest := 0
+				if round == 1 {
+					dest = 1
+				}
+				child := x.approve(t, 1, x.tx(t, 1, 0, uint64(200+round), owner, round+3, &loser, dest), 0, 1, 2)
+				h := x.append(t, boundaryWire(t, child))
+				out := loser.Certificate.Summary.OutputID(0)
+				x.append(t, protocol.ClockTick(x.f[0].Org.Network, x.height+1))
+				x.snapshot(t, fmt.Sprintf("round%d_before_compensation", round+1))
+				decision := protocol.CompensationDecision{Network: x.f[0].Org.Network, Output: out, Height: h, Transaction: 0, Input: 0}
+				d, e := decision.MarshalBinary()
+				if e != nil {
+					t.Fatal(e)
+				}
+				x.append(t, d)
+				if err := x.ledger.View(func(v state.ReadView) error {
+					tr, e := x.engine.ExecuteAt(v, d, apppkg.BlockContext{Height: x.height + 1, Time: time.Unix(1700000000+40*(x.height+1), 0)})
+					if e != nil {
+						return e
+					}
+					result, effects, e := protocol.DecodePublicExecution(x.f[0].Org.Network, d, tr.Data)
+					if e != nil || len(tr.Changes) != 0 || result.Applied || len(effects) != 0 || len(result.FeeOutputs) != 0 {
+						t.Fatal("duplicate compensation effects", e)
+					}
+					return nil
+				}); err != nil {
+					t.Fatal(err)
+				}
+				x.append(t, d)
+				bal := boundaryLoad[uint64](t, x.ledger, rules.AccountKey(x.f[0].Org.Org, protocol.AssetCAL))
+				if bal != 300-uint64(round+1)*100 {
+					t.Fatal("wrong net reserve loss", bal)
+				}
+				spend := boundaryLoad[state.Spend](t, x.ledger, rules.DirectSpendKey(loser.Tx.Body.Inputs[0].Output, 0))
+				creation := boundaryRequire[state.Creation](t, x.ledger, rules.DirectCreationKey(loser.Tx.Body.Inputs[0].Output, 0))
+				if !creation.Final {
+					t.Fatal("original principal not final")
+				}
+				if spend.Consumed != (protocol.SpendFactID{}) {
+					t.Fatal("rejected source input consumed")
+				}
+				for i := 0; i < 3; i++ {
+					x.quota(t, i, 200-uint64(round+1)*100, uint64(round+1)*100)
+					p := boundaryRequire[member.LocalProgress](t, x.db[0][i], member.ProgressKey(loser.Certificate.QC.Fact))
+					if p.Settled || p.Paid != 100 || p.Recovered != 0 {
+						t.Fatal("loser progress", p)
+					}
+					local := boundaryLoad[state.Spend](t, x.db[0][i], rules.DirectSpendKey(loser.Tx.Body.Inputs[0].Output, 0))
+					if local.Candidate != loser.Certificate.QC.Fact {
+						t.Fatal("original source lock disappeared")
+					}
+				}
+				u := boundaryRequire[rules.PublicUsage](t, x.ledger, state.Key(state.KeyUsage, x.f[0].Genesis.Grants[0].Key.Encode()))
+				if u.Reserved != 0 || u.Spent != uint64(round+1)*100 {
+					t.Fatal("net public usage", u)
+				}
+				if owner {
+					fee := loser.Tx.Body.Fee.Inputs[0]
+					c := boundaryRequire[state.Creation](t, x.ledger, rules.DirectCreationKey(fee.Output, 0))
+					s := boundaryLoad[state.Spend](t, x.ledger, rules.DirectSpendKey(fee.Output, 0))
+					if !c.Final || c.Output.Amount != 10000 || s.Consumed != (protocol.SpendFactID{}) {
+						t.Fatal("locked fee principal", c, s)
+					}
+					for i := 0; i < 3; i++ {
+						if boundaryRequire[state.Spend](t, x.db[0][i], rules.DirectSpendKey(fee.Output, 0)).Candidate != loser.Certificate.QC.Fact {
+							t.Fatal("fee lock lost")
+						}
+					}
+				}
+				x.snapshot(t, fmt.Sprintf("round%d_paid_duplicate_noop", round+1))
+				returned = &child
+			}
+			// The first three members have 200 reserved and cannot issue a third QC;
+			// this slice stoppage happens before the 300-CAL reserve is empty.
+			next := x.tx(t, 0, 4, 999, owner, 8, nil, 1)
+			for i := 0; i < 3; i++ {
+				if _, e := x.m[0][i].ApproveDirect(context.Background(), next); !errors.Is(e, rules.ErrLimited) {
+					t.Fatal("expected exhausted signer slice", e)
+				}
+			}
+			// The final compensation-funded descendant is actually spendable at B.
+			usable := x.approve(t, 1, x.tx(t, 1, 0, 1000, owner, 9, returned, 1), 0, 1, 2)
+			x.append(t, boundaryWire(t, usable))
+			x.snapshot(t, "two_round_stop_original_signers")
+		})
+	}
+}
+
+func TestRevisionUnauthorizedSponsorAndLegacyEntry(t *testing.T) {
+	x := newBoundaryLab(t, true)
+	r := x.tx(t, 0, 0, 1, false, 0, nil, 0)
+	for i, m := range x.m[0] {
+		before := boundaryRows(t, x.db[0][i])
+		if _, err := m.ApproveDirect(context.Background(), r); !errors.Is(err, protocol.ErrAuth) {
+			t.Fatal("unauthorized sponsorship accepted", err)
+		}
+		after := boundaryRows(t, x.db[0][i])
+		if !reflect.DeepEqual(before, after) {
+			t.Fatal("rejection changed member state")
+		}
+	}
+	// A cryptographically valid test-key QC does not override the public policy
+	// guard. This negative probe is explicitly not a reachable honest quorum.
+	c, err := x.f[0].DirectCertificate(r.Tx, x.p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Verify(x.f[0].Org); err != nil {
+		t.Fatal("negative probe needs valid QC", err)
+	}
+	wire := boundaryWire(t, protocol.DirectPayment{Tx: r.Tx, Certificate: c})
+	err = x.ledger.View(func(v state.ReadView) error {
+		tr, e := x.engine.ExecuteAt(v, wire, apppkg.BlockContext{Height: 1, Time: time.Unix(1700000040, 0)})
+		if len(tr.Changes) != 0 {
+			t.Fatal("unauthorized execution changed state")
+		}
+		return e
+	})
+	if !errors.Is(err, protocol.ErrAuth) {
+		t.Fatal("public policy bypass", err)
+	}
+	legacy, err := x.f[0].Transaction(0, 2).MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if x.engine.Check(legacy) == nil {
+		t.Fatal("wire4 accepted legacy envelope")
+	}
+	err = x.ledger.View(func(v state.ReadView) error {
+		tr, e := x.engine.ExecuteAt(v, legacy, apppkg.BlockContext{Height: 1, Time: time.Unix(1700000040, 0)})
+		if len(tr.Changes) != 0 {
+			t.Fatal("legacy entry wrote state")
+		}
+		return e
+	})
+	if err == nil {
+		t.Fatal("legacy bypass")
+	}
+	// Same payer and principal succeed when the payer supplies FUEL.
+	good := x.approve(t, 0, x.tx(t, 0, 0, 3, true, 0, nil, 0), 0, 1, 2)
+	for _, count := range []int{0, 2} {
+		bad := good
+		bad.Certificate.QC.Votes = bad.Certificate.QC.Votes[:count]
+		raw, encodeErr := bad.Submission().MarshalBinary()
+		if encodeErr != nil {
+			if !errors.Is(encodeErr, protocol.ErrAuth) {
+				t.Fatal(encodeErr)
+			}
+			continue // The canonical wire encoder already enforces this boundary.
+		}
+		if err := x.ledger.View(func(v state.ReadView) error {
+			tr, e := x.engine.ExecuteAt(v, raw, apppkg.BlockContext{Height: 1, Time: time.Unix(1700000040, 0)})
+			if e == nil || len(tr.Changes) != 0 {
+				t.Fatal("insufficient current authorization bypass", count, e)
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	x.append(t, boundaryWire(t, good))
+}
+
+完整既定计划:
+# Next 论文完整大修实施方案
+
+> 执行方式：在当前会话按 executing-plans 分工作包执行和验收，不主动启动子代理。本文件规划整篇论文的大修直至定稿交付；本轮仅制定计划，以下实施项尚未执行。
+
+**目标：** 保留分层架构、直接担保责任、授权历史表示三项贡献，将代码语义、证明、实验、英文正文与交付材料统一，逐项处理本轮必要审稿意见。
+
+**方法：** 先核对已有证据，再验证具体轨迹；只有实际缺陷或保留主张要求更强机制时才改生产代码。新证据在可追溯候选构建产生，旧测量保持原版本。
+
+**技术与环境：** Go、项目 CometBFT overlay、现有持久化与实验驱动、Mac Studio、IEEEtran LaTeX、现有 Overleaf 项目。无需增加消息中间件、重配置协议或新的密码学方案。
+
+## 1. 基线、范围与共同决策
+
+- 论文基线：9879f64；局部批准回收代码：bf71c4d；主实验冻结构建：721800c。工作分支当前为 fix/partial-approval-reclamation。执行前重新核实 HEAD 和未提交改动，不覆盖本轮之后的用户工作。
+- 评审与对话原文位于 docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/；本轮完整方案位于其 final-plan/ 子目录。
+- C1 保留整体架构，C2 是论证核心，C3 保留授权历史表示与完整身份保持。保留三个编号，不靠改名或重复描述增加贡献。
+- 本轮不默认改变 Intent 作用域，不加全局解锁、罚没、没收输入、任意规模推广、在线重配置、远程轻客户端、全球部署或新系统跑分。
+- 条件性服务不是无条件活性或担保组织无损承诺；实际授权/唯一消费/覆盖/守恒等性质出现反例，必须修复，不能只改措辞掩盖。
+- 两位评审认可的是大修路径，不是测试已通过、系统已证明安全或期刊保证录用。
+
+## 2. 工作包与依赖
+
+A 证据与版本映射 → B/C 语义和实现验证 → 冻结候选构建 → D 小型网络与测量验证 → E/F 证明和全篇修订 → G 定稿交付。
+
+E/F 可提前整理结构，但技术结论和最终措辞等待 B–D。每个工作包完成后登记产出、原始证据及必要的后续影响；不以“审稿模型说可以”替代验收。
+
+## A. 建立唯一的版本与证据映射
+
+**输入：** 当前论文、补充材料、历史实验清单及原始日志。
+
+- [ ] 核实提交祖先关系与生产 diff、Comet overlay、实验工具和二进制指纹；不能仅凭提交日期判断继承。
+- [ ] 建立“主张—模型假设—定理/守卫—代码位置及提交—测试/实验及提交—原始记录—论文位置—改动后受影响证据”表。
+- [ ] 先盘点 bf71c4d 的现有定向测试和日志，再判断缺口。重点复用 docs/experiments/partial-reclaim-2026-10-03/README.md、targeted-tests.log、race.log、securitymodel.log、summary.json 及 results.tgz；已有测试不改写成未做过。
+- [ ] 确定候选生产构建 R；工具修改独立记录。新证据统一标识 R，旧性能始终标识 721800c。
+
+**验收：** 每项核心主张可定位到真实材料；没有用最新版本标签覆盖旧数据，没有把“文中报告通过”当作原始日志。
+
+**影响控制：** 若后续代码修改涉及认证、公开执行、恢复、持久化或时延语义，按依赖表重验相关证明与实验。影响主性能比较时，在最终构建重跑相应连续链/混合负载对照；不以“是否热路径”作为唯一依据，不自动废弃全部旧结果。
+
+**产出：** 证据映射表、版本谱系、缺口清单、候选构建清单。
+
+## B. 核实经济损失、额度停顿及实际准入边界
+
+### B0：先查消费与费用授权入口
+
+- [ ] 使用代码知识图谱发现并核对带路由输出的全部公开消费入口，检查无 QC、错误组织 QC、新请求及其他命令能否绕过同一消费约束；为相关入口给负向测试。存在另一入口本身不是漏洞，关键是能否绕过等价约束。
+- [ ] 核对签名时的 Intent 读取及绑定行为、原签名者恢复提交条件、组织付费 FUEL 的授权条件。
+- [ ] 未授权组织付费必须拒绝；获授权组织付费与用户付费分开核算，不能默认任何用户都能让组织代付。
+
+**验收：** 代码位置、守卫和测试对应清楚。若发现破坏唯一消费或授权的旁路，先修复并更新相关证明，再继续依赖该安全前提的实验。
+
+### B1：两轮 Intent 冲突账目
+
+- [ ] 采用真实签名、正常验证、实际执行器及跟块路径。定向调度和扣留完整 QC 只由实验客户端控制，不直接写生产状态制造结果。
+- [ ] 同一 Subject 持有两组织路由的输入；每轮 T1/T2 使用新的同一配对 Nonce，先形成两张 QC，T1 先成功公开执行，随后由辅助组织认证 T3 消费 T2 输出。T3 使用不冲突 Intent；下一轮资金返回同一 Subject。末轮输出选择仍能服务的组织，并实际合法续花一次。
+- [ ] 最小夹具可用目标 grant B=300、单成员容量200、单笔完整 CAL 输出100、一个 Worker；辅助组织和其他资源充足。数值是测试参数，按实际编码和费用规则核实，不预填损失或成功结果。
+- [ ] 至少检查两轮；逐步保存原 CAL/FUEL 输入、公共未消费与成员锁状态、新输出、可用性、实际收费、整笔费用输入冻结、Held/退款、义务、Promise、Reserved/Spent、Paid/Recovered、储备余额及每成员/Worker 预留。
+- [ ] 用户付费为主；用同一参数化设施核对获授权组织付费的成本归属。若共用规则已有充分测试，引用其证据，不重复完整网络负载。
+- [ ] 对各成功公共前缀核对 CAL/FUEL 审计与覆盖；按证书事实去重计算责任，不能把四成员重叠额度相加当真实本金。
+
+**解释口径：** 停服条件可以实际触发，也可以根据已记录的预留和拒绝守卫推导，必须标明证据类型并与损失上界分开。固定且无后续充值的 grant 下，区分永久未偿还净损失、历史累计 Paid 与当前 Q_g；损失上界和哪个切片先拒绝分别报告。原 CAL 可能仍计入账本但无法消费；新输出可能接替流动性。不得称无本金启动、无成本或无条件清空全部储备。费用价值比只有在明确跨资产估值时才可讨论。
+
+**验收：** 可复现完整账目，或给出实际阻止轨迹的守卫及适用条件。未复现不等于排除；实验观察不替代上界论证。
+
+### B2：三个小场景与补资对照
+
+| 场景 | 构造 | 要检查的结论 |
+|---|---|---|
+| 独立交易碎片化 | B=300、每成员200，四笔各100，输入/费用输入/Intent独立；成员批准集合按 T1T2、T2T3、T3T4、T4T1 排列 | 每笔是否停在两票、具体占用与拒绝原因、停止新发送后是否自行进展 |
+| 同输入2/2分裂 | 同一输入的两个冲突授权，定向给两组诚实成员 | 是否无QC，输入锁、每成员预留与真实储备扣款分开记录；充值是否仍不能消除锁冲突 |
+| 有公开赢家的局部回收 | 复用 bf71c4d 的同配置真实QC成功赢家测试 | 剩余本地预留只归还一次、原批准与其他输入锁保留、失效事实不能复活 |
+
+- [ ] 对碎片化采用真实补资入口从未保护资金注入 ΔB=150（或按实际切片计算的充足数额），停止新流量，使用相同交易重试补齐证书，并观察执行与释放。
+- [ ] 实际新增容量按 floor(2(B+ΔB)/3)−floor(2B/3) 和 Worker 分配核算。补资增加授权，不是删除旧批准或解除旧锁。
+- [ ] 无新块时采用预先固定的有限观察窗口和状态快照；不能因空闲停块无限等待“再过N个块”。有限时间无变化只证明本次观察；不可达释放条件由规则论证支持。
+
+### B3：形成明确的运行条件和结果分支
+
+按成员/Worker 给出排除 CAL 容量不足的保守条件：C_mw ≥ L_mw + N_mw × a_max。
+
+L 是未计入本轮请求的已有残留预留；N 覆盖所有可能占用该切片而尚未本地释放的不同请求，包括局部批准、已获证未释放和已执行未跟块释放；a_max 含找零。相关诚实法定人数切片需同时满足，FUEL/工作资源、无冲突授权、公平交付及付款可执行性另行成立。
+
+- [ ] 说明该条件是实际强制准入，还是受控工作负载/部署条件。开放 collector 可绕过网关，不能把压测并发上限写成协议抗攻击保障。
+- [ ] 给出“已获证责任”“无QC碎片化”“同输入分裂”“成功赢家回收”对照表。
+- [ ] 若实际结果违反授权、唯一消费、资金覆盖、守恒、至多一次效果等保留性质，做最小修复并更新证明。
+- [ ] 若属于已经界定的经济损失或有条件活性边界，写明账目、条件、现有可操作恢复步骤和代价；不默认改 Intent、没收输入或新增解锁协议。
+
+**产出：** 参数化定向测试、逐步账目、守卫证据、边界与运行条件表。生产修改只在证据触发后形成，不预设漏洞存在。
+
+## C. 补齐最新构建的组合一致性证据
+
+- [ ] 公共历史：覆盖“补偿→表示→迟到偿还”和“补偿→迟到偿还→表示”；复用已有fixtures，结合保留已提交状态的落后副本与网络追赶，使提供历史的副本确实持有修订表示。
+- [ ] 成员边界：批准提交后/签名返回前；恢复额度、Applied 与 follower cursor 提交边界。优先引用现有等价的重启/原子回滚测试，不做全部事件排列组合。
+- [ ] 用受控测试屏障或持久化夹具构造状态，不人为回滚生产签名状态。区分保留状态的重启与数据丢失/损坏/旧schema迁移，后三者不在本轮。
+
+**必须断言：** 原始执行下载/重放使用原始材料；完整 BlockID 对应正确；旧前缀读取不泄露较晚修订；补偿/偿还/额度恢复至多一次；原输入锁不因资源回收解除；经济状态与 cursor 原子一致。相同原始命令历史复现同高度状态；不同表示分组不能错误要求应用哈希相同。
+
+**失败分支：** 代码缺陷修复并重验对应安全接口；覆盖缺口只补对应测试。没有固定截止期的活性假设不能因一次超时直接宣布被推翻，先检查前提和阻塞位置。
+
+**产出：** 同一候选构建的组合断言表、事件时间线、日志与指纹。
+
+## D. 最小网络验证与测量解释
+
+### D1：固定四条件、十二轮
+
+| 条件 | 实际认证请求/响应及委员会P2P | 故障 |
+|---|---|---|
+| H | 使用相同注入设施，附加时延0 | 无 |
+| L | 每方向附加25 ms，目标附加RTT50 ms | 无 |
+| L-M | 同L | 一个承担测量支付的组织成员不响应 |
+| L-C | 同L | 一个委员会验证者不响应 |
+
+- [ ] Mac既有环境；每条件3次独立运行，交替条件顺序。预热5s，20笔/s、60s普通负载，加两条10跳真实连续支付链。15–45s为故障窗口，两条短链在窗口内启动；结束后60s排空观察。
+- [ ] 成员故障与委员故障分开，不合并归因。具体故障成员必须落在所测链实际调用路径，委员故障期间覆盖其提议机会。
+- [ ] 固定预算、用户付费/组织付费模式、持久化、并发和共识参数；预算满足B的受控负载条件。使用同构注入设施消除代理本身的对照偏差，记录注入粒度/位置、实际RTT及未覆盖链路；不将仅跨站HTTP延迟当成委员会P2P覆盖。
+- [ ] 保存全部结果，包括超时/拒绝；报告认证、公共完成、发送滞后、积压、排空、同高副本一致与资源审计。故障期间剩余法定人数应有合法进展；恢复后状态对齐。性能降低不是正确性失败。
+
+**验收：** 注入实际生效，两个故障域分别被覆盖，成功/失败有完整事件与账目，声明只对应本机受控条件。观察期限不是协议期限；若未排空，查前提和原因，不能删除失败样本。无需36轮全链fast/wait矩阵、RTT扫描、真实WAN或新TPS上限。
+
+### D2：解释已有等待基线
+
+原14.15倍结果只对应原单机、无注入时延的测量配置；D1不用于声称该比值在有时延条件下保持。
+
+- [ ] 核对721800c实际轮询设置及逐笔时间戳，按同一交易关联应用提交、钱包确认、驱动观察；选择最早/指定/所有副本提交口径要明示。
+- [ ] 只有已有对应时间戳才拆阶段。缺钱包时刻就报告“应用提交→驱动观察”联合区间；最早副本时间还包含副本进度差。只计算真正阻塞下一跳的观测时间，不把重叠耗时直接从总量中减去。
+- [ ] 计划发送延迟逐笔算 receipt_i−scheduled_i 再求分位数，不能相加两个P95。缺字段如实说明，不为非核心统计重跑所有混合负载。
+- [ ] 若观测开销改变核心解释且仍要保留该解释，才加一组同配置低轮询/事件驱动对照；否则保持有效端到端结果并精确限定归因。
+
+**产出：** 小型网络报告、等待分解、测量字段字典与原始结果。完成后网络补证范围关闭，不继续扩大部署实验。
+
+## E. 统一三项贡献、安全证明与历史读取需求
+
+- [ ] C1：比较认证者、执行委员会、证书含义、预存资金与第三方储备、来源缺失责任和失效条件，说明职责分离的目标。未测扩展性只能写设计目标，不能写已证明收益；不强制新增FastPay/Sui跑分。
+- [ ] C2：亲自核对Stingray等原论文，将重叠预算比例先例与Next隐藏证书、直接义务、补偿/偿还动态不变量区别清楚。模型、守卫和定理写同一版本；说明资金安全、条件性进展和经济损失的不同结论。
+- [ ] C3：优先复用本地已验证副本上的审计/导出/重建工具；没有现成使用方时做最小示例消费者并明确标为示例，不能伪称真实商业需求。执行原坐标寻址、读取获授权历史字节、检查原完整BlockID/部件、显示Revision/Task引用、区分历史垫付与当前义务/偿还状态。
+- [ ] 明确索引路径与表示路径提供何种不同接口。仍需永久决定和义务状态，不写“无需决定索引”。不要求证明所有非CH方案不可替代；7–12%本地点读改善只能支持该布局配置的测量。
+- [ ] 补实际RSA参数、e选取与条件、FDH函数与上下文编码、门限组合方案/引用及dealer假设；自定义接口补对应论证。原始绑定须连同版本/开口检查及完整身份守卫说明，不能把整个共识安全缩成只依赖FDH。
+- [ ] 四维状态表统一“公开执行、经济义务、逻辑表示、物理安装”；集中列局部回收覆盖/未覆盖情形。若代码修复改变守卫或范围，同步引理、定理及其代码对应。
+
+**验收：** C3有可运行接口演示、明确需求契约、授权/身份/回放断言与成本数据。若只能证明可选表示能力，就收窄其定位与篇幅，不制造必需性；若仍强调查询效率优于替代布局，才补匹配布局/缓存的对照。三项结构保留，C2承担核心技术叙事。
+
+## F. 全篇英文修订及补充材料重整
+
+论文目录：docs/paper/review-2026-10-02/。沿用现有英文，不全面推倒重写。
+
+| 文件/部分 | 修改职责 | 验收重点 |
+|---|---|---|
+| abstract.tex | 问题、直接责任机制、固定模型、最硬有效结果；C3简述 | 不写无条件执行/无损/普遍低延迟 |
+| introduction.tex | 解释分层选择；保留C1/C2/C3编号，突出C2 | 每项贡献指向证明或证据 |
+| related.tex、references.bib | 直接核对最近工作与基础计数先例、系统名称 | 不凭AI转述改文献，不泛称已有系统无资金要求 |
+| model.tex、architecture.tex | 固定配置、状态不回滚、公开端点/collector、费用和本地读者范围 | 不虚构已实现准入或重配置 |
+| protocol.tex | 压缩实现名词；四维状态与回收覆盖表；恢复/赔付/表示职责 | 凭证、批准、公开责任和物理安装不混淆 |
+| security.tex | 完整经济账目与条件性进展；核对不变量及接口证明 | 同一套符号/守卫；范围说明不掩盖反例 |
+| evaluation.tex | 旧主测量与新验证分开；加B–D紧凑结果、参数和基线解释 | 同口径、版本清楚、不把有限试验写成持续极限 |
+| 讨论段落/短节 | 集中说明部署条件、资本与费用、永久冲突及C3适用性 | 用准确条件代替重复免责声明 |
+| conclusion.tex | 强化已证实贡献与结果 | 不升级结论，也不突然引入新缺点 |
+| supplement-*.tex | 当前证明/参数/映射/验证优先，旧数据精简索引 | 修S2/S3引用及旧正文迁移残留 |
+| zh-*.tex | 英文技术内容冻结后同步中文阅读版 | 定理、数值、范围逐项一致 |
+
+- [ ] 修D、δ、R、x等符号复用；公式标点；图7位置；图中文字和表格可读性；附录重复段落。
+- [ ] 作者Lu Hengrun与用户批准的University占位保持真实。正式单位/通信信息未获确认时标为提交前信息项，不编造、不影响技术大修验收。
+
+**验收：** 摘要—贡献—定理—实验—结论没有语义升级。逐项审稿意见定位到已修改页/节、测试或合理范围说明；不通过增加免责文字凑完成度。
+
+## G. 定稿交付、复核和归档
+
+- [ ] 重用现有data/下校验与图表脚本、rereview-2026-10-03/check_artifacts.py等已验证工具，按新证据更新；测量数字从原始记录重算核对，常量与例子不强制程序生成。
+- [ ] 干净目录编译英文正文/补充与中文阅读版四个根文件；英文pdfLaTeX/BibTeX、中文XeLaTeX沿用项目已验证配置。无未定义引用、缺图、错误、缺字或溢出；逐页目视检查。
+- [ ] 本地源码与Overleaf内容、编译配置及版面一致，保存在线源包核对记录；不要求PDF时间戳造成的字节差异完全消失。
+- [ ] 准备英文正文PDF、英文补充PDF、中文正文/补充PDF、LaTeX与图表源包、数据/运行入口及版本清单、逐项审稿关闭表。
+- [ ] 验证artifact入口实际可访问；核对投稿时适用的官方格式/篇幅/匿名与披露要求，记录来源，不能将编译成功等同投稿合规。
+- [ ] Git提交与发布标签固定代码—论文—数据关系，按授权推送；整洁保存原始数据和失败记录，不自动清理/删除可追溯证据。
+- [ ] 最终一次聚焦审阅只核对关闭表和主张证据一致性；意见若与既定主张无关，列后续工作而不重启本轮研究。
+
+## 3. 完成标准与例外
+
+全部满足后结束本轮大修：
+
+1. 必要意见逐项有证据关闭，或有依据说明不适用，或通过收窄非核心主张关闭；不能只标“已讨论”。
+2. 无未处理的模型内安全反例；保留的进展主张有明确前提与对应验证，不能用实验超时替代理论判断。
+3. 代码、模型、证明、数据与正文同义且版本可追溯；旧结果不伪装新结果。
+4. 三项贡献定位、可运行C3接口和相关工作归属说明完整；不制造需求或原创性。
+5. 四份PDF、源包、数据索引、artifact与Overleaf核查完成。未知作者信息独立列提交前事项。
+
+新发现真实安全反例，或确实违背保留的进展保证，才按影响重开机制工作；排版错误仅重开排版检查，数据错误只重开对应分析。没有必要再增加与当前论文主张无关的实验。
+
+## 4. 本轮输出与执行状态
+
+- 方案规划：已完成。Claude（Opus 5.5 High）与GPT分别阅读对方意见，并已确认共同执行口径无剩余实质异议；确认原文见下方归档索引。
+- 对话归档：[最终方案与双方确认](../../paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/README.md)。
+- 代码修改、上述新测试、论文修订、Git推送：本轮未执行。
+- 实施时默认同一会话顺序执行；Claude/GPT用于具体问题与文字复核，Codex负责证据、工具、测试和审计。不把模拟评审认可当作科学证明。

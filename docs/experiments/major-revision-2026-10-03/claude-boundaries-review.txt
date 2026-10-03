@@ -1,0 +1,79 @@
+测试审计与生产代码验证
+
+Share
+Claude finished the response
+
+Use the up and down arrow keys to move between messages.
+
+这是Next论文完整大修的执行接续。请作为独立技术审稿者，先核查以下B工作包的实现证据，再提供可用于英文论文的条件性进展/经济边界文字。不是要求重新审整篇，不新增研究目标。旧Claude会话额度耗尽，所以本对话没有之前记忆；以本消息材料为准。三项贡献为C1分层认证/公开执行架构、C2直接担保责任下来源解耦与后继执行、C3经济赔付之后的受限授权历史表示/完整BlockID保持。固定四成员三签、最多一恶意、原子不回滚签名状态，公开collector不强制并发准入。A–G完整计划附后。 前一位GPT检查测试后发现Next header夹具不连续（这是测试夹具问题，不是生产漏洞）；现在已修正：每条命令
+
+PASTED
+
+11 minutes ago
+
+
+
+Claude responded: 我只看到了测试源码，没有生产代码，也没有运行它；"全部重跑通过"按你的说明采信。下面是测试层面的审计，不能替代对生产守卫的核查。
+Ranking missing-test gaps by severity and impact.
+
+Ranking missing-test gaps by severity and impact.
+
+我只看到了测试源码，没有生产代码，也没有运行它；"全部重跑通过"按你的说明采信。下面是测试层面的审计，不能替代对生产守卫的核查。
+
+结论
+
+在这个夹具范围内（4成员、3签、W=1、两轮），账目解释站得住。我没有发现推翻性反例。守恒、按证书去重的覆盖账、原输入锁和耗尽时的 ErrLimited 都有真实断言。但有两条攻击面上的路径没有被测到，一个夹具保真问题需要你确认，几处证据强度需要在措辞里降级或补断言。
+
+需要处理的问题（按重要性）
+Intent 失败者从未进入真实区块。 loser 只通过 ExecuteAt 直接调用并比较前后行。公开 collector 不强制准入，loser 的持有者完全可以把它放进区块。此时区块里有一条失败结果，follower 如何处理它没有被测，包括是否释放本地输入锁和额度预留、cursor 怎么走、LastResultsHash 怎么算。"原输入锁不因资源回收解除"恰好可能在这条路径上被破坏。建议补一个测试：
+把 loser 放进真实块，经 VerifyBlock 和 blockfollow.Commit 跟块；
+断言三个签署成员的 Spend 锁、LocalProgress 和 Quota 均不变，后续补偿结果不变。
+如果生产层根本不允许失败交易入块，请指出具体代码位置，并改用该证据。
+补偿命令只测了重复字节。 它不需要授权，任何人都能提交。至少应补以下负向测试：
+未到超时即提交；
+坐标错误（Height、Transaction、Input）；
+对已 Paid 的义务再提交；
+源输入后来被公开消费时，应走 Recovered/Discharged 分支而非 Paid。
+否则"至多一次"只对相同字节成立，不是对命令语义成立。
+空继块夹具可能有保真问题，请核实。
+代码把 DataHash 置 nil，并且在 b.Hash() 之前调用 MakePartSet。
+我记得 CometBFT 的 Hash() 内部会 fillHeader 补 DataHash。若如此，parts 序列化的头与 BlockID.Hash 提交的头不一致。重新加载后哈希仍会相等，但真实节点的 ValidateBasic 会拒绝。
+修法：在 MakePartSet 前设 b.Header.DataHash = b.Data.Hash()，再从 x.blocks 重新加载，做 ValidateBasic 和哈希比对。
+这只影响"真实 parts/完整 BlockID"对空块的措辞，不影响经济账目。AppHash 连续性未验证，不要写进去。
+证据强度不一。
+同输入 2/2 测试对 ErrConflict 有断言，但成员 Reserved、储备账户不变、公共 Usage 为零只写进了 snapshot 日志，没有断言。文中可以写"记录"，不要写"验证"，或补断言。
+两轮测试没有断言第四成员（未签名者）的 Available 仍为 200。补上才能说明停服是签署者切片局部耗尽，而不是全局耗尽。
+范围与经济解释。
+Workers=1，所以 C_mw 的多 Worker 分配和 a_max 含找零没有被该夹具检验。
+money() 把冻结的源输入仍计为资产。因此"守恒"不等于流动性或偿付能力，净损失落在担保组织，Subject 冻结的本金与之等额。
+补偿输出可作为下一轮本金，所以循环自筹本金。
+owner=false（组织付费）路径下，被授权的 Subject 没有 FUEL 成本。
+不要写"攻击者无利可图"，除非同时明说对冻结本金的估值假设。
+可用英文（三段）
+
+Resource retention on the guarantor's side comes in four distinct forms, and we do not conflate them. (i) Fragmentation without a quorum certificate: independent requests, each holding fewer than three approvals, occupy per-member CAL slices; in our fixture four requests with two approvals each leave every member with 200 reserved and 0 available, so any further approval is refused with a capacity error. No certificate exists, no public obligation is created, and the reserve account is untouched. A reserve increase raises each slice (here from 200 to 300 for ΔB=150), and the same requests then complete and release capacity, but it deletes no existing approval. (ii) Same-input 2/2 split: two conflicting authorizations of one input, each approved by two honest members, never reach a quorum, because every member's input lock refuses the other request. This is an input-lock conflict, not a capacity shortage, and additional funding does not lift it.
+
+(iii) Local reclamation after a public winner: when a request that did obtain a certificate loses to a publicly executed winner, the remaining local reservation is returned exactly once while the original approval and the locks on other inputs are retained. (iv) Cross-organization Intent failure with a certificate, followed by payout: the loser holds a valid certificate, its output is accepted downstream under the direct guarantee, the public obligation times out, and a compensation decision pays it from the source organization's reserve. The source input stays unconsumed in the public state but remains locked at the three signers, and the user's FUEL fee input is frozen in full (10,000 in our fixture), separately from the 1,000 maximum fee. In two rounds the reserve fell 300→200→100 while the three signers reached 200 reserved and 0 available; new independent requests were refused at those signers while 100 CAL remained in the reserve. We report this as slice exhaustion preceding reserve exhaustion, not as a reserve-sized bound on service.
+
+Operating condition. Slice-level capacity exhaustion is excluded for a member m and worker w when C_mw ≥ L_mw + N_mw·a_max, where L_mw is residual reservation from other requests, N_mw counts all distinct not-yet-released requests that may occupy the slice (partial approvals, certified but unreleased, and executed but not yet followed), and a_max includes change. In our four-member, three-signature, at-most-one-malicious setting the condition must hold at every honest member's slice (any three if one member is faulty). This is a deployment condition on a controlled workload, not an admission control enforced by the protocol: public collectors can bypass any gateway, so the condition must not be read as a denial-of-service guarantee. It also does not cover FUEL availability, conflict-free authorization, or payment executability, which are separate assumptions. Our experiments use one worker and two rounds, so they illustrate the accounting but do not test multi-worker allocation.
+
+最后一句"does not test multi-worker allocation"是按现状写的。如果你补了多 Worker 测试，就可以去掉。
+
+
+Create a Word document
+
+
+
+
+
+8 minutes ago
+
+Write a message…
+
+
+
+
+
+
+
+Sonnet 5.5 Medium

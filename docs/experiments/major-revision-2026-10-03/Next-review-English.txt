@@ -1,0 +1,2195 @@
+1
+Next: Enabling Continuous UTXO Payments with
+Direct Guarantees
+Lu Hengrun
+Abstract—Continuous payments let a recipient spend an output
+before its creating transaction executes publicly. Next is a native
+UTXO ledger in which a recipient veriﬁes a quorum-signed
+output certiﬁcate (TXCer) after one certiﬁcation round and
+can request a successor while public processing continues. If
+the successor executes ﬁrst, the committee records a funded
+obligation against the direct issuer. Original signers can resubmit
+the source from its publicly exposed certiﬁcate. A deadline-
+triggered decision debits the issuer’s reserve, and a late source
+repays it. Optional authorized history commands then record the
+reserve reference at the original coordinates while preserving
+owner authorizations, successor references, and the complete
+BlockID. For four-member organizations and a four-validator
+committee, each requiring three votes with at most one static
+Byzantine member, we prove unique consumption, coverage of
+outstanding certiﬁcate liability, and delay-neutral terminal CAL
+holdings for source-closed, conﬂict-free payment sets. On one host
+with synchronous member commits, a 100-hop chain reaches its
+last certiﬁed receipt in a median 4.557 s, versus 64.476 s with
+per-hop waiting. Targeted boundary and restart tests validate the
+conditions on capacity, economic closure, and historical reads.
+Index
+Terms—Blockchain,
+certiﬁed
+payments,
+collateral,
+Byzantine fault tolerance, chameleon hash.
+I. INTRODUCTION
+In a UTXO ledger, each payment spends outputs of earlier
+transactions, so if recipients wait for public execution, every
+hop of a payment chain adds a conﬁrmation delay. Suppose
+Alice pays Bob 100 CAL and Bob forwards it to Carol before
+Alice’s payment executes. If Bob’s payment executes ﬁrst, the
+ledger consumes an output that does not yet exist, and the
+missing 100 CAL needs an identiﬁed, funded source, whether
+Alice’s transaction arrives later or never.
+Waiting for public execution at every hop is the direct
+alternative, and our evaluation uses it as a control. Certiﬁcate-
+based systems separate recipient usability from public process-
+ing: FastPay and Zef support low-latency certiﬁed payments,
+and Sui Lutris combines broadcast and consensus paths for
+different kinds of state access [1]–[3]. Payment channels
+obtain rapid transfers from channel liquidity [4], [5]. Next
+asks how a native ledger can fund a certiﬁed payment whose
+source has not executed, with registered organizations rather
+than channels standing behind it.
+Three difﬁculties are coupled. Certiﬁcates circulate before
+public registration, so accounting from public gaps misses
+existing commitments. A late source must not pay both the
+guarantor that advanced the value and the recipient who
+already spent it. A client may hold a source and never submit
+it.
+Lu Hengrun is with University.
+Our insight is that the party answerable for a missing source
+is already named by the certiﬁcate that travels with the output.
+Next charges the gap to that direct issuer instead of tracing
+ancestors, bounds every signed certiﬁcate’s liability by reserve-
+backed signing capacity, and closes an unresolved obligation
+by a public decision without changing stored history. The
+design has three contributions, centered on direct responsibility
+for missing sources.
+C1: A layered architecture for one-round continuation.
+Certiﬁcation and public execution carry different duties: a
+certiﬁcate ﬁxes outputs and assigns liability to its issuer,
+whereas public execution decides which payment the ledger
+accepts. Members of the consuming organization lock inputs
+and reserve capacity atomically before signing, and one par-
+allel round yields a TXCer. The recipient veriﬁes and records
+the output and can request a successor at once, carrying only
+certiﬁcates of its direct inputs, while replication and public
+submission run in the background.
+C2: Direct responsibility with source decoupling. Public
+execution atomically consumes a missing certiﬁed input and
+records an obligation against its issuer. The successor’s block
+publishes the source’s certiﬁcate, so the original signers can
+resubmit the source from stored approvals; after the deadline,
+a public decision debits the issuer’s reserve without threshold
+adaptation, and a late source repays it. Each approval reserves
+the full CAL output, change included, while it remains poten-
+tially certiﬁable, and an authenticated conﬂicting public spend
+may release the unused local reservation of a non-certiﬁed
+approval. For four-member organizations and a four-validator
+committee with at most one static Byzantine member each, we
+prove unique consumption and that signing capacity covers the
+outstanding CAL liability of every certiﬁcate, published or not.
+For a ﬁnite, acyclic, conﬂict-free payment set that contains the
+sources of its certiﬁed inputs and executes each payment once,
+all orders of arrival and compensation end with the same CAL
+holdings and reserve balances. The accounting extends over-
+lapping per-member budgets [6] to hidden certiﬁcate liability,
+dynamic compensation and repayment, and source closure.
+C3: Optional authorized historical representation. Re-
+stricted chameleon-hash commands replace the funding ref-
+erence of a compensated input with the reserve reference,
+preserving owner authorizations, successor references, and the
+complete BlockID. An honest replica that has executed preﬁx
+H can then serve, at the original coordinates (h, j, k), the
+original and authorized body bytes, the complete BlockID,
+the authorizing Revision and Task, the historical funding
+reference, and the current obligation state. The permanent
+decision remains the economic basis, and replay of the original
+
+2
+commands is unchanged. The layer stays off the payment path
+and costs extra records and local maintenance; a runnable local
+consumer demonstrates the byte-export contract.
+On one M4 Max host with synchronous member commits
+and unsynchronized wallet stores, a 100-hop chain reaches
+its last certiﬁed receipt in a median 4.557 s, against 64.476 s
+when the same system waits for public execution at each
+hop. A fourteen-service mixed workload with organization-
+paid FUEL completes 84,192 payments under bounded con-
+currency; original signers resolve all 24 sources withheld in
+the resubmission treatment, and compensation and repayment
+complete while all adaptation services are paused. In a twelve-
+run study on the same host, adding 25 ms per direction to
+member RPC and committee P2P trafﬁc raises certiﬁed-receipt
+P50 from 41.6 to 81.9 ms, and suspending one member or
+one committee validator for 30 s leaves certiﬁed-receipt P95
+at 109–113 ms; all 15,840 payments close. In local hot-page
+reads without object caches, representation lowers point-read
+P50 by 7.44–12.32% against an optimized decision index for
+the tested layout, adding 0.28–2.19 MiB and one 43–214 ms
+maintenance step per repaired block. These read measurements
+characterize the cost of the optional layer in that conﬁguration.
+II. BACKGROUND AND RELATED WORK
+Next combines certiﬁed payments that a recipient can reuse
+before public execution, reserve-backed responsibility for a
+source that has not executed, and authorized editing of stored
+history. We compare prior work along two questions: who
+answers for a missing source, and which payment and block
+identities survive once that answer is recorded.
+Certiﬁcate-based payments and execution. FastPay uses
+Byzantine consistent broadcast for low-latency payments and,
+in its primary-ledger deployment, backs redemption with
+prepaid funds [1]. Its redeemability argument lets a valid
+certiﬁcate be conﬁrmed before all incoming transfers are lo-
+cally conﬁrmed, provided the sender’s missing earlier outgoing
+certiﬁcates are supplied; redemption then reaches the primary
+funding pool. Zef combines disposable accounts with private,
+transferable coins, and ordinary spending uses current coin cer-
+tiﬁcates and consumption evidence in place of the full ancestor
+history [2]. Sui Lutris pairs broadcast execution for owned
+objects with consensus for shared-object interactions [3].
+Stingray supports concurrent transactions through Byzantine
+bounded counters and FastUnlock [6]. Its overlapping per-
+replica budgets (Sec. 4.2) and its treatment of budget exhaus-
+tion when no quorum certiﬁcate forms (Sec. 5.3) are the count-
+ing precedent for Next’s signing-capacity accounting, and we
+do not present them as new. Its commutative workloads differ
+from a payment chain in which each transaction consumes its
+predecessor’s output. For that chain, Next publicly executes a
+certiﬁed consumption before the source executes and registers
+a funded obligation against the direct issuer. It adds respon-
+sibility for certiﬁcates that were never published, dynamic
+conservation of the Paid, Recovered, and Remaining quantities
+of each certiﬁcate, and closure of the source obligation by a
+public decision. The successor’s execution also publishes the
+source’s certiﬁcate, so the issuing organization’s own members
+can resubmit the source from the approvals they stored.
+Channels and collateralized guarantees. Blitz replaces
+two-phase commitment in channel payments with pay-or-
+revoke [4], Donner develops virtual channels that address the
+Domino attack [5], and CryptoMaze provides atomic multipath
+channel payments with unlinkable partial payments [7]. All
+three operate through channel arrangements. Next runs on a
+native ledger with registered consumption routes and organiza-
+tion reserves, so counterparties need neither a bilateral channel
+nor a prefunded route between them.
+Snappy protects merchants who accept fast on-chain pay-
+ments through collateralized approvals, and reusable payment
+guarantees combine privacy with customer collateral that can
+be reused across deﬁned time windows [8], [9]. Next keeps
+the user’s payment principal separate from additional orga-
+nizational backing, and its compensation closes the missing
+source of an already executed child without a second principal
+credit to that child’s recipient. HyperService adjudicates cross-
+chain execution violations through a public Network Status
+Blockchain and an Insurance Smart Contract that ﬁnancially
+reverses the effects of committed transactions [10]. Next draws
+the responsibility boundary within one native UTXO ledger:
+compensation settles a direct issuer obligation and leaves the
+principal effects of executed successors in place.
+Controlled editing and historical consistency. Chameleon
+hashes permit authorized alternative messages under the same
+digest and underpin editable-blockchain designs [11]. SDR
+studies decentralized attribute-based edit authority and dy-
+namic delegation [12], Escaping moves committee selection
+and voting outside the consensus layer to shorten redaction
+waiting [13], and Reconstructing Chameleon Hash develops
+stronger deﬁnitions of indistinguishability and collision resis-
+tance [14]. Next uses an established adaptation primitive, with
+the trapdoor held as threshold shares of an RSA exponent
+following Shoup’s practical threshold-signature approach [15].
+The authority to apply a compatible replacement comes from
+a committed compensation decision and public payment-state
+checks, not from the primitive.
+Reparo provides a publicly veriﬁable repair layer and can
+re-execute affected transactions while repairing state [16].
+Next ﬁxes payment authorizations and outputs in advance:
+a public decision accounts for the compensation once, and
+representation commands replace only the permitted funding
+representation, without re-executing successors. The original
+commands, including the decisions, remain the economic
+replay history. RedactChain coordinates concurrent edits to
+the same block and their preprocessing [17], and CDEdit
+uses reusable privilege tokens to cut repeated token and key
+generation and veriﬁcation across multiple edits [18]. In Next,
+a batch shares the ﬁnal block representation across the decided
+slots of one block, and each slot’s reserve debit was already
+committed by its own decision, so the edit has no economic
+effect. The complete block identity combines the stable header
+hash with the original part-set header, and publicly committed
+logical revisions authorize exact replacement bodies. Physical
+installation can therefore advance directly to a later authorized
+revision without changing successor references or replay of the
+public command history.
+
+3
+III. SYSTEM MODEL AND OVERVIEW
+Next lets a recipient spend a newly certiﬁed output before
+the transaction that creates it executes publicly. Four objects
+carry the design: authenticated payment rights, their public
+consumption, the responsibility for unresolved sources, and
+the later representation of that responsibility in stored history.
+Table I lists the notation.
+A. Participants, Assets, and Assumptions
+Next operates a native UTXO ledger. CAL carries payment
+value and FUEL pays processing fees. Users spend their own
+outputs, and organizations hold additional CAL in public
+reserve accounts. The fast path requires an output with a
+supported organization route; payment principal stays with its
+owner, and no bilateral channel is opened. Fees default to the
+user’s ﬁnal FUEL outputs; an authorized organization-funded
+mode also exists.
+Each organization has four ﬁxed members and a replace-
+able collector. Members validate requests independently and
+authorize payments, while the collector distributes requests,
+assembles certiﬁcates, and coordinates propagation without
+spending authority. A separate committee C of four equally
+weighted validators, with three votes required, orders public
+commands and maintains accounts, outputs, obligations, and
+compensation decisions.
+Collector access and deployment conditions. Any client
+may relay an owner-authorized request; acting as collector
+grants neither spending authority nor organization-funded fees.
+Members still enforce ownership, input locks, resource grants,
+and the applicable fee policy. These per-request guards do
+not enforce a system-wide bound on unﬁnished approvals
+across collectors, and a gateway concurrency limit is not such
+a bound. The capacity condition in Section V-F therefore
+describes a controlled workload or an external deployment
+restriction. Without that restriction, an organization accepts the
+retained-capacity and reserve-loss boundaries analyzed there.
+Faults and cryptography. The adversary corrupts statically
+at most one member per organization and one committee
+validator throughout an execution; users and collectors behave
+arbitrarily. Honest participants share the network conﬁgura-
+tion, genesis, rules, and organization registry, and each route
+names one active conﬁguration and one consumption-lock
+domain. Signatures are unforgeable, canonical digests and
+TABLE I
+PRINCIPAL NOTATION.
+Symbol
+Meaning
+G, C
+Guarantor organization and public committee
+T, cT
+Payment and its certiﬁed summary fact
+(x, i)
+Output identiﬁer and spend instance
+g, Bg
+Grant and cumulative authorization
+aT , pT , RecT
+Total CAL outputs, gross compensation, and recov-
+ered compensation
+Ox, Dx
+Direct obligation for a missing output and its im-
+mutable compensation decision
+(Hb, Pb)
+Stable block hash and original part-set header
+ρℓ, ρp
+Committed logical and installed physical revisions
+original block commitments are binding, and messages may
+be delayed arbitrarily.
+State. Honest signing state is atomic and never forgotten or
+rolled back. Before a member signs, its approval records the
+payment, the admission vector, and the direct input certiﬁcates
+of the request; the quorum certiﬁcate is not part of it. Public
+execution is deterministic and atomically committed, and fol-
+lowers apply authenticated consecutive blocks, updating state
+and cursor together. Compensation and representation read
+original blocks and their metadata, so correct committee repli-
+cas retain both at every height that holds an open obligation
+or a decided slot awaiting representation.
+Adaptation and progress. Representation uses threshold
+adaptation with material generated and distributed by a trusted
+ofﬂine dealer, and a committed command must authorize any
+adaptation output. Progress needs responsive honest partici-
+pants, available evidence, sufﬁcient fees and resources, and
+fair delivery and scheduling. The experimental in-memory
+conﬁguration keeps state atomic only while the process runs,
+and each run starts from fresh genesis.
+Historical reads concern an honest replica that has veriﬁed
+and executed public preﬁx H, using one read transaction on
+its state VH. Section IV-H speciﬁes the interface semantics.
+B. Outputs, Routes, and Certiﬁcates
+An output carries an asset, an amount, an owner, and a
+consumption route. Its identiﬁer x derives from the network,
+the creating transaction, and the output position, and spending
+is indexed by (x, i) with i = 0 for ordinary outputs. All
+inputs of a fast payment share one consumption organization,
+and the owner authorizes the transaction. New outputs may
+select another registered organization, so cross-organization
+continuation changes the route of the new output while the
+previous issuer’s responsibility stays in place.
+A TXCer pairs a summary with a quorum certiﬁcate (QC):
+three distinct member signatures over one fact cT . The sum-
+mary binds the network, transaction identity, issuer, conﬁg-
+uration, epoch, rules, output commitments and amounts, and
+admission grants. Output bodies may be delivered separately,
+and the recipient checks commitment, position, and ownership
+before saving an output. The certiﬁcate authenticates the
+issuer’s guarantee and is neither an asset, a registered public
+obligation, nor an unconditional guarantee of public execution
+or repayment.
+Each payment carries
+IntentID = Digest(INTENT, Network,
+Subject, Nonce),
+which names an operation of one payer on one network; it
+is not a nonce space shared among users. Members keep
+local intent records per organization, whereas public execution
+binds an intent to one TxID in the same atomic transition
+that executes the payment successfully. Two organizations can
+therefore certify, from independent inputs, two payments with
+the same subject and nonce and both obtain QCs, but at most
+one executes publicly.
+Three events recur: certiﬁed receipt, where the wallet veri-
+ﬁes and records an output locally; public execution, where a
+
+4
+Sender wallet
+Authorize payment
+Consumption
+organization
+4 independent
+members
+3 matching
+signatures
+Recipient wallet
+Verify and
+record TXCer
+Ready to continue
+Next payment
+Same or another
+registered organization
+Transaction
+Output + TXCer
+Direct evidence
+Original signers
+Resubmit
+retained payment
+Same authorization
+Public committee
+Execute child payment
+Record direct gap
+Public decision
+Debit issuer reserve
+Close economic gap
+Authorized
+representation
+Adapt restricted slots
+Install committed
+revision
+Public submission
+Consumed
+input QC
+Original submission
+Still missing
+after deadline
+Immutable
+decision
+Economic closure does not wait for adaptation
+Fig. 1. One-round continuation and evidence-driven source resolution. Solid arrows form the recipient path; dashed arrows denote background work. Public
+successor evidence enables the original signers to resubmit retained authorized material. If the source remains unresolved after its deadline, the committee
+closes the gap independently of adaptation. A subsequent authorized representation preserves the payment and complete block identities.
+committed command consumes inputs and creates outputs; and
+liability closure, where a missing source is fulﬁlled or compen-
+sated. Compensation closes a liability economically, and rep-
+resentation records the closure later in stored history. Receipt
+supplies evidence for a successor request, which undergoes
+its own authorization and resource checks. Throughout, the
+source of an output (also its parent) is the payment that creates
+it, and its consumer (also its successor or child) is the payment
+that spends it. Child outputs are the outputs that the consumer
+creates. Source arrival means successful public execution of
+the source transaction, which the implementation’s Settled
+ﬂag marks and which may coexist with nonzero Pending.
+C. Three-Layer Design
+Certiﬁcation and continuation. A member reserves the
+input instances and applicable resources atomically before
+it signs. A CAL grant g authorizes Bg, and each member
+holds ⌊2Bg/3⌋signing capacity, partitioned among its local
+execution Workers. A payment reserves aT , the sum of all its
+CAL outputs including change; these overlapping capacities
+constrain commitments but do not increase the backing funds.
+The collector returns a TXCer after three matching approvals
+in one parallel request–response round. Recipient veriﬁcation
+and atomic local recording complete the fast path, while relay-
+material storage, INSTALL (replication of complete material
+within the organization), and public submission run in the
+background. Input locks outlive budget release.
+Source-decoupled public execution. A public command car-
+ries the transaction, admission vector, organization authoriza-
+tion, and direct input certiﬁcates. The committee reconstructs
+the certiﬁed summary, veriﬁes the authorization, and checks
+the current consumption state. For a certiﬁed input that is not
+yet publicly created, it atomically records the consumption,
+registers certiﬁcate-wide coverage against the issuer, creates
+Ox and its gap, and creates the child outputs; only a miss-
+ing output that is actually consumed opens an obligation.
+Each public payment check uses direct certiﬁcates rather than
+fetching ancestor transaction bodies. Members restore signing
+capacity from authenticated blocks against their own recorded
+debits (Section IV-C). Genesis checks aggregate grants against
+each backing account, and top-ups debit unprotected accounts
+and raise balance and grant atomically; authorizations never
+decrease.
+Resubmission, compensation, and representation. An obli-
+gation closes by source arrival or, after a deadline ﬁxed by
+public block time, by compensation from the issuer’s reserve.
+The block that executes the consumer publishes the certiﬁcate
+of its source, and members of the issuing organization that
+hold the approval rebuild the payment from retained material
+and resubmit it without new signatures. Once the deadline has
+passed, a public compensation decision can close an obligation
+that remains Open. It debits the reserve, closes the gap, and
+records an immutable decision without adaptation data; a
+source that arrives afterwards repays the compensating issuer
+within its own execution, and the decision stays recorded.
+Representation commands then replace the funding ref-
+erence of a decided input with the reserve reference. Re-
+stricted chameleon-hash adaptation preserves the ﬁxed au-
+thorization, the output references, and the complete block
+identity (Hb, Pb); RepairBatch groups the decided slots of
+one historical block, and the commands write representation
+state only. Original commands, committed revisions ρℓ, and
+installed revisions ρp stay separate, installation can advance
+directly to a later authorized version, and replay runs the
+original commands, which include the decisions. Successors
+need neither new signatures nor re-execution.
+D. A Continuous-Payment Example and Design Goals
+Alice pays Bob 100 CAL through GA, creating output x
+routed to GB. Bob veriﬁes its TXCer and obtains a certiﬁcate
+for a payment to Carol. If Bob’s payment executes ﬁrst, the
+committee consumes (x, 0), records a 100-CAL obligation
+against GA, and creates Bob’s outputs. Carol continues from
+Bob’s payment without Alice’s transaction body, and the block
+that carries Bob’s payment also carries the certiﬁcate of Alice’s
+payment, so members of GA that approved it can resubmit it
+when Alice’s wallet does not.
+Three outcomes follow. If Alice’s payment executes before
+compensation, it closes the obligation and instance 0 stays
+consumed. Once the deadline passes, a compensation decision
+
+5
+can close an obligation that remains Open by debiting GA
+by 100 CAL; Carol receives no second principal credit, Bob’s
+payment does not re-execute, and the stored block keeps the
+original funding reference until a representation command
+replaces it with the reserve reference. If Alice’s payment
+executes after compensation, it consumes its own inputs under
+the same rules and repays GA the 100 CAL; the decision
+stays recorded, Bob receives no second output, and (x, 0) stays
+consumed. If Alice’s payment never executes, GA bears the
+loss.
+IV. PROTOCOL DESIGN
+Next certiﬁes ﬁxed payment authorizations and outputs and
+lets their sources stay unresolved. Public execution consumes
+a missing certiﬁed input and records the issuer’s direct obliga-
+tion atomically, and it publishes the source’s certiﬁcate so that
+the original signers can resubmit the source. A source still
+absent at its deadline closes through a public compensation
+decision without threshold adaptation, and representation com-
+mands later replace the funding reference under the existing
+commitments.
+A. Identity, Certiﬁcation, and Delivery
+Let KT be the encoded payment body and input claims,
+CT the input commitments, and ΣT the output summary:
+KT = Encode(T.Body, T.Claims),
+id(T) = H(TX_V3, KT , CT ),
+cT = H(DIRECT_CERT_V3, Encode(ΣT )).
+(1)
+Owner signatures authenticate id(T) and stay outside its
+computation, and each output identiﬁer binds this identity,
+the network, and the output position. Funding references and
+openings are encoded separately, so a restricted replacement
+leaves the authorized claims and outputs unchanged. Initial
+submission requires OriginalFunding for each claimed
+input with a valid opening, and a later representation preserves
+body, claims, commitments, and owner signatures. Veriﬁcation
+caches therefore key complete command bytes.
+Under one Network and Subject, an honest wallet uses a
+fresh payment nonce for every new payment, across organiza-
+tions and instances; a retry resubmits the same payment with
+its original authorization. A wallet must not change the nonce
+and reuse an old certiﬁcate, and two facts that share an intent
+are not merged into one guarantee. The experimental drivers
+derive nonces from input identities, which is not a general
+multi-device nonce allocation service.
+A member checks ownership, routes, direct input certiﬁ-
+cates, value conservation, and the admission vector. One local
+transaction rechecks the input locks, ﬁnal fee inputs, and the
+designated Worker’s resource slices and records the approval
+with its exact debits; the approval keeps the transaction,
+admission vector, and direct input certiﬁcates of the request
+(Section IV-D). CAL reservation equals aT including change
+even when every principal input is ﬁnal, since each certiﬁed
+output may circulate before the payment executes. The mem-
+ber signs after the transaction commits, a retry reuses a non-
+invalidated approval, and releasing resource capacity keeps the
+consumption locks.
+The collector sends one canonical request to four members
+and returns after verifying three signatures over the same cT ;
+different valid subsets give the same fact. The recipient checks
+the TXCer against the output body, index, owner, and trusted
+conﬁguration, records the coin atomically, and can construct a
+successor request at once, carrying its direct input certiﬁcates
+in place of the ancestor chain.
+Relay material is saved in the background, and bounded
+early tasks let INSTALL and public submission proceed
+independently. INSTALL stores complete material at members
+and records certiﬁed consumption locally; it creates neither a
+new approval nor a budget debit. Public submission proceeds
+separately. Members schedule backup submission relative to
+their ﬁrst INSTALL, and repeated INSTALLs cannot postpone
+it. HTTP acceptance leaves the outbox entry pending until au-
+thenticated public completion removes it. Backup submission
+requires a retained complete submission; Section IV-D adds a
+path from the approvals of the original signers.
+The public DirectSubmission carries the transaction,
+admission vector, organization SpendQC, and direct input
+certiﬁcates. The committee reconstructs ΣT and veriﬁes the
+same authorization; omitting a separate new-output TXCer
+wrapper changes the envelope and keeps the requirement.
+Public veriﬁcation binds each input certiﬁcate to its network,
+issuing organization, fact, and claimed output and rejects
+duplicates. It accepts exactly one certiﬁcate for each certiﬁcate
+input and rejects any further certiﬁcate. The admission vector
+holds one CAL entry, bound to the issuer.
+B. Atomic Execution with Direct Obligations
+Public execution separates certiﬁcate-wide coverage from
+an actual missing-input obligation. On the ﬁrst missing use of
+a parent fact c, register reserves its entire certiﬁed CAL
+amount and creates a Promise for every output. The coverage
+record maintains
+Originalc = Dischargedc + Paidc + Remainingc,
+(2)
+where Paidc is a gross cumulative counter and Recc ≤Paidc
+counts the part repaid by source execution. Grant usage
+satisﬁes Reservedg + Spentg ≤Bg, where Spentg sums
+Paidc −Recc over the certiﬁcates under g. Registration raises
+public grant usage and leaves the reserve account untouched;
+an effective compensation (Section IV-E) debits the account
+and raises Spentg, and a repayment credits it and lowers
+Spentg by the same amount. Only a missing output that is
+actually consumed opens a direct obligation and raises the
+public gap, so consuming one missing 40-CAL output of a
+40/60 certiﬁcate reserves 100 CAL, opens a 40-CAL gap, and
+leaves the unused Promise covered.
+Figure 2 gives the public transition. Its prestate includes
+earlier successful commands of the same block; static autho-
+rization may be cached, while consumption, balances, grants,
+and obligations are evaluated against the current state. All
+changes occur in a private overlay, and a failure discards the
+entire transition.
+The intent check belongs to this evaluation: if the intent of
+T is already bound to a different TxID, the transition returns
+
+6
+Require: Veriﬁed submission T, current state S, public time
+1: If T is already settled, return no new effect
+2: O ←Overlay(S)
+3: Check intent, grants, and work; fund fee escrow in O
+4: for each CAL input (x, i) do
+5:
+Require (x, i) to be unconsumed
+6:
+if a ﬁnal creation for (x, i) exists then
+7:
+Check its body and evidence against the claim
+8:
+else
+9:
+Require i = 0 and a matching direct TXCer c
+10:
+Register all of c’s coverage if unseen
+11:
+Create unique Ox; add gap and Pending
+12:
+end if
+13:
+Record consumption of (x, i) in O
+14: end for
+15: Require equal total CAL input and output values
+16: Record T settled; advance its fee stages
+17: Resolve each output: fulﬁll an Open obligation; repay the issuer
+for a Repaired one and mark it Recovered; otherwise fulﬁll any
+registered Promise. Create ﬁnal instance 0 unless repaid
+18: Return all changes and results as one transition
+Fig. 2.
+Public payment execution. Any failed check rejects all provisional
+changes. Output resolution follows Section IV-C.
+a conﬂict. The binding is written in the same atomic transition
+that executes a payment successfully, and no production path
+deletes or rebinds it, so resubmitting the same bytes cannot
+remove the conﬂict.
+An obligation binds the consumed output, parent certiﬁcate
+fact, issuer, amount, consuming transaction, and historical
+input location, and public block time anchors its deadline. The
+consuming payment records its Pending input obligations and
+fee progress. User-funded fees consume authenticated ﬁnal
+FUEL, return excess input value as change, and escrow the
+signed maximum, which covers registration, settlement, clo-
+sure, and one compensation charge per certiﬁed input; unique
+stage and obligation identities prevent duplicate charging, and
+unused escrow returns to the payer when the input obligations
+close. The child outputs are ﬁnal even while some inputs
+remain obligations, so a further transaction consumes them
+under the ordinary ﬁnal-input checks.
+C. Source Closure, Repayment, and Cumulative Reconcilia-
+tion
+A source transaction arrives through normal payment execu-
+tion, including validation and consumption of its own inputs,
+and its outputs resolve within that transition according to their
+obligations. Arrival closes an Open obligation as Fulﬁlled:
+it fulﬁlls the Promise, discharges the coverage, and lowers
+the consumer’s Pending count. An output that no payment
+consumed fulﬁlls any registered Promise and becomes ﬁnal
+instance 0. A Repaired obligation means that a reserve debit
+funded the consumer, so arrival repays that debit instead of
+creating a second output: the amount returns to the issuer
+account that paid it, the obligation becomes Recovered, and
+the repayment counter and the grant’s Spent change together,
+while the compensation decision stays as recorded. An already
+consumed instance 0 remains consumed in every branch; a
+repaid output has no ﬁnal creation. The source’s own inputs
+may open new obligations against their direct issuers within
+the same atomic transition.
+Members reconstruct progress from authenticated consecu-
+tive blocks and results, and only an existing local approval
+supplies a debit to restore. For its CAL debit, member m
+computes
+tm,T =
+(
+aT −
+ bpm,T −d
+Recm,T
+
+,
+if settled,
+0,
+otherwise,
+δm,T = tm,T −Appliedm,T ,
+(3)
+where “settled” means that the member has observed its
+own payment execute successfully, and bpm,T and d
+Recm,T
+are the compensation and repayment recorded locally for that
+approval’s outputs. On observing the execution of its payment,
+the member checks that the repayment in the authenticated
+result covers bpm,T and sets d
+Recm,T
+= bpm,T , since that
+execution repays every compensated output of T; a member
+that approved T after following the compensation recorded
+none. After checking bounds and monotonicity, it moves δm,T
+from Reserved to Available in the original Worker and updates
+Applied. Pending inputs leave CAL release unaffected, since
+their issuers carry those liabilities, and work resources wait
+for fee closure. An unexecuted certiﬁed source keeps its full
+CAL amount, including change, reserved at each approving
+member; compensation alone does not release it. Spent FUEL
+is not restored as unspent fee. Repeated blocks and late ma-
+terial cannot repeat a credit. A wallet records a repaid output
+as a terminal observation without certiﬁcate, ﬁnal creation, or
+balance.
+An authorized reserve increase debits an external, unpro-
+tected CAL account, credits the reserve, and raises its grant
+atomically. Each member adds the difference between the new
+and old ⌊2Bg/3⌋shares while Reserved and its approvals stay
+in place, and aggregate backing checks cover all grants that
+share an account.
+Superseded partial approvals. Equation (3) governs normal
+settlement and repayment. A separate local terminal transition
+applies when an authenticated, successfully applied public
+payment under the same organization conﬁguration consumes
+an ordinary or user-funded fee input instance that the member
+had locked for a different fact. Before replacing the local
+spend candidate, the follower reloads the immutable approval
+and checks the exact output instance, the distinct fact and
+transaction, and the absence of observed execution, installed
+or queued certiﬁcate material, pending obligations, compensa-
+tion, recovery, or any fee effect.
+The member then returns, for every recorded local debit d,
+exactly d.Cap −Applied from Reserved to Available in the
+original resource slice and records the approval as invalidated
+by the ﬁrst successful conﬂicting fact and height. It does not
+set Settled, close a fee escrow, modify the approval, clear
+other input locks, or change public state. The cumulative
+Applied vector makes the transition idempotent when several
+inputs of one approval conﬂict or a block is replayed. Retries
+and late INSTALL are rejected. Exposure of an invalidated
+fact as a purported certiﬁed source is treated as an accounting
+contradiction and stops the follower under the stated fault
+
+7
+model. A timeout, INSTALL alone, or a global Intent conﬂict
+between disjoint inputs does not authorize this release.
+D. Source Resubmission from Public Certiﬁcates
+The block that executes a payment carries the quorum
+certiﬁcates authenticating its certiﬁed inputs and their creating
+payments. Each member follows the block in its authenticated
+block transaction. For every carried certiﬁcate of its own
+organization, it loads the approval indexed by the certiﬁcate’s
+fact, unless it has observed the source’s public execution or
+already holds an outbox entry for that fact, and checks that
+the stored transaction and admission vector reproduce the
+fact. It then assembles the stored transaction, the stored direct
+input certiﬁcates, and the exposed QC, and applies ordinary
+payment veriﬁcation. On success it writes an outbox entry
+in the same atomic local update, staggering the ﬁrst attempt
+by member index; the existing relay submits the entry after
+commit. Payments of other organizations trigger the same path,
+and a stored record that fails these checks is corrupted state
+that stops the follower.
+The job resubmits the payment that the organization certi-
+ﬁed, so it needs no new owner or member signature, creates
+no approval, keeps input locks unchanged, and reserves no
+capacity. An existing outbox entry keeps its retry time, and
+execution of the source removes the entry. The path needs
+an original signer that holds the approval, follows the chain,
+and reaches the committee, and it needs that no global intent
+conﬂict prevents the source from executing; a source still
+absent at its deadline falls to compensation. It gives no ﬁxed-
+time guarantee. Section V-B shows that at least two honest
+signers hold the material whenever an obligation is public.
+E. Compensation Decisions
+After its deadline, an Open obligation closes through a
+public CompensationDecision δ = (net, x, h, j, k): the
+network, the consumed output, and the height, transaction
+index, and input index of the consuming payment. The ﬁxed-
+length canonical encoding holds neither a submitter signature
+nor adaptation data. Authority comes from the public obliga-
+tion, and committed state ﬁxes the target coordinates, so every
+submitter forms the same bytes for a given obligation. Com-
+mittee workers scan the due index and submit due decisions
+without requesting adaptation shares.
+Figure 3 gives the transition. The executor compares the
+request’s network, position, and input slot with the obligation
+before it reads any historical block, so a mismatching request
+is rejected without loading history. It then reads the canonical
+consuming payment at (h, j), checks its identity, fact, input,
+and claimed amount, and requires OriginalFunding for x
+with a valid opening and a same-width reserve replacement; it
+computes no replacement opening and contacts no adapter.
+One overlay carries every change: the reserve debit, the
+Repaired status, Paid, Spent, the gap, the consumer’s Pending
+count, the compensation charge (from the consumer’s escrow
+to rewards), and, when no input obligation remains, the con-
+sumer’s fee closure and refund, together with the immutable
+Require: Decision δ = (net, x, h, j, k), state S, execution height
+and block time
+1: Require h to be older than the execution height
+2: If Dx exists, return no effect when it equals δ; otherwise reject
+3: Require Ox Open with consumer position (h, j, k) and network
+net
+4: Require the deadline of Ox to be reached by block time
+5: Load
+the
+canonical
+consuming
+payment
+at
+(h, j);
+check
+its
+identity,
+fact,
+input,
+and
+claimed
+amount;
+require
+OriginalFunding for x with a valid opening and a
+same-width reserve reference
+6: O ←Overlay(S)
+7: In O: debit the issuer reserve; set Ox Repaired; move its Promise
+to Paid; update Spent, the gap, and the consumer’s Pending count
+and fee stages
+8: In O: record Dx and the pending-representation entry
+9: Return the changes and the compensation result
+Fig. 3. Compensation decision. The transition reads and requests no adapta-
+tion material. Any failed check rejects all provisional changes.
+decision record Dx (obligation snapshot and reserve-debit
+identity) and the pending-representation entry.
+The result carries the single per-output effect, which names
+the parent and consumer facts, amount, input position, and
+debit identity, together with any fee outputs. A repeated
+identical decision returns an unapplied result with an empty
+change set, also after the source’s repayment, and a decision
+that differs from the record is rejected; once the source has
+executed, no new decision for its obligation commits. Mem-
+bers apply the effect from the authenticated result together
+with their cursor and locate original approvals for the Paid
+and Pending updates, and wallets apply each fee output once.
+The compensation credits no principal to the recipient or to
+an executed successor.
+F. Representation Commands and Batches
+A RepairBatch targets one historical block and holds 1–
+32 items in canonical order, each naming an output, a transac-
+tion index, an input index, and a new input opening; outputs
+and slots are unique. The batch ﬁxes the base revision and the
+previous and replacement canonical-body digests, carries the
+part openings, and advances the logical revision from Base
+to Base + 1. A single RepairInput is the one-item form
+and carries the replaced transaction bytes. Both commands
+accept only outputs with a committed compensation decision,
+take amounts, issuers, and replacement references from the
+decision record, and write no accounting state.
+Public execution repeats all checks against its current state.
+A changed base, an item without a decision, or a slot that
+no longer holds OriginalFunding rejects the entire batch,
+and exact successful replays are recognized before base valida-
+tion. Since every command requires OriginalFunding in
+its slot, a different batch or the single-item entry cannot replace
+a slot twice, and command and revision identities stay speciﬁc
+to the chosen packaging. The authenticated result names the
+command and whether it applied; followers map it to an empty
+economic effect, and the economic effect of a compensation
+comes from the decision result alone. A repayment belongs to
+the source’s own execution result.
+
+8
+G. Identity-Preserving Installation and Replay
+Four identities are kept apart. The payment identity id(T)
+ﬁxes the authorization and commitments, and owner signatures
+bind it; it is not the consensus transaction hash. The consensus
+Tx.Hash of a well-formed UTXO4CH envelope is a SHA-256
+over its header and ﬁxed ﬁelds and checks no payment validity.
+DataHash is the Merkle root over consensus transaction
+hashes, and an inclusion proof does not grant revision au-
+thority. The complete BlockID (Hb, Pb) keeps the block hash
+and the original part-set header, and execution and installation
+compare both. Part commitments are chameleon commitments
+bound to chain, key, height, and part index, and changed parts
+carry valid openings to their original commitments. Original
+consensus parts carry revision 0 and opening 1; original
+validation requires the correct height and these values, and the
+application veriﬁes the original payment normally. A revised
+part cannot pass as a new original execution, and only a
+committed Task authorizes a rewrite. Replay uses the retained
+original commands and never executes a revised body as a
+new payment.
+The public revision and Task authorize an exact new body
+and its part evidence, which an installer copies from one
+committed read view before it acquires the physical revision
+lock. For target revision r, a lower physical version is veriﬁed
+and installed, an equal version requires identical material, and
+a higher version covers the old task without rollback. The orig-
+inal block is retained, and parts and local version metadata are
+written atomically. Installation may skip intermediate physical
+versions and keeps every economic command. Queue progress
+stays global and consecutive: for entries A1, B1, A2, installing
+A2 while handling A1 leaves B1 open. Logical execution reads
+committed Canonical revisions, so every installation schedule
+leaves the same economic history. A revision is materialized
+at a replica once its revised body has been physically installed
+there.
+Replay executes retained original blocks in their committed
+order, including payments, compensation decisions, and repre-
+sentation commands, and reconstructs the application hashes
+of that sequence. Existing successors keep their authorizations,
+output references, and block identities. A compensation deci-
+sion alone closes the obligation economically as an append-
+only public record. Representation adds an interface: at the
+consumer’s original coordinates (h, j, k), the stored block
+names the reserve debit for the designated input and still
+veriﬁes against the original BlockID. A reader still reads the
+permanent decision and the obligation status for the economic
+state, and the revised ﬁeld does not replace them. Batching
+shares representation work within a block and direct installa-
+tion coalesces historical writes, and neither adds a round to
+normal certiﬁcation. Section VI-C reports the read beneﬁt and
+the storage and maintenance cost of this interface against an
+optimized decision index.
+H. Reading Funding at Original Coordinates
+A read at (h, j, k) returns (H, h, j, k, F, r, d, sH), assembled
+from existing functions inside one read transaction on VH.
+Here F is the funding representation, r its revision, d the
+decision or an absent marker, and sH the obligation state.
+This logical tuple describes local composition, not a deployed
+network interface. The index j counts the original transaction
+list and is not renumbered after ﬁltering maintenance com-
+mands or failed transactions. The logical body comes from
+the committed revision in VH and falls back to the original
+block only when no revision exists, so physical installation
+progress, or a block store that already holds a later version
+during replay, does not change the answer. A revision that
+exists but cannot be decoded is an error and never falls back
+to the original. Missing history is reported as unavailable and is
+not read as the absence of compensation; the contract assumes
+that the relevant history is not pruned. In a complete, veriﬁed,
+unpruned VH, a missing decision means that none exists as of
+H.
+Four state dimensions. These dimensions describe different
+objects and advance separately.
+Dimension
+Meaning
+Public payment
+Settled records successful execution. Newly
+created outputs are ﬁnal even when Pending
+is nonzero; outputs with Repaired obligations
+repay the reserve rather than being recreated.
+Direct
+obligation
+Open→Fulﬁlled,
+or
+Open→Repaired→Recovered. Repaired denotes
+compensation; Recovered denotes subsequent
+repayment. The compensation decision persists.
+Logical
+representation
+The
+revision
+in
+VH
+determines
+the
+slot.
+OriginalFunding does not imply absence
+of compensation. ReserveFunding records a
+historical advance and remains after repayment.
+Physical
+instal-
+lation
+ρp records the installed block-store version. In-
+stallation progress does not determine the logical
+answer at H or change economic state.
+The reader therefore consults the permanent decision and
+obligation state together with the funding representation. A
+pending-representation entry is removable work state, not
+durable evidence that compensation occurred. None of these
+representation or installation changes credits a second princi-
+pal amount to the consumer.
+Executable archival consumer. A local example exports the
+original and authorized body bytes at (h, j, k), the complete
+BlockID, Revision and Task identiﬁers, historical funding, and
+current obligation state. It checks the exact Task body, recon-
+structed parts, owner authorization, QC, and input opening.
+After repayment the authorized bytes stay unchanged while
+the obligation becomes Recovered. This byte-export contract
+supplements the economic tuple; the permanent decision re-
+mains necessary. The example operates on an already veriﬁed,
+unpruned replica and is not a remote proof protocol.
+Cryptographic instantiation. The implementation uses RSA
+chameleon hashing with a 2048-bit modulus, e = 65537,
+and context-bound SHAKE256 full-domain hashing into Z∗
+N.
+A trusted dealer generates a three-of-four threshold RSA
+key using CIRCL v1.6.5 [19], following Shoup’s threshold
+construction [15]. Public adaptation ratios do not convey edit
+authority; committed decisions, exact Tasks, and complete-
+identity guards do. The supplement speciﬁes the encoding,
+parameter assumptions, and raw-group adaptation interface.
+
+9
+V. SECURITY ANALYSIS
+We analyze ﬁnite executions of the protocol of Section IV
+under the model of Section III-A. The arguments reason over
+the guards of the transition functions and use, besides the fault
+and state assumptions, the veriﬁcation rules of Section IV-A:
+input certiﬁcates bind network, organization, fact, and claimed
+output and correspond one-to-one with certiﬁcate inputs, and
+each admission vector holds one CAL entry bound to the
+issuer. A representation takes effect only through a committed
+command whose guards require an existing compensation
+decision, derive the slot and reserve reference, and verify every
+non-target byte and the complete block identity, so adaptation
+output is a candidate whose availability governs representa-
+tion progress alone. The consensus argument specializes the
+Tendermint locking interface [20] to complete block identities.
+A. Original Execution and Certiﬁed Consumption
+A polka is a same-round quorum of prevotes for a complete
+block identity or nil.
+Lemma 1 (Original-execution agreement): Under the lock-
+ing and validity rules of the consensus interface, one original
+block body is admitted per committed height, including its
+application context.
+Proof: With original opening 1, a part leaf hashes its
+context-bound message representative, so binding and the
+Merkle proof ﬁx its bytes under the original part-set header.
+Candidate bodies are rebuilt from parts or paired locally with
+parts, Locked and Valid transfers preserve the pairing, and
+proposal, proof-of-lock (POL), lock, and commit comparisons
+use (Hb, Pb); a change of download target clears the old body,
+and the round and step guards allow one precommit per round.
+Conﬂicting same-round commits need an honest double
+precommit. Take a commit of v in round r with its two honest
+signers, and the smallest later round s with a conﬂicting polka
+(nil polkas that authorize unlocking included) at its earliest
+certiﬁcate formation. The quorum meets the two signers, and
+the vote of that signer needs an earlier unlocking justiﬁcation,
+which contradicts the choice of s or of the formation event.
+Votes for a locked value trace through earlier lock rounds
+to proposal validation, and Finalize follows a commit that
+matches the complete block identity. Synchronization and
+replay preserve body, height, and time, and the supplement
+expands the argument.
+Lemma 2 (Authenticated, unique consumption): A TXCer
+ﬁxes its outputs and issuer. No two valid certiﬁcates authorize
+conﬂicting consumption of the same (x, i), and public execu-
+tion consumes that instance at most once.
+Proof: Binding ﬁxes the certiﬁed summary and the owner-
+authorized transaction, and the ﬁxed route sends competing
+requests to one organization. Two three-member quorums
+intersect in at least two members, so an honest member lies
+in both. Its atomic input lock precedes signing, so it approves
+only one of two conﬂicts, and budget release keeps the lock.
+Final-input and certiﬁcate-input execution consult the same
+spend key. Replaying a fact adds neither a consumption nor
+a fee charge. A repaid output has no ﬁnal creation and its
+instance 0 stays consumed, so a later claim on (x, i) fails.
+Lemma 3 (Superseded partial approval): Fix one four-
+member organization with three signatures required and at
+most one Byzantine member. Let an honest member have
+approved fact c and locked an ordinary or user-funded fee
+input instance ξ. If a successfully applied public payment
+under the same organization conﬁguration carries a valid QC
+for a different fact c′ and a different transaction identity and
+consumes ξ, then no three matching valid member signatures
+for c can have existed. The honest member may therefore re-
+store the residual local debits of c while permanently refusing
+to sign or install c. This conclusion does not apply to two QC-
+bearing facts with disjoint inputs that conﬂict only through
+their global Intent.
+Proof: The public execution of c′ has passed the current
+organization’s authorization checks and therefore carries a
+valid three-member QC. Assume for contradiction that c also
+has a valid three-member QC. The two signer sets intersect in
+at least two members. Since at most one member is Byzantine,
+an honest member belongs to the intersection. That member
+would have signed two different facts that consume the same
+instance ξ, although honest members atomically lock ordinary
+and user-funded fee instances before signing and reject a
+different candidate for a locked instance. This contradicts the
+approval rule.
+Thus no three matching signatures for c can have existed.
+In the notation introduced in Section V-C, c /∈Cg. Restoring
+one member’s residual debits for c cannot remove a capacity
+witness for any term of Qg. The successful public consumption
+of ξ, the immutable approval, and the invalidated progress
+record continue to reject later use of c; only its unused local
+resource reservation is restored.
+B. Source Resubmission and Compensation Decisions
+For an output x, Ox is its direct obligation, with status Open,
+Fulﬁlled, Repaired, or Recovered, and Dx is its immutable
+compensation decision. Repaired means economically com-
+pensated, whatever the state of the stored bytes. The decision
+is written inside the transition from Open to Repaired and is
+never deleted, so Dx exists exactly when Ox is Repaired or
+Recovered. The set R holds the representation state (commit-
+ted revisions, head command, tasks, batch references, queue,
+pending-representation index), and the projection πecon retains
+public assets, consumption, coverage, obligations, grant usage,
+and fee states while omitting D and R.
+Lemma 4 (Resubmission preserves authorization): Let an
+honest member create a resubmission job for a fact c. The
+job submits the payment, admission vector, and direct input
+certiﬁcates that the member stored before it signed c, with the
+public QC of c, and public veriﬁcation and execution treat it
+as any submission of that payment. It needs no new owner
+or member signature, creates no approval, keeps input locks
+unchanged, and reserves no signing capacity. A member holds
+at most one job per fact, and execution of the payment removes
+it. Once a direct obligation on an output of c is public, at least
+two honest signers of c retain the stored material.
+Proof: The member indexes its approval by the fact in
+the public QC, and the stored payment and admission vector
+
+10
+must reproduce that fact. It combines this material and its
+stored direct input certiﬁcates with the exposed QC and applies
+ordinary payment veriﬁcation before it creates an outbox
+entry. Fact binding and quorum veriﬁcation exclude any other
+payment core, and the quorum signatures ﬁx the content of the
+certiﬁcate that the exposing party chose to carry. The transition
+writes the outbox alone, so the approval, input locks, and grant
+reservation stay as they were, and the existing outbox and
+observed-execution marks suppress duplicates. A stored record
+that fails these checks lies outside the fault model.
+An obligation arises only from an executed payment that
+consumes a certiﬁed missing input, and public veriﬁcation
+requires that input’s certiﬁcate, which is therefore public. Its
+three distinct signers include at least two honest members,
+each of which stored the approved material before it returned
+a signature. The approvals hold no quorum certiﬁcate, which
+arrives with the block, so a client that withholds the certiﬁcate
+leaves the material for resubmission intact. Execution further
+needs a continuing honest follower, fair delivery, and a source
+payment that meets the ordinary execution rules, including the
+global intent check.
+Lemma 5 (Certiﬁcates bound liability, not execution): Let
+T1 ̸= T2 be payments with the same Network, Subject, and
+Nonce, spending disjoint inputs routed to organizations G1
+and G2, each valid under its own organization’s approval
+rules. Both payments can obtain QCs, and in every public
+order at most one executes. A malicious user can cause this,
+and resubmitting either payment does not remove the conﬂict.
+Payments of different Subjects with the same nonce do not
+conﬂict.
+Proof: Each organization holds its own local intent record
+and the approvals concern disjoint inputs, so neither organiza-
+tion observes a conﬂict, and the owner’s authorization covers
+each payment. At public execution, the evaluation returns a
+conﬂict when the intent is already bound to a different TxID.
+The binding is written in the transition that executes a payment
+successfully, and no production path deletes or rebinds it, so
+the other payment stays unexecuted whatever its resubmission.
+A different Subject yields a different intent.
+If T2 cannot execute but a consumer of its certiﬁed output
+does, the consumer registers an obligation against G2. Com-
+pensation debits that issuer without making T2 executable. Its
+approving members retain rm,c = ac, and its liability remains
+wc = ac. The original inputs stay locked, but a user controlling
+the consumer’s output may use that new value in a later
+request. Repetition requires fresh paired Intents, usable routes,
+certiﬁcation capacity, and fees; the ﬁnal descendant must also
+retain a usable route. This reuses descendant value rather than
+unlocking the rejected source inputs. In user-funded mode,
+the rejected source retains locks on its complete FUEL inputs,
+not merely its signed escrow maximum. Theorem 3 excludes
+this case because not every payment succeeds. Terminating
+repeated submissions of the conﬂicting source would not
+authorize release of its certiﬁed liability.
+Lemma 6 (Compensation takes effect at most once): Each
+direct obligation incurs at most one reserve debit and its
+associated economic effects. A decision for x with an existing
+record Dx has no effect if it equals the record, including after
+repayment, and is rejected otherwise. A decision without a
+record is rejected once Ox is no longer Open.
+Proof:
+Status
+changes
+only
+along
+Open→Fulﬁlled,
+Open→Repaired
+(by
+a
+decision
+alone),
+and
+Repaired→Recovered
+(inside
+the
+successful
+execution
+of the source). A decision ﬁrst checks Dx: an exact match
+returns an unapplied result with an empty change set, and
+a mismatch is rejected. Without a record, the transition
+requires an Open obligation, a deadline reached by block
+time, and a matching historical position, amount, and funding
+commitment, all re-derived from committed state. It then
+debits the issuer reserve, closes the gap, updates fees and
+coverage, and records Dx in one atomic step. The status
+machine is acyclic, so Open is left once and at most one
+decision takes effect.
+If the source executes ﬁrst, the obligation leaves Open and
+no decision for it commits. If compensation comes ﬁrst, the
+source’s execution returns the funds to the issuer through
+the single Repaired→Recovered transition, keeping Dx and
+creating no user output. Induction over the public command
+order gives at-most-once compensation and repayment.
+C. Covering Public and Hidden Commitments
+Every certiﬁed fact carries one CAL entry bound to the
+issuer, because at least two honest signers computed the
+vector through the admission rules before they signed and
+the fact binds the summary. For a complete CAL grant g,
+the cumulative authorization Bg gives each member s(Bg) =
+⌊2Bg/3⌋capacity. Let Cg contain every distinct fact whose
+three signatures have existed by the current preﬁx, including
+unassembled and hidden certiﬁcates and settled facts. The
+unique CAL allocation binds each fact to one conﬁguration,
+ResourceKey, and Grant ID. A fact c has output cap ac, the
+sum of its CAL outputs. For c ∈Cg, let pc be the cumulative
+compensation paid for those outputs, Recc the part repaid by
+source execution, and zc indicate that the payment of c has
+executed successfully. The net compensation is ¯pc = pc−Recc.
+Deﬁne
+wc =
+(
+ac,
+zc = 0,
+¯pc,
+zc = 1,
+Qg =
+X
+c∈Cg
+wc.
+(4)
+Lemma 7 (Source repayment): A compensated output leaves
+the Repaired state only inside the successful execution of
+its source, in the same transition that sets zc = 1, and the
+repayment is credited to the account that was debited. Hence
+0 ≤Recc ≤pc ≤ac, Recc = 0 while zc = 0, and Recc = pc
+once zc = 1. In particular ¯pc = pc while the source is pending
+and ¯pc = 0 afterwards, so no net compensation survives the
+execution of the source.
+Proof: Each registered promise leaves Open at most once,
+and by Lemma 6 compensation applies at most once to an
+output and only while its obligation is Open, so pc ≤ac. The
+only transition that leaves Repaired is the output-resolution
+step of a payment whose fact and issuer equal the certiﬁcate
+fact and issuer of the obligation. It runs in the overlay that
+records the payment as settled, so zc and the repayment change
+together. The step resolves every output of the source that
+
+11
+has an obligation, turning Open into Fulﬁlled and Repaired
+into Recovered, and afterwards every promise of c is closed,
+so no new compensation arises and a repeated submission is
+a no-op. Compensation debits and repayment credits use the
+issuer account stored in the obligation, which is the account
+of the single CAL allocation of c, and the repayment leaves
+Dx untouched.
+For any local approval, let rm,c = ac −Appliedm,c, where
+Applied is its cumulative CAL restoration.
+Lemma 8 (Residual capacity): For every fact c ∈Cg and
+every honest member m that approved c, at every preﬁx,
+rm,c ≥wc.
+Proof: For c ∈Cg, Lemma 3 excludes invalidation by an
+honest signer: the triggering conﬂict would imply c /∈Cg. Un-
+til m observes the successful execution of the payment of c, its
+CAL restoration for c is zero, so rm,c = ac ≥wc whatever the
+compensation state. After it observes that execution, m checks
+that the reported repayment covers its recorded compensation
+and sets its recorded repayment equal to it. The restoration
+target is ac minus a recorded net compensation of zero, so
+rm,c = 0, and wc = ¯pc = 0 by Lemma 7. A member that
+approved after following a compensation recorded none and
+restores only its own debit.
+Theorem 1 (Potential liabilities are funded): For every CAL
+grant, Qg ≤Bg. For each reserve account x, its total open gap
+Dx does not exceed its balance Ax.
+Proof: Let Am,g contain all successful approvals under g,
+including those without a QC (invalidated approvals contribute
+zero residual), and Lm,g = P
+c∈Am,g rm,c across Workers.
+Approval, ordinary restoration, and superseding invalidation
+move capacity between Available and Reserved, and top-ups
+add the difference in member shares, so Lm,g ≤s(Bm,g) ≤
+s(Bg) for the locally observed authorization Bm,g; grants
+only increase. Fix any three honest members Hg of the
+organization. A QC has three distinct signers and at most one
+member lies outside Hg, so the set Sigc of members of Hg that
+signed c has at least two elements. Honest members sign only
+after approving, so Lemma 8 gives rm,c ≥wc for m ∈Sigc,
+and
+2Qg ≤
+X
+m∈Hg
+X
+c∈Cg
+m∈Sigc
+rm,c
+≤
+X
+m∈Hg
+Lm,g ≤3⌊2Bg/3⌋≤2Bg.
+(5)
+Let Rc and dc be the registered remaining and discharged
+coverage, with pc = dc = Rc = 0 before registration.
+Registered records satisfy ac = pc + dc + Rc, and zc = 1
+implies Rc = 0. Hence Rc ≤wc −¯pc: while zc = 0 we have
+Recc = 0, so Rc ≤ac −pc = wc −¯pc, and once zc = 1 both
+sides vanish. Deﬁne Sg = P ¯pc, Vg = P Rc, and Eg =
+Qg −Sg, with sums over Cg. Registration, compensation,
+repayment, and discharge maintain public Usage.Spent= Sg
+and Usage.Reserved= Vg.
+Let Gx contain all grants backed by x; their certiﬁed CAL
+account is the debited issuer account. Genesis establishes
+P
+g∈Gx(Bg −Sg) ≤Ax. External, non-protected top-ups raise
+both sides equally. Compensation raises Sg and lowers Ax
+by the same amount, repayment lowers Sg and raises Ax by
+the same amount (Lemma 7), and no other protocol operation
+withdraws CAL reserves. Each Open obligation corresponds
+to a distinct remaining promise, so
+Dx ≤
+X
+g∈Gx
+Vg ≤
+X
+g∈Gx
+Eg
+≤
+X
+g∈Gx
+(Bg −Sg) ≤Ax.
+(6)
+Gross Paid and its recovery are each counted once, and Eg is
+a risk bound rather than available member capacity.
+A partial approval remains charged until either its own
+payment executes or authenticated public history proves that
+one of its locked instances was consumed by a different
+successfully authorized fact under the same conﬁguration.
+Time alone never releases it. A disjoint-input payment that
+loses a global Intent conﬂict may still have a valid QC and
+issuer liability, and therefore retains its input locks and signing
+reservation.
+CAL admission consequence. At the execution prestate,
+including earlier successful block commands, let Ng be the
+distinct, valid, unregistered parent facts under g that matching,
+unconsumed missing inputs require. They have wc = ac and
+pc = Rc = 0. Every registered fact satisﬁes Rc + ¯pc ≤wc,
+and the facts are disjoint, so
+Vg + Sg +
+X
+c∈Ng
+ac ≤Qg ≤Bg.
+(7)
+Repeated uses of one certiﬁcate count once, and sequential reg-
+istration sees earlier reservations, so every partial sum obeys
+the bound. First registration therefore cannot fail for CAL
+authorization capacity, even when it precedes a repayment
+in the same transition, since a repayment only lowers Sg.
+Likewise an Open amount a ≤Dx ≤Ax has sufﬁcient reserve
+principal. Other resource and fee checks remain separate.
+D. Asset Conservation and Delay Neutrality
+Theorem 2 (CAL conservation): Let U be the total value
+of ﬁnal, unspent CAL instances, A the total CAL account
+balance, and D the total value of Open gaps. Every execution
+preﬁx satisﬁes
+U + A −D = C0,
+(8)
+where C0 includes genesis outputs and all accounts, including
+top-up sources.
+Proof: A payment consumes ﬁnal value F and missing
+value M and produces F + M. Let J and R be the total
+values of its arriving outputs whose obligations were Open and
+compensated, respectively. The former outputs were already
+consumed, so they close gaps and add no unspent value; the
+latter receive no creation record. Hence ∆U = M −J −R,
+∆D = M −J, and the repayment gives ∆A = R, so ∆(U +
+A −D) = 0. A compensation decision of amount a gives
+∆A = ∆D = −a and ∆U = 0. Resubmission changes no
+public state, and by Lemma 10 representation commands and
+installation leave U, A, and D unchanged. Top-ups transfer
+between included accounts, and other transitions preserve the
+projection.
+
+12
+FUEL follows separate accounting: each escrow maximum
+equals Held plus cumulative Rewards, Burned, and Refunded,
+and the global conserved sum counts unspent FUEL, ordinary
+accounts, current Held, reward balances, and cumulative burn.
+Unique stage and obligation identities transfer value once, for
+user-funded and organization-funded fees alike.
+Conservation ﬁxes totals, and the next result ﬁxes the ﬁnal
+holders.
+Theorem 3 (CAL delay neutrality): Let T be a ﬁnite set of
+payments such that (i) no two consume the same instance
+or fee input, (ii) the relation “consumes an output created
+by” is acyclic, and (iii) every certiﬁcate input of a payment
+in T certiﬁes an output of a payment in T . Let U be a
+ﬁnite set of authorized reserve increases. Start from a clean
+genesis state with no coverage, promise, or obligation records
+and zero CAL Reserved and Spent. Let ρ0 execute T
+in
+an order consistent with (ii), applying U, and let ρ be any
+execution consisting of the payments of T , the increases of
+U, and compensation decisions of due Open obligations, in any
+order, optionally interleaved with admissible representation
+commands. Suppose every payment and increase succeeds
+exactly once in both executions. Then at the end of ρ and
+of ρ0:
+1) the ﬁnal, unspent CAL instances coincide, with the same
+owners and amounts;
+2) every reserve account holds the same CAL balance;
+3) every CAL grant has the same authorization and
+Reserved=Spent= 0, every obligation is Fulﬁlled or
+Recovered, and Paidc = Recc for every certiﬁcate.
+Fees and FUEL are not compared.
+Proof: Holders. By (i), both executions consume the
+same instances. In ρ, an output consumed before its source
+executes receives an obligation, and when the source executes
+the output is either Fulﬁlled, with a creation record that is
+already consumed, or Recovered, with no creation record; in
+both cases it is consumed. Outputs that no payment of T
+consumes are created as ﬁnal and unspent in both executions.
+The unspent instances are therefore the genesis outputs and
+the outputs of T that T leaves unconsumed.
+Reserves. For a reserve account x, let ˆAx be its balance
+plus the amounts of Repaired obligations issued by x. Com-
+pensation lowers Ax and raises the Repaired total by the
+same amount, repayment reverses this on the same account
+(Lemma 7), and creating or fulﬁlling an obligation changes
+neither term. As in Theorem 1, only top-ups, compensation,
+and repayment change reserve balances, so ˆAx = Ax(0) + τx
+at every preﬁx, where τx is the total of increases credited to
+x so far. An obligation exists only for an output consumed
+before its source executes, and by (iii) that source executes
+in ρ and leaves the obligation Fulﬁlled or Recovered. At the
+end no obligation is Open or Repaired, so Ax = Ax(0) + τx,
+which is also the value in ρ0.
+Usage. Every registered certiﬁcate is used by a missing
+input, so by (iii) its source executes in ρ. That execution
+closes all of its promises, so Remaining= 0, and Lemma 7
+gives Paidc = Recc. Hence Reserved= PRemaining= 0 and
+Spent= P(Paidc−Recc) = 0, and authorizations change only
+through U.
+Representation. By Lemma 10, an interleaved representation
+command leaves every compared quantity and the result of
+a later payment or decision at the same height and time
+unchanged.
+Intermediate states differ: a compensated source’s issuer
+holds less until the source executes, which Theorem 1 covers,
+and the compared projection omits the decision records and
+representation state that exist only in ρ. A source that never
+executes leaves its compensated amount as a net loss of its
+issuer, and incentives lie outside the theorem.
+E. Authorized Representation and Independence
+Lemma 9 (Decision-gated representation authority): Ev-
+ery effective representation item refers to an existing com-
+pensation decision, including one whose obligation has
+since been repaid, and to a canonical slot that still holds
+OriginalFunding. A successful representation changes no
+transaction bytes outside its authorized funding slots, even
+when adaptation outputs are adversarial.
+Proof: Let N be the RSA modulus, e its public exponent,
+and r an opening in Z∗
+N. The domain-separated representative
+FDH(ctx, m) binds the message and its repair context. The
+relation
+C = FDH(ctx, m)re = FDH(ctx, m′)r′e
+(mod N)
+(9)
+gives compatibility and carries no fresh approval, and a
+published opening ratio can be reused for the same message
+relation. Public guards read the decision record, which holds
+the obligation snapshot and the reserve-debit identity, and
+derive the slot and the replacement reference from it. They
+check the current base and body digests and verify all non-
+target bytes and the complete block commitments. Reading the
+snapshot keeps a decided slot representable after repayment.
+Invalid candidates leave no changes, exact successful replays
+are no-ops, and a repackaged command meets a slot that no
+longer holds OriginalFunding or an existing task. The
+decision committed the economic effect, so the command
+supplies no amount, issuer, or account change, and the adapter
+writes no ledger state; the argument rests on the veriﬁed output
+alone.
+Lemma 10 (Representation is economically inert): For every
+successful single or batch representation command r and state
+S, πecon(r(S)) = πecon(S). A payment or decision executed
+at the same height and time yields the same result in r(S) as
+in S, and the projections of the two successor states agree.
+Proof: A representation command checks the decision,
+the canonical target, the base revision, the preceding digest,
+and the permitted replacement. Its write set holds revisions, the
+head command, task and batch-reference records, the queue,
+and pending-index removals; it skips the accounting transition
+and writes no account, obligation, coverage, usage, spend, or
+fee record. Followers map its result to an empty economic
+effect. The projection is therefore unchanged for one step and,
+by induction, for any sequence of such steps.
+A decision for an output y reads the canonical body only
+through the transaction identity, the authorization fact, the
+inputs, claims, and amounts, the encoded length, and the slot
+
+13
+of y. If Dy exists, the decision is a no-op that reads no history.
+Otherwise the slot of y still holds OriginalFunding, since
+replacement requires Dy, and replacing other ﬁxed-width slots
+leaves the remaining ﬁelds unchanged. Payment execution
+never reads the canonical body.
+Lemma 11 (Identity preservation and installation indepen-
+dence): An effective representation preserves the owner autho-
+rizations, transaction and output identities, claims, successor
+references, and the complete original BlockID (Hb, Pb). For
+the same public history, legal physical installation sched-
+ules have identical economic projections. Moreover, if the
+chameleon relation has a unique valid opening for each ﬁxed
+message and commitment, then for a ﬁxed original body and a
+ﬁxed set of decided slots the ﬁnal body and part openings do
+not depend on the grouping or order of representation com-
+mands. Revision numbers, command histories, and application
+hashes may differ.
+Proof: The executor builds the canonical body by chang-
+ing only the declared funding slots and their openings. Trans-
+action identity, claims, and input commitments stay ﬁxed
+by the identity encoding of Eq. (1), and replacements keep
+the encoded width. The executor veriﬁes the new openings,
+recomputes the block hash and part-set header of the revised
+body, and accepts only equality with the original BlockID.
+Base and Previous serialize competing canonical revisions,
+and the committed Task binds the permitted bytes. Successors
+reference transaction and output identities, so they need neither
+re-signing nor re-execution.
+Canonical reads the committed logical revision ρℓ, and an
+exact Task authorizes body and parts at revision r ≤ρℓ.
+Installation advances if ρp < r, checks exact equality if
+ρp = r, and treats ρp > r as covered without rollback.
+It writes no economic state and reads only the committed
+revision and task records, and queue progress crosses only
+completed entries. For legal schedules µ1, µ2 over one public
+preﬁx this gives
+πecon(Sµ1) = πecon(Sµ2).
+(10)
+The convergence statement follows from the uniqueness of
+each slot and part opening and the independence of part
+contexts from the revision counter. The supplement gives
+this argument and the comparison of follower updates and
+histories.
+Reader
+scope. These lemmas concern a replica whose
+own state ran the guards, so the reader of Section IV-H
+trusts local state that executed them. A block that carries a
+RepairBatch which did not execute successfully confers
+no representation authority. An inclusion proof, an equal
+BlockID, or the chameleon relation alone does not show that
+a representation was authorized as of H. Serving untrusted
+remote readers would need authorization evidence tied to an
+authenticated state root or to proofs of original execution,
+which this paper does not deﬁne.
+F. Protected Continuation and Progress
+Let FreshRecv(w, o, c) denote authenticated receipt by an
+honest owner who has not previously authorized consumption
+of that instance. Freshness is a history predicate and does not
+follow from successful receipt alone.
+Theorem 4 (Protected continuation): Following FreshRecv,
+the certiﬁed output cannot be reinterpreted or consumed
+without owner authorization. A certiﬁed, publicly executed
+successor consumes a ﬁnal source or atomically establishes
+a funded direct obligation. Source closure, compensation, and
+representation preserve its established principal effects without
+successor re-signing or re-execution.
+Proof: Lemma 2 ﬁxes ownership and excludes conﬂicting
+consumption, and atomic execution couples each missing con-
+sumption with its obligation and outputs. Theorem 1 supplies
+funding, Theorem 2 accounts for closure and late sources,
+Lemma 1 identiﬁes the executed history, Lemma 4 bounds re-
+submission, Lemma 6 bounds compensation, and Lemmas 9–
+11 restrict later changes. Induction over the joint local and
+public transitions composes these properties. INSTALL retains
+local consumption effects and leaves public assets unchanged.
+A compensation decision may change Pending, fees, and
+reserve balances without repeating successor principal, and
+representation and physical installation change none of them.
+Local retention cases. The following cases distinguish re-
+source restoration from input unlocking. Elapsed time alone
+authorizes neither.
+Approval state
+Consequence under the existing rules
+Independent
+partial
+approvals
+without QCs
+Capacity may be fragmented without public
+liabilities. Funded increases can enable com-
+pletion but do not erase existing locks.
+All-honest
+same-
+input 2/2 split
+Neither candidate can obtain a third signature.
+Additional capacity does not resolve the con-
+ﬂicting input locks.
+Superseded uncer-
+tiﬁed approval
+A successfully executed conﬂicting QC under
+the same conﬁguration proves that the old
+approval could not have formed a QC. The
+guarded invalidation restores only its residual
+local debits.
+QC-bearing Intent
+loser
+Disjoint-input Intent rejection does not permit
+invalidation. The unexecuted source retains its
+signing reservation even after compensation.
+Conditional progress. Fix a CAL grant. For member m and
+Worker w, let Cm,w be the locally observed total slice capacity,
+Available plus Reserved. Let Lm,w bound residual reservations
+outside a designated request set, and let Nm,w ≥1 bound
+its distinct requests that may simultaneously acquire or retain
+reservations, including the candidate. If each request reserves
+at most amax CAL, including change, then
+Cm,w ≥Lm,w + Nm,wamax
+excludes a CAL-capacity refusal for that candidate: other
+reservations occupy at most Lm,w + (Nm,w −1)amax. All
+competing reservations must be counted exactly once, includ-
+ing partial or abandoned approvals, certiﬁed but unreleased
+payments, and payments awaiting local reconciliation.
+The condition must hold at the relevant debit steps and slices
+of a responsive honest quorum. It is a workload condition, not
+a bound enforced across collectors. Input and Intent compat-
+ibility, sufﬁcient fees and other resources, available evidence,
+and fair delivery and inclusion remain separate requirements.
+
+14
+Source execution, economic closure, and representation have
+distinct progress conditions; none implies a universal comple-
+tion deadline or timeout-based unlocking.
+Lemma 12 (Economic closure does not wait for adaptation):
+An outstanding direct obligation can be closed by its public
+compensation decision once its public deadline is reached and
+the decision is included, provided the original history at its
+location, the issuer’s reserve, and the consumer’s fee escrow
+are available. This transition requires no adaptation contribu-
+tion. Completion of the representation separately requires valid
+adaptation material, a current canonical revision, and progress
+of public submission and local physical installation.
+Proof: The decision path validates the obligation and the
+historical slot and performs accounting without an adaptation
+endpoint. The reserve sufﬁces by Theorem 1, and the ad-
+mission rule reserves one compensation charge per certiﬁed
+input within the consumer’s escrow. Unavailable adaptation
+therefore blocks neither the decision nor a later repayment.
+The threshold service needs three valid contributions from the
+four ﬁxed holders; three responding honest holders sufﬁce,
+and a Byzantine holder may also supply a valid contribution.
+Shared execution resources and public ordering still govern
+latency, so the statement separates protocol dependencies and
+gives no completion-time bound.
+Availability and guarantor risk. Once a consumer exposes
+the source QC, at least two honest source signers retain
+its submission material (Lemma 4). With fair delivery and
+inclusion, this supports resubmission of an executable source,
+but does not remove a permanent Intent conﬂict. A due
+obligation can instead close without adaptation (Lemma 12).
+At every preﬁx,
+0 ≤Sg =
+X
+c∈Cg
+ pc −Recc
+
+≤Qg ≤Bg.
+For a ﬁxed grant without further funding, this bounds unrepaid
+compensation, not lifetime gross Paid or the availability of
+individual signing slices. Certiﬁcation can stop while reserve
+principal remains. When the hypotheses of Theorem 3 hold,
+terminal CAL holdings and reserves coincide; permanently
+unexecuted sources fall outside that comparison. Open deploy-
+ment therefore accepts adversarial reserve losses and retained
+capacity, rather than merely an expected rate of accidental
+source failures. FUEL fees do not insure these losses, and no
+CAL–FUEL exchange value is assumed.
+VI. IMPLEMENTATION AND EVALUATION
+We evaluate certiﬁed continuation, source resolution during
+ordinary trafﬁc, and local historical reading on frozen evalua-
+tion build 721800c. It integrates independent compensation
+decisions, public-certiﬁcate source recovery, and one-to-one
+input-certiﬁcate checks. The continuation and mixed-load ex-
+periments on that build use identical node binaries and Comet
+sources; additions are conﬁned to observation and ofﬂine test
+tools. Artifacts retain source/overlay/binary ﬁngerprints and
+per-run records. The local invalidation transition was intro-
+duced in patch bf71c4d. Boundary/replay regressions and
+the injected-latency study use production snapshot 9879f64.
+Their test and driver additions are ﬁngerprinted separately;
+node paths are unchanged. These functional results do not
+replace the performance measurements of 721800c.
+Setup and measurement. Experiments use one Mac Studio
+M4 Max with 16 CPU cores, 64 GiB RAM, macOS 26.6.2,
+and Go 1.27.1. The project overlay of CometBFT v0.38.26
+implements the identity and installation rules. Network trials
+use synchronous bbolt member commits before signing; com-
+mittee application state, BlockStore, and gateways are disk-
+backed. Members use GOMAXPROCS=16 and GOGC=200;
+commit, ﬂush, and gossip settings are 250, 10, and 10 ms.
+Network trials copy the same unrun genesis and keys, reset
+genesis time, and use sufﬁcient ﬁxed funding without top-up.
+Certiﬁed receipt runs from ﬁrst actual send to recipient
+veriﬁcation and atomic local recording. Public and member
+observations include block following and driver polling; the
+chain experiment separately records application-commit com-
+pletion. Unless stated otherwise, summaries take the median
+of three run-level statistics, not pooled transaction quantiles;
+ranges describe runs, not conﬁdence intervals. The timing
+trials do not measure restart recovery, sustainable throughput,
+or minimum capital. The persistent restart checks below are
+separate functional regressions.
+A. Continuous Spending Without Per-Hop Settlement
+Nine services support three independent NoSync wallets
+rotating 100 CAL along A →B →C →A, with each
+payment using the owner’s ﬁnal FUEL. After a uniform
+three-second warm-up, successors are constructed online from
+preceding recipients’ stored outputs. Fast mode proceeds after
+certiﬁed receipt; wait mode additionally awaits the driver’s
+observation of wallet-veriﬁed public execution. Three pairs run
+in fast/wait, wait/fast, fast/wait order.
+Both modes measure Sent1 →Ready100, including con-
+struction of hops 2–100 and retries, but excluding ﬁrst-
+payment construction. Wait mode adds 99 inter-hop waits,
+not ﬁnal-payment public conﬁrmation. Median chain time is
+4.557 s versus 64.476 s, a 14.15-fold ratio and 92.93% reduc-
+tion (Fig. 4); ranges are 4.498–4.740 and 64.461–64.627 s. Fast
+uses 300 attempts for 300 payments; wait uses 407 attempts.
+The comparison includes retry costs without attributing every
+retry or the entire difference to consensus waiting.
+All 297 fast successors use their parent’s TXCer, are con-
+structed after parent receipt, and are ﬁrst sent before the
+earliest parent application-commit completion recorded across
+all four replicas. The minimum lead is 224.785 ms. These
+records timestamp database commit, not consensus decisions.
+Later driver observations are not original wallet-validation
+timestamps. Actual missing-input records, rather than send
+ordering, establish 3, 2, and 4 child-before-source executions,
+all fulﬁlled without compensation.
+The driver polls every 5 ms and the follower every 25 ms;
+250 ms is the commit setting. Across the 99 inter-hop waits
+per waiting run, earliest-replica application commit to driver
+observation totals 29.542, 29.681, and 29.347 s. This joint
+interval includes successor-header availability, fetching, veriﬁ-
+cation, local recording, and replica differences. Wallet-internal
+
+15
+Certified continuation
+Inter-hop public wait
+0
+20
+40
+60
+100-hop chain time (s)
+4.557 s
+64.476 s
+Fig. 4.
+Build-721800c 100-hop chains: three runs per mode, synchronous
+members and NoSync wallets. Both modes end at the last certiﬁed receipt;
+only wait mode requires public observation between hops.
+timestamps do not separate these terms. Thus 14.15 is the
+measured end-to-end mode ratio, not a pure consensus speedup
+or polling penalty. The supplement gives the matched intervals
+and observation-to-next-build times.
+Fast medians are 5.228 s for last-payment public observa-
+tion, 5.229 s for all-payment public observation, and 5.294 s
+for all-payment member closure. All 600 payments pass
+input/output, replica-agreement, CAL/FUEL, fee-closure, and
+outbox audits. Each chain spends 9,400 FUEL: 8,400 rewards
+and 1,000 burned. For this ﬁxed shape, TXCer size is 779 B;
+requests are 1,979 B initially and 2,766 B thereafter, without
+ancestry-dependent growth.
+B. Source Resolution Under Mixed Load
+Four committee processes and two organizations, each
+with four members and one gateway, give 14 services. Fees
+use explicitly authorized organization-funded FUEL. Ordinary
+wallets are NoSync; scenario wallets commit synchronously
+and follow blocks for at least 55 s in every treatment. Each
+run offers 7,000 independent ordinary payments targeting 100
+payments/s for 70 s, with limits of 64 fast requests and 256
+outstanding payments. Starting ten seconds after driver launch,
+eight independent cross-organization parent–child pairs start
+one second apart, using inputs and Intents separate from the
+ordinary stream. Every treatment includes these pairs.
+N delivers normally. R withholds publisher submission and
+INSTALL of each certiﬁed parent, leaving public-evidence
+recovery enabled. C uses the same withholding with recovery
+disabled. P additionally pauses all adaptation endpoints, but
+not consensus or decisions. C/P release each late parent after
+its compensation is observed, without awaiting another target
+or representation. P resumes adaptation only after all four
+replicas report all eight targets Recovered with representations
+neither committed nor materialized. Each treatment has three
+fresh runs, ordered N/R/C/P, P/C/R/N, N/R/C/P.
+Economic closure while adaptation is unavailable. R ful-
+ﬁlls all 24 withheld sources automatically, without publisher
+resubmission or compensation. Across these targets, source
+execution is observed 2.054–3.357 s after child send (median
+2.905 s). C/P compensate 48 targets by 100 CAL each and
+recover every debit: 4,800 CAL paid and repaid. Across the
+48 targets, compensation observations span 31.806–34.499 s
+after child send, including the 30-second public-time deadline,
+scheduling, execution, and polling.
+In P, all 96 replica–target checks conﬁrm repayment before
+adaptation resumes, at 51.256–51.792 s after the ﬁrst ordi-
+nary send. Every subsequent representation and materializa-
+tion completes before the last ordinary send. This ordering
+demonstrates economic closure without available adaptation
+in the measured executions (Fig. 5), rather than inferring
+independence from matching ﬁnal balances.
+Shared-resource costs and audit. Table II reports admitted
+receipt latency alongside actual send spans and drain. All N/C
+runs and two P runs reach the 256-outstanding limit; two C
+runs and two P runs also reach 64 fast requests. Dispatch
+lag, measured from scheduled to actual send, reaches a run-
+level P95 of 895.88 ms. The P run-1 tail after 70 s contains
+89 payments with receipt P95 282.61 ms; it is not a full
+ten-second window. Thus lower aggregate quantiles do not
+establish a performance improvement or zero interference. All
+runs drain 0.815–1.356 s after the last ordinary send.
+All 84,192 payments across the twelve runs close. Each
+run’s four replicas agree at the same height; CAL/FUEL
+conservation, fees, identities, obligations, and outboxes pass
+audit. Final user CAL allocations coincide across treatments,
+reserves recover, and CAL/work reservations clear without
+budget rejection. N/R spend 659,504 FUEL per run; C/P spend
+659,544, including eight additional 5-FUEL compensation
+fees. Actual fee expenditure is not restored as available fund-
+ing.
+The archived scheduled-to-receipt P95s, computed per pay-
+ment before aggregation, are 304/140/475/667 ms for N/R/C/P.
+This includes pre-send backpressure; the supplement records
+the timestamp convention and small wall-clock anomalies
+separately from actual-send receipt latency.
+C. Historical Reading: Equivalent Answers and Explicit Costs
+The reader is an honest local replica that has veriﬁed
+and executed preﬁx H, querying original coordinates (h, j, k)
+within one application read transaction VH. A loads original
+history and uses the permanent decision index; B uses existing
+Canonical revisions. Both consult the same permanent deci-
+sions and obligations, returning identical input identity, TxID,
+coordinates, amount, historical funding/debit, decision/height,
+and obligation state at H. Authorization comes from success-
+ful execution binding exact revisions, not a CH equation or
+matching BlockID. This is not remote-server authentication.
+Fixtures use real signatures, successful ABCI execution,
+disk-backed bbolt/GoLevelDB, and frozen BlockStores. A has
+its own original BlockStore, without B’s backup-layout cost.
+Point queries load a block and decode the selected transaction;
+A’s block query scans its range index once and builds a
+timed map. Neither strategy receives a precomputed decision
+map. Pages are warm, with no decoded-block or result cache;
+GOMAXPROCS=16, GOGC=100.
+Three fresh processes each test four (n, m) ﬁxtures, with
+n ∈{32, 256} payments and m ∈{1, 8} compensated slots
+
+16
+TABLE II
+ORDINARY-PAYMENT MEASUREMENTS UNDER MIXED LOAD. EACH TREATMENT HAS THREE RUNS OF 7,000 ORDINARY PAYMENTS PLUS EIGHT
+PARENT–CHILD PAIRS. ENTRIES ARE MEDIANS OF RUN-LEVEL STATISTICS, EXCEPT THE FINAL COLUMN, WHICH IS THE LARGEST RUN-LEVEL
+DISPATCH-LAG P95. SEND SPAN AND DRAIN ARE MEASURED FROM ACTUAL SENDS; DRAIN IS AN OBSERVATION.
+Treatment
+Receipt P50
+(ms)
+Receipt P95
+(ms)
+Receipt P99
+(ms)
+Send span
+(s)
+Post-send drain
+(s)
+Max. dispatch P95
+(ms)
+N
+55.13
+152.77
+243.87
+70.245
+1.015
+255.40
+R
+53.03
+139.89
+220.06
+69.990
+0.890
+0.24
+C
+54.01
+136.49
+227.58
+70.395
+1.029
+700.33
+P
+55.00
+144.21
+227.52
+70.576
+1.155
+895.88
+10
+20
+30
+40
+50
+60
+Seconds after first ordinary send (10-s windows)
+100
+120
+140
+160
+180
+200
+Ordinary receipt P95 (ms)
+(a) Ordinary-payment interference
+N
+R
+C
+P
+0
+10
+20
+30
+40
+50
+60
+70
+Seconds after first ordinary send
+1
+2
+3
+4
+5
+6
+7
+8
+Source–child pair
+(b) Paused adaptation: run 1
+Child receipt
+Compensation
+Repayment
+Materialization
+Adaptation resumed
+Fig. 5. Mixed-load observations. Left: ordinary-receipt P95 in the ﬁrst seven ten-second windows; lines are three-run medians and bands are minima–maxima,
+not conﬁdence intervals. Right: the eight targets in P run 1, showing compensation and repayment before adaptation resumes and subsequent materialization.
+Public events are observations, not internal commit timestamps.
+per block. After 20 warm-ups per strategy, 300 interleaved
+queries per strategy for compensated points, ordinary points,
+and whole blocks yield 21,600 timed queries. Timing includes
+read-transaction boundaries, loading/decoding, record associa-
+tion, and result construction. All timed reads use represented,
+materialized H = 4; other stages and subsequent real re-
+payments are functional-equivalence checks, not extra timing
+samples.
+Canonical reduces compensated-point P50 by 7.44–12.32%
+(12.6–123.8 µs); whole-block differences are 1.49–3.88% (Ta-
+ble III). In (256, 8) run 1, A performs 12 BlockStore Gets
+returning 622,183 B; B performs none but reads 825,526 B
+from application state. Mean per-query heap allocation is
+approximately 4.95 versus 2.24 MB, while record-association
+medians are 11.50 versus 10.83 µs. This indicates a lay-
+out/reconstruction beneﬁt, not fewer total bytes or crypto-
+graphic acceleration. Decoded-object caching could change
+that tradeoff.
+Representation adds 0.28–2.19 MiB of net logical KV per
+repaired block, for revisions, tasks, and backup/history records,
+net of deleted Pending. The (256, 8) 5,056-B batch is al-
+ready included. Local sequential adaptation, assembly, Fi-
+nalize, synchronous application Commit, and materialization
+total 43–214 ms. It excludes network/consensus waits, public-
+block saving, and commit-signature construction. Common
+compensation costs are reported separately.
+Equivalence checks cover compensation before represen-
+tation, representation before materialization, and repayment
+preserving the historical debit with state Recovered. Invalid
+coordinates, cross-preﬁx decisions, and wrong debit/amount
+are rejected; undecodable revisions fail rather than fall back.
+These checks do not establish detection of arbitrary decodable
+corruption. Canonical offers authorized funding representation
+at stable historical coordinates, with measured maintenance
+costs, rather than an economically necessary or universally
+faster alternative to indexed history.
+D. Injected Latency and Single-Fault Runs
+On 9879f64, four conditions run three times each in alter-
+nating order. H uses the injection proxies without added delay;
+L adds 25 ms per direction to member RPC and committee P2P
+trafﬁc. L-M and L-C add that delay and suspend member 3
+or committee validator 3, respectively, from 15 to 45 s. Each
+run sends 100 warm-up payments, 1,200 ordinary payments at
+20/s, and two 10-hop chains starting inside the fault window.
+The actual health-RPC RTT rises from 1.17 to 52.20 ms; both
+RPC and P2P mean holds are about 25.2 ms per direction. The
+supplement speciﬁes the FIFO injection, ﬁxed resources and
+per-run results.
+All 15,840 payments close, with equal committee states,
+empty outboxes and zero public gap. No compensation is
+
+17
+TABLE III
+HISTORICAL READING AND REPRESENTATION COSTS. A IS ORIGINAL HISTORY PLUS DECISION INDEX; B IS CANONICAL. POINT READS TARGET
+COMPENSATED SLOTS. QUERY ENTRIES ARE MEDIANS OF THREE RUN-LEVEL P50S; COST ENTRIES ARE MEDIANS OF THREE TOTALS. EXTRA KV
+EXCLUDES COMMON HISTORY, DECISIONS, AND APPLICATION COMMIT METADATA.
+(n, m)
+Point (µs)
+Whole block (µs)
+Extra net KV
+(MiB/block)
+Local work
+(ms/block)
+A
+B
+A
+B
+(32, 1)
+162.54
+148.38
+1,028.29
+1,005.79
+0.279
+43.32
+(32, 8)
+169.21
+156.62
+1,127.46
+1,083.71
+0.314
+94.46
+(256, 1)
+1,005.21
+881.38
+8,441.58
+8,316.00
+2.153
+65.32
+(256, 8)
+1,006.25
+887.25
+8,554.17
+8,407.12
+2.189
+214.40
+TABLE IV
+INJECTED LATENCY AND SINGLE FAULTS: MEDIANS OF THREE RUN-LEVEL
+STATISTICS OVER ALL 1,200 ORDINARY PAYMENTS PER RUN; WARM-UP
+AND CHAINS ARE EXCLUDED. PUBLIC AND MEMBER COLUMNS ARE
+SEND-TO-OBSERVATION P95; THE MEMBER COLUMN WAITS FOR ALL
+FOUR MEMBERS.
+Condition
+Receipt P50/P95 (ms)
+Public (s)
+Members (s)
+H
+41.56/83.20
+1.28
+1.36
+L
+81.91/118.22
+1.32
+1.41
+L-M
+77.71/112.85
+1.30
+29.00
+L-C
+77.41/109.32
+10.02
+10.04
+needed. Table IV separates receipt, public observation and
+observation of all four members. With one member sus-
+pended, new QCs use the other three members and public
+completion continues, while the absent member’s observation
+creates a peak of 630–641 outstanding tasks. With a validator
+suspended, receipt P95 remains 108–111 ms and 400–510
+payments reach public observation inside each fault window,
+but public P95 rises to 9.5–12.6 s. Retained commit certiﬁcates
+verify ﬁve paused-validator round-0 proposer opportunities
+per run; each commits in round 1 without that validator’s
+signature. Both chains ﬁnish certiﬁcation within each fault
+window, and every run drains within 1.25 s of its last ordinary
+send. These are single-host injected-delay results, separate
+from the fast/wait comparison.
+E. Current-Build Boundary and Composition Checks
+Deterministic tests on 9879f64 use actual member ap-
+provals, ABCI execution, and authenticated follower updates.
+They reproduce no-QC capacity fragmentation, a same-input
+2/2 split, and two Intent-conﬂict compensation rounds with
+complete CAL/FUEL accounting. An external top-up resolves
+the ﬁrst case but not the second. Real threshold adaptation
+covers both representation/repayment orders; retained-state
+restart reproduces each original command history. A commit-
+before-signature interruption preserves locks and reservations
+and permits an idempotent retry. The supplement gives the
+per-preﬁx ledgers, negative-entry tests, and restart assertions.
+Archived evidence. The supplement retains earlier contin-
+uation, throughput, capital, organization-path, and availabil-
+ity experiments under their original builds and conﬁgura-
+tions. They provide historical context, not measurements of
+721800c; cross-version differences are not attributed to in-
+dividual changes.
+VII. CONCLUSION
+Next separates three paths that continuous payments other-
+wise serialize. One-round certiﬁcation lets a recipient spend
+a newly certiﬁed output, so on one host with synchronous
+member commits a 100-hop chain reaches its last certiﬁed
+receipt in 4.557 s rather than 64.476 s. Direct responsibility
+removes the wait for the source: reserve-backed signing capac-
+ity covers the outstanding CAL liability of every certiﬁcate,
+original signers can resubmit withheld sources from published
+certiﬁcates, and a public decision can close a due Open
+obligation under the stated protocol conditions, which a late
+source repays. In the mixed workload, compensation and
+repayment completed with all adaptation services paused.
+The optional authorized representation records the reserve
+debit at the original coordinates while preserving successor
+references and the complete BlockID, at a measured storage
+and maintenance cost. Continuation, economic closure, and
+historical record each proceed on their own evidence.
+ACKNOWLEDGMENTS
+ChatGPT and Claude assisted with drafting and revising the
+abstract, main-text sections, supplementary explanations, and
+Chinese reading edition. Codex assisted with source-grounded
+review, implementation and test scaffolding, revision, LaTeX
+assembly, and plotting scripts. Experimental plots were gen-
+erated from recorded measurements.
+REFERENCES
+[1] M. Baudet, G. Danezis, and A. Sonnino, “FastPay: High-Performance
+Byzantine Fault Tolerant Settlement,” in Proceedings of the ACM
+Conference on Advances in Financial Technologies, 2020, pp. 163–177.
+[2] M. Baudet, A. Sonnino, M. Kelkar, and G. Danezis, “Zef: Low-latency,
+Scalable, Private Payments,” in Proceedings of the Workshop on Privacy
+in the Electronic Society, 2023, pp. 1–16.
+[3] S. Blackshear, A. Chursin, G. Danezis, A. Kichidis, L. Kokoris-Kogias,
+X. Li, M. Logan, A. Menon, T. Nowacki, A. Sonnino, B. Williams, and
+L. Zhang, “Sui Lutris: A Blockchain Combining Broadcast and Con-
+sensus,” in Proceedings of the ACM SIGSAC Conference on Computer
+and Communications Security, 2024, pp. 2606–2620.
+[4] L. Aumayr, P. Moreno-Sanchez, A. Kate, and M. Maffei, “Blitz: Secure
+Multi-Hop Payments Without Two-Phase Commits,” in 30th USENIX
+Security Symposium, 2021, pp. 4043–4060. [Online]. Available: https:
+//www.usenix.org/conference/usenixsecurity21/presentation/aumayr
+[5] ——, “Breaking and Fixing Virtual Channels: Domino Attack and
+Donner,” in Network and Distributed System Security Symposium, 2023.
+
+18
+[6] S. Sridhar, A. Sonnino, and L. Kokoris-Kogias, “Stingray: Fast
+Concurrent Transactions Without Consensus,” 2025, arXiv:2501.06531,
+version 1. [Online]. Available: https://arxiv.org/abs/2501.06531
+[7] S. Mazumdar and S. Ruj, “CryptoMaze: Privacy-Preserving Splitting of
+Off-Chain Payments,” IEEE Transactions on Dependable and Secure
+Computing, vol. 20, no. 2, pp. 1060–1073, 2023.
+[8] V. Mavroudis, K. W¨ust, A. Dhar, K. Kostiainen, and S. ˇCapkun,
+“Snappy: Fast On-Chain Payments with Practical Collaterals,” in
+Network and Distributed System Security Symposium, 2020. [Online].
+Available: https://arxiv.org/abs/2001.01278
+[9] A. Madhusudan, M. Sedaghat, S. Tiwari, K. Cong, and B. Preneel,
+“Reusable, instant and private payment guarantees for cryptocurrencies,”
+in Information Security and Privacy (ACISP), 2023, pp. 580–605.
+[10] Z. Liu, Y. Xiang, J. Shi, P. Gao, H. Wang, X. Xiao, B. Wen, Q. Li, and Y.-
+C. Hu, “Make Web3.0 Connected,” IEEE Transactions on Dependable
+and Secure Computing, vol. 19, no. 5, pp. 2965–2981, 2022.
+[11] G. Ateniese, B. Magri, D. Venturi, and E. Andrade, “Redactable
+Blockchain—or—Rewriting History in Bitcoin and Friends,” in IEEE
+European Symposium on Security and Privacy, 2017, pp. 111–126.
+[Online]. Available: https://eprint.iacr.org/2016/757
+[12] D. Zhang, J. Le, X. Lei, T. Xiang, and X. Liao, “Secure Redactable
+Blockchain With Dynamic Support,” IEEE Transactions on Dependable
+and Secure Computing, vol. 21, no. 2, pp. 717–731, 2024.
+[13] X. Li, J. Xu, L. Yin, Y. Lu, Q. Tang, and Z. Zhang, “Escaping From
+Consensus: Instantly Redactable Blockchain Protocols in Permissionless
+Setting,” IEEE Transactions on Dependable and Secure Computing,
+vol. 20, no. 5, pp. 3699–3715, 2023.
+[14] K. Y. Chan, L. Chen, Y. Tian, and T. H. Yuen, “Reconstructing
+Chameleon Hash: Full Security and the Multi-Party Setting,” in Proceed-
+ings of the ACM Asia Conference on Computer and Communications
+Security, 2024, pp. 1076–1091.
+[15] V. Shoup, “Practical Threshold Signatures,” in Advances in Cryptology—
+EUROCRYPT, 2000, pp. 207–220. [Online]. Available: https://www.
+iacr.org/archive/eurocrypt2000/1807/18070209-new.pdf
+[16] S. A. K. Thyagarajan, A. Bhat, B. Magri, D. Tschudi, and A. Kate,
+“Reparo: Publicly Veriﬁable Layer to Repair Blockchains,” in Financial
+Cryptography and Data Security, 2021, pp. 37–56. [Online]. Available:
+https://arxiv.org/abs/2001.00486
+[17] R. Matzutt, V. Ahlrichs, J. Pennekamp, R. Karwacik, and K. Wehrle, “A
+Moderation Framework for the Swift and Transparent Removal of Illicit
+Blockchain Content,” in IEEE International Conference on Blockchain
+and Cryptocurrency, 2022.
+[18] X. Chen and Y. Gao, “CDEdit: A Highly Applicable Redactable
+Blockchain
+with
+Controllable
+Editing
+Privilege
+and
+Diversiﬁed
+Editing Types,” 2022, arXiv:2205.07054. [Online]. Available: https:
+//arxiv.org/abs/2205.07054
+[19] Cloudﬂare, “CIRCL v1.6.5: Threshold RSA implementation,” Software,
+tss/rsa
+package,
+accessed
+October
+3,
+2026.
+[Online].
+Available:
+https://github.com/cloudﬂare/circl/tree/v1.6.5/tss/rsa
+[20] E. Buchman, J. Kwon, and Z. Milosevic, “The latest gossip on BFT
+consensus,” 2019, arXiv:1807.04938, version 3. [Online]. Available:
+https://arxiv.org/abs/1807.04938v3

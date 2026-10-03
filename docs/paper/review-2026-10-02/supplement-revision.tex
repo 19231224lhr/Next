@@ -1,0 +1,212 @@
+\section{Current-Build Revision Validation}
+\label{supp:major-revision}
+Production snapshot \texttt{9879f64} retains the local reclamation patch
+\texttt{bf71c4d}. The new fixtures and network driver additions are
+fingerprinted independently; the measurements of \texttt{721800c} remain
+unchanged. The artifact directory \texttt{major-revision-2026-10-03}
+contains source manifests, raw logs, parsed ledgers and review closure.
+
+\noindent\textbf{Finite-capacity and Intent boundaries.}
+Deterministic regressions obtain actual member approvals, execute
+blocks through \texttt{FinalizeBlock}/\texttt{Commit}, and authenticate
+their results with retained empty successor blocks before member
+following. The harness fixes ordering and block time.
+
+With $B_g=300$ and one Worker per member, four independent 100-CAL
+requests each obtain two approvals, exhausting all four members'
+200-CAL capacities without a QC. A 150-CAL external reserve increase
+adds 100 capacity per member without deleting locks; the same requests
+then complete, leaving Available$=300$ and Reserved$=0$ per member.
+An all-honest same-input 2/2 split remains blocked after the same increase.
+
+Two cross-organization Intent-conflict rounds run under both user-funded
+and authorized organization-funded fees. Organization A's reserve falls
+from 300 to 200 and then 100 CAL; public Spent reaches 200 and Reserved
+returns to zero. The same three source signers each retain 200 locally,
+while the fourth retains its unused capacity; new requests cannot obtain
+a quorum from this slice. Authenticated failure results do not release
+the rejected approvals. Their original inputs remain publicly unspent
+and locally locked. User-funded runs additionally retain two complete
+10,000-FUEL inputs, distinct from their 1,000-FUEL escrow maxima.
+
+The first descendant funds the second A-side request, and the final
+descendant is successfully spent through B. Each B-side winner uses a
+different initial input, and the harness completes compensation before
+the next round. Independent sums check Open gaps, certificate coverage,
+grant usage, and CAL/FUEL conservation at every committed prefix.
+Repeated compensation produces no new changes, effects, or fee outputs.
+These results demonstrate finite reserve loss and conservative
+certification stoppage, not a network attack rate.
+
+\noindent\textbf{State-preserving restart and original-history replay.}
+With real threshold adaptation, regressions cover both
+compensation--representation--repayment and
+compensation--repayment--representation. A replay replica stops at
+height 2, reopens its retained persistent ledger, and catches up using
+\texttt{Original} material from a BlockStore that already contains
+revised bodies. Within each fixed command history, application roots
+and ledger rows match the reference at every replayed height.
+This exercises local persistent restart and original-history access,
+not network downloading or equality of application roots across
+different command orders.
+
+\noindent\textbf{Fees and locked funds.}
+Each successful normal payment in this trace spends 94 FUEL, and a
+compensated consumer spends 99. The two rounds plus the final descendant
+spend 480 FUEL: 430 rewards and 50 burned, out of escrow maxima totaling
+5,000; 4,520 is returned. The user-funded trace separately retains two
+10,000-FUEL inputs of the unexecuted sources. The organization-funded
+trace debits B's authorized fee account by 480, with A's public FUEL
+balance unchanged. A's local fee reservations still remain. CAL loss,
+fee expenditure, and fee-input locks are distinct quantities.
+
+\noindent\textbf{Public entry and atomicity coverage.}
+The wire4 dispatcher admits DirectSubmission, reserve increases, clock
+ticks, and restricted repair commands. DirectSubmission reconstructs and
+verifies the current-organization QC, owner authorization and direct-input
+certificates before common spend-state checks. Legacy ordinary transfers
+require CommitteeRoute and are excluded by the wire4 dispatcher.
+Organization-funded fees require a grant whose Policy Subject matches
+the payer; unapproved sponsorship is rejected at member and public paths.
+The zero/two-vote construction probes fail during canonical encoding;
+existing public-verification negative tests separately cover malformed or
+mismatched certificates. Compensation and representation cannot provide
+an alternative arbitrary owner-spend entry.
+
+The synchronous approval boundary test interrupts immediately after the
+real database commit and before control returns to the signer. Reopening
+the same store preserves the reservation and input lock; the same request
+can be signed without another debit. Existing tests reject conflicting
+requests after restart, roll back cursor and state together on failed
+follower application, and apply restoration once across restart. These
+checks retain committed state rather than simulate its loss.
+
+\subsection{Waiting-Mode Timestamp Audit}
+\noindent\textbf{Inter-hop observation cost.}
+The driver polls every 5\,ms and the block follower every 25\,ms;
+250\,ms is the commit setting, not either polling interval.
+Matching the original 600 payment records to all four replicas'
+application-commit records identifies 99 inter-hop waits per waiting
+run. Receipt-to-public-observation intervals total
+56.851, 58.921, and 57.031\,s.
+For the same hops, earliest-replica-commit-to-driver-observation
+intervals total 29.542, 29.681, and 29.347\,s, with per-hop
+P50 approximately 297\,ms. The latter interval spans successor-header
+authentication, fetching and verification, local recording, observation,
+and replica differences; missing wallet-internal timestamps prevent
+further separation. Observation-to-next-build handoffs total only
+0.273, 0.314, and 0.315\,ms per run.
+
+The 14.15-fold ratio consequently compares the two measured
+end-to-end modes in this configuration. It is neither a pure consensus
+speedup nor a polling-only penalty, and these intervals do not establish
+a counterfactual event-driven result.
+
+\subsection{Archival Byte-Export Example}
+The runnable \texttt{TestHistoricalExportConsumer} emits a local export
+with prefix, coordinates, complete BlockID, Revision, Task ID, original
+and authorized body bytes, historical funding and current obligation
+state. It verifies the exact Task body and revision, original part-set
+identity, owner signature, QC and input CH relation. A late repayment
+changes the economic answer without changing the authorized bytes.
+This is an example consumer of verified local history, not a claimed
+deployed client or remote authentication protocol. The permanent decision
+and obligation are consulted on both read paths.
+
+\subsection{Chameleon-Hash Instantiation}
+\label{sec:ch-params}
+
+\noindent\textbf{Parameters.} The hash is an RSA chameleon hash with a 2048-bit modulus $N$ and public exponent $e=65537$. For context $c$ and message $m$, the digest is $\mathrm{CH}=H(c,m)\cdot r^{e}\bmod N$ with randomness $r$ in $\mathbb{Z}_N^{*}$. Given the digest of $(c,m,r)$ and a new message $m'$, the adapted randomness $r'=r\,(H(c,m)/H(c,m'))^{d}\bmod N$ satisfies $H(c,m')\,r'^{e}=H(c,m)\,r^{e}$, where $d=e^{-1}$ modulo the group order. Because $\gcd(e,\varphi(N))=1$ holds for correctly generated keys, $r\mapsto r^e$ is a permutation of $\mathbb{Z}_N^{*}$. Each message and digest then determine a unique valid opening.
+
+\noindent\textbf{Full-domain hash.} $H$ reads a SHAKE256 stream over the prefix \texttt{UTXO\_CH\_RSA\_FDH\_V3}, the 256-byte modulus, $\mathrm{u64be}(|c|)$, the context $c$, $\mathrm{u64be}(|m|)$, and the message $m$. It takes consecutive 256-byte blocks from the stream and returns the first value that is nonzero, below $N$, and a unit modulo $N$. The length prefixes make the encoding injective across contexts and messages. The contexts of block parts depend on the height and the part index and not on the revision counter.
+
+\noindent\textbf{Threshold trapdoor.} A trusted dealer uses CIRCL \texttt{GenerateKey} to generate two distinct safe primes and check the inverse of $e$ modulo $\varphi(N)$, then uses \texttt{Deal} to share $\widetilde d=e^{-1}\bmod\mu$, where $\mu=(p-1)(q-1)/4$, into four shares with Cloudflare CIRCL v1.6.5 \texttt{tss/rsa} (\texttt{Deal(4,3,true)}), and the experiments never persist the complete private key. Each share holder signs the public ratio $H(c,m)/H(c,m')$ as a raw group element, not through a padded RSA signing API. \texttt{CombineSignShares} recombines the shares and the combiner tries at most four three-member groups until the final opening verifies against the public relation. The construction follows the threshold RSA approach of Shoup~\cite{shoup}. The raw-group interface is checked by its final public relation; the library reference alone is not a proof of that interface or of ledger authorization.
+
+\noindent\textbf{Raw-group correctness.} Write $u=H(c,m)/H(c,m')$ and $\Delta=4!=24$. Interpolation of honest shares produces $W$ with $W^e=u^{4\Delta^2}$. Since $\gcd(4\Delta^2,e)=\gcd(2304,65537)=1$, choose integers $\alpha,\beta$ satisfying $\alpha4\Delta^2+\beta e=1$. The combiner obtains $z=W^\alpha u^\beta$ with $z^e=u$, hence $r'=rz$ preserves the commitment. The shared exponent $\widetilde d$ modulo $\mu$ is distinct from the full-group exponent $d$ used above to express the unique root. This explains honest-combination correctness for the unit-group ratio; it is not a claim of unforgeability for publicly combinable raw ratios.
+
+\noindent\textbf{Assumptions and scope.} Next's public-key constructor checks only that the modulus is a 2048-bit odd number and that $e=65537$. It does not prove that the modulus is well formed, so the argument needs the dealer to generate and split the key correctly. The ratio is public and algebraically combinable, so the chameleon hash does not by itself establish that one authorization was issued for one replacement. An adaptation takes effect only through a committed compensation decision and an exact Task. These are checked independently of the hash. The original body is bound by the original parts at revision~0 with opening~1 together with the complete-identity checks described in the historical read interface of the main paper. This binding does not depend on secrecy of the trapdoor. Consensus safety still rests on the BFT, authentication, and state guards of the base protocol.
+
+\subsection{Representation Construction and Batch Checks}
+A constructor reads the latest committed logical representation, independently of physical installation, and selects decided outputs whose slots still hold \texttt{OriginalFunding}; the decision enforced affordability when it committed, so the constructor simulates no economic step. For every item it derives the reserve-debit identity from the network and the consumed output and replaces the slot's \texttt{OriginalFunding} by the reserve reference with its opening, patching slots of one transaction into the same copy. Serialization lengths and all non-target bytes, including earlier authorized replacements, stay unchanged. Input adaptation runs per slot, and each block part that the combined body touches is adapted once while unchanged parts keep their commitments and proofs.
+
+Share endpoints bind to fixed committee identities, and each holder derives the requested replacements from its own committed decisions and refuses a slot without one. The collector tests bounded three-member candidates by actual cryptographic combination and accepts a candidate only when every affected part verifies, so malformed or invalid responses eliminate candidates and leave three valid contributions from other members usable. A successful combination cancels outstanding requests. Openings give commitment compatibility, and the committed decision gives the authorization.
+
+\begin{figure}[t]
+  \small
+  \begin{algorithmic}[1]
+    \REQUIRE Batch $B$, state $S$, execution height
+    \STATE $b\gets\operatorname{BatchID}(B)$; if a successful Task $b$
+    exists, return no new effect
+    \STATE Load Canonical; require an older target height and the stated
+    base and previous digest
+    \STATE Check item order and unique outputs and slots
+    \STATE Require, for each item, a decision $\mathcal D_x$ at the
+    stated location and a canonical slot holding \texttt{OriginalFunding}
+    for $x$
+    \STATE Reconstruct the permitted combined funding replacements and
+    verify their openings
+    \STATE Require the canonical candidate-body digest to equal
+    $B.\mathsf{Next}$
+    \STATE Verify non-target bytes, lengths, and that block hash and
+    part-set header equal the stored original identity
+    \STATE $O\gets\operatorname{Overlay}(S)$; remove the pending entries
+    and record per-output references
+    \STATE Add one logical revision, Task, and queue entry to $O$
+    \STATE Return the transition and a result without economic effect
+  \end{algorithmic}
+  \caption{Atomic representation-batch execution. Failure rejects the
+    whole batch, and only a successful transition commits. Batch
+    identity covers the complete canonical command, including its proof
+    data.}
+  \label{fig:supp-protocol-batch}
+\end{figure}
+
+
+\subsection{Additional Historical Reader Costs}
+From already decoded $(256,8)$ run-1 objects, separate authorization
+rechecks cost about 26.3\,ms per block on both paths, input-CH
+checks 10.3\,ms, and complete BlockID reconstruction 0.67\,ms.
+These independent rechecks are excluded from trusted-reader timings.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{reader-cost.pdf}
+  \caption{Reader tradeoffs. (a,b) Medians and min--max ranges of three
+    run-level P50s. (c) Mean major logical-record bytes. (d) Mean
+    sequential stage costs, not the median total work in
+    the historical-reader table in the main paper.}
+  \label{fig:reader-cost}
+\end{figure*}
+
+\subsection{Injected-Latency Configuration and Per-Run Results}
+\begin{table}[t]
+  \caption{Per-run results of the injected-latency study (\texttt{9879f64}). Public and member P95 in s; chain time is the median and maximum over the run's two 10-hop chains, in ms.}
+  \label{tab:supp-faults}
+  \centering
+  \small
+  \setlength{\tabcolsep}{3.5pt}
+  \begin{tabular}{@{}lrrrrr@{}}
+    \toprule
+    Run & \shortstack{Receipt\\P50/P95 (ms)} & \shortstack{Public\\P95} & \shortstack{Member\\P95} & \shortstack{Chain\\med/max} & \shortstack{In-window\\public} \\
+    \midrule
+    H-1   & 42.88/87.52 & 1.277  & 1.361  & 577/619  & -- \\
+    H-2   & 41.56/83.20 & 1.288  & 1.375  & 599/619  & -- \\
+    H-3   & 40.68/78.23 & 1.263  & 1.344  & 515/542  & -- \\
+    L-1   & 81.91/118.22 & 1.315 & 1.410  & 946/980  & -- \\
+    L-2   & 83.73/123.52 & 1.360 & 1.468  & 1001/1029 & -- \\
+    L-3   & 78.05/111.80 & 1.307 & 1.394  & 815/835  & -- \\
+    L-M-1 & 77.65/112.85 & 1.281 & 29.002 & 844/846  & 599 \\
+    L-M-2 & 78.31/115.68 & 1.327 & 29.026 & 842/869  & 601 \\
+    L-M-3 & 77.71/108.46 & 1.304 & 28.473 & 881/908  & 603 \\
+    L-C-1 & 78.18/110.94 & 12.627 & 12.744 & 906/965 & 510 \\
+    L-C-2 & 77.33/109.32 & 10.018 & 10.042 & 916/992 & 400 \\
+    L-C-3 & 77.41/108.44 & 9.516  & 9.618  & 873/901 & 421 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+The fixed four-validator configuration runs one organization's four members and one gateway. Each TCP direction uses a bounded FIFO of at most 64 chunks of 16 KiB, released at arrival plus the configured delay. All committee peer addresses use the proxies; duplicate-peer connection suppression can leave a listening proxy idle when that validator retains outgoing connections. Wallet--gateway traffic, public HTTP, wallet delivery and storage are not delayed. All twelve final runs use a file-descriptor limit of 16,384. The matrix was rerun after a pilot inherited a 256-descriptor limit; those tool-contaminated pilot results are retained separately and not pooled. Nodes stop before offline database audits.
+
+The two chain durations in each run are measured from their first send to last certified receipt. Their median is first taken within the run, then across its three replications. The fault-window QC cohort starts at least one second after suspension and receives before resumption. All member-fault cohort QCs contain exactly members 0, 1 and 2. Offline verification checks all 91, 91 and 95 committed BlockIDs in the committee-fault runs. Fixed-set proposer priorities show five round-0 opportunities for the paused validator in each run; each commits in round~1 without its signature. Windows use the latest valid precommit timestamp rather than the previous height's header time.
+
+\subsection{Scheduled-to-Receipt Timing in the Archived Mixed Workload}
+For each of the 84,000 ordinary payments, we compute the recorded receipt timestamp minus its scheduled timestamp before taking quantiles. Using the archived nearest-rank convention and then the median of three run-level P95s gives 304.253, 140.007, 475.236 and 666.915\,ms for N/R/C/P. Actual-send-to-receipt P95s are 152.766, 139.894, 136.491 and 144.205\,ms. The former includes pre-send backpressure; neither is formed by adding separate P95s. Some third-run wall-clock records put sending before the scheduled timestamp (minimum $-13.104$\,ms); raw differences and counts are retained, not clipped. These archived timestamps do not distinguish timer wake-up error from clock adjustment, and are not used to claim submillisecond dispatch accuracy.

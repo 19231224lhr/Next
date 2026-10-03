@@ -1,0 +1,221 @@
+{
+  "build": "721800c",
+  "wallet_internal_finality_timestamp_available": false,
+  "follower_poll_ms": 25,
+  "driver_finality_poll_ms": 5,
+  "retry_pause_ms": 25,
+  "commit_selection": "earliest of four and configured follower replica 0 reported separately",
+  "scope": "Single-host, zero injected delay. Post-commit includes next-header availability, fetching, verification, local recording and observation; not pure polling.",
+  "cases": [
+    {
+      "case": "r1-fast",
+      "metrics": {
+        "earliest_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 410.40250000000003,
+          "p95_ms": 460.537,
+          "sum_ms": 40271.036
+        },
+        "selected_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 403.0245,
+          "p95_ms": 454.415,
+          "sum_ms": 39071.386
+        },
+        "selected_replica_lag_ms": {
+          "n": 100,
+          "p50_ms": 7.033,
+          "p95_ms": 23.984,
+          "sum_ms": 1199.65
+        }
+      }
+    },
+    {
+      "case": "r1-wait",
+      "metrics": {
+        "earliest_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 296.746,
+          "p95_ms": 321.412,
+          "sum_ms": 29834.535
+        },
+        "selected_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 287.122,
+          "p95_ms": 314.165,
+          "sum_ms": 28867.002
+        },
+        "selected_replica_lag_ms": {
+          "n": 100,
+          "p50_ms": 4.073499999999999,
+          "p95_ms": 31.009,
+          "sum_ms": 967.533
+        },
+        "ready_to_observation_ms": {
+          "n": 99,
+          "p50_ms": 570.675,
+          "p95_ms": 625.404,
+          "sum_ms": 56850.803
+        },
+        "blocking_before_earliest_commit_ms": {
+          "n": 99,
+          "p50_ms": 275.513,
+          "p95_ms": 322.11,
+          "sum_ms": 27308.308
+        },
+        "blocking_after_earliest_commit_ms": {
+          "n": 99,
+          "p50_ms": 297.055,
+          "p95_ms": 323.894,
+          "sum_ms": 29542.495
+        },
+        "observation_to_next_build_ms": {
+          "n": 99,
+          "p50_ms": 0.002,
+          "p95_ms": 0.006,
+          "sum_ms": 0.273
+        }
+      }
+    },
+    {
+      "case": "r2-fast",
+      "metrics": {
+        "earliest_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 402.74300000000005,
+          "p95_ms": 453.54,
+          "sum_ms": 38665.003
+        },
+        "selected_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 391.053,
+          "p95_ms": 433.419,
+          "sum_ms": 37590.413
+        },
+        "selected_replica_lag_ms": {
+          "n": 100,
+          "p50_ms": 11.017,
+          "p95_ms": 24.022,
+          "sum_ms": 1074.59
+        }
+      }
+    },
+    {
+      "case": "r2-wait",
+      "metrics": {
+        "earliest_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 298.094,
+          "p95_ms": 323.895,
+          "sum_ms": 30000.072
+        },
+        "selected_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 292.777,
+          "p95_ms": 314.531,
+          "sum_ms": 29162.509
+        },
+        "selected_replica_lag_ms": {
+          "n": 100,
+          "p50_ms": 3.9835000000000003,
+          "p95_ms": 25.912,
+          "sum_ms": 837.563
+        },
+        "ready_to_observation_ms": {
+          "n": 99,
+          "p50_ms": 600.113,
+          "p95_ms": 625.488,
+          "sum_ms": 58921.197
+        },
+        "blocking_before_earliest_commit_ms": {
+          "n": 99,
+          "p50_ms": 297.642,
+          "p95_ms": 323.638,
+          "sum_ms": 29240.68
+        },
+        "blocking_after_earliest_commit_ms": {
+          "n": 99,
+          "p50_ms": 297.631,
+          "p95_ms": 324.054,
+          "sum_ms": 29680.517
+        },
+        "observation_to_next_build_ms": {
+          "n": 99,
+          "p50_ms": 0.003,
+          "p95_ms": 0.007,
+          "sum_ms": 0.314
+        }
+      }
+    },
+    {
+      "case": "r3-fast",
+      "metrics": {
+        "earliest_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 415.9335,
+          "p95_ms": 459.568,
+          "sum_ms": 38794.441
+        },
+        "selected_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 406.423,
+          "p95_ms": 457.459,
+          "sum_ms": 37953.82
+        },
+        "selected_replica_lag_ms": {
+          "n": 100,
+          "p50_ms": 4.031,
+          "p95_ms": 39.957,
+          "sum_ms": 840.621
+        }
+      }
+    },
+    {
+      "case": "r3-wait",
+      "metrics": {
+        "earliest_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 297.03499999999997,
+          "p95_ms": 322.323,
+          "sum_ms": 29662.324
+        },
+        "selected_commit_to_observation_ms": {
+          "n": 100,
+          "p50_ms": 288.1655,
+          "p95_ms": 315.377,
+          "sum_ms": 28676.682
+        },
+        "selected_replica_lag_ms": {
+          "n": 100,
+          "p50_ms": 7.138,
+          "p95_ms": 29.831,
+          "sum_ms": 985.642
+        },
+        "ready_to_observation_ms": {
+          "n": 99,
+          "p50_ms": 580.341,
+          "p95_ms": 620.885,
+          "sum_ms": 57030.633
+        },
+        "blocking_before_earliest_commit_ms": {
+          "n": 99,
+          "p50_ms": 285.906,
+          "p95_ms": 319.11,
+          "sum_ms": 27683.686
+        },
+        "blocking_after_earliest_commit_ms": {
+          "n": 99,
+          "p50_ms": 296.563,
+          "p95_ms": 322.42,
+          "sum_ms": 29346.947
+        },
+        "observation_to_next_build_ms": {
+          "n": 99,
+          "p50_ms": 0.002,
+          "p95_ms": 0.009,
+          "sum_ms": 0.315
+        }
+      }
+    }
+  ]
+}

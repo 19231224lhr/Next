@@ -1,0 +1,1288 @@
+[
+  {
+    "case": "TestRevisionCapacityFragmentationAndFunding",
+    "label": "four_independent_requests_two_votes_each",
+    "height": 0,
+    "A_CAL": 300,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 1000000000,
+    "A_usage": {
+      "Reserved": 0,
+      "Spent": 0
+    },
+    "A_members": [
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [],
+    "fee_totals": {
+      "Maximum": 0,
+      "Held": 0,
+      "Rewards": 0,
+      "Burned": 0,
+      "Refunded": 0
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionCapacityFragmentationAndFunding",
+    "label": "funded_150_no_locks_deleted",
+    "height": 2,
+    "A_CAL": 450,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 1000000000,
+    "A_usage": {
+      "Reserved": 0,
+      "Spent": 0
+    },
+    "A_members": [
+      {
+        "Available": 100,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 200,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [],
+    "fee_totals": {
+      "Maximum": 0,
+      "Held": 0,
+      "Rewards": 0,
+      "Burned": 0,
+      "Refunded": 0
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionCapacityFragmentationAndFunding",
+    "label": "all_four_closed",
+    "height": 10,
+    "A_CAL": 450,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 1000000000,
+    "A_usage": {
+      "Reserved": 0,
+      "Spent": 0
+    },
+    "A_members": [
+      {
+        "Available": 300,
+        "Reserved": 0,
+        "Generation": 1
+      },
+      {
+        "Available": 300,
+        "Reserved": 0,
+        "Generation": 1
+      },
+      {
+        "Available": 300,
+        "Reserved": 0,
+        "Generation": 1
+      },
+      {
+        "Available": 300,
+        "Reserved": 0,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      }
+    ],
+    "fee_totals": {
+      "Maximum": 4000,
+      "Held": 0,
+      "Rewards": 336,
+      "Burned": 40,
+      "Refunded": 3624
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionSplitInputNotUnlockedByFunding",
+    "label": "before_funding",
+    "height": 0,
+    "A_CAL": 300,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 1000000000,
+    "A_usage": {
+      "Reserved": 0,
+      "Spent": 0
+    },
+    "A_members": [
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [],
+    "fee_totals": {
+      "Maximum": 0,
+      "Held": 0,
+      "Rewards": 0,
+      "Burned": 0,
+      "Refunded": 0
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionSplitInputNotUnlockedByFunding",
+    "label": "after_funding",
+    "height": 2,
+    "A_CAL": 450,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 1000000000,
+    "A_usage": {
+      "Reserved": 0,
+      "Spent": 0
+    },
+    "A_members": [
+      {
+        "Available": 200,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 100,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [],
+    "fee_totals": {
+      "Maximum": 0,
+      "Held": 0,
+      "Rewards": 0,
+      "Burned": 0,
+      "Refunded": 0
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionIntentTwoRoundCompensation/owner_fee_true",
+    "label": "round1_before_compensation",
+    "height": 8,
+    "A_CAL": 300,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 1000000000,
+    "A_usage": {
+      "Reserved": 100,
+      "Spent": 0
+    },
+    "A_members": [
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 0,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 940,
+        "Rewards": 60,
+        "Burned": 0,
+        "Refunded": 0,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 6,
+        "Closed": false
+      }
+    ],
+    "fee_totals": {
+      "Maximum": 2000,
+      "Held": 940,
+      "Rewards": 144,
+      "Burned": 10,
+      "Refunded": 906
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionIntentTwoRoundCompensation/owner_fee_true",
+    "label": "round1_paid_duplicate_noop",
+    "height": 12,
+    "A_CAL": 200,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 1000000000,
+    "A_usage": {
+      "Reserved": 0,
+      "Spent": 100
+    },
+    "A_members": [
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 0,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      }
+    ],
+    "fee_totals": {
+      "Maximum": 2000,
+      "Held": 0,
+      "Rewards": 173,
+      "Burned": 20,
+      "Refunded": 1807
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionIntentTwoRoundCompensation/owner_fee_true",
+    "label": "round2_before_compensation",
+    "height": 20,
+    "A_CAL": 200,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 1000000000,
+    "A_usage": {
+      "Reserved": 100,
+      "Spent": 100
+    },
+    "A_members": [
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 0,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 940,
+        "Rewards": 60,
+        "Burned": 0,
+        "Refunded": 0,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 6,
+        "Closed": false
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      }
+    ],
+    "fee_totals": {
+      "Maximum": 4000,
+      "Held": 940,
+      "Rewards": 317,
+      "Burned": 30,
+      "Refunded": 2713
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionIntentTwoRoundCompensation/owner_fee_true",
+    "label": "round2_paid_duplicate_noop",
+    "height": 24,
+    "A_CAL": 100,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 1000000000,
+    "A_usage": {
+      "Reserved": 0,
+      "Spent": 200
+    },
+    "A_members": [
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 0,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      }
+    ],
+    "fee_totals": {
+      "Maximum": 4000,
+      "Held": 0,
+      "Rewards": 346,
+      "Burned": 40,
+      "Refunded": 3614
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionIntentTwoRoundCompensation/owner_fee_true",
+    "label": "two_round_stop_original_signers",
+    "height": 26,
+    "A_CAL": 100,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 1000000000,
+    "A_usage": {
+      "Reserved": 0,
+      "Spent": 200
+    },
+    "A_members": [
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 0,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      }
+    ],
+    "fee_totals": {
+      "Maximum": 5000,
+      "Held": 0,
+      "Rewards": 430,
+      "Burned": 50,
+      "Refunded": 4520
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionIntentTwoRoundCompensation/owner_fee_false",
+    "label": "round1_before_compensation",
+    "height": 8,
+    "A_CAL": 300,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 999998906,
+    "A_usage": {
+      "Reserved": 100,
+      "Spent": 0
+    },
+    "A_members": [
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 0,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 940,
+        "Rewards": 60,
+        "Burned": 0,
+        "Refunded": 0,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 6,
+        "Closed": false
+      }
+    ],
+    "fee_totals": {
+      "Maximum": 2000,
+      "Held": 940,
+      "Rewards": 144,
+      "Burned": 10,
+      "Refunded": 906
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionIntentTwoRoundCompensation/owner_fee_false",
+    "label": "round1_paid_duplicate_noop",
+    "height": 12,
+    "A_CAL": 200,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 999999807,
+    "A_usage": {
+      "Reserved": 0,
+      "Spent": 100
+    },
+    "A_members": [
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 100,
+        "Reserved": 100,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 0,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      }
+    ],
+    "fee_totals": {
+      "Maximum": 2000,
+      "Held": 0,
+      "Rewards": 173,
+      "Burned": 20,
+      "Refunded": 1807
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionIntentTwoRoundCompensation/owner_fee_false",
+    "label": "round2_before_compensation",
+    "height": 20,
+    "A_CAL": 200,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 999998713,
+    "A_usage": {
+      "Reserved": 100,
+      "Spent": 100
+    },
+    "A_members": [
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 0,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 940,
+        "Rewards": 60,
+        "Burned": 0,
+        "Refunded": 0,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 6,
+        "Closed": false
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      }
+    ],
+    "fee_totals": {
+      "Maximum": 4000,
+      "Held": 940,
+      "Rewards": 317,
+      "Burned": 30,
+      "Refunded": 2713
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionIntentTwoRoundCompensation/owner_fee_false",
+    "label": "round2_paid_duplicate_noop",
+    "height": 24,
+    "A_CAL": 100,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 999999614,
+    "A_usage": {
+      "Reserved": 0,
+      "Spent": 200
+    },
+    "A_members": [
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 0,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      }
+    ],
+    "fee_totals": {
+      "Maximum": 4000,
+      "Held": 0,
+      "Rewards": 346,
+      "Burned": 40,
+      "Refunded": 3614
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  },
+  {
+    "case": "TestRevisionIntentTwoRoundCompensation/owner_fee_false",
+    "label": "two_round_stop_original_signers",
+    "height": 26,
+    "A_CAL": 100,
+    "B_CAL": 1000000000,
+    "A_FUEL": 1000000000,
+    "B_FUEL": 999999520,
+    "A_usage": {
+      "Reserved": 0,
+      "Spent": 200
+    },
+    "A_members": [
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 0,
+        "Reserved": 200,
+        "Generation": 1
+      },
+      {
+        "Available": 200,
+        "Reserved": 0,
+        "Generation": 1
+      }
+    ],
+    "fee_states": [
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 89,
+        "Burned": 10,
+        "Refunded": 901,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      },
+      {
+        "Maximum": 1000,
+        "Held": 0,
+        "Rewards": 84,
+        "Burned": 10,
+        "Refunded": 906,
+        "Plan": {
+          "Register": 20,
+          "Settle": 40,
+          "Close": 34,
+          "Burn": 10
+        },
+        "Completed": 14,
+        "Closed": true
+      }
+    ],
+    "fee_totals": {
+      "Maximum": 5000,
+      "Held": 0,
+      "Rewards": 430,
+      "Burned": 50,
+      "Refunded": 4520
+    },
+    "asset_projection": [
+      1000002300,
+      2000400000
+    ]
+  }
+]

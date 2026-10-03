@@ -33,7 +33,7 @@ if any(c[k] for c in checks for k in ['unresolved_references','duplicate_labels'
 
 # A translation may reorder references within a sentence, but must not lose them.
 parity = []
-for stem in ["abstract", "introduction", "related", "model", "protocol", "security", "evaluation", "conclusion", "supplement-security", "supplement-methods", "supplement-tables", "supplement-current", "supplement-archived"]:
+for stem in ["abstract", "introduction", "related", "model", "protocol", "security", "evaluation", "conclusion", "supplement-security", "supplement-methods", "supplement-tables", "supplement-current", "supplement-archived", "network-current", "supplement-revision"]:
     en = (root / (stem + ".tex")).read_text(encoding="utf-8")
     zh = (root / ("zh-" + stem + ".tex")).read_text(encoding="utf-8")
     for command in ["label", "ref", "eqref", "cite"]:
@@ -41,7 +41,11 @@ for stem in ["abstract", "introduction", "related", "model", "protocol", "securi
         assert Counter(re.findall(pattern, en)) == Counter(re.findall(pattern, zh)), (stem, command)
     for env in ["equation", "align", "align*"]:
         pattern = r"\\begin\{" + re.escape(env) + r"\}(.*?)\\end\{" + re.escape(env) + r"\}"
-        normalize = lambda text: [re.sub(r"\s+", "", x) for x in re.findall(pattern, text, re.S)]
+        def normalize(text):
+            # Only these two reviewed prose labels differ inside a display.
+            text = text.replace(r"\text{若 settled}", r"\text{if settled}")
+            text = text.replace(r"\text{否则}", r"\text{otherwise}")
+            return [re.sub(r"\s+", "", x) for x in re.findall(pattern, text, re.S)]
         assert normalize(en) == normalize(zh), (stem, env)
     counts = {}
     for env in ["lemma", "theorem", "IEEEproof", "algorithmic", "tabular"]:
