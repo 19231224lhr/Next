@@ -1,0 +1,82 @@
+ChatGPT said:
+
+**ABCI 的删改合理。**现有断言支持“三个实际入口均拒绝且业务状态不变”，不支持逐例确定最深拒绝层级；删除该归因句更准确，无需为此补测。
+
+归档首段和方法表的旧定位可直接替换；以下采用你确认的现行章节与标签。
+Next-overleaf-supplement-English
+ 
+Next-overleaf-supplement-English
+
+英文替换句
+LaTeX
+% S6 首段：整体替换
+These archived results retain their original builds, storage modes,
+and measurement endpoints. The main paper reports continuous-payment
+and representative P results on \texttt{f856c7b}; historical-reader
+results retain \texttt{721800c}, and the injected-latency study retains
+\texttt{9879f64}. Results from different builds and workloads are not
+combined into a capacity estimate for one configuration.
+
+% S5 方法表：替换 721800c 所在行
+Archived evaluation & \texttt{721800c} &
+100-hop chains, the complete N/R/C/P matrix, and historical-reading
+controls (Section~S2). \\
+
+% S6 delivery-gate 段：替换原末句
+Authorization is unchanged. Fig.~\ref{fig:delivery-gate} shows the
+run-level results; Section~\ref{sec:supp-methods} gives the methods.
+
+% S6 5% 轨迹：替换原含模糊交叉引用的句子
+The lowest sampled reserve reflects the driver's release schedule
+rather than a reserve-sizing result; Fig.~\ref{fig:reserve-recovery}
+shows the trajectories of the three 5\% runs.
+
+% S6 末段：替换首句，其余关于历史内存和 LND 的句子保留
+The multi-identity measurements in Section~\ref{sec:supp-methods}
+report per-payment CPU and HTTP-payload costs; 2,048 identities
+share clients.
+
+% ABCI：替换逐例归因说明
+The test checks rejection and unchanged business state at
+\texttt{CheckTx}, \texttt{ProcessProposal}, and \texttt{FinalizeBlock}.
+It does not identify the deepest rejection stage for each case.
+Encoding or decoding rejection is not treated as evidence that
+signature verification executed.
+中文对应句
+LaTeX
+% S6 首段：整体替换
+这些归档结果保留各自的原始构建、存储模式和测量终点。
+主文的连续付款及代表性 P 结果来自 \texttt{f856c7b}；
+历史读取结果仍对应 \texttt{721800c}，
+注入延迟实验仍对应 \texttt{9879f64}。
+不同构建和负载的结果不合并为某一配置的容量估计。
+
+% S5 方法表：替换 721800c 所在行
+归档评测 & \texttt{721800c} &
+100 跳链、完整 N/R/C/P 矩阵及历史读取对照（第~S2~节）。\\
+
+% S6 delivery-gate 段：替换原末句
+授权不变。图~\ref{fig:delivery-gate} 给出逐轮结果，
+方法见第~\ref{sec:supp-methods}~节。
+
+% S6 5% 轨迹：替换原含模糊交叉引用的句子
+最低采样储备反映驱动的来源释放安排，而非储备规模估算结果；
+三轮 5\% 实验的轨迹见图~\ref{fig:reserve-recovery}。
+
+% S6 末段：替换首句，其余关于历史内存和 LND 的句子保留
+第~\ref{sec:supp-methods}~节的多身份测量报告每笔付款的
+CPU 和 HTTP 载荷成本；2,048 个身份共享客户端。
+
+% ABCI：替换逐例归因说明
+测试检查 \texttt{CheckTx}、\texttt{ProcessProposal} 和
+\texttt{FinalizeBlock} 均拒绝请求，且业务状态不变。
+测试不确定各用例到达的最深拒绝阶段，
+不将编码或解码拒绝视为已经执行签名验证的证据。
+ChatGPT can make mistakes. Check important info.
+Latest response
+
+
+
+
+Pro
+Response complete

@@ -29,7 +29,7 @@ The collector sends one canonical request to four members and returns after veri
 
 Relay material is saved in the background, and bounded early tasks let \texttt{INSTALL} and public submission proceed independently. \texttt{INSTALL} stores complete material at members and records certified consumption locally; it creates neither a new approval nor a budget debit. Public submission proceeds separately. Members schedule backup submission relative to their first \texttt{INSTALL}, and repeated \texttt{INSTALL}s cannot postpone it. HTTP acceptance leaves the outbox entry pending until authenticated public completion removes it. Backup submission requires a retained complete submission; Section~\ref{sec:protocol-resubmission} adds a path from the approvals of the original signers.
 
-The public \texttt{DirectSubmission} carries the transaction, admission vector, organization \texttt{SpendQC}, and direct input certificates. The committee reconstructs $\Sigma_T$ and verifies the same authorization; omitting a separate new-output TXCer wrapper changes the envelope and keeps the requirement. Public verification binds each input certificate to its network, issuing organization, fact, and claimed output and rejects duplicates. It accepts exactly one certificate for each certificate input and rejects any further certificate. The admission vector holds one CAL entry, bound to the issuer.
+The public \texttt{DirectSubmission} carries the transaction, admission vector, organization \texttt{SpendQC}, and direct input certificates. The committee reconstructs $\Sigma_T$ and verifies the same authorization; omitting a separate new-output TXCer wrapper changes the envelope and keeps the requirement. Public verification binds each input certificate to its network, issuer, fact, and output index. It requires exactly one certificate--index entry per certified input, rejects duplicate OutputIDs and extraneous entries, and permits distinct outputs of one parent certificate. Coverage is registered once per parent fact. The admission vector holds one CAL entry, bound to the issuer.
 
 \subsection{Atomic Execution with Direct Obligations}
 \label{sec:protocol-execution}
@@ -105,7 +105,7 @@ An authorized reserve increase debits an external, unprotected CAL account, cred
 Equation~\eqref{eq:protocol-release} governs normal settlement and
 repayment.  A separate local terminal transition applies when an
 authenticated, successfully applied public payment under the same
-organization configuration consumes an ordinary or user-funded fee
+organization configuration consumes a principal or user-funded fee
 input instance that the member had locked for a different fact.
 Before replacing the local spend candidate, the follower reloads the
 immutable approval and checks the exact output instance, the distinct
@@ -186,7 +186,7 @@ Four identities are kept apart. The payment identity $\mathsf{id}(T)$ fixes the 
 
 The public revision and Task authorize an exact new body and its part evidence, which an installer copies from one committed read view before it acquires the physical revision lock. For target revision $r$, a lower physical version is verified and installed, an equal version requires identical material, and a higher version covers the old task without rollback. The original block is retained, and parts and local version metadata are written atomically. Installation may skip intermediate physical versions and keeps every economic command. Queue progress stays global and consecutive: for entries $A_1,B_1,A_2$, installing $A_2$ while handling $A_1$ leaves $B_1$ open. Logical execution reads committed Canonical revisions, so every installation schedule leaves the same economic history. A revision is \emph{materialized} at a replica once its revised body has been physically installed there.
 
-Replay executes retained original blocks in their committed order, including payments, compensation decisions, and representation commands, and reconstructs the application hashes of that sequence. Existing successors keep their authorizations, output references, and block identities. A compensation decision alone closes the obligation economically as an append-only public record. Representation adds an interface: at the consumer's original coordinates $(h,j,k)$, the stored block names the reserve debit for the designated input and still verifies against the original BlockID. A reader still reads the permanent decision and the obligation status for the economic state, and the revised field does not replace them. Batching shares representation work within a block and direct installation coalesces historical writes, and neither adds a round to normal certification. Section~\ref{sec:eval-reader} reports the read benefit and the storage and maintenance cost of this interface against an optimized decision index.
+Replay executes retained original blocks in their committed order, including payments, compensation decisions, and representation commands, and reconstructs the application hashes of that sequence. Existing successors keep their authorizations, output references, and block identities. A compensation decision alone closes the obligation economically as an append-only public record. Representation adds an interface: at the consumer's original coordinates $(h,j,k)$, the stored block names the reserve debit for the designated input and still verifies against the original BlockID. A reader still reads the permanent decision and the obligation status for the economic state, and the revised field does not replace them. Batching shares representation work within a block and direct installation coalesces historical writes, and neither adds a round to normal certification. Section~\ref{sec:eval-reader} reports the functional distinction and the read, storage, and maintenance tradeoffs against an optimized decision index.
 
 \subsection{Reading Funding at Original Coordinates}
 \label{sec:protocol-reader}
@@ -232,15 +232,38 @@ entry is removable work state, not durable evidence that compensation
 occurred. None of these representation or installation changes credits
 a second principal amount to the consumer.
 
-\noindent\textbf{Executable archival consumer.}
-A local example exports the original and authorized body bytes at $(h,j,k)$,
-the complete BlockID, Revision and Task identifiers, historical funding,
-and current obligation state. It checks the exact Task body, reconstructed
-parts, owner authorization, QC, and input opening. After repayment the
-authorized bytes stay unchanged while the obligation becomes Recovered.
-This byte-export contract supplements the economic tuple; the permanent
-decision remains necessary. The example operates on an already verified,
-unpruned replica and is not a remote proof protocol.
+\noindent\textbf{Use: block-record archival review.}
+Consider a local archival review that keeps each block's original commit
+evidence and transaction coordinates. After compensation, its input review
+must associate a reserve advance with the payment that consumed the missing
+output. An index or a materialized funding view supplies that association
+as an annotation to the unchanged original body. C3 offers a different
+record format: the designated input field itself names the historical
+reserve debit, and the authorized body remains compatible with the saved
+commit. This lets the review replace its body representation while retaining
+the block record and its existing commit evidence.
+
+The consumer reads the authorized body and exact Revision and Task from
+$V_H$, reconstructs the block and parts with that revision's openings,
+and checks the complete BlockID against the saved commit through Next's
+verification interfaces. Votes sign both the block hash and the part-set
+header. Because the funding slot lies outside the fixed fields covered by
+consensus transaction hashes, changing that slot preserves the header
+hash; the part-set check rejects the changed body when its parts have
+not been adapted. The consumer then extracts the reserve-debit
+reference at $(h,j,k)$ and associates it with the permanent decision and
+obligation state at $H$. The old commit establishes compatibility with the committed identity;
+the successfully executed decision and representation command, recorded
+with the exact Task in $V_H$, authorize the new bytes.
+
+Our prototype exercises this workflow, including late repayment.
+Table~\ref{tab:c3-function} separates this body-level record format from the
+economic answer, which the index and ordinary view provide equally,
+together with original identities and successor references.
+This is a Next-aware local consumer, not an unmodified CometBFT client.
+``Optional'' means that economic closure proceeds with the subsequent
+representation service stopped; the current build still uses the CH
+transaction and part encodings.
 
 \noindent\textbf{Cryptographic instantiation.}
 The implementation uses RSA chameleon hashing with a 2048-bit modulus,

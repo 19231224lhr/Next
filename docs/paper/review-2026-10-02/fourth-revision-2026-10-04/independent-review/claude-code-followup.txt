@@ -1,0 +1,189 @@
+Claude responded: 先读取这五个文件，再回答。 继续核对中：刚才复现覆盖层补丁锚点时被换行格式搞坏了脚本，我重新规范化后再跑一遍，然后接着读表示层和边界测试。 还在读：表示层 repair.go 已读完，下一步读 batch.go、decision.go 和归档消费者测试，再读边界测试和证明到代码映射，之后写交换意见和修订集。 继续核对…
+Reviewing uploaded code packages and an accompanying review file.
+Reviewing uploaded code packages and an accompanying review file.
+
+先读取这五个文件，再回答。
+
+Ran 18 commands
+
+Ran 18 commands
+
+继续核对中：刚才复现覆盖层补丁锚点时被换行格式搞坏了脚本，我重新规范化后再跑一遍，然后接着读表示层和边界测试。
+
+Ran 13 commands
+
+Ran 13 commands
+
+我读完了四个代码包和 GPT 的评审。你的四点核对，第 1、2 点我认；第 3 点我给出一个具体论据；第 4 点我没有找到攻击或 oracle，只剩一段需要写出来的游戏陈述。代码里还有 1 个需要补证的真实缺口（非 CAL 资源的可执行性）和几个小加固项。
+
+0. 先更正我上一轮的错误
+摘要是我读错了。 摘要只有 4.707/64.479 s，外加一句含糊的 "Targeted boundary and restart tests validate the conditions…"。109–113 ms、41.6→81.9 ms、7.44–12.32% 这些多构建数字在引言最后一段。问题应改挂到引言末段：它把 f856c7b、9879f64、721800c 的数字并列却不标构建。摘要里只需改末句，写明是哪些条件、哪个构建。
+TLA+ 不是必要条件，我撤回。 真实缺失的推理见第 2 节，共三项。
+我上一轮的缓解建议"补偿后由发行方接管被锁输入"要撤回。 Intent 输家的输入不在公共账本上，只是各成员本地的 Spend.Candidate 锁（direct.go），公共层没有可接管的对象。这等于新 Intent 协议，你们本轮不做，我同意。M1 应改成如实量化加部署声明，不带缓解机制。
+GPT 指出而我漏掉的，核对后属实：
+S6 开头仍说三个核心实验在 721800c。
+表 S10 没有 f856c7b 和 9879f64 两行。
+D_x 一词两用：Table I 和 V-B 里是"决定"，Theorem 1 里是"储备账户缺口"。
+IV-A 没讲清证据的去重单位。
+我对 DataHash 的提醒是多余的。 IV-G 已写明 DataHash 不授予修订权限，我那条不成立。
+1. 代码核对
+
+Comet 覆盖层与 Lemma 1。 我下载了 GitHub 上 v0.38.26 标签的源码，把 overlay.py 的 patch() 去掉 Go 步骤后重跑。我没有对照 Go module proxy 的校验和，但标签与模块应一致。
+
+所有锚点计数都匹配：LockedBlock.HashesTo 3 处、ProposalBlock.HashesTo 5 处、POL 判断 1 处。
+补丁后只剩两处仍按哈希比较：
+finalizeCommit 的 block.HashesTo，其前已有 blockParts.HasHeader(PartSetHeader) 的 panic 检查，所以完整身份仍被检。
+state/execution.go 的 ExtendVote 里的断言，只有启用 vote extension 时才可达。
+上游 VoteSet 本来就以 BlockID.Key()（哈希加 PartSetHeader）计票。blocksync 用被补丁成原始开口的 MakePartSet 重建 BlockID 后再 VerifyCommit。
+执行相关的 LoadBlock 调用点，上游共 4 处（replay ×2、blocksync、reactor 的 LoadBlockPart），覆盖层恰好补了这 4 处。其余是 LoadBlockMeta（未改）和 RPC 只读。
+
+所以 GPT 要的"逐入口清单"现在能闭合，这不是 Lemma 1 的漏洞。建议把这个审计做成补充材料里的脚本和表，新增未分类站点时让 CI 失败。
+
+Lemma 3 的叙述比代码窄。 reclaimPartial 的 shared 检查遍历所有 Body.Inputs（含 CertificateInput）和 Fee.Inputs。证明也不依赖输入种类，因为所有输入都在签名前加了 Candidate 锁。建议把引理改成"any locked input instance, including certificate and fee inputs"。回归里 TestPartialReclaim* 是否含证书输入案例，我看不到，没有就补一个。
+
+真实缺口：非 CAL 资源的可执行性。 Theorem 1 只证 CAL。公共执行时（EvaluateDirectPaymentAt）对 FUEL、Execution、Bytes、Policy 调用 updateUsage(..., true)，另外 org 付费时要从 FUEL 账户扣 Fee.Maximum。这些任何一项失败，一个带 QC 的来源都不会执行。
+
+按调用形态，updateUsage 应是 Reserved+Spent+Cap ≤ Amount 的检查，但它不在附件里，需要确认。同样的重叠签名者论证很可能成立，因为成员的恢复时点和公共的 closeFee 一致。但论文没有陈述，而 Theorem 3 的假设"每个支付都成功"正依赖它。这是第一个真实缺失的推理。
+
+N1，低危加固。 LoadOriginalBlock 和 OriginalBlockPart 在 RO:h 缺失时回退到当前块，而当前块可能已是修订体。installRevision 用一个 WriteSync 批量同时写 RO 和 RV，所以只有存储损坏才会触发，超出故障模型。建议在回退分支多读一次 RV:h，非零则返回 ErrRedaction。注意 catchup_test 断言了精确的 Get 序列，需要同步改。
+
+N2。 启用 vote extension 时，ExtendVote 的哈希断言应补 PartSetHeader；若确认关闭，加一条启动断言。
+
+N3。 ExecuteDecision 依赖本机 BlockStore 内容，裁剪会让某副本 ErrMissing 而分叉。文稿已声明不裁剪，建议补一条启动断言。
+
+正面核对。 以下几处代码与论文一致：
+
+Canonical 对存在的修订读应用状态而不是 BlockStore。
+无法解码的修订返回错误而不回退。
+ExecuteDecision 先比对位置再读历史块。
+Bolt.Update 在提交结果不确定后拒绝后续写（ErrUncertain）。
+2. 真实缺失的推理（不是工具形式）
+项	缺什么	性质
+R1	非 CAL 资源与费用账户的覆盖不变量，或把 Theorem 3 的假设限定为"通过下表所有条件"	真实缺口，可能直接成立，也可能暴露新缺陷
+R2	Lemma 3 扩到所有被锁输入实例	表述，证明不变
+R3	Lemma 1 的站点清单（第 1 节已可闭合）	论证步骤缺清单，不缺定理
+3. M2：成员批准与公共执行的检查差异表
+
+建议放在 V-F 或补充 S3，并让 Theorem 3 的假设引用它。
+
+类	检查	能否分叉
+A 同一确定性函数	所有者与 QC 授权、规则 ID、admission vector 与 Cap（两边都走 PrepareDirectVector）、补偿费用托管下限	不能
+B 成员本地状态蕴含公共状态	FinalInput 的本地创建记录（来自已认证块）、输入与费用输入的 Candidate/Consumed	单调蕴含，唯一性由 Lemma 2/3 保证
+C 独立判断	全局 Intent；非 CAL 授权用量与 FUEL 账户余额；区块纳入与公平性；父证书的 network 是否相等	可以
+
+C 类说明：
+
+全局 Intent：有反例，即 Lemma 5。
+非 CAL 用量与账户余额：即 R1，未证。
+区块纳入：属活性假设。
+父证书 network：公共侧显式检查，成员侧没有显式等式，可能在 c.Verify(org) 内部。这需要 protocol 的 Verify 源码确认；若没有，加一行对等检查。
+4. C3：一个必须且可验证的用例论据
+
+不需要虚构用户，只需要一个消费者类分离论断，加一个可执行的见证：
+
+定义类 𝒞：只通过 BlockStore 接口取得区块字节和保存的提交证据，不打开应用状态，要给出 (h,j,k) 处的储备借记引用。A 和 M 都需要应用状态里的旁路数据，所以不属于 𝒞；B 属于 𝒞。
+
+验证方式是在一个只允许导入 cmtstore、types、protocol 解码器的包里写测试（用 go list -deps 断言依赖），在已修复区块上返回借记标识，还款前后各一次，并以未修复块作负对照。
+
+要同时写明：𝒞 信任本地 BlockStore 由 Task 流程写入，信任程度与索引读者信任本地应用状态相同。所以这是接口优势，不是安全优势，也不论证 𝒞 有多大用处。这样 C3 就按功能贡献准确定位，也避开了 GPT 担心的"值不值"问题。
+
+GPT 提的多次修订累计成本，可以补一个小测：同一 256 区块，修复 k=1..8 个槽，分别用一个批量、k 个单项、两个批量，测净 KV。依据是代码：单项路径每个命令都存一份完整 Task 体，批量只存一份 BatchTask，预期 O(k·|body|) 对 O(|body|)。
+
+5. 变色龙哈希的条件核对（你的第 4 点）
+
+我没有找到 oracle 或攻击。 核对到的代码点如下：
+
+替换消息 m′ 由账本推导，提交者不能选。InputTarget 要求已提交的决定，batchBody 把槽位设为 ReserveFunding{Ref: ReserveDebitIdentity(network, output)}，提交者只提供开口，并用公钥验证。
+ExecuteBatch 重算 NewRedactablePartSet 和区块哈希，要求与原 meta.BlockID 完全相等，Base 和 Previous 串行化竞争修订。
+实时共识里，ValidateOriginal 要求开口为 1 且 revision 为 0，所以修订体进不了实时共识。
+同步时 MakePartSet 用原始开口，修订体的 part header 对不上，会被提交校验拒绝。
+
+剩下的是应写出来的陈述，不是缺口。 建议在 S3-C 写一个游戏：
+
+Game AO-CR. 挑战者运行可信 dealer，对 A 开放账本。每个守卫通过的 RepairInput/RepairBatch，返回账本推导出的 (m,m′) 在 ctx(h,idx,rev) 下的组合开口。若 A 输出同摘要、m*≠m**，且 (m*,m**) 不是该 ctx 下 oracle 推导的对，则获胜。
+
+论文只主张：在 ROM 下，Adv_AO-CR 小量，假设依据是 context-labelled FDH-RSA 的 one-more 型假设。该归约在此作为假设陈述，不作证明。
+
+另外应声明两点：
+
+三个陈述持有者联合，已超过共识故障界。
+陷门泄露后，旧块改写对不信任本地状态的读者不可区分，这与 reader scope 已声明的内容一致。
+
+一个观察。 同一 ctx 内乘积组合（z₀₁·z₁₂）只给出已授权链上的开口，跨 ctx 的 H 值彼此独立，所以单纯乘积不增加能力。这是推理依据，不是证明。
+
+6. 新证据的写法与我能核对的程度
+
+R 模式 2006（2000+3×2）。 这和 GPT 要的"完整源恢复实验"、以及我对 P 运行关闭自动重提交的疑虑直接相关。代码路径与论文一致：recoverExposedSources 在 applyPayment 内、只在 result.Applied 时触发，按成员索引错开 250 ms，不等 INSTALL，只写 outbox。
+
+补充材料需要的列是：每对的子交易公开、各成员 outbox 创建、来源公开、额度恢复的时间。对照用已有的"关闭自动补交"处理，来源缺席并走补偿。我看不到这批日志，以上都按你描述核对。
+
+旋转 Byzantine 回归。 它与 Theorem 1 相符：B=300、a=100 时 Q_g=B_g，诚实残留 [200,200,200]，第四笔被所有诚实成员拒绝。建议 S3 里把固定签署者的 n_fixed=2 与旋转轨迹并列，写成：
+
+With one Byzantine signer holding no local limit and honest pairs rotating, B_g=300 and a=100 reach Q_g=B_g: honest residuals [200,200,200], reserve 0, and a fourth request is refused by every honest member. This witnesses that the bound is attained; it measures neither attacker profit nor cost.
+
+测试代码不在附件里，请确认"Byzantine"在其中是只模拟无本地限额，还是也忽略锁和 Intent。
+
+终端持证退出边界。 从代码看，退出路径只有三条：
+
+来源执行。
+持有者拿到消费组织的后继批准，受其容量限制。
+后继暴露证书后原签署者补交。
+
+收款人不持有来源的完整付款，而 INSTALL 需要完整 DirectPayment，所以收款人无法自己触发补交。建议在 Table II 加一行，不加协议：
+
+Terminal holder. A verified TXCer holder who does not continue has no direct redemption interface. The certificate becomes final balance only if the source executes, or the holder obtains a successor approval within the consuming organization's capacity. Recipients do not hold the source's full payment, so they cannot trigger resubmission. The contract suits recipients who continue spending in-system or accept source execution as a condition of terminal settlement.
+
+重试分类。 等待模式 414 次尝试对 300 个快速尝试，正好是 140+138+136。我的假设（待日志验证）是这样的：等待模式花费的是 FinalInput，成员要求本地已有创建记录，而成员 25 ms 轮询可能落后于钱包观察，于是 ErrMissing 后重试。快速模式用证书输入，不依赖本地创建记录，所以没有重试。
+
+如果这个假设成立，每次重试的退避会计入等待路径，13.70× 里一部分来自轮询滞后。请用已有原始记录按原因分类（HTTP 错误、成员拒绝的错误码、超时），并报告每次重试增加的时间。这样可以决定 13.70× 是否需要加一条"含轮询滞后"的限定，或补一个等成员观察后再构建下一跳的变体。
+
+版本桥。 表格式建议：每个表或图一行，列为构建、读写的源路径、与 f856c7b 的差异文件、结论。差异应来自 source-manifest 的文件哈希比较，路径分为 production、test-only、docs。
+
+历史读取（表 V）建议直接在 f856c7b 上重跑，因为是离线夹具，成本最低，也就不需要桥。N/R/C/P 矩阵和注入延迟较重，保留桥加归档。同时修正 S6 开头、补 S10 两行，并在引言末段给每个数字标构建。
+
+7. 其他小项
+去重单位（IV-A）。 证据去重按输入实例（OutputID）。覆盖登记按证书事实。补偿托管下限按证书输入数。
+D_x 改名。 例如决定记为 Δ_x，储备账户缺口记为 G_x。
+Cap 含找零。 用 GPT 的例子加一个单测：一个 10,000 CAL 输入付 1 CAL，找零 9,999，批准仍预留 10,000，成员容量条件要求授权至少 15,000。这足以说明资本效率，不需要参数扫描。
+全局 Intent。 我同意只写业务理由和代价，不改协议；可在 future work 里留一句"从输入身份派生 nonce"，不计入修订集。
+r3-P 的 917 次快速并发上限命中。 根因仍未解释，需要已有 trace 说明在哪一段，不需重跑。
+8. 前轮问题的处理状态与本轮新增
+前轮	状态
+M1 开放部署亏损	改为量化加声明，缓解建议撤回。旋转回归补齐了"可达"。还缺一句攻击者成本，即 FUEL 费用和冻结的自有本金，不是盈利。
+M2 非执行原因	采纳，见第 3 节表；由此发现 R1。
+M3 C3 需求与密码学	需求改为消费者类论断，密码学无攻击，写 AO-CR；DataHash 项撤回。
+M4 版本与基线	版本桥加重试分类；不再要求外部系统同口径对比。
+M5 资本	降级为公式加 worked example。
+M6 形式化	TLA 要求撤回，换成 R1、R2、R3。
+M7 代表性负载	R 模式新证据部分闭合；917 次命中的根因仍开着。
+旧 Minor 1	由代码解决，见 R2。
+旧 Minor 2	代码确认 fail-stop 是有意设计，加一句说明。
+旧 Minor 3、4、10	不再要求，其中 4 已有 ErrUncertain 作支撑。
+旧 Minor 5、7	保留（引言数字标构建；作者单位）。
+旧 Minor 6	部分撤回。
+
+本轮新增： R1（真实缺口）、N1–N3（低危加固）、S6/S10 过期、D_x 重载、去重单位、Table II 终端持证行、消费者类论断、AO-CR 陈述、多次修订累计成本小测、worked example 单测。
+
+我认为必须处理的： R1（证明或限定假设）、版本标注（S6、S10、引言末段）、M2 表、Table II 终端行、C3 消费者类论断。其余为建议。
+
+9. 需要你补给我的
+
+我没法核对这些，请提供：
+
+新 R 模式的日志和旋转 Byzantine 测试代码。
+updateUsage 源码。
+protocol 的证书 Verify 源码。
+final-evidence-2026-10-04/README.md 与 source-manifest。
+721800c 和 9879f64 的 manifest，用于版本桥。
+等待模式的原始重试记录。
+
+如果需要，我可以把第 1 节的审计脚本和第 3 节的差异表整理成可直接放进补充材料的 Markdown 文件。
+
+
+Create a Word document
+
+
+
+
+
+1 minute ago

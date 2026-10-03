@@ -1,0 +1,30 @@
+\begin{table*}[t]
+\centering
+\caption{Ordinary-payment measurements for representative P runs
+on \texttt{f856c7b}. Each run contains 7,000 ordinary payments
+plus eight parent--child pairs. Receipt starts at actual send;
+dispatch spans scheduled to actual send; scheduled-to-receipt
+is calculated directly per payment. Drain starts at the last
+ordinary send. The final row takes the median of each column's
+three run-level entries.}
+\label{tab:current-p}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrrrrrr}
+\toprule
+Run &
+\shortstack{Receipt P50\\(ms)} &
+\shortstack{Receipt P95\\(ms)} &
+\shortstack{Dispatch P95\\(ms)} &
+\shortstack{Scheduled-to-receipt P95\\(ms)} &
+\shortstack{Send span\\(s)} &
+\shortstack{Drain\\(s)} \\
+\midrule
+P-1 & 54.538 & 156.680 &  90.335 & 189.591 & 70.080 & 1.090 \\
+P-2 & 54.007 & 147.549 & 245.315 & 326.828 & 70.235 & 0.955 \\
+P-3 & 55.001 & 141.424 & 780.727 & 851.742 & 70.771 & 1.115 \\
+\midrule
+Median & 54.538 & 147.549 & 245.315 & 326.828 & 70.235 & 1.090 \\
+\bottomrule
+\end{tabular}
+\end{table*}

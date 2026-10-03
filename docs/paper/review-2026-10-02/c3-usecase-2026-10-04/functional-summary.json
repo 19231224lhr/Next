@@ -1,0 +1,29 @@
+{
+  "prefix_checks": [
+    {
+      "Prefix": 4,
+      "Height": 1,
+      "Revision": 1,
+      "OriginalCommitVerified": true,
+      "RevisedCommitVerified": true,
+      "UnadaptedPartsRejected": true,
+      "economic_equal": true,
+      "state": 2
+    },
+    {
+      "Prefix": 5,
+      "Height": 1,
+      "Revision": 1,
+      "OriginalCommitVerified": true,
+      "RevisedCommitVerified": true,
+      "UnadaptedPartsRejected": true,
+      "economic_equal": true,
+      "state": 3
+    }
+  ],
+  "authorized_body_unchanged_after_repayment": true,
+  "scope": "local executed-prefix functional comparison; plain materialized JSON rows, not a deployed view backend or timing benchmark",
+  "cached_immutable_materialized_rows_unchanged_after_repayment": true,
+  "original_commit_source": "BlockStore.LoadBlockCommit(1), actual retained commit and validator set",
+  "rejection_reason": "wrong block ID with unchanged header hash and changed PartSetHeader"
+}

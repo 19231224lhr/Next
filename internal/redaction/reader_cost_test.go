@@ -100,6 +100,7 @@ type readerReport struct {
 }
 type readerFixture struct {
 	db                    *store.Bolt
+	validators            *types.ValidatorSet
 	original, revised     *cmtstore.BlockStore
 	originalDB, revisedDB *readerDB
 	policy                rules.DirectPolicy
@@ -414,6 +415,7 @@ func newReaderFixture(t *testing.T, path string, n, m int) *readerFixture {
 	readerOK(t, e)
 	t.Cleanup(func() { readerOK(t, od.Close()); readerOK(t, rd.Close()) })
 	f := &readerFixture{db: db, originalDB: &readerDB{DB: od}, revisedDB: &readerDB{DB: rd}, policy: policy, count: n, repaired: m, path: path, report: readerReport{Payments: n, Repairs: m, Build: "721800c-production", TimingNS: map[string]int64{}, Storage: map[string]int64{}}}
+	f.validators = vals
 	f.original = cmtstore.NewBlockStore(f.originalDB)
 	f.revised = cmtstore.NewBlockStore(f.revisedDB)
 	engine, e := apppkg.NewEngine(apppkg.EngineConfig{Network: lab.Org.Network, Organizations: []protocol.OrgConfig{lab.Org}, Schedule: lab.Schedule, Genesis: lab.Genesis, Direct: &settings, Accounts: []apppkg.GenesisAccount{{Owner: lab.Org.Org, Asset: protocol.AssetCAL, Balance: 1000000000}, {Owner: lab.Org.Org, Asset: protocol.AssetFUEL, Balance: 1000000000}}}, db)

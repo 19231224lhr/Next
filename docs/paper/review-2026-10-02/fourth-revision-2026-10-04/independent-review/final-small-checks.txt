@@ -1,0 +1,582 @@
+
+=== internal/rules/direct_deadline.go ===
+package rules
+
+import (
+	"encoding/json"
+	"math"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+func DirectAnchorKey(height int64, id protocol.OutputID) []byte {
+	e := new(protocol.Encoder)
+	e.U64(uint64(height))
+	e.Fixed(id[:])
+	return state.Key(111, e.Data())
+}
+
+// AnchorDirectDeadlines runs before a block's commands. Tendermint block H+1
+// carries the median commit time of H, so idle time before H cannot shorten a
+// responsibility opened in H. This never delays H's payment confirmation.
+func AnchorDirectDeadlines(v state.ReadView, p DirectPolicy, height, now int64) (state.Transition, error) {
+	if now <= 0 || p.TimeoutSeconds <= 0 || now > math.MaxInt64-p.TimeoutSeconds {
+		return state.Transition{}, protocol.ErrRule
+	}
+	scanner, ok := v.(state.ScanView)
+	if !ok {
+		return state.Transition{}, protocol.ErrRule
+	}
+	o := state.NewOverlay(v)
+	var cursor []byte
+	for {
+		entries, err := scanner.Scan(state.Key(111), cursor, 1024)
+		if err != nil {
+			return state.Transition{}, err
+		}
+		if len(entries) == 0 {
+			break
+		}
+		for _, entry := range entries {
+			var queued DirectObligation
+			if err = json.Unmarshal(entry.Value, &queued); err != nil {
+				return state.Transition{}, err
+			}
+			if queued.AnchorHeight > height {
+				return state.Transition{Changes: o.Changes()}, nil
+			}
+			ob, found, err := state.Load[DirectObligation](o, DirectObligationKey(queued.Output))
+			if err != nil {
+				return state.Transition{}, err
+			}
+			if found && ob.Status == DirectOpen && ob.Deadline == 0 {
+				ob.Deadline = now + p.TimeoutSeconds
+				if err = state.Put(o, DirectObligationKey(ob.Output), ob); err != nil {
+					return state.Transition{}, err
+				}
+				if err = state.Put(o, DirectDueKey(ob.Deadline, ob.Output), ob); err != nil {
+					return state.Transition{}, err
+				}
+			}
+			o.Apply([]state.Change{{Key: entry.Key, Delete: true}})
+			cursor = entry.Key
+		}
+	}
+	return state.Transition{Changes: o.Changes()}, nil
+}
+
+
+=== internal/committee/repair.go ===
+//go:build comet_v3
+
+package committee
+
+import (
+	cmtstore "github.com/cometbft/cometbft/store"
+	"utxo/internal/redaction"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// EnableRepair is configured before starting ABCI. Ordinary v2 nodes do not
+// expose this command. Physical block writes happen separately after Commit.
+func (e *Engine) EnableRepair(blocks *cmtstore.BlockStore) error {
+	if e.direct == nil || blocks == nil {
+		return protocol.ErrRule
+	}
+	e.repairCheck = func(raw []byte) error {
+		if protocol.IsCompensationDecision(raw) {
+			c, err := protocol.DecodeCompensationDecision(raw)
+			if err != nil {
+				return err
+			}
+			if c.Network != e.cfg.Network {
+				return protocol.ErrAuth
+			}
+			return nil
+		}
+		if protocol.IsRepairBatch(raw) {
+			c, err := protocol.DecodeRepairBatch(raw)
+			if err != nil {
+				return err
+			}
+			if c.Network != e.cfg.Network {
+				return protocol.ErrAuth
+			}
+			return nil
+		}
+		c, err := protocol.DecodeRepairInput(raw)
+		if err != nil {
+			return err
+		}
+		if c.Network != e.cfg.Network {
+			return protocol.ErrAuth
+		}
+		return nil
+	}
+	e.repairExecute = func(v state.ReadView, raw []byte, b BlockContext) (state.Transition, error) {
+		if protocol.IsCompensationDecision(raw) {
+			c, err := protocol.DecodeCompensationDecision(raw)
+			if err != nil {
+				return state.Transition{}, err
+			}
+			return redaction.ExecuteDecision(v, blocks, *e.direct, c, b.Height, b.Time.Unix())
+		}
+		if protocol.IsRepairBatch(raw) {
+			c, err := protocol.DecodeRepairBatch(raw)
+			if err != nil {
+				return state.Transition{}, err
+			}
+			return redaction.ExecuteBatch(v, blocks, *e.direct, c, b.Height, b.Time.Unix())
+		}
+		c, err := protocol.DecodeRepairInput(raw)
+		if err != nil {
+			return state.Transition{}, err
+		}
+		return redaction.Execute(v, blocks, *e.direct, c, b.Height, b.Time.Unix())
+	}
+	return nil
+}
+
+
+=== cmd/payctl/direct_dispatch.go ===
+package main
+
+import (
+	"context"
+	"sync"
+	"time"
+)
+
+type directDispatchWait struct {
+	ReceivedAt                                              time.Time `json:"-"`
+	TotalReleasedUnixNS                                     int64
+	ReceivedUnixNS, TotalAcquiredUnixNS, SendAcquiredUnixNS int64
+	TotalWaitMS, SendWaitMS                                 float64
+	TotalLimited, SendLimited                               bool
+}
+
+// totalLimit=0 preserves the original complete-lifecycle worker pool.
+// Otherwise permits are acquired before spawning, so observers remain bounded.
+func runDirectBench(ctx context.Context, jobs <-chan int, sendLimit, totalLimit int, waits []directDispatchWait, run func(int, func())) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	if totalLimit == 0 {
+		for worker := 0; worker < sendLimit; worker++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for i := range jobs {
+					waits[i].ReceivedAt = time.Now()
+					waits[i].ReceivedUnixNS = waits[i].ReceivedAt.UnixNano()
+					run(i, func() {})
+				}
+			}()
+		}
+		return
+	}
+	total, send := make(chan struct{}, totalLimit), make(chan struct{}, sendLimit)
+	acquire := func(permits chan struct{}, waited *float64, limited *bool) bool {
+		start := time.Now()
+		defer func() { *waited = float64(time.Since(start)) / float64(time.Millisecond) }()
+		if ctx.Err() != nil {
+			return false
+		}
+		select {
+		case permits <- struct{}{}:
+			return true
+		default:
+			*limited = true
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case permits <- struct{}{}:
+			// A release and cancellation may become ready together.
+			if ctx.Err() != nil {
+				<-permits
+				return false
+			}
+			return true
+		}
+	}
+	for i := range jobs {
+		w := &waits[i]
+		w.ReceivedAt = time.Now()
+		w.ReceivedUnixNS = w.ReceivedAt.UnixNano()
+		if !acquire(total, &w.TotalWaitMS, &w.TotalLimited) {
+			return
+		}
+		w.TotalAcquiredUnixNS = time.Now().UnixNano()
+		if !acquire(send, &w.SendWaitMS, &w.SendLimited) {
+			<-total
+			w.TotalReleasedUnixNS = time.Now().UnixNano()
+			return
+		}
+		w.SendAcquiredUnixNS = time.Now().UnixNano()
+		if ctx.Err() != nil {
+			<-send
+			<-total
+			w.TotalReleasedUnixNS = time.Now().UnixNano()
+			return
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() { <-total; w.TotalReleasedUnixNS = time.Now().UnixNano() }()
+			// Only this payment's goroutine calls release; no cross-task state.
+			released := false
+			release := func() {
+				if !released {
+					<-send
+					released = true
+				}
+			}
+			defer release() // Covers HTTP/validation/persistence failure.
+			run(i, release)
+		}()
+	}
+}
+
+
+=== cmd/payctl/direct_pace.go ===
+package main
+
+import (
+	"context"
+	"time"
+)
+
+// A bounded worker pool provides backpressure. Scheduled and actual send times
+// are both reported: falling behind the target cannot masquerade as low latency.
+func directBenchJobs(ctx context.Context, count int, rate float64, start time.Time) <-chan int {
+	jobs := make(chan int)
+	go func() {
+		defer close(jobs)
+		timer := time.NewTimer(0)
+		defer timer.Stop()
+		for i := 0; i < count; i++ {
+			if ctx.Err() != nil {
+				return
+			}
+			if rate > 0 {
+				due := start.Add(time.Duration(float64(i) / rate * float64(time.Second)))
+				timer.Reset(max(time.Until(due), 0))
+				select {
+				case <-ctx.Done():
+					return
+				case <-timer.C:
+				}
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case jobs <- i:
+			}
+		}
+	}()
+	return jobs
+}
+
+// Admission is serialized immediately before HTTP send, after acquiring permits.
+// Retain at most four sends of credit; a stalled observer cannot build a large burst.
+// Original scheduled timestamps remain unchanged in benchDirect.
+func newDirectPacer(perSecond float64) func(context.Context) error {
+	if perSecond == 0 {
+		return func(ctx context.Context) error { return ctx.Err() }
+	}
+	interval := time.Duration(float64(time.Second) / perSecond)
+	gate := make(chan struct{}, 1)
+	var next time.Time
+	return func(ctx context.Context) error {
+		select {
+		case gate <- struct{}{}:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		defer func() { <-gate }()
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		floor := time.Now().Add(-3 * interval)
+		if next.Before(floor) {
+			next = floor
+		}
+		if delay := time.Until(next); delay > 0 {
+			timer := time.NewTimer(delay)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+			}
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		next = next.Add(interval)
+		return nil
+	}
+}
+
+
+=== docs/experiments/final-evidence-2026-10-04/results-mixed/dispatch-analysis.json ===
+{
+  "scope": "Same-host timestamps. Fast slot acquisition precedes serialized pacing; release is approximated by FastUnixNS, recorded immediately before fastDone(). Population samples are not runtime traces.",
+  "runs": [
+    {
+      "case": "r1-P",
+      "send_limit_hits": 0,
+      "total_limit_hits": 7,
+      "sum_fast_slot_presend_ms": 96003.939,
+      "sum_fast_slot_sent_to_receipt_ms": 475236.39400000003,
+      "presend_share_of_slot_time": 0.16806225585615292,
+      "presend_ms": {
+        "p50": 0.008,
+        "p95": 90.311,
+        "max": 91.824
+      },
+      "pacing_wait_ms": {
+        "p50": 0.000333,
+        "p95": 90.304167,
+        "max": 91.818709
+      }
+    },
+    {
+      "case": "r2-P",
+      "send_limit_hits": 0,
+      "total_limit_hits": 29,
+      "sum_fast_slot_presend_ms": 355699.054,
+      "sum_fast_slot_sent_to_receipt_ms": 465833.526,
+      "presend_share_of_slot_time": 0.4329701130051348,
+      "presend_ms": {
+        "p50": 0.008,
+        "p95": 245.276,
+        "max": 250.898
+      },
+      "pacing_wait_ms": {
+        "p50": 0.000375,
+        "p95": 245.2695,
+        "max": 250.890916
+      }
+    },
+    {
+      "case": "r3-P",
+      "send_limit_hits": 917,
+      "total_limit_hits": 143,
+      "sum_fast_slot_presend_ms": 803520.15,
+      "sum_fast_slot_sent_to_receipt_ms": 465704.236,
+      "presend_share_of_slot_time": 0.6330796657101103,
+      "presend_ms": {
+        "p50": 0.009,
+        "p95": 589.422,
+        "max": 622.345
+      },
+      "pacing_wait_ms": {
+        "p50": 0.000375,
+        "p95": 589.417667,
+        "max": 622.334833
+      },
+      "at_send_limit_check": {
+        "presend": {
+          "p50": 59,
+          "p95": 61,
+          "max": 63
+        },
+        "sent_awaiting_receipt": {
+          "p50": 5,
+          "p95": 12,
+          "max": 18
+        }
+      }
+    }
+  ]
+}
+
+
+=== docs/paper/review-2026-10-02/fourth-revision-2026-10-04/version-bridge.json ===
+{
+  "differences": {
+    "721800c..9879f64": {
+      "checked_paths": [
+        "internal/member",
+        "internal/committee",
+        "internal/rules",
+        "internal/redaction",
+        "internal/transport",
+        "internal/wallet",
+        "third_party/cometbft",
+        "protocol",
+        "finality",
+        "cmd/committee",
+        "cmd/gateway",
+        "cmd/member",
+        "cmd/internal",
+        "go.mod",
+        "go.sum"
+      ],
+      "changed_production": [
+        "internal/member/blocks.go",
+        "internal/member/direct.go",
+        "internal/member/outcome.go",
+        "internal/member/partial_reclaim.go",
+        "internal/member/source_recovery.go"
+      ],
+      "changed_tests_and_support": [
+        "internal/member/intent_scope_test.go",
+        "internal/member/partial_reclaim_internal_test.go",
+        "internal/member/partial_reclaim_test.go",
+        "internal/redaction/reader_cost_test.go"
+      ],
+      "client_changes": [
+        "cmd/payctl/audit.go",
+        "cmd/payctl/direct.go"
+      ],
+      "entrypoints_and_dependencies": []
+    },
+    "9879f64..f856c7b": {
+      "checked_paths": [
+        "internal/member",
+        "internal/committee",
+        "internal/rules",
+        "internal/redaction",
+        "internal/transport",
+        "internal/wallet",
+        "third_party/cometbft",
+        "protocol",
+        "finality",
+        "cmd/committee",
+        "cmd/gateway",
+        "cmd/member",
+        "cmd/internal",
+        "go.mod",
+        "go.sum"
+      ],
+      "changed_production": [],
+      "changed_tests_and_support": [
+        "internal/member/approval_boundary_test.go",
+        "internal/redaction/history_export_test.go",
+        "internal/redaction/payment_test.go",
+        "internal/redaction/revision_boundaries_test.go"
+      ],
+      "client_changes": [
+        "cmd/payctl/direct_chain.go",
+        "cmd/payctl/network_history_test.go"
+      ],
+      "entrypoints_and_dependencies": []
+    }
+  },
+  "identical_representation_and_overlay_files": {
+    "internal/redaction/repair.go": {
+      "721800c": "eb1d89abab4dc5649567f26213609f550b075512ef1afc99577bb74249603542",
+      "9879f64": "eb1d89abab4dc5649567f26213609f550b075512ef1afc99577bb74249603542",
+      "f856c7b": "eb1d89abab4dc5649567f26213609f550b075512ef1afc99577bb74249603542"
+    },
+    "internal/redaction/batch.go": {
+      "721800c": "a1c835188ea0395f16225217df04cb1a6997c5559cd5fd06b828a450a6bbfb60",
+      "9879f64": "a1c835188ea0395f16225217df04cb1a6997c5559cd5fd06b828a450a6bbfb60",
+      "f856c7b": "a1c835188ea0395f16225217df04cb1a6997c5559cd5fd06b828a450a6bbfb60"
+    },
+    "internal/redaction/decision.go": {
+      "721800c": "14caad4e3ec24abd96c49d9d7858293352c525e5b043712d8007e0cb1ca37062",
+      "9879f64": "14caad4e3ec24abd96c49d9d7858293352c525e5b043712d8007e0cb1ca37062",
+      "f856c7b": "14caad4e3ec24abd96c49d9d7858293352c525e5b043712d8007e0cb1ca37062"
+    },
+    "third_party/cometbft/README.md": {
+      "721800c": "2ba42e848650afe64aec2c59f2bf0a7c2e7a45e537eb464f20d2b7a0ae6f7560",
+      "9879f64": "2ba42e848650afe64aec2c59f2bf0a7c2e7a45e537eb464f20d2b7a0ae6f7560",
+      "f856c7b": "2ba42e848650afe64aec2c59f2bf0a7c2e7a45e537eb464f20d2b7a0ae6f7560"
+    },
+    "third_party/cometbft/consensus/block_identity.go": {
+      "721800c": "bc391ee0628b3edcb0dfaca2f378956e09a284b4bbba8cb345af87f6b7076535",
+      "9879f64": "bc391ee0628b3edcb0dfaca2f378956e09a284b4bbba8cb345af87f6b7076535",
+      "f856c7b": "bc391ee0628b3edcb0dfaca2f378956e09a284b4bbba8cb345af87f6b7076535"
+    },
+    "third_party/cometbft/consensus/block_identity_test.go": {
+      "721800c": "dcaf8778c797189b1b3bca79a3e1f86468de0b45c0637e44b8cf948d18227fe1",
+      "9879f64": "dcaf8778c797189b1b3bca79a3e1f86468de0b45c0637e44b8cf948d18227fe1",
+      "f856c7b": "dcaf8778c797189b1b3bca79a3e1f86468de0b45c0637e44b8cf948d18227fe1"
+    },
+    "third_party/cometbft/consensus/proposal_batch.go": {
+      "721800c": "3eae0e13796d8c6543661bc3b4be2b523a89d03113e0d83cfa35d825a64bc307",
+      "9879f64": "3eae0e13796d8c6543661bc3b4be2b523a89d03113e0d83cfa35d825a64bc307",
+      "f856c7b": "3eae0e13796d8c6543661bc3b4be2b523a89d03113e0d83cfa35d825a64bc307"
+    },
+    "third_party/cometbft/consensus/proposal_batch_test.go": {
+      "721800c": "33525f52b384a75296e65dbc3427e9530196597b181e93521e95c5c593c5858f",
+      "9879f64": "33525f52b384a75296e65dbc3427e9530196597b181e93521e95c5c593c5858f",
+      "f856c7b": "33525f52b384a75296e65dbc3427e9530196597b181e93521e95c5c593c5858f"
+    },
+    "third_party/cometbft/go.mod": {
+      "721800c": "62c0cf78d32b0b0316e3e01ec2d160f0219a767ced110ff2b30e4c7b06dee31c",
+      "9879f64": "62c0cf78d32b0b0316e3e01ec2d160f0219a767ced110ff2b30e4c7b06dee31c",
+      "f856c7b": "62c0cf78d32b0b0316e3e01ec2d160f0219a767ced110ff2b30e4c7b06dee31c"
+    },
+    "third_party/cometbft/libs/autofile/sync_test.go": {
+      "721800c": "e01280eaf4574cf3311868c57bad18c3fed16061b49f6065939923d3217f942a",
+      "9879f64": "e01280eaf4574cf3311868c57bad18c3fed16061b49f6065939923d3217f942a",
+      "f856c7b": "e01280eaf4574cf3311868c57bad18c3fed16061b49f6065939923d3217f942a"
+    },
+    "third_party/cometbft/libs/operationtrace/trace.go": {
+      "721800c": "c3a3647e2548badae292c4d5bb905a6c5c24005438a2d9cb3aad33695e2ba041",
+      "9879f64": "c3a3647e2548badae292c4d5bb905a6c5c24005438a2d9cb3aad33695e2ba041",
+      "f856c7b": "c3a3647e2548badae292c4d5bb905a6c5c24005438a2d9cb3aad33695e2ba041"
+    },
+    "third_party/cometbft/node/redaction.go": {
+      "721800c": "931f3e838492f694bf6c0da25d3226d79f89a724c9687e00d45c0b97f45d5717",
+      "9879f64": "931f3e838492f694bf6c0da25d3226d79f89a724c9687e00d45c0b97f45d5717",
+      "f856c7b": "931f3e838492f694bf6c0da25d3226d79f89a724c9687e00d45c0b97f45d5717"
+    },
+    "third_party/cometbft/overlay.py": {
+      "721800c": "a3d5170f2012f395b83eb83d841d5f93898dc1c0df384fb08f8fb4de1a88041d",
+      "9879f64": "a3d5170f2012f395b83eb83d841d5f93898dc1c0df384fb08f8fb4de1a88041d",
+      "f856c7b": "a3d5170f2012f395b83eb83d841d5f93898dc1c0df384fb08f8fb4de1a88041d"
+    },
+    "third_party/cometbft/state/results_batch_test.go": {
+      "721800c": "91d44ee8e5c8753f4aacd825d44c010b14c8a40300958ab56e272c48e2b9e112",
+      "9879f64": "91d44ee8e5c8753f4aacd825d44c010b14c8a40300958ab56e272c48e2b9e112",
+      "f856c7b": "91d44ee8e5c8753f4aacd825d44c010b14c8a40300958ab56e272c48e2b9e112"
+    },
+    "third_party/cometbft/store/catchup_test.go": {
+      "721800c": "52c8e02b6f13a71100eeedaf217f321734e87d7aa248cefd218af725956c5eb9",
+      "9879f64": "52c8e02b6f13a71100eeedaf217f321734e87d7aa248cefd218af725956c5eb9",
+      "f856c7b": "52c8e02b6f13a71100eeedaf217f321734e87d7aa248cefd218af725956c5eb9"
+    },
+    "third_party/cometbft/store/redaction.go": {
+      "721800c": "014e372aeb5c96114d38a3970f8d16e3aa33313e2c14cf2ba8cdc6502fcb1d17",
+      "9879f64": "014e372aeb5c96114d38a3970f8d16e3aa33313e2c14cf2ba8cdc6502fcb1d17",
+      "f856c7b": "014e372aeb5c96114d38a3970f8d16e3aa33313e2c14cf2ba8cdc6502fcb1d17"
+    },
+    "third_party/cometbft/types/redaction.go": {
+      "721800c": "75b4ca3036d4ed25a5e17c9b14b9d651ac505791cc02597bb042bcaf4fdf99ee",
+      "9879f64": "75b4ca3036d4ed25a5e17c9b14b9d651ac505791cc02597bb042bcaf4fdf99ee",
+      "f856c7b": "75b4ca3036d4ed25a5e17c9b14b9d651ac505791cc02597bb042bcaf4fdf99ee"
+    }
+  }
+}
+
+
+=== docs/paper/review-2026-10-02/fourth-revision-2026-10-04/build-identity-check.json ===
+{
+  "base": "f856c7b",
+  "manifest_file_count": 309,
+  "build_source_file_count": 305,
+  "manifest_additional_files": [
+    "docs/experiments/final-evidence-2026-10-04/run_chain.py",
+    "docs/experiments/final-evidence-2026-10-04/run_mixed.py",
+    "go.mod",
+    "go.sum"
+  ],
+  "identical_chain_P_R_source_binary_and_expanded_Comet": true,
+  "binaries": {
+    "bin-final/committee": "cba6a04f0b269cdac7ba443510fb6f89f60b7271d80bf20ca0832ec710e2e042",
+    "bin-final/gateway": "cdc4db54e5863a0f43e7277726e24d2968f7c3a674282ef1f29c5b6c0fa95a50",
+    "bin-final/member": "5334100fba5a9750d18aae5f69347d71298fb934ccfa649b37b204f79fcdaf7c",
+    "bin-final/member-real": "127ca692771664cb9c92ad67bab6517792dcf97d41b64a1ef66741424343ec3c",
+    "bin-final/payctl": "d0b30f820873cb31259c9d473a1f0e636c93005f117196504c17f9a87b398f39"
+  },
+  "client": "d0b30f820873cb31259c9d473a1f0e636c93005f117196504c17f9a87b398f39",
+  "member_entry": "bin-final/member is a shell wrapper: exec env GOMAXPROCS=16 GOGC=200 bin-final/member-real; see run_chain.py.",
+  "overlay_git_blob_sha256": "a3d5170f2012f395b83eb83d841d5f93898dc1c0df384fb08f8fb4de1a88041d",
+  "scope": "309 manifest entries = 305 build source entries + two runner scripts + go.mod/go.sum. Counts include tests; not 309 production files."
+}

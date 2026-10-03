@@ -1,0 +1,201 @@
+一、独立判断：C3 的增量是“修订正文与原承诺相容”，不是更强的经济答案
+
+当前材料能够支持一个可选的、面向区块正文的历史检查功能，但不能证明存在某个已部署消费者必须使用 C3。 原块＋决定索引已经提供相同经济答案；普通物化视图也可以保留原坐标、原 BlockID 指针和后继引用。不能把这些能力算成 C3 独占。
+Next-overleaf-English
+
+本轮已阅读附带的测试函数文本，但未检查其辅助函数、完整仓库或运行测试。现有代码中，真正使用 C3 特性的步骤是：通过 NewRedactablePartSet 重建分片承诺，与原完整 BlockID 比较，再从这份修订正文中解码资金引用。 它不是仅把旧 BlockID 写入导出对象。代码还显式检查 Task／Revision 正文一致、TxID 和首个输出不变。
+Pasted text
+ 
+Pasted text
+
+可以成立、但尚未部署的消费者场景
+
+建议使用：可信本地副本上的历史资金复核工具。 它已有一个以原坐标和完整 BlockID 定位的检查记录；赔付后重新检查时，既查看资金垫付与回款，也可以选择检查一份“资金槽已经体现储备引用、但仍与原完整承诺相容”的区块正文。
+
+这里必须承认：只需账务答案，或者允许独立注释视图的工具，并不需要这项正文能力。 因而不能先规定“必须返回同 ID 的修订正文”，再把测试通过当成实际需求存在的证据。可提出该使用方式，但目前不能声称降低了实际集成成本、兼容未经修改的客户端，或优于所有物化方案。
+
+另外，现有导出检查仍依赖本地读取的 Task 及其分片材料；不能将其描述成已经实现的、脱离可信副本即可独立认证的归档包。完整身份相等也不单独证明修订获得授权，授权仍来自已执行状态中的成功决定和精确表示命令。
+Pasted text
+ 
+Pasted text
+
+二、可直接使用的英文 LaTeX
+1. 替换 Introduction 的 C3 贡献段
+LaTeX
+\noindent\textbf{C3: Optional authorized historical representation.}
+Decision-gated chameleon-hash commands embed a compensated input's
+reserve reference in an authorized historical body while preserving
+payment authorizations, successor references, and the complete BlockID,
+including its PartSetHeader. For an honest replica that has executed
+prefix $H$, this supports an optional block-oriented archival view:
+funding is decoded from a replacement body compatible with the original
+commitments. A runnable local example exercises this contract.
+Successfully executed decisions and representation commands supply
+authorization; commitment equality alone does not. Indexed history
+already provides the same economic answers. The layer adds storage and
+maintenance, not economic finality.
+2. 替换 §IV-H 的消费者说明段
+
+以下正文约 320 词。它将应用场景明确写为设想，将已经实现的本地检查与尚未证明的部署价值分开。
+
+LaTeX
+\noindent\textbf{Consumer, motivation, and alternatives.}
+Consider a prospective local archival inspector operated by a guarantor
+on an honest replica that has executed prefix $H$. A case record
+contains the original coordinates $(h,j,k)$ and complete BlockID. The
+operator revisits that record after compensation to inspect the
+historical reserve debit and current repayment state, keeping the case
+linked to the original block. This scenario is proposed, not an observed
+customer requirement.
+
+Original history plus a decision index already answers this question.
+An ordinary materialized funding view can expose the same reserve debit
+and status, carry the original BlockID as a source pointer, and retain
+the original body for verification. Both alternatives preserve original
+references and permit auditing without successor re-signing or
+re-execution. A source pointer, however, does not by itself make a
+projection's bytes a block body compatible with the original commitments.
+A view caching C3's authorized bytes inherits C3 rather than avoiding it.
+
+For a revision-aware inspector that also consumes block-shaped
+representations, C3 offers an additional operation. Within one read
+transaction on $V_H$, it selects the authorized body, checks its exact
+committed Task, reconstructs the part-set header using the supplied
+openings, compares both components of the original BlockID, and decodes
+\texttt{ReserveFunding} from that same body. The body being inspected,
+rather than merely an associated original, satisfies the original
+commitments. This property is optional: an inspector accepting a separate
+annotated view does not need it.
+
+Authorization still comes from successfully executed decisions and
+representation commands in $V_H$, not from BlockID equality or a
+chameleon-hash equation. Prefix, revision, and Task distinguish
+representations sharing one BlockID. The permanent decision and
+obligation remain necessary; repayment changes the economic state
+without erasing the historical advance. Revised bodies are not
+re-executed as original payments.
+
+The existing \texttt{TestHistoricalExportConsumer} illustrates this
+local operation. It does not establish deployed demand, compatibility
+with unmodified clients, or lower integration effort than ordinary
+materialization. The evaluation therefore separates representation
+compatibility, authorization from executed state, and measured costs.
+3. 功能对照表与完成标准
+
+建议放入补充材料 S3-B。保留现有读测标签 A／B，新增 M 表示普通物化视图，避免把旧实验中的 B 改指其他方案。 M 目前只是待补的测试内对照，不能标成已经测得的结果。
+
+LaTeX
+\begin{table*}[t]
+\centering
+\caption{Contract-level comparison for a local historical-funding
+inspector. A and B retain the labels of the reader measurements.
+M denotes a plain materialized funding view and a proposed test-only
+comparator, not a measured implementation. All alternatives use the
+same verified public prefix.}
+\label{tab:history-consumer-contract}
+\small
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{@{}p{0.24\textwidth}
+                    p{0.23\textwidth}
+                    p{0.23\textwidth}
+                    p{0.23\textwidth}@{}}
+\toprule
+Property &
+A: Original history and decision index &
+M: Plain materialized funding view &
+B: Authorized representation (C3) \\
+\midrule
+
+Historical reserve debit and obligation state at $H$ &
+Resolved from permanent decisions and obligations. &
+The same information, derived from the same records. &
+The same records remain necessary. \\
+
+Original coordinates, identity references, and successors &
+Preserved without changing the original body. &
+Preserved through source references; no successor changes required. &
+Preserved for the authorized replacement body. \\
+
+Where the reserve reference is inspected &
+Decision records associated with the original input. &
+A separate derived view, optionally block-shaped. &
+The designated funding slot of the authorized block body. \\
+
+Body compatible with the original complete BlockID &
+The retained original body. &
+The retained original body; materialization alone does not guarantee
+this property for the derived view. &
+Both the original body and the authorized replacement, using the
+corresponding openings. \\
+
+Basis for interpreting the representation &
+Verified original execution and successful compensation decisions. &
+The same executed records and correct derivation of the view. &
+The same records plus successful representation execution binding
+the exact Task body. \\
+
+Additional representation maintenance &
+Decision-index maintenance; no historical replacement. &
+Maintenance of the derived view; costs are not measured here. &
+Adaptation, revisions, Tasks, and physical installation. \\
+
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\noindent\textbf{Functional completion criterion.}
+A minimal comparison should supply A, M, and B to the same local
+inspection routine at a fixed prefix and repeat after repayment.
+The economic answers should agree on coordinates, transaction identity,
+amount, reserve debit, decision, and obligation state.
+The routine should separately report whether the reserve reference
+occurs in the body checked against the original complete BlockID,
+and whether that representation is authorized in the selected prefix.
+These checks must use actual bytes, openings, and executed records,
+not strategy-name predicates. A source pointer must not be relabeled
+as proof that a derived body satisfies the original commitments.
+Any alternative satisfying the same checks must be accepted.
+The observed results should determine the final comparison;
+neither failure of M nor superiority of B is presumed.
+This check establishes neither deployed demand nor a performance result.
+4. §VI-C 的实验解释
+
+这段对应已有 21,600 次 A／B 查询及记录、维护成本，不将其转换为 C3 的必要性证据。
+Next-overleaf-English
+
+LaTeX
+The 21,600 timed queries compare original history plus an optimized
+decision index (A) with Canonical reading (B), not with a materialized
+funding view (M). Both return equivalent economic answers under the
+same verified-prefix assumptions. The 7.44--12.32\% compensated-point
+P50 reduction reflects the tested hot-page layout and reconstruction
+path without decoded-object caches; it establishes neither a unique
+need for C3 nor general superiority. Representation adds
+0.28--2.19\,MiB of net logical records and 43--214\,ms of measured local
+maintenance per repaired block, excluding network and consensus waits.
+These measurements quantify a configuration-specific tradeoff,
+separately from the optional body-compatibility contract and its
+authorization requirements.
+三、给 Codex 的最小测试增量
+
+只增加一个同消费者子测试即可，不新增生产接口或性能测试。 当前函数只读取原块作局部比较，没有将 A、M、B 的经济读取结果交给同一检查流程；回款后的显式条件也只是状态发生变化，而非直接断言具体状态转换。
+Pasted text
+
+建议新增 same_consumer_views 子测试：
+
+复用同一 fixture、同一读事务。 A 使用已有原块＋索引路径；M 从 A 的决定和义务记录构造测试内物化元组，保留原坐标和 BlockID 指针，不借用 B 的修订正文；B 使用现有 Canonical／Task 路径。
+
+先要求共同任务成功，再报告额外正文属性。 三者的经济答案一致；原块仍能匹配原完整身份。另行检查“读出储备引用的那份正文”是否同时通过完整 BlockID 检查，以及是否有该前缀下的表示授权。不要因为 A 返回 OriginalFunding，就把其正确的经济查询判失败；也不要按方案名称强制 M 失败。 若 M 复用 C3 的正文、开口和 Task，应如实注明它依赖 C3。
+
+复用现有回款步骤，强化状态断言。 明确检查 Repaired → Recovered，历史 reserve-debit 身份不变，B 的授权正文不变，三条路径在新的同一前缀下仍返回一致经济答案。具体枚举和辅助函数由 Codex 对照实现确定。
+
+中文要点：C3 提供的是“同一份修订正文既显示储备引用，又满足原完整承诺”的可选功能。成功执行记录提供授权，读测提供成本；三者不能互相替代。新增对照能够澄清这项功能，但不能凭测试本身证明真实需求，更不能预先保证其贡献权重与 C2 相当。 
+
+ChatGPT can make mistakes. Check important info.
+Latest response
+
+
+
+
+Pro

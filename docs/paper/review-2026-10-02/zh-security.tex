@@ -33,7 +33,7 @@ TXCer 固定其输出和签发者。不存在两张有效证书
 \label{lem:security-superseded}
 固定一个四成员组织，要求三份签名，且至多
 有一名拜占庭成员。设某诚实成员已批准事实
-$c$，并锁定了普通输入或用户付费输入实例 $\xi$。
+$c$，并锁定了本金输入（最终或认证输入）或用户付费输入实例 $\xi$。
 如果同一组织配置下一笔成功应用的公开付款
 携带针对另一事实 $c'$ 的有效 QC，具有不同的
 交易身份，并消费了 $\xi$，那么不可能曾经存在针对 $c$ 的
@@ -52,7 +52,7 @@ $c'$ 的公开执行已通过当前组织的
 一名成员是拜占庭成员，交集中必有一名诚实成员。
 这意味着该成员签署了两个消费
 同一实例 $\xi$ 的不同事实，然而诚实成员在签名前会原子地
-锁定普通输入和用户付费输入实例，并拒绝
+锁定本金输入和用户付费输入实例，并拒绝
 针对已锁定实例的另一候选请求。这与批准规则矛盾。
 
 因此，不可能曾经存在针对 $c$ 的三份相匹配的签名。使用
@@ -157,7 +157,7 @@ $r_{m,c}\ge w_c$。
 \begin{theorem}[潜在责任具有资金覆盖]
 \label{thm:security-coverage}
 对于每个 CAL 授权项，都有 $Q_g\le B_g$。对于每个储备账户 $x$，
-其未闭缺口总额 $D_x$ 不超过账户余额 $A_x$。
+其未闭缺口总额 $\mathsf{Gap}_x$ 不超过账户余额 $A_x$。
 \end{theorem}
 \begin{IEEEproof}
 令 $\mathcal A_{m,g}$ 包含 $g$ 下的全部成功批准，包括没有 QC 的批准（失效批准的残留贡献为零），并令 $L_{m,g}=\sum_{c\in\mathcal A_{m,g}}r_{m,c}$，该求和涵盖各 Worker。批准、普通恢复和被取代后的失效处理在 Available 与 Reserved 之间移动容量，补资则增加成员份额的差值，因此对于本地观察到的授权额 $B_{m,g}$，有 $L_{m,g}\le s(B_{m,g})\le s(B_g)$；授权额只增不减。固定该组织中任意三名诚实成员组成集合 $H_g$。QC 有三名不同签署者，而 $H_g$ 之外至多只有一名成员，因此 $H_g$ 中签署了 $c$ 的成员集合 $\mathsf{Sig}_c$ 至少含有两名成员。诚实成员仅在批准之后签名，所以由引理~\ref{lem:security-witness}，对 $m\in\mathsf{Sig}_c$ 有 $r_{m,c}\ge w_c$，并且
@@ -176,7 +176,7 @@ $r_{m,c}\ge w_c$。
 令 $\mathcal G_x$ 包含全部由 $x$ 提供资金支撑的授权项；其认证的 CAL 账户就是被扣款的签发者账户。创世状态建立 $\sum_{g\in\mathcal G_x}(B_g-S_g)\le A_x$。来自外部非受保护账户的补资使两边等量增加。补偿使 $S_g$ 增加，并使 $A_x$ 减少相同金额；偿还使 $S_g$ 减少，并使 $A_x$ 增加相同金额（引理~\ref{lem:security-recovery}）；不存在其他提取 CAL 储备的协议操作。每项 Open 义务对应一项不同的剩余承诺，因此
 \begin{equation}
 \begin{aligned}
-D_x&\le\sum_{g\in\mathcal G_x}V_g
+\mathsf{Gap}_x&\le\sum_{g\in\mathcal G_x}V_g
     \le\sum_{g\in\mathcal G_x}E_g\\
    &\le\sum_{g\in\mathcal G_x}(B_g-S_g)\le A_x.
 \end{aligned}
@@ -199,7 +199,7 @@ D_x&\le\sum_{g\in\mathcal G_x}V_g
  V_g+S_g+\sum_{c\in N_g}a_c\le Q_g\le B_g.
  \label{eq:security-admission}
 \end{equation}
-同一证书的重复使用只计一次，顺序登记能够看到此前的预留，因此每个部分和都满足该上界。故首次登记不可能因 CAL 授权容量不足而失败，即使它先于同一转移中的偿还执行也是如此，因为偿还只会降低 $S_g$。同样，金额为 $a\le D_x\le A_x$ 的 Open 义务具有足够的储备本金。其他资源和费用检查仍是独立要求。
+同一证书的重复使用只计一次，顺序登记能够看到此前的预留，因此每个部分和都满足该上界。故首次登记不可能因 CAL 授权容量不足而失败，即使它先于同一转移中的偿还执行也是如此，因为偿还只会降低 $S_g$。同样，金额为 $a\le\mathsf{Gap}_x\le A_x$ 的 Open 义务具有足够的储备本金。其他资源和费用检查仍是独立要求。
 
 \subsection{资产守恒与延迟中立性}
 \label{sec:security-conservation}
@@ -249,6 +249,8 @@ Reserved$=$Spent$=0$；每项义务均为 Fulfilled 或 Recovered，
 \end{enumerate}
 不比较费用和 FUEL。
 \end{theorem}
+此处成功包含全部适用的授权、输入、Intent、资源与费用检查。
+CAL 覆盖上界并不推出每个带 QC 的付款均满足这些独立的执行条件。
 \begin{IEEEproof}
 \emph{持有者。} 由条件 (i)，两个执行消费相同的实例。在 $\rho$ 中，一个在源交易执行之前被消费的输出会获得一项义务；源交易执行时，该输出要么转为 Fulfilled，具有对应实例已经被消费的创建记录；要么转为 Recovered，没有创建记录；两种情况下它都已被消费。未被 $\mathcal T$ 中任何付款消费的输出，在两个执行中都被创建为最终且未消费的输出。因此，未消费实例就是创世输出和 $\mathcal T$ 的输出中未被 $\mathcal T$ 消费的那些实例。
 
@@ -411,25 +413,22 @@ Canonical 读取已提交的逻辑修订版本 $\rho_\ell$，精确的 Task 授�
 \end{IEEEproof}
 
 \noindent\textbf{可用性与担保方风险。}
-一旦消费方公开源交易 QC，至少两名诚实的源交易
-签署者就保有其提交材料
-（引理~\ref{lem:security-resubmission}）。在公平的消息交付和
-入块条件下，这支持对可执行源交易的重提交，
-但不会消除永久性 Intent 冲突。到期义务可以
-转而在不依赖适配的情况下闭合
-（引理~\ref{lem:security-closure}）。
-
+消费方公开来源 QC 后，至少两名诚实来源签署者保有提交材料
+（引理~\ref{lem:security-resubmission}）。公平交付与入块支持
+可执行来源的重提交，但不能消除永久 Intent 冲突；到期义务
+可以不依赖适配而闭合（引理~\ref{lem:security-closure}）。
 在每个前缀，
 \[
   0\le S_g=\sum_{c\in C_g}
        \bigl(p_c-\mathsf{Rec}_c\bigr)\le Q_g\le B_g .
 \]
-对于不再补资的固定授权项，该式限制的是未偿还
-补偿额，而不是整个生命周期内的累计补偿总额 Paid，
-也不代表各签名切片的可用性。即使仍有储备本金，认证也可能停止。
-当定理~\ref{thm:security-neutrality} 的假设成立时，
-最终 CAL 持有情况和储备相同；永久未执行的
-源交易不属于该比较范围。因此，开放部署接受的是
-对抗性储备损失和容量持续占用，
-而不只是偶发源交易失败的某个预期比例。FUEL 费用并不为
-这些损失提供保险，本文也不假设任何 CAL--FUEL 兑换价值关系。
+对不再补资的固定 grant，该式约束净未偿赔付，而非整个生命周期
+的赔付毛额 Paid。未执行的已认证来源在诚实签署者处保持
+$r_{m,c}=a_c$，因此备付尚有余额时，切片也可能停止签发。
+有资金支持的补资增加份额，但不清除预留或输入冲突，且新增授权
+仍面临同样的风险。永久未执行来源不属于
+定理~\ref{thm:security-neutrality} 的范围。
+第~\ref{sec:model-contract}~节的开放服务接受对抗性备付损失
+和容量滞留；FUEL 费用不为二者提供保险，本文不假定
+CAL--FUEL 兑换价值。补充材料~S3 给出两轮账目及固定签署者下的
+容量上界。

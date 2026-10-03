@@ -1,0 +1,38 @@
+Claude responded: 这七处校正都没有实质性错误。以下三点建议在定稿时一并处理：
+Checking wording on capacity, abstract claims, and issuer liability.
+
+Checking wording on capacity, abstract claims, and issuer liability.
+
+这七处校正都没有实质性错误。以下三点建议在定稿时一并处理：
+
+第 2 处：保留“含找零”这一点。 改成覆盖“每项 applicable resource”是正确的，但 CAL 那一项最好仍写明是 
+𝑎
+𝑇
+a
+T
+	​
+
+，即包含找零在内的全部 CAL 输出。覆盖论证（定理 1）和 S3 的容量轨迹都依赖这个口径；如果只写成泛指的 resource，读者看不出找零同样占用额度。可写作 “each applicable resource, including 
+𝑎
+𝑇
+a
+T
+	​
+
+ CAL with change”。
+
+第 4 处：两个措辞要落实。
+
+一是 “below” 在模型节里指代不清，请改为 Section~\ref{sec:security-composition}。
+二是改写后仍需保留一句事实陈述：协议没有实现 Subject 级的 CAL 准入，也没有跨收集器的未完成上限，费用赞助政策不等于 CAL 准入。原稿中的 “which this paper assumes rather than implements” 如果删掉，这句事实陈述就是防止读者把外部条件当成协议性质的唯一依据，不宜省去。
+
+第 6 处：摘要短句不要只写一个条件。 “successor admission depends on available capacity” 容易被理解为容量是唯一的条件，建议改为 “on member capacity and the other admission guards”。“issuer bears unrepaid source failures” 建议精确为 “the CAL of consumed outputs whose sources never execute”。这样与正文一致：只有输出被公开消费时才会登记义务。没有被消费的输出要等到日后被消费时才产生义务，并不是来源一失败就立即形成损失。
+
+其余几处，即第 1、3、5、7 处，按你的方案处理即可。第 5 处的 “at most ... on this fixed signer/Worker pattern”，前提是固定 B、不补资；这一前提在台账段中已经写明。comet_v3 两轮测试通过，可以作为本轮台账数据的依据，但请确认我上次标出的推断值（第 1 轮 Spent = 100、第四成员初值 200、终态 Q = 200）都已与日志逐项对照。
+
+
+
+
+
+
+2 minutes ago

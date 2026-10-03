@@ -1,0 +1,154 @@
+\begin{table*}[t]
+\centering
+\caption{Selected proof--implementation correspondences for production
+baseline \texttt{f856c7b}. Rows group claims sharing production guards.
+Detailed file paths, caller boundaries, and test assertions remain in
+the artifact index; this table is not an exhaustive ingress inventory.}
+\label{tab:proof-implementation}
+\small
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{@{}p{0.18\textwidth}
+                    p{0.49\textwidth}
+                    p{0.29\textwidth}@{}}
+\toprule
+Claims &
+Production entry and proof-relevant obligation &
+Representative regression evidence \\
+\midrule
+
+Lemma~\ref{lem:security-original} &
+The Comet overlay and \texttt{matchesBlockID} compare both identity
+components. Original-part validation and candidate transfers preserve
+body--parts pairing and execution context through consensus and replay. &
+Stable-hash identity cases, rejected relabelled openings and uncertified
+revisions, and retained-original replay; Comet-specific evidence keeps
+its recorded build. \\
+
+Lemma~\ref{lem:security-consumption};
+public authorization &
+\texttt{ApproveDirectBytes} commits locks, Intent, approval, and debits
+before signing. \texttt{CheckTx}, \texttt{ProcessProposal}, and
+\texttt{FinalizeBlock} reach \texttt{Engine.Check} and submission
+verification. Full-byte caching does not replace current-ledger checks
+in \texttt{EvaluateDirectPaymentAt}. &
+\texttt{TestPublicAuthorization\allowbreak AtABCIEntry};
+distinct-voter, identical-byte-cache, current-ledger, durable-approval,
+and replay tests. \\
+
+Lemmas~\ref{lem:security-superseded}
+and~\ref{lem:security-witness} &
+Authenticated successful, applied results reach
+\texttt{reclaimPartial} and \texttt{finishLocal}.
+Normal CAL restoration requires observed source settlement;
+invalidation separately requires the guarded same-configuration input
+conflict. Both restore only original residual debits, with cumulative
+progress and the follower cursor committed atomically. &
+Partial-conflict, multiple-input, failed-result, contradiction,
+late-effect, original-debit, and cumulative-restart tests. \\
+
+Lemmas~\ref{lem:security-resubmission}
+and~\ref{lem:security-intent} &
+\texttt{recoverExposedSources} reconstructs retained approved material
+with the public QC and verifies it before queuing; it creates no
+approval or debit. \texttt{EvaluateDirectPaymentAt} preserves the global
+Intent binding established by successful execution. &
+Cross-organization and multi-depth source reconstruction, duplicate
+exposure, Subject separation, and the two-round Intent-compensation
+ledger. \\
+
+Theorem~\ref{thm:security-coverage} &
+\texttt{PrepareDirectVector}, submission verification, and approval
+bind issuer, configuration, grant, and Worker availability.
+\texttt{GrantShare}, \texttt{EvaluateReserveIncrease}, and
+\texttt{ApplyReserveIncrease} use external unprotected funding and
+cumulative share differences without erasing existing debits. &
+Capacity fragmentation, funded completion, persistent 2/2 input split,
+protected-source rejection, shared external funding, and cumulative
+rounding tests. \\
+
+Lemmas~\ref{lem:security-decision}
+and~\ref{lem:security-recovery} &
+\texttt{ExecuteDecision} checks the recorded decision, Open status,
+public deadline, position, and amount before atomic compensation.
+\texttt{recoverOutput} repays the original issuer within successful
+source execution, bounds recovery by payment, and creates no second
+user output. &
+Repeated and conflicting decisions, late-source repayment, partial-output
+repair, four-hop orders, and split--merge orders. \\
+
+Theorems~\ref{thm:security-conservation}
+and~\ref{thm:security-neutrality} &
+Payment, compensation, repayment, and reserve-increase transitions
+apply through overlays and public commit. Failed transitions contribute
+no business changes. Terminal CAL comparison retains the theorem's
+initial-state and successful source-closed payment-set conditions;
+it does not compare FUEL. &
+Monetary projections across interleavings and replay; current-build
+audits of 600 chain payments and 21,048 representative P payments. \\
+
+Lemmas~\ref{lem:security-repair}
+and~\ref{lem:security-representation} &
+\texttt{InputTarget}, \texttt{batchBody}, and \texttt{ExecuteBatch}
+derive decided slots, preserve non-target bytes, and check openings,
+version digests, and the original complete BlockID.
+Representation-only writes and unchanged subsequent economic reads
+are separate obligations; \texttt{DecodePublicExecution} adds no
+representation-induced principal effect. &
+Atomic two-input and cross-part batches, compensation before adaptation,
+and payment--repair monetary replay. \\
+
+Lemma~\ref{lem:security-installation};
+local reader contract &
+\texttt{Canonical} selects the logical revision in $V_H$.
+\texttt{PrepareMaterialization} supplies exact Task material;
+physical revision guards prevent rollback, and replay uses originals.
+Saved-commit compatibility does not itself authorize a revision. &
+Revision-order and interleaved-queue tests, original-history replay,
+reader equivalence, and \texttt{same\_consumer\_views} across real
+repayment at $H=4,5$. \\
+
+Theorem~\ref{thm:security-continuation};
+Lemma~\ref{lem:security-closure} &
+Shared authorization guards compose with
+\texttt{finality.VerifyBlock}, \texttt{PrepareBlock}, and
+\texttt{blockfollow.Commit}.
+\texttt{FreshRecv} remains a history premise.
+Economic closure uses \texttt{ExecuteDecision} without adaptation
+access; business updates and follower progress commit together. &
+Durable approval/background installation, 297 early successors in six
+chains, and 96 replica--target P checks showing repayment before
+representation commitment or materialization. \\
+
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\noindent\textbf{Premises and evidence levels.}
+The proofs cover finite traces under the stated model; production
+guards identify implementation responsibilities, and regressions
+exercise particular acceptance and rejection traces.
+Fixed four-member groups with three-vote quorums and at most one static
+Byzantine participant per group, consistent configuration, aggregate
+genesis backing, protected-reserve withdrawal restrictions, and
+non-rollback of honest signing state remain explicit premises.
+Signature unforgeability, binding original commitments, and correctly
+generated dealer-based threshold RSA parameters are not established by
+functional tests; fixed-target opening convergence additionally requires
+unique valid openings.
+Historical reads trust one verified, executed prefix $V_H$ with retained
+history, while progress retains its capacity, resource, and fair-delivery
+conditions.
+The new \texttt{TestPublicAuthorizationAtABCIEntry} sends already encoded,
+tampered authorization bytes directly through the three ABCI interfaces
+and checks rejection without business-state changes.
+Sender-side encoding failures are separate; receiver-side decoding,
+binding, and signature-verification rejections are distinct outcomes.
+Existing cache regressions distinguish byte-identical reuse from
+current-ledger validation.
+The current eight-package regression passes, with client and test
+additions fingerprinted separately from the production baseline.
+Comet-interface, persistent-restart, network-evidence, and threshold
+tests retain their recorded versions and scope; they are not new
+remote-download experiments, exhaustive Byzantine-scheduling tests,
+or mechanized proofs.

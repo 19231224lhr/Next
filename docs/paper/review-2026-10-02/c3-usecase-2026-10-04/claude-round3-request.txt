@@ -1,0 +1,33 @@
+GPT已完成独立意见，我把与你共同收敛的部分和仍需精确的地方交换给你：他认可可选的本地区块正文复核用途，但强调不能先人为定义必须同BlockID修订正文再称真实市场需求已证明；索引/普通物化视图同样可以审计，保留原ID/后继；测试证明功能区别不证明外部采用、集成收益或普遍必要性。其最小测试要求已全部实现：A/M/B在H4,H5相等；M真正复用缓存的不可变行，仅从V_H读取最新状态；具体Repaired→Recovered；原body和授权body均VerifyCommitLight同一真实保存的commit；未适配parts的修改body同header但differentpartset被wrong block ID拒绝。测试通过。本轮不新做性能实验。
+下面是综合稿。请最后核对并给最多3项必要修改，特别避免“fullID唯一绑定新版字节”或“旧签名直接授权新版”。若表述成立则确认，不用重复大量免责声明，正常期刊语言即可。
+
+
+Consider a local archival review that keeps each block's original commit
+evidence and transaction coordinates. After compensation, its input review
+must associate a reserve advance with the payment that consumed the missing
+output. An index or a materialized funding view supplies that association
+as an annotation to the unchanged original body. C3 offers a different
+record format: the designated input field itself names the historical
+reserve debit, and the authorized body remains compatible with the saved
+commit. This lets the review replace its body representation while retaining
+the block record and its existing commit evidence.
+
+The consumer reads the authorized body and exact Revision and Task from
+$V_H$, reconstructs the block and parts with that revision's openings,
+and checks the complete BlockID against the saved commit through Next's
+verification interfaces. Votes sign both the block hash and the part-set
+header. Since the funding slot is outside the fixed fields hashed for
+consensus transactions, matching the header alone does not establish
+part-set compatibility. The consumer then extracts the reserve-debit
+reference at $(h,j,k)$ and associates it with the permanent decision and
+obligation state at $H$. The old commit establishes identity compatibility;
+successful execution of the exact Task authorizes the new bytes.
+
+Our prototype exercises this workflow, including late repayment.
+Table~\ref{tab:c3-function} distinguishes its body-level requirement from
+an economic-state query, for which the index and ordinary view suffice.
+This is a Next-aware local consumer, not an unmodified CometBFT client.
+``Optional'' means that economic closure proceeds with the subsequent
+representation service stopped; the current build still uses the CH
+transaction and part encodings.
+

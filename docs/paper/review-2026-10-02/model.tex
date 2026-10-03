@@ -30,18 +30,6 @@ Next operates a native UTXO ledger. CAL carries payment value and FUEL pays proc
 
 Each organization has four fixed members and a replaceable collector. Members validate requests independently and authorize payments, while the collector distributes requests, assembles certificates, and coordinates propagation without spending authority. A separate committee $\mathcal C$ of four equally weighted validators, with three votes required, orders public commands and maintains accounts, outputs, obligations, and compensation decisions.
 
-\noindent\textbf{Collector access and deployment conditions.}
-Any client may relay an owner-authorized request; acting as collector
-grants neither spending authority nor organization-funded fees.
-Members still enforce ownership, input locks, resource grants, and
-the applicable fee policy. These per-request guards do not enforce
-a system-wide bound on unfinished approvals across collectors, and
-a gateway concurrency limit is not such a bound. The capacity condition
-in Section~\ref{sec:security-composition} therefore describes a
-controlled workload or an external deployment restriction. Without
-that restriction, an organization accepts the retained-capacity and
-reserve-loss boundaries analyzed there.
-
 \noindent\textbf{Faults and cryptography.}
 The adversary corrupts statically at most one member per organization and one committee validator throughout an execution; users and collectors behave arbitrarily. Honest participants share the network configuration, genesis, rules, and organization registry, and each route names one active configuration and one consumption-lock domain. Signatures are unforgeable, canonical digests and original block commitments are binding, and messages may be delayed arbitrarily.
 
@@ -57,16 +45,16 @@ Historical reads concern an honest replica that has verified and executed public
 \label{sec:model-certificates}
 An output carries an asset, an amount, an owner, and a consumption route. Its identifier $x$ derives from the network, the creating transaction, and the output position, and spending is indexed by $(x,i)$ with $i=0$ for ordinary outputs. All inputs of a fast payment share one consumption organization, and the owner authorizes the transaction. New outputs may select another registered organization, so cross-organization continuation changes the route of the new output while the previous issuer's responsibility stays in place.
 
-A TXCer pairs a summary with a quorum certificate (QC): three distinct member signatures over one fact $c_T$. The summary binds the network, transaction identity, issuer, configuration, epoch, rules, output commitments and amounts, and admission grants. Output bodies may be delivered separately, and the recipient checks commitment, position, and ownership before saving an output. The certificate authenticates the issuer's guarantee and is neither an asset, a registered public obligation, nor an unconditional guarantee of public execution or repayment.
+A TXCer pairs a summary with a quorum certificate (QC): three distinct member signatures over one fact $c_T$. The summary binds the network, transaction identity, issuer, configuration, epoch, rules, output commitments and amounts, and admission grants. Output bodies may be delivered separately, and the recipient checks commitment, position, and ownership before saving an output. The certificate authenticates the issuer's guarantee; Section~\ref{sec:model-contract} defines the corresponding service.
 
 Each payment carries
 \[\begin{aligned}
 \mathsf{IntentID}=\operatorname{Digest}(&\texttt{INTENT},\mathit{Network},\\
 &\mathit{Subject},\mathit{Nonce}),
 \end{aligned}\]
-which names an operation of one payer on one network; it is not a nonce space shared among users. Members keep local intent records per organization, whereas public execution binds an intent to one TxID in the same atomic transition that executes the payment successfully. Two organizations can therefore certify, from independent inputs, two payments with the same subject and nonce and both obtain QCs, but at most one executes publicly.
+which names an operation of one payer on one network; it is not a nonce space shared among users. Members keep local intent records per organization, whereas public execution binds an intent to one TxID in the same atomic transition that executes the payment successfully. Two organizations can therefore certify, from independent inputs, two payments with the same subject and nonce and both obtain QCs, but at most one TxID executes publicly. This deduplicates transaction execution, not economic receipts from separately executed successors of conflicting QCs.
 
-Three events recur: \emph{certified receipt}, where the wallet verifies and records an output locally; \emph{public execution}, where a committed command consumes inputs and creates outputs; and \emph{liability closure}, where a missing source is fulfilled or compensated. Compensation closes a liability economically, and representation records the closure later in stored history. Receipt supplies evidence for a successor request, which undergoes its own authorization and resource checks. Throughout, the \emph{source} of an output (also its parent) is the payment that creates it, and its \emph{consumer} (also its successor or child) is the payment that spends it. Child outputs are the outputs that the consumer creates. Source arrival means successful public execution of the source transaction, which the implementation's \texttt{Settled} flag marks and which may coexist with nonzero \texttt{Pending}.
+Throughout, the \emph{source} of an output (also its parent) is the payment that creates it, and its \emph{consumer} (also its successor or child) is the payment that spends it. Child outputs are the outputs that the consumer creates. Source arrival means successful public execution of the source transaction, which the implementation's \texttt{Settled} flag marks and which may coexist with nonzero \texttt{Pending}.
 
 \subsection{Three-Layer Design}
 \label{sec:model-layers}
@@ -86,3 +74,65 @@ Representation commands then replace the funding reference of a decided input wi
 Alice pays Bob 100 CAL through $G_A$, creating output $x$ routed to $G_B$. Bob verifies its TXCer and obtains a certificate for a payment to Carol. If Bob's payment executes first, the committee consumes $(x,0)$, records a 100-CAL obligation against $G_A$, and creates Bob's outputs. Carol continues from Bob's payment without Alice's transaction body, and the block that carries Bob's payment also carries the certificate of Alice's payment, so members of $G_A$ that approved it can resubmit it when Alice's wallet does not.
 
 Three outcomes follow. If Alice's payment executes before compensation, it closes the obligation and instance~0 stays consumed. Once the deadline passes, a compensation decision can close an obligation that remains Open by debiting $G_A$ by 100~CAL; Carol receives no second principal credit, Bob's payment does not re-execute, and the stored block keeps the original funding reference until a representation command replaces it with the reserve reference. If Alice's payment executes after compensation, it consumes its own inputs under the same rules and repays $G_A$ the 100~CAL; the decision stays recorded, Bob receives no second output, and $(x,0)$ stays consumed. If Alice's payment never executes, $G_A$ bears the loss.
+
+\subsection{Service Contract}
+\label{sec:model-contract}
+Table~\ref{tab:model-contract} separates certified receipt, public
+consumption, and liability closure.
+
+\begin{table}[!t]
+\caption{Service contract by stage.}
+\label{tab:model-contract}
+\centering\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.24\columnwidth}>{\raggedright\arraybackslash}p{0.69\columnwidth}@{}}
+\toprule
+Trigger & Established state \\
+\midrule
+Verified receipt &
+The issuer's QC binds the output and its owner. The recipient may
+request a successor, subject to its own admission checks. Receipt
+alone creates no public compensation obligation. \\
+Public consumption of a missing certified output &
+Successful execution atomically consumes the input, registers its
+direct issuer's obligation, and creates the child outputs.
+Authorization, fees, consumption state, and Intent must pass the
+public checks. \\
+Liability closure &
+Source execution fulfills the obligation; otherwise an included,
+valid post-deadline decision debits the issuer's CAL reserve.
+A later source repays it without a second credit to the recipient.
+The deadline alone does not guarantee completion. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Terminal holders.}
+A verified TXCer alone creates no redeemable public obligation. If its source
+does not execute and the holder cannot obtain a valid successor that executes
+publicly, the protocol offers no certificate-only redemption or unconditional exit;
+waiting does not create one.
+
+\noindent\textbf{Admission and stoppage.}
+Any client may collect approvals, without acquiring spending or
+fee-sponsorship authority. Before a new approval, each member checks
+the Intent, input locks, fees, grants, and available capacity in every
+applicable Worker slice in one transaction, including $a_T$ CAL for all outputs and change. Insufficient capacity
+rejects that approval without committing its changes or returning a
+signature. A retry of an existing, non-invalidated approval adds no
+reservation. The wallet records certified receipt only after verifying
+three matching signatures and the network, configuration, ownership,
+and output commitment. If no quorum approves, the request yields no
+new TXCer; earlier partial approvals remain reserved. Thus new
+certification can stop while the public reserve still has funds.
+Stoppage does not cancel existing certificates or unlock inputs.
+
+\noindent\textbf{Deployment and risk bearer.}
+The implementation has neither Subject-level CAL admission nor a
+cross-collector unfinished-request bound. Fee-sponsorship policies and
+gateway concurrency limits do not supply these guarantees. Sustained
+progress depends on the workload conditions of
+Section~\ref{sec:security-composition}, rather than an enforced global
+admission limit. In open deployment, the direct issuer bears the
+principal of a publicly consumed certified output whose source never
+executes, including an Intent loser. FUEL sponsorship does not transfer
+this CAL liability to the fee payer.

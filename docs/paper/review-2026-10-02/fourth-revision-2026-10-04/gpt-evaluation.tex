@@ -1,0 +1,102 @@
+% Evaluation opening: replace the build-description paragraph.
+\noindent\textbf{Builds and measurement.}
+The current-build series is based on \texttt{f856c7b}: three
+100-hop runs per continuation mode and three runs of the
+representative paused-adaptation treatment P. All nine runs
+share the same node build. Additional timing probes are confined
+to \texttt{payctl} and are enabled in all six chain runs, without
+changes to production node paths. The complete N/R/C/P matrix
+on \texttt{721800c} remains archived; historical-reader measurements
+retain \texttt{721800c}, and the injected-latency study retains
+\texttt{9879f64}. Chain summaries use medians and ranges of three
+run totals; mixed-load summaries use medians of three run-level
+statistics.
+
+% Replace the continuous-spending subsection text.
+\subsection{Continuous Spending Without Per-Hop Settlement}
+
+Three independent NoSync wallets rotate 100~CAL through online
+100-hop chains, using synchronous member commits and user-funded
+final FUEL. Fast mode proceeds after certified receipt; wait mode
+also requires the driver's observation of wallet-verified public
+execution between hops. Both measure
+$\mathsf{Sent}_1 \rightarrow \mathsf{Ready}_{100}$, including
+successor construction and retries. Wait mode adds 99 intermediate
+waits, not the final payment's public confirmation.
+
+Median chain times are 4.707\,s and 64.479\,s, respectively,
+a 13.70-fold ratio of medians; run ranges are 4.700--4.726\,s
+and 64.387--64.670\,s. Fast uses 300 attempts for 300 payments,
+whereas wait uses 414. All 297 fast successors use the preceding
+TXCer and are first sent before the earliest parent
+application-commit completion across the four replicas, with a
+minimum lead of 183.439\,ms. Actual child-before-source obligations
+number 2, 4, and 1 in the three fast runs; early sending alone is
+not counted as out-of-order execution. All 600 payments close and
+pass the accounting, input, replica, fee, and outbox audits.
+Fast-mode all-payment member closure has a median of 5.526\,s
+from the first send. Each chain spends 9,400~FUEL. For the fixed
+transaction shape, the TXCer is 779~B and requests are 1,979~B
+initially and 2,766~B thereafter.
+
+\noindent\textbf{Client timing.}
+Records are matched by receiving wallet, block height, and payment
+fact. This decomposition uses application-commit completion at
+\texttt{committee0}, the fetch source, rather than the earliest
+replica used in the lead check above. For height $h$,
+\texttt{BlockData} first obtains the signed header at $h+1$ and
+then fetches the block and results at $h$. Commit-to-complete-fetch
+therefore remains a joint interval covering successor evidence,
+replica progress, polling, and retrieval, not pure query overhead.
+Its wait-mode P50/P95 are 285.884/314.509\,ms. The separately
+observed post-fetch verification, preparation/local-recording,
+and post-transaction-callback-to-driver intervals have P95s of
+0.236, 1.343, and 4.713\,ms, respectively. The verification
+checkpoint is the \texttt{PrepareBlock} entry after successful
+\texttt{VerifyBlock}; the callback follows local transaction
+completion, not a durability flush.
+
+Cross-process intervals use same-host Unix-nanosecond timestamps;
+whole-chain durations use a monotonic clock. Driver polling,
+follower polling, and the commit setting remain 5, 25, and
+250\,ms. Fast successors can precede public observation, so
+negative observation-to-next-build differences record overlap,
+not negative waiting time. The chain ratio compares the measured
+end-to-end modes, including retries and evidence observation.
+
+% Replace the mixed-load subsection text.
+\subsection{Source Resolution Under Representative Mixed Load}
+
+The fourteen-service P treatment schedules 7,000 ordinary payments
+at 100 payments/s over 70\,s, alongside eight independent
+cross-organization parent--child pairs, using authorized
+organization-funded FUEL. Parent publication and \texttt{INSTALL}
+are withheld, automatic source resubmission is disabled, and all
+adaptation endpoints are paused; consensus and compensation
+decisions remain active. Each late source is released after its
+compensation is observed. Ordinary traffic spans the injected
+fault and recovery intervals.
+
+All 21,048 payments across the three runs close, including
+21,000 ordinary payments and 24 parent--child pairs. Each run
+pays and recovers 800~CAL. Before adaptation resumes, all four
+committee replicas report all eight targets \texttt{Recovered},
+with their representation \texttt{Committed} and
+\texttt{Materialized} flags both false. These 96 replica--target
+checks establish compensation and repayment before adaptation
+resumption in the measured executions. Within each run,
+committee state hashes agree at a common height, and CAL/FUEL,
+input, fee, reservation, and outbox audits pass. Per-run fees are
+659,544~FUEL: 589,384 in rewards and 70,160 burned.
+
+Table~\ref{tab:current-p} reports ordinary receipt latency together
+with pre-send backpressure and drain. Median run-level receipt
+P50/P95 are 54.538/147.549\,ms; public and member-observation P95s
+are 2.187 and 2.255\,s. All three runs reach the 256-outstanding
+limit. Dispatch P95 reaches 780.727\,ms and scheduled-to-receipt
+P95 reaches 851.742\,ms; the latter is computed per payment,
+not by adding quantiles. Actual send spans are 70.080--70.771\,s,
+followed by 0.955--1.115\,s of ordinary-payment drain. This
+representative P series demonstrates economic closure during
+ordinary traffic with adaptation unavailable; it is not a
+current-build comparison of interference across N/R/C/P.

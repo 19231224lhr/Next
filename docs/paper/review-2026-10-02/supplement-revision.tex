@@ -1,4 +1,4 @@
-\section{Current-Build Revision Validation}
+\section{Boundary and Network Validation: Build 9879f64}
 \label{supp:major-revision}
 Production snapshot \texttt{9879f64} retains the local reclamation patch
 \texttt{bf71c4d}. The new fixtures and network driver additions are
@@ -37,6 +37,43 @@ grant usage, and CAL/FUEL conservation at every committed prefix.
 Repeated compensation produces no new changes, effects, or fee outputs.
 These results demonstrate finite reserve loss and conservative
 certification stoppage, not a network attack rate.
+
+
+\begin{table}[!t]
+\caption{Intent-conflict ledger after compensation under A's grant (CAL).}
+\label{tab:s3-ledger}
+\centering\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+ & Start & Round 1 & Round 2 \\
+\midrule
+A's reserve & 300 & 200 & 100 \\
+Public Spent / Reserved & 0/0 & 100/0 & 200/0 \\
+Reserved per source signer & 0 & 100 & 200 \\
+Available per source signer & 200 & 100 & 0 \\
+Available at fourth member & 200 & 200 & 200 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Fixed-signer capacity bound.}
+Table~\ref{tab:s3-ledger} separates public reserve accounting from
+local signing capacity. With the same three source signers, one Worker
+per member, initially unused capacity, no top-up or release, and
+reservation $a>0$ per source, this pattern admits at most
+\[
+  n_{\mathrm{fixed}}=\left\lfloor
+       \frac{\lfloor2B_g/3\rfloor}{a}\right\rfloor
+\]
+rounds. Each round retains $a$ at every honest source signer; when all
+of that source's value is consumed and compensated, it also adds $a$
+to net reserve loss. Here $B_g=300$, $a=100$, and two rounds exhaust
+the three signers while 100 CAL remains in reserve. This is a bound
+for the specified signer pattern, not a maximum over arbitrary
+signer sets or schedules. Repetition also needs fresh paired Intents,
+independent winner inputs, usable descendant routes, and sufficient
+fees. A funded top-up adds the share difference without clearing prior
+reservations. No CAL--FUEL exchange value is inferred from this trace.
 
 \noindent\textbf{State-preserving restart and original-history replay.}
 With real threshold adaptation, regressions cover both
@@ -103,15 +140,27 @@ speedup nor a polling-only penalty, and these intervals do not establish
 a counterfactual event-driven result.
 
 \subsection{Archival Byte-Export Example}
-The runnable \texttt{TestHistoricalExportConsumer} emits a local export
-with prefix, coordinates, complete BlockID, Revision, Task ID, original
-and authorized body bytes, historical funding and current obligation
-state. It verifies the exact Task body and revision, original part-set
-identity, owner signature, QC and input CH relation. A late repayment
-changes the economic answer without changing the authorized bytes.
-This is an example consumer of verified local history, not a claimed
-deployed client or remote authentication protocol. The permanent decision
-and obligation are consulted on both read paths.
+The runnable \texttt{TestHistoricalExportConsumer} exports prefix,
+coordinates, full BlockID, exact Revision and Task, original and authorized
+bodies, and historical funding with current obligation state. It checks
+Task equality, owner authorization, QC, input openings, and reconstructed
+parts. The extended test compares original-body/index, plain cached
+funding rows, and C3 at $H=4$ and after real repayment at $H=5$; all return
+the same economic answer. Cached rows retain immutable fields and obtain
+status from the current read view. Both original and authorized bodies
+pass signature verification against the same saved original commit and
+validator set. A negative control retains the changed body and header
+but uses initial part openings: the part-set header differs and the
+commit check rejects the complete BlockID. Thus matching the header
+alone is insufficient for this consumer.
+
+After repayment, authorized bytes, cached rows, and the permanent decision
+remain unchanged; current status changes from Repaired to Recovered.
+This local functional comparison does not time the cached view or establish
+external adoption. The main paper's read timings compare the original
+index and C3 layouts, not this third view. Authorization in every case
+comes from the executed prefix; the saved commit is an identity check,
+not independent permission to replace bytes.
 
 \subsection{Chameleon-Hash Instantiation}
 \label{sec:ch-params}

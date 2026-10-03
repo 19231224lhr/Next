@@ -27,7 +27,7 @@ Invalidation is evaluated only while applying an authenticated block
 entry whose execution result is successful and applied; \texttt{INSTALL}
 does not trigger it.  Before the follower overwrites a spend record, it
 reads the previous candidate and verifies the immutable approval and
-the exact ordinary or user-fee input instance.  Existing observation,
+the exact principal (final or certified) or user-fee input instance.  Existing observation,
 installed certificate material, an outbox entry, settlement, pending
 obligations, compensation, recovery, or a fee effect is treated as an
 accounting contradiction rather than as releasable state.

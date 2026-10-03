@@ -1,0 +1,15 @@
+\noindent\textbf{Client timing.}
+For target height $h$, \texttt{BlockData} obtains the signed header
+at $h+1$ before fetching the block and results at $h$. The RPC can
+supply the latest-height seen commit without waiting for $h+2$.
+From application-commit completion at the fetch source,
+\texttt{committee0}, commit-to-complete-fetch includes successor
+evidence, replica progress, polling, and retrieval, not pure polling
+or query overhead. Its wait-mode P50/P95 are 285.884/314.509\,ms.
+Separate P95s for post-fetch verification, preparation/local recording,
+and post-transaction callback-to-driver observation are 0.236, 1.343,
+and 4.713\,ms. The callback does not await a durability flush.
+Supplement~S4 specifies checkpoints, clocks, matching, and aggregation.
+The chain ratio compares end-to-end modes, including retries and
+evidence observation; negative fast observation-to-build differences
+indicate overlap.

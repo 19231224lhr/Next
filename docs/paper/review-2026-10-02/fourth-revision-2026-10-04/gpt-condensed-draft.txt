@@ -1,0 +1,95 @@
+ChatGPT said:
+1. 摘要（英文 193 词；关键词保持原文）
+
+英文：
+
+LaTeX
+\begin{abstract}
+Next is a native UTXO ledger enabling a recipient to verify a
+quorum-signed output certificate (TXCer) after one certification round
+and request a successor before public source execution, subject to
+successor admission and available capacity. If the successor executes
+first, the committee records a funded obligation against the direct
+issuer. Original signers can resubmit sources from publicly exposed
+certificates. A deadline-triggered decision debits the issuer's reserve;
+late sources repay it, but permanently unexecuted sources leave the
+issuer bearing the CAL of publicly consumed outputs. Optional authorized
+history commands support local block review by embedding reserve
+references at original coordinates while preserving owner authorizations,
+successor references, and the complete BlockID. For four-member
+organizations and a four-validator committee, each requiring three votes
+with at most one static Byzantine member, we prove unique consumption,
+coverage of outstanding certificate liability, and delay-neutral terminal
+CAL holdings for finite, acyclic, source-closed, conflict-free payment
+sets whose payments each succeed exactly once. On one host with
+synchronous member commits, median time to the last certified receipt
+in a 100-hop chain is 4.707\,s versus 64.479\,s with per-hop waiting.
+Targeted boundary and restart tests check capacity, economic closure,
+and historical reads.
+\end{abstract}
+
+中文：
+
+LaTeX
+\begin{abstract}
+Next 是一种原生 UTXO 账本，收款人在一轮认证后验证法定人数签署的
+输出凭证（TXCer），即可在来源公开执行前请求后继付款，但仍须满足
+后继准入及可用容量条件。若后继先执行，委员会记录由直接签发方承担、
+具有资金覆盖的义务。原签名者可依据公开暴露的凭证补交来源。
+到期触发的决定扣减签发方储备；迟到来源偿还储备，而来源永不执行时，
+签发方承担其已公开消费输出的 CAL 损失。可选的授权历史命令在
+原坐标嵌入储备引用，支持本地区块复核，同时保持所有者授权、
+后继引用及完整 BlockID。对于四成员组织和四验证者委员会，
+在各需三票、各至多一个静态 Byzantine 成员的条件下，
+我们证明唯一消费、未结凭证责任的资金覆盖，以及有限、无环、
+来源闭合、无冲突且每笔付款均恰好成功一次的集合之终态 CAL
+持有量的延迟中性。在成员同步提交的单机实验中，100 跳链到达
+最后一笔认证到账的时长中位数为 4.707\,s，
+逐跳等待时为 64.479\,s。
+定向边界与重启测试检查容量、经济闭合和历史读取。
+\end{abstract}
+2. Client timing（英文 110 词，不计标题）
+
+英文：
+
+LaTeX
+\noindent\textbf{Client timing.}
+For target height $h$, \texttt{BlockData} obtains the signed header
+at $h+1$ before fetching the block and results at $h$. The RPC can
+supply the latest-height seen commit without waiting for $h+2$.
+From application-commit completion at the fetch source,
+\texttt{committee0}, commit-to-complete-fetch includes successor
+evidence, replica progress, polling, and retrieval, not pure polling
+or query overhead. Its wait-mode P50/P95 are 285.884/314.509\,ms.
+Separate P95s for post-fetch verification, preparation/local recording,
+and post-transaction callback-to-driver observation are 0.236, 1.343,
+and 4.713\,ms. The callback does not await a durability flush.
+Supplement~S4 specifies checkpoints, clocks, matching, and aggregation.
+The chain ratio compares end-to-end modes, including retries and
+evidence observation; negative fast observation-to-build differences
+indicate overlap.
+
+中文：
+
+LaTeX
+\noindent\textbf{客户端计时。}
+对于目标高度 $h$，\texttt{BlockData} 先取得 $h+1$ 的签名头，
+再获取 $h$ 的区块和结果。RPC 可返回最新高度的 seen commit，
+无需等待 $h+2$。
+从取数端 \texttt{committee0} 的应用提交完成到完整取数返回，
+该区间包含后继证据、副本推进、轮询及取数，不是纯轮询或查询开销。
+wait 模式的 P50/P95 为 285.884/314.509\,ms。
+另行测量的取数后验证、准备与本地记录、
+以及事务完成后回调至驱动观察三个区间，
+P95 分别为 0.236、1.343 和 4.713\,ms。
+回调不等待耐久刷盘。补充材料第~S4~节给出检查点、时钟、
+匹配及聚合方法。链时长比比较包含重试和证据观察的端到端模式；
+fast 中为负的观察至下一跳构造差值表示执行重叠。
+ChatGPT can make mistakes. Check important info.
+Latest response
+
+
+
+
+Pro
+Response complete

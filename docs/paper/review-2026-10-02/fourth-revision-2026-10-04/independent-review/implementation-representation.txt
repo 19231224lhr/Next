@@ -1,0 +1,1045 @@
+Project source snapshot; production baseline f856c7b. Files are complete unless explicitly stated. This package does not include generated keys, local runtime configuration, or credentials.
+
+
+===== FILE: internal/redaction/repair.go =====
+//go:build comet_v3
+
+// Package redaction implements the exceptional compensation path. Normal
+// payment validation never requests threshold adaptation shares.
+package redaction
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"fmt"
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cmtstore "github.com/cometbft/cometbft/store"
+	"github.com/cometbft/cometbft/types"
+	"utxo/crypto/chameleon"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+type Revision struct {
+	Number uint64
+	Body   []byte
+}
+type Location struct {
+	Height int64
+	Index  uint32
+}
+
+func LocationKey(tx protocol.TxID) []byte { return state.Key(107, tx[:]) }
+func RevisionKey(height int64) []byte {
+	e := new(protocol.Encoder)
+	e.U64(uint64(height))
+	return state.Key(108, e.Data())
+}
+func TaskKey(id protocol.Hash) []byte { return state.Key(109, id[:]) }
+func QueueKey(height, target int64, revision uint64, id protocol.Hash) []byte {
+	e := new(protocol.Encoder)
+	e.U64(uint64(height))
+	e.U64(uint64(target))
+	e.U64(revision)
+	e.Fixed(id[:])
+	return state.Key(113, e.Data())
+}
+
+type Task struct {
+	Command protocol.RepairInput
+	Body    []byte
+	Height  int64
+}
+
+// Canonical reads application-committed revisions, not the background worker's
+// materialized view. Worker timing can never change consensus execution.
+// The caller supplies a state snapshot from a verified committed prefix and a
+// height within that prefix. This is an internal view, not an authentication
+// check for a block returned by an untrusted peer. Physical installation may
+// lag behind this logical revision; compensation is recorded independently.
+func Canonical(v state.ReadView, bs *cmtstore.BlockStore, height int64) (*types.Block, Revision, error) {
+	revision, found, err := state.Load[Revision](v, RevisionKey(height))
+	if err != nil {
+		return nil, revision, err
+	}
+	if found {
+		pb := new(cmtproto.Block)
+		if err = pb.Unmarshal(revision.Body); err != nil {
+			return nil, revision, err
+		}
+		b, err := types.BlockFromProto(pb)
+		return b, revision, err
+	}
+	b, err := bs.LoadOriginalBlock(height)
+	if err != nil {
+		return nil, revision, err
+	}
+	if b == nil {
+		return nil, revision, rules.ErrMissing
+	}
+	pb, err := b.ToProto()
+	if err != nil {
+		return nil, revision, err
+	}
+	revision.Body, err = pb.Marshal()
+	return b, revision, err
+}
+
+func digest(b []byte) protocol.Hash { return protocol.Hash(sha256.Sum256(b)) }
+
+// CompensationTarget checks the due obligation and exact original funding
+// slot without requesting an adaptation witness.
+func CompensationTarget(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, output protocol.OutputID, now int64) (protocol.RepairInput, protocol.DirectSubmission, error) {
+	var command protocol.RepairInput
+	ob, found, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(output))
+	if err != nil {
+		return command, protocol.DirectSubmission{}, err
+	}
+	if !found || ob.Status != rules.DirectOpen {
+		return command, protocol.DirectSubmission{}, rules.ErrMissing
+	}
+	if ob.Deadline == 0 || now < ob.Deadline {
+		return command, protocol.DirectSubmission{}, rules.ErrLimited
+	}
+	return targetSlot(v, bs, p, ob)
+}
+
+// InputTarget authorizes adaptation from the immutable successful decision.
+// Later source recovery does not revoke an already paid repair.
+func InputTarget(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, output protocol.OutputID, now int64) (protocol.RepairInput, protocol.DirectSubmission, error) {
+	todo, found, err := state.Load[rules.DirectRepairTodo](v, rules.DirectRepairKey(output))
+	if err != nil {
+		return protocol.RepairInput{}, protocol.DirectSubmission{}, err
+	}
+	if !found || todo.DecisionHeight <= 0 || todo.Decision.Output != output || todo.Debit != protocol.ReserveDebitIdentity(todo.Decision.Network, output) {
+		return protocol.RepairInput{}, protocol.DirectSubmission{}, rules.ErrMissing
+	}
+	c, pay, err := targetSlot(v, bs, p, todo.Obligation)
+	if err == nil && (c.Network != todo.Decision.Network || c.Height != todo.Decision.Height || c.Transaction != todo.Decision.Transaction || c.Input != todo.Decision.Input) {
+		err = protocol.ErrAuth
+	}
+	return c, pay, err
+}
+
+func targetSlot(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, ob rules.DirectObligation) (protocol.RepairInput, protocol.DirectSubmission, error) {
+	var command protocol.RepairInput
+	output := ob.Output
+	cfg, ok := p.Organizations[ob.Config]
+	if !ok || cfg.Org != ob.Issuer {
+		return command, protocol.DirectSubmission{}, protocol.ErrAuth
+	}
+	location, found, err := state.Load[Location](v, LocationKey(ob.Transaction))
+	if err != nil {
+		return command, protocol.DirectSubmission{}, err
+	}
+	if !found {
+		return command, protocol.DirectSubmission{}, rules.ErrMissing
+	}
+	b, revision, err := Canonical(v, bs, location.Height)
+	if err != nil {
+		return command, protocol.DirectSubmission{}, err
+	}
+	if int(location.Index) >= len(b.Data.Txs) {
+		return command, protocol.DirectSubmission{}, protocol.ErrRule
+	}
+	payment, err := protocol.DecodeDirectSubmission(b.Data.Txs[location.Index])
+	if err != nil {
+		return command, payment, err
+	}
+	if payment.Tx.ID() != ob.Transaction || payment.Authorization.Fact != ob.Consumer || int(ob.Input) >= len(payment.Tx.Funding) || payment.Tx.Body.Inputs[ob.Input].Output != output || payment.Tx.Claims[ob.Input].Output.Amount != ob.Amount {
+		return command, payment, protocol.ErrAuth
+	}
+	f := payment.Tx.Funding[ob.Input]
+	if f.Kind != protocol.OriginalFunding || f.Ref != protocol.Hash(output) || !p.Key.Verify(payment.Tx.FundingContext(int(ob.Input), p.Key.KeyID()), f.ReferenceBytes(), payment.Tx.Commitments[ob.Input], f.Opening) {
+		return command, payment, protocol.ErrAuth
+	}
+	command = protocol.RepairInput{Network: cfg.Network, Output: output, Height: location.Height, Transaction: location.Index, Input: ob.Input, Base: revision.Number, Previous: digest(revision.Body)}
+	return command, payment, nil
+}
+
+func InputShare(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, signer chameleon.Signer, output protocol.OutputID, now int64) (chameleon.Contribution, error) {
+	command, payment, err := InputTarget(v, bs, p, output, now)
+	if err != nil {
+		return chameleon.Contribution{}, err
+	}
+	i := int(command.Input)
+	old := payment.Tx.Funding[i]
+	next := protocol.Funding{Kind: protocol.ReserveFunding, Ref: protocol.ReserveDebitIdentity(command.Network, output)}
+	return signer.Adapt(payment.Tx.FundingContext(i, p.Key.KeyID()), old.ReferenceBytes(), next.ReferenceBytes(), payment.Tx.Commitments[i], old.Opening)
+}
+
+// ReplaceInput changes only one fixed-width funding slot; the immutable claim,
+// wallet signature, organization authorization, fees and output IDs remain byte-for-byte unchanged.
+func ReplaceInput(p rules.DirectPolicy, c protocol.RepairInput, payment protocol.DirectSubmission, shares []chameleon.Contribution) (protocol.RepairInput, error) {
+	i := int(c.Input)
+	if i >= len(payment.Tx.Funding) {
+		return c, protocol.ErrRule
+	}
+	old := payment.Tx.Funding[i]
+	next := protocol.Funding{Kind: protocol.ReserveFunding, Ref: protocol.ReserveDebitIdentity(c.Network, c.Output)}
+	r, err := p.Key.Combine(payment.Tx.FundingContext(i, p.Key.KeyID()), old.ReferenceBytes(), next.ReferenceBytes(), payment.Tx.Commitments[i], old.Opening, shares)
+	if err != nil {
+		return c, err
+	}
+	payment.Tx.Funding = append([]protocol.Funding(nil), payment.Tx.Funding...)
+	next.Opening = r
+	payment.Tx.Funding[i] = next
+	c.TransactionBytes, err = payment.MarshalBinary()
+	return c, err
+}
+
+func nextBody(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairInput, now int64) (*types.Block, []byte, error) {
+	expected, payment, err := InputTarget(v, bs, p, c.Output, now)
+	if err != nil {
+		return nil, nil, err
+	}
+	if c.Network != expected.Network || c.Height != expected.Height || c.Transaction != expected.Transaction || c.Input != expected.Input || c.Base != expected.Base || c.Previous != expected.Previous {
+		return nil, nil, protocol.ErrAuth
+	}
+	next, err := protocol.DecodeDirectSubmission(c.TransactionBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	i := int(c.Input)
+	if i >= len(next.Tx.Funding) {
+		return nil, nil, protocol.ErrAuth
+	}
+	f := next.Tx.Funding[i]
+	if f.Kind != protocol.ReserveFunding || f.Ref != protocol.ReserveDebitIdentity(c.Network, c.Output) || !p.Key.Verify(payment.Tx.FundingContext(i, p.Key.KeyID()), f.ReferenceBytes(), payment.Tx.Commitments[i], f.Opening) {
+		return nil, nil, protocol.ErrAuth
+	}
+	payment.Tx.Funding[i] = f
+	exact, err := payment.MarshalBinary()
+	if err != nil {
+		return nil, nil, err
+	}
+	if !bytes.Equal(exact, c.TransactionBytes) {
+		return nil, nil, protocol.ErrAuth
+	}
+	old, _, err := Canonical(v, bs, c.Height)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(c.TransactionBytes) != len(old.Data.Txs[c.Transaction]) {
+		return nil, nil, protocol.ErrRule
+	}
+	pb, err := old.ToProto()
+	if err != nil {
+		return nil, nil, err
+	}
+	pb.Data.Txs[c.Transaction] = c.TransactionBytes
+	b, err := types.BlockFromProto(pb)
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err := pb.Marshal()
+	return b, body, err
+}
+
+type PartRequest struct {
+	Index              uint32
+	Context, Old, Next []byte
+	Commitment         chameleon.Commitment
+	Opening            chameleon.Opening
+}
+
+// PartRequests validates the proposed input repair first. Each signer runs
+// this function against its own committed state before providing part shares.
+func PartRequests(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairInput, now int64) ([]PartRequest, []chameleon.Opening, []byte, error) {
+	_, next, err := nextBody(v, bs, p, c, now)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return partRequestsForBody(v, bs, p, c.Height, next)
+}
+
+func partRequestsForBody(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, height int64, next []byte) ([]PartRequest, []chameleon.Opening, []byte, error) {
+	_, revision, err := Canonical(v, bs, height)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	var oldOpenings []chameleon.Opening
+	if revision.Number > 0 {
+		// The preceding command is stored with its materialization; never infer
+		// current authorization from the mutable local block store.
+		old, found, err := state.Load[protocol.RepairInput](v, state.Key(110, RevisionKey(height)))
+		if err != nil || !found {
+			return nil, nil, nil, rules.ErrMissing
+		}
+		oldOpenings = old.Parts
+	}
+	oldParts, err := types.NewRedactablePartSet(revision.Body, types.BlockPartSizeBytes, height, revision.Number, oldOpenings)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	openings := make([]chameleon.Opening, oldParts.Total())
+	var requests []PartRequest
+	for i := range openings {
+		part := oldParts.GetPart(i)
+		start := i * int(types.BlockPartSizeBytes)
+		end := min(start+int(types.BlockPartSizeBytes), len(next))
+		if start >= len(next) {
+			return nil, nil, nil, protocol.ErrRule
+		}
+		openings[i] = part.Redaction.Opening
+		if bytes.Equal(part.Bytes, next[start:end]) {
+			continue
+		}
+		ctx := types.RedactionContext(height, uint32(i))
+		commitment, err := p.Key.Digest(ctx, part.Bytes, openings[i])
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		requests = append(requests, PartRequest{Index: uint32(i), Context: ctx, Old: part.Bytes, Next: next[start:end], Commitment: commitment, Opening: openings[i]})
+	}
+	return requests, openings, next, nil
+}
+
+func PartShares(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, signer chameleon.Signer, c protocol.RepairInput, now int64) ([]chameleon.Contribution, error) {
+	requests, _, _, err := PartRequests(v, bs, p, c, now)
+	if err != nil {
+		return nil, err
+	}
+	shares := make([]chameleon.Contribution, len(requests))
+	for i, r := range requests {
+		shares[i], err = signer.Adapt(r.Context, r.Old, r.Next, r.Commitment, r.Opening)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return shares, nil
+}
+
+func CompleteParts(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairInput, now int64, shares [][]chameleon.Contribution) (protocol.RepairInput, error) {
+	requests, openings, body, err := PartRequests(v, bs, p, c, now)
+	if err != nil {
+		return c, err
+	}
+	openings, err = combinePartOpenings(p, requests, openings, shares)
+	if err != nil {
+		return c, err
+	}
+	c.Parts = openings
+	c.Next = digest(body)
+	return c, nil
+}
+
+func Execute(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairInput, height, now int64) (state.Transition, error) {
+	id := protocol.RepairIdentity(c.Network, c.Output)
+	if old, found, err := LoadTask(v, id); err != nil {
+		return state.Transition{}, err
+	} else if found {
+		a, _ := old.Command.MarshalBinary()
+		b, _ := c.MarshalBinary()
+		if bytes.Equal(a, b) {
+			raw, e := (protocol.RepairResult{Command: c.ID()}).MarshalBinary()
+			return state.Transition{Data: raw}, e
+		}
+		return state.Transition{}, rules.ErrConflict
+	}
+	if c.Height >= height {
+		return state.Transition{}, protocol.ErrRule
+	}
+	b, body, err := nextBody(v, bs, p, c, now)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if c.Next != digest(body) {
+		return state.Transition{}, protocol.ErrAuth
+	}
+	parts, err := types.NewRedactablePartSet(body, types.BlockPartSizeBytes, c.Height, c.Base+1, c.Parts)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	meta := bs.LoadBlockMeta(c.Height)
+	if meta == nil || !bytes.Equal(b.Hash(), meta.BlockID.Hash) || !parts.Header().Equals(meta.BlockID.PartSetHeader) {
+		return state.Transition{}, protocol.ErrAuth
+	}
+	raw, err := (protocol.RepairResult{Command: c.ID(), Applied: true}).MarshalBinary()
+	if err != nil {
+		return state.Transition{}, err
+	}
+	tr := state.Transition{Data: raw}
+	o := state.NewOverlay(v)
+	o.Apply([]state.Change{{Key: DecisionPendingKey(c.Height, c.Output), Delete: true}})
+	if err = state.Put(o, RevisionKey(c.Height), Revision{Number: c.Base + 1, Body: body}); err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(o, state.Key(110, RevisionKey(c.Height)), c); err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(o, TaskKey(id), Task{Command: c, Body: body, Height: height}); err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(o, QueueKey(height, c.Height, c.Base+1, id), id); err != nil {
+		return state.Transition{}, err
+	}
+	tr.Changes = o.Changes()
+	return tr, nil
+}
+
+// Materialize is idempotent after Commit. It verifies the application-committed
+// exact bytes; an isolated hash collision never grants editing authority.
+// Materialization owns decoded committed bytes; installation never re-enters
+// application storage while holding the block store revision lock.
+type Materialization struct{ task Task }
+
+func PrepareMaterialization(v state.ReadView, id protocol.Hash) (Materialization, error) {
+	task, found, err := LoadTask(v, id)
+	if err != nil {
+		return Materialization{}, err
+	}
+	if !found {
+		return Materialization{}, rules.ErrMissing
+	}
+	revision, found, err := state.Load[Revision](v, RevisionKey(task.Command.Height))
+	if err != nil {
+		return Materialization{}, err
+	}
+	if !found || revision.Number < task.Command.Base+1 {
+		return Materialization{}, rules.ErrConflict
+	}
+	if revision.Number > task.Command.Base+1 {
+		command, ok, err := state.Load[protocol.RepairInput](v, state.Key(110, RevisionKey(task.Command.Height)))
+		if err != nil {
+			return Materialization{}, err
+		}
+		if !ok || command.Height != task.Command.Height || command.Base+1 != revision.Number || digest(revision.Body) != command.Next {
+			return Materialization{}, rules.ErrConflict
+		}
+		task.Command, task.Body = command, revision.Body
+	}
+	if digest(task.Body) != task.Command.Next {
+		return Materialization{}, protocol.ErrAuth
+	}
+	return Materialization{task: task}, nil
+}
+
+func (m Materialization) Install(bs *cmtstore.BlockStore) error {
+	task := m.task
+	c := task.Command
+	if c.Base == ^uint64(0) || len(task.Body) == 0 {
+		return protocol.ErrRule
+	}
+	parts, err := types.NewRedactablePartSet(task.Body, types.BlockPartSizeBytes, c.Height, c.Base+1, c.Parts)
+	if err != nil {
+		return err
+	}
+	return bs.InstallCommittedRevision(c.Height, c.Base+1, parts, func(_, next *types.Block) error {
+		pb, err := next.ToProto()
+		if err != nil {
+			return err
+		}
+		body, err := pb.Marshal()
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(body, task.Body) || digest(body) != c.Next {
+			return fmt.Errorf("repair body differs from committed command")
+		}
+		return nil
+	})
+}
+
+func Materialize(v state.ReadView, bs *cmtstore.BlockStore, id protocol.Hash) error {
+	m, err := PrepareMaterialization(v, id)
+	if err != nil {
+		return err
+	}
+	return m.Install(bs)
+}
+
+// A malformed row invalidates only triples containing that row. All changed
+// parts must verify with one triple of distinct fixed-committee contributors.
+func combinePartOpenings(p rules.DirectPolicy, requests []PartRequest, base []chameleon.Opening, rows [][]chameleon.Contribution) ([]chameleon.Opening, error) {
+	if len(rows) < 3 || len(rows) > 4 || len(requests) == 0 {
+		return nil, protocol.ErrAuth
+	}
+	for i := 0; i < len(rows)-2; i++ {
+		for j := i + 1; j < len(rows)-1; j++ {
+			for k := j + 1; k < len(rows); k++ {
+				if len(rows[i]) != len(requests) || len(rows[j]) != len(requests) || len(rows[k]) != len(requests) {
+					continue
+				}
+				openings := append([]chameleon.Opening(nil), base...)
+				valid := true
+				for n, r := range requests {
+					opening, err := p.Key.Combine(r.Context, r.Old, r.Next, r.Commitment, r.Opening, []chameleon.Contribution{rows[i][n], rows[j][n], rows[k][n]})
+					if err != nil {
+						valid = false
+						break
+					}
+					openings[r.Index] = opening
+				}
+				if valid {
+					return openings, nil
+				}
+			}
+		}
+	}
+	return nil, protocol.ErrAuth
+}
+
+
+===== FILE: internal/redaction/batch.go =====
+//go:build comet_v3
+
+package redaction
+
+import (
+	"bytes"
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cmtstore "github.com/cometbft/cometbft/store"
+	"github.com/cometbft/cometbft/types"
+	"sort"
+	"utxo/crypto/chameleon"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+type BatchTask struct {
+	Command protocol.RepairBatch
+	Body    []byte
+	Height  int64
+}
+type batchReference struct {
+	Batch protocol.Hash
+	Index uint32
+}
+
+func BatchTaskKey(id protocol.Hash) []byte      { return state.Key(114, id[:]) }
+func batchReferenceKey(id protocol.Hash) []byte { return state.Key(115, id[:]) }
+
+// LoadTask projects a batch item for legacy observation APIs without storing
+// the full batch body once per obligation. Batch commands stay immutable.
+func LoadTask(v state.ReadView, id protocol.Hash) (Task, bool, error) {
+	task, found, err := state.Load[Task](v, TaskKey(id))
+	if err != nil || found {
+		return task, found, err
+	}
+	ref, hasRef, err := state.Load[batchReference](v, batchReferenceKey(id))
+	if err != nil {
+		return task, false, err
+	}
+	batchID := id
+	if hasRef {
+		batchID = ref.Batch
+	}
+	batch, found, err := state.Load[BatchTask](v, BatchTaskKey(batchID))
+	if err != nil || !found {
+		return task, found, err
+	}
+	// A batch ID projects item zero only to reuse the single-task installer.
+	// Body, Next and Parts describe the complete batch revision, not one item.
+	index := int(ref.Index)
+	if index >= len(batch.Command.Items) {
+		return task, false, protocol.ErrRule
+	}
+	c := batch.Command
+	x := c.Items[index]
+	block, err := decodeBody(batch.Body)
+	if err != nil {
+		return task, false, err
+	}
+	if int(x.Transaction) >= len(block.Data.Txs) {
+		return task, false, protocol.ErrRule
+	}
+	task = Task{Height: batch.Height, Body: batch.Body, Command: protocol.RepairInput{Network: c.Network, Output: x.Output, Height: c.Height, Transaction: x.Transaction, Input: x.Input, Base: c.Base, Previous: c.Previous, Next: c.Next, Parts: c.Parts, TransactionBytes: bytes.Clone(block.Data.Txs[x.Transaction])}}
+	return task, true, nil
+}
+
+func BuildBatch(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, singles []protocol.RepairInput, now int64) (protocol.RepairBatch, error) {
+	var c protocol.RepairBatch
+	if len(singles) == 0 || len(singles) > protocol.MaxRepairItems {
+		return c, protocol.ErrRule
+	}
+	for i, s := range singles {
+		expected, _, err := InputTarget(v, bs, p, s.Output, now)
+		if err != nil {
+			return c, err
+		}
+		if s.Network != expected.Network || s.Height != expected.Height || s.Transaction != expected.Transaction || s.Input != expected.Input {
+			return c, protocol.ErrAuth
+		}
+		pay, err := protocol.DecodeDirectSubmission(s.TransactionBytes)
+		if err != nil {
+			return c, err
+		}
+		if int(s.Input) >= len(pay.Tx.Funding) {
+			return c, protocol.ErrRule
+		}
+		if i == 0 {
+			c.Network, c.Height, c.Base, c.Previous = expected.Network, expected.Height, expected.Base, expected.Previous
+			c.Parts = []chameleon.Opening{{}}
+		}
+		if expected.Height != c.Height || expected.Base != c.Base || expected.Previous != c.Previous {
+			return c, protocol.ErrRule
+		}
+		c.Items = append(c.Items, protocol.RepairItem{Output: s.Output, Transaction: s.Transaction, Input: s.Input, Opening: pay.Tx.Funding[s.Input].Opening})
+	}
+	sort.Slice(c.Items, func(i, j int) bool {
+		a, b := c.Items[i], c.Items[j]
+		return a.Transaction < b.Transaction || (a.Transaction == b.Transaction && a.Input < b.Input)
+	})
+	_, body, err := batchBody(v, bs, p, c, now)
+	if err != nil {
+		return c, err
+	}
+	c.Next = digest(body)
+	return c, nil
+}
+
+func batchBody(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairBatch, now int64) (*types.Block, []byte, error) {
+	if _, err := c.MarshalBinary(); err != nil {
+		return nil, nil, err
+	}
+	old, revision, err := Canonical(v, bs, c.Height)
+	if err != nil {
+		return nil, nil, err
+	}
+	if revision.Number != c.Base || digest(revision.Body) != c.Previous {
+		return nil, nil, rules.ErrConflict
+	}
+	pb, err := old.ToProto()
+	if err != nil {
+		return nil, nil, err
+	}
+	payments := make(map[uint32]protocol.DirectSubmission)
+	for _, x := range c.Items {
+		expected, pay, err := InputTarget(v, bs, p, x.Output, now)
+		if err != nil {
+			return nil, nil, err
+		}
+		if expected.Network != c.Network || expected.Height != c.Height || expected.Transaction != x.Transaction || expected.Input != x.Input || expected.Base != c.Base || expected.Previous != c.Previous {
+			return nil, nil, protocol.ErrAuth
+		}
+		if previous, ok := payments[x.Transaction]; ok {
+			pay = previous
+		}
+		f := pay.Tx.Funding[x.Input]
+		f.Kind = protocol.ReserveFunding
+		f.Ref = protocol.ReserveDebitIdentity(c.Network, x.Output)
+		f.Opening = x.Opening
+		if !p.Key.Verify(pay.Tx.FundingContext(int(x.Input), p.Key.KeyID()), f.ReferenceBytes(), pay.Tx.Commitments[x.Input], f.Opening) {
+			return nil, nil, protocol.ErrAuth
+		}
+		pay.Tx.Funding[x.Input] = f
+		payments[x.Transaction] = pay
+	}
+	for index, pay := range payments {
+		raw, err := pay.MarshalBinary()
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(raw) != len(pb.Data.Txs[index]) {
+			return nil, nil, protocol.ErrRule
+		}
+		pb.Data.Txs[index] = raw
+	}
+	b, err := types.BlockFromProto(pb)
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err := pb.Marshal()
+	return b, body, err
+}
+
+func BatchPartRequests(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairBatch, now int64) ([]PartRequest, []chameleon.Opening, []byte, error) {
+	_, body, err := batchBody(v, bs, p, c, now)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return partRequestsForBody(v, bs, p, c.Height, body)
+}
+func BatchPartShares(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, signer chameleon.Signer, c protocol.RepairBatch, now int64) ([]chameleon.Contribution, error) {
+	if _, err := c.MarshalBinary(); err != nil {
+		return nil, err
+	}
+	requests, _, _, err := BatchPartRequests(v, bs, p, c, now)
+	if err != nil {
+		return nil, err
+	}
+	shares := make([]chameleon.Contribution, len(requests))
+	for i, r := range requests {
+		shares[i], err = signer.Adapt(r.Context, r.Old, r.Next, r.Commitment, r.Opening)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return shares, nil
+}
+func CompleteBatchParts(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairBatch, now int64, shares [][]chameleon.Contribution) (protocol.RepairBatch, error) {
+	requests, openings, body, err := BatchPartRequests(v, bs, p, c, now)
+	if err != nil {
+		return c, err
+	}
+	openings, err = combinePartOpenings(p, requests, openings, shares)
+	if err != nil {
+		return c, err
+	}
+	c.Parts, c.Next = openings, digest(body)
+	return c, nil
+}
+
+func ExecuteBatch(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairBatch, height, now int64) (state.Transition, error) {
+	id := c.ID()
+	if id == (protocol.Hash{}) {
+		return state.Transition{}, protocol.ErrEncoding
+	}
+	if _, found, err := state.Load[BatchTask](v, BatchTaskKey(id)); err != nil {
+		return state.Transition{}, err
+	} else if found {
+		raw, e := (protocol.RepairResult{Command: id}).MarshalBinary()
+		return state.Transition{Data: raw}, e
+	}
+	if c.Height >= height {
+		return state.Transition{}, protocol.ErrRule
+	}
+	b, body, err := batchBody(v, bs, p, c, now)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if digest(body) != c.Next {
+		return state.Transition{}, protocol.ErrAuth
+	}
+	parts, err := types.NewRedactablePartSet(body, types.BlockPartSizeBytes, c.Height, c.Base+1, c.Parts)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	meta := bs.LoadBlockMeta(c.Height)
+	if meta == nil || !bytes.Equal(b.Hash(), meta.BlockID.Hash) || !parts.Header().Equals(meta.BlockID.PartSetHeader) {
+		return state.Transition{}, protocol.ErrAuth
+	}
+	o := state.NewOverlay(v)
+	result := protocol.RepairResult{Command: id, Applied: true}
+	for i, x := range c.Items {
+		o.Apply([]state.Change{{Key: DecisionPendingKey(c.Height, x.Output), Delete: true}})
+		if err = state.Put(o, batchReferenceKey(protocol.RepairIdentity(c.Network, x.Output)), batchReference{Batch: id, Index: uint32(i)}); err != nil {
+			return state.Transition{}, err
+		}
+	}
+	raw, err := result.MarshalBinary()
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(o, RevisionKey(c.Height), Revision{Number: c.Base + 1, Body: body}); err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(o, state.Key(110, RevisionKey(c.Height)), c); err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(o, BatchTaskKey(id), BatchTask{Command: c, Body: body, Height: height}); err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(o, QueueKey(height, c.Height, c.Base+1, id), id); err != nil {
+		return state.Transition{}, err
+	}
+	return state.Transition{Changes: o.Changes(), Data: raw}, nil
+}
+
+func decodeBody(body []byte) (*types.Block, error) {
+	pb := new(cmtproto.Block)
+	if err := pb.Unmarshal(body); err != nil {
+		return nil, err
+	}
+	return types.BlockFromProto(pb)
+}
+
+
+===== FILE: internal/redaction/decision.go =====
+//go:build comet_v3
+
+package redaction
+
+import (
+	cmtstore "github.com/cometbft/cometbft/store"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// Pending entries may be removed after a representation command commits;
+// the separate immutable index remains available for canonical reconstruction.
+func decisionIndexKey(kind uint8, height int64, out protocol.OutputID) []byte {
+	e := new(protocol.Encoder)
+	e.U64(uint64(height))
+	e.Fixed(out[:])
+	return state.Key(kind, e.Data())
+}
+func DecisionPendingKey(height int64, out protocol.OutputID) []byte {
+	return decisionIndexKey(116, height, out)
+}
+func DecisionIndexKey(height int64, out protocol.OutputID) []byte {
+	return decisionIndexKey(117, height, out)
+}
+
+func ExecuteDecision(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.CompensationDecision, height, now int64) (state.Transition, error) {
+	if c.ID() == (protocol.Hash{}) || c.Height >= height {
+		return state.Transition{}, protocol.ErrRule
+	}
+	if todo, found, err := state.Load[rules.DirectRepairTodo](v, rules.DirectRepairKey(c.Output)); err != nil {
+		return state.Transition{}, err
+	} else if found {
+		if todo.Decision != c || todo.DecisionHeight <= 0 {
+			return state.Transition{}, protocol.ErrAuth
+		}
+		raw, err := (protocol.CompensationResult{Decision: c.ID()}).MarshalBinary()
+		return state.Transition{Data: raw}, err
+	}
+	// Reject mismatched public requests before loading/decoding a historical
+	// block. The decision is permissionless, but its target is not caller-chosen.
+	ob, found, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(c.Output))
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if !found || ob.Status != rules.DirectOpen {
+		return state.Transition{}, rules.ErrMissing
+	}
+	location, found, err := state.Load[Location](v, LocationKey(ob.Transaction))
+	if err != nil {
+		return state.Transition{}, err
+	}
+	cfg, known := p.Organizations[ob.Config]
+	if !found || !known || cfg.Network != c.Network || location.Height != c.Height || location.Index != c.Transaction || ob.Input != c.Input {
+		return state.Transition{}, protocol.ErrAuth
+	}
+	target, pay, err := CompensationTarget(v, bs, p, c.Output, now)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if c.Network != target.Network || c.Height != target.Height || c.Transaction != target.Transaction || c.Input != target.Input {
+		return state.Transition{}, protocol.ErrAuth
+	}
+	// Replacement is fixed width. Check representability without computing a
+	// collision or contacting an adapter before authorizing the debit.
+	original, err := pay.MarshalBinary()
+	if err != nil {
+		return state.Transition{}, err
+	}
+	pay.Tx.Funding[c.Input].Kind = protocol.ReserveFunding
+	pay.Tx.Funding[c.Input].Ref = protocol.ReserveDebitIdentity(c.Network, c.Output)
+	replaced, err := pay.MarshalBinary()
+	if err != nil || len(original) != len(replaced) {
+		return state.Transition{}, protocol.ErrRule
+	}
+	tr, err := rules.EvaluateDirectCompensation(v, c.Output, p, now)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	effect, err := protocol.DecodeExecution(tr.Data)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if !effect.Applied {
+		return state.Transition{}, rules.ErrConflict
+	}
+	o := state.NewOverlay(v)
+	o.Apply(tr.Changes)
+	todo, found, err := state.Load[rules.DirectRepairTodo](o, rules.DirectRepairKey(c.Output))
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if !found {
+		return state.Transition{}, rules.ErrMissing
+	}
+	todo.Decision, todo.DecisionHeight = c, height
+	if err = state.Put(o, rules.DirectRepairKey(c.Output), todo); err != nil {
+		return state.Transition{}, err
+	}
+	for _, key := range [][]byte{DecisionPendingKey(c.Height, c.Output), DecisionIndexKey(c.Height, c.Output)} {
+		if err = state.Put(o, key, todo.Obligation); err != nil {
+			return state.Transition{}, err
+		}
+	}
+	ob = todo.Obligation
+	raw, err := (protocol.CompensationResult{Decision: c.ID(), Applied: true, Effects: []protocol.RepairEffect{{Output: c.Output, ParentFact: ob.Certificate, ConsumerFact: ob.Consumer, ConsumerTx: ob.Transaction, Input: ob.Input, Amount: ob.Amount, Debit: todo.Debit}}, FeeOutputs: effect.FeeOutputs}).MarshalBinary()
+	if err != nil {
+		return state.Transition{}, err
+	}
+	return state.Transition{Changes: o.Changes(), Data: raw}, nil
+}
+
+
+===== FILE: internal/redaction/history_export_test.go =====
+//go:build comet_v3
+
+package redaction_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"reflect"
+	"strings"
+	"testing"
+
+	"github.com/cometbft/cometbft/types"
+	"utxo/internal/redaction"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// This runnable example exports a byte-oriented archival view from an already
+// verified local replica. It is not a remote proof or a deployed business client.
+func TestHistoricalExportConsumer(t *testing.T) {
+	f := newReaderFixture(t, t.TempDir(), 4, 1)
+	type exported struct {
+		Prefix, Height               int64
+		Transaction, Input           uint32
+		BlockID                      types.BlockID
+		Revision                     uint64
+		Task                         protocol.Hash
+		OriginalBody, AuthorizedBody []byte
+		HistoricalFunding            protocol.Funding
+		Economic                     readerAnswer
+		IndexedEconomic              readerAnswer
+		MaterializedEconomic         readerAnswer
+		OriginalCommitVerified       bool
+		RevisedCommitVerified        bool
+		UnadaptedPartsRejected       bool
+	}
+	var materializedView []byte
+	read := func() (out exported) {
+		readerOK(t, f.db.View(func(v state.ReadView) error {
+			b, revision, err := redaction.Canonical(v, f.revised, 1)
+			if err != nil {
+				return err
+			}
+			task, found, err := redaction.LoadTask(v, f.batch.ID())
+			if err != nil {
+				return err
+			}
+			if !found || !bytes.Equal(task.Body, revision.Body) || task.Command.Base+1 != revision.Number {
+				return protocol.ErrAuth
+			}
+			parts, err := types.NewRedactablePartSet(revision.Body, types.BlockPartSizeBytes, 1, revision.Number, task.Command.Parts)
+			if err != nil {
+				return err
+			}
+			id := f.original.LoadBlockMeta(1).BlockID
+			if !id.Equals(types.BlockID{Hash: b.Hash(), PartSetHeader: parts.Header()}) {
+				return protocol.ErrAuth
+			}
+			pay, err := protocol.DecodeDirectSubmission(b.Data.Txs[0])
+			if err != nil {
+				return err
+			}
+			if err = readerCrypto(pay, f.policy); err != nil {
+				return err
+			}
+			if err = readerInputCH(pay, f.policy); err != nil {
+				return err
+			}
+			answers, err := readerResolve(v, f.policy, pay, 1, 0, f.height, true, nil)
+			if err != nil {
+				return err
+			}
+			original, err := f.revised.LoadOriginalBlock(1)
+			if err != nil {
+				return err
+			}
+			pb, err := original.ToProto()
+			if err != nil {
+				return err
+			}
+			raw, err := pb.Marshal()
+			if err != nil {
+				return err
+			}
+			before, err := protocol.DecodeDirectSubmission(original.Data.Txs[0])
+			if err != nil {
+				return err
+			}
+			if before.Tx.ID() != pay.Tx.ID() || before.Tx.Body.Outputs[0] != pay.Tx.Body.Outputs[0] || before.Tx.Funding[0].Kind != protocol.OriginalFunding || pay.Tx.Funding[0].Kind != protocol.ReserveFunding {
+				return protocol.ErrAuth
+			}
+			// All three alternatives use the same executed read view. A plain
+			// materialized row retains identity pointers without claiming to be
+			// a replacement block body or an independently authenticated proof.
+			indexed, err := readerResolve(v, f.policy, before, 1, 0, f.height, false, nil)
+			if err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(indexed, answers) {
+				return protocol.ErrAuth
+			}
+			type fundingView struct {
+				BlockID types.BlockID
+				Rows    []readerAnswer
+			}
+			if materializedView == nil {
+				rows := append([]readerAnswer(nil), indexed...)
+				for i := range rows {
+					rows[i].Prefix, rows[i].Status = 0, 0
+				}
+				materializedView, err = json.Marshal(fundingView{id, rows})
+				if err != nil {
+					return err
+				}
+			}
+			var view fundingView
+			if err = json.Unmarshal(materializedView, &view); err != nil {
+				return err
+			}
+			for i := range view.Rows {
+				ob, found, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(view.Rows[i].Output))
+				if err != nil {
+					return err
+				}
+				if !found {
+					return protocol.ErrAuth
+				}
+				view.Rows[i].Prefix, view.Rows[i].Status = f.height, ob.Status
+			}
+			if !view.BlockID.Equals(id) || !reflect.DeepEqual(view.Rows, answers) {
+				return protocol.ErrAuth
+			}
+			// Use the actual retained commit, not a new signature on the revision.
+			cert := f.original.LoadBlockCommit(1)
+			originalParts, err := original.MakePartSet(types.BlockPartSizeBytes)
+			if err != nil {
+				return err
+			}
+			originalID := types.BlockID{Hash: original.Hash(), PartSetHeader: originalParts.Header()}
+			revisedID := types.BlockID{Hash: b.Hash(), PartSetHeader: parts.Header()}
+			for _, candidate := range []types.BlockID{originalID, revisedID} {
+				if err = f.validators.VerifyCommitLight(chain, candidate, 1, cert); err != nil {
+					return err
+				}
+			}
+			// Isolate the role of part adaptation: this candidate already has
+			// the valid input opening, but rebuilds parts with initial openings.
+			plainParts, err := types.NewRedactablePartSet(revision.Body, types.BlockPartSizeBytes, 1, 0, nil)
+			if err != nil {
+				return err
+			}
+			plainID := types.BlockID{Hash: b.Hash(), PartSetHeader: plainParts.Header()}
+			plainErr := f.validators.VerifyCommitLight(chain, plainID, 1, cert)
+			if !bytes.Equal(plainID.Hash, id.Hash) || plainID.PartSetHeader.Equals(id.PartSetHeader) || plainErr == nil || !strings.Contains(plainErr.Error(), "wrong block ID") {
+				return protocol.ErrAuth
+			}
+			out = exported{Prefix: f.height, Height: 1, BlockID: id, Revision: revision.Number, Task: f.batch.ID(), OriginalBody: raw, AuthorizedBody: revision.Body, HistoricalFunding: pay.Tx.Funding[0], Economic: answers[0]}
+			out.IndexedEconomic, out.MaterializedEconomic = indexed[0], view.Rows[0]
+			out.OriginalCommitVerified, out.RevisedCommitVerified, out.UnadaptedPartsRejected = true, true, true
+			return nil
+		}))
+		return
+	}
+	before := read()
+	savedView := bytes.Clone(materializedView)
+	readerRecoveryCheck(t, f)
+	after := read()
+	if !bytes.Equal(before.AuthorizedBody, after.AuthorizedBody) || !bytes.Equal(savedView, materializedView) || before.Economic.Status != rules.DirectRepaired || after.Economic.Status != rules.DirectRecovered || before.Economic.Decision != after.Economic.Decision || before.Economic.Ref != after.Economic.Ref {
+		t.Fatal("historical provenance and current repayment state conflated")
+	}
+	if path := os.Getenv("UTXO_HISTORY_EXPORT"); path != "" {
+		raw, err := json.MarshalIndent([]exported{before, after}, "", "  ")
+		readerOK(t, err)
+		readerOK(t, os.WriteFile(path, raw, 0644))
+	}
+	t.Log("original-coordinate export verified: authorization, full BlockID, owner signatures, direct certificates, immutable outputs, and paid provenance after repayment")
+	t.Log("same-prefix index/materialized-row/C3 economic answers agree; original and revised bodies reuse the retained commit; equal header with unadapted parts is rejected")
+}

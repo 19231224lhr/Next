@@ -1,4 +1,4 @@
-"""Recompute manuscript aggregates from frozen experiment CSVs."""
+"""Recompute archived 721800c aggregates. Latest f856c7b evidence uses check-final-evidence.py."""
 import csv
 import json
 from pathlib import Path

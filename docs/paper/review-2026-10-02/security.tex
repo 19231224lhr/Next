@@ -33,7 +33,7 @@ Binding fixes the certified summary and the owner-authorized transaction, and th
 \label{lem:security-superseded}
 Fix one four-member organization with three signatures required and at
 most one Byzantine member.  Let an honest member have approved fact
-$c$ and locked an ordinary or user-funded fee input instance $\xi$.
+$c$ and locked a principal (final or certified) or user-funded fee input instance $\xi$.
 If a successfully applied public payment under the same organization
 configuration carries a valid QC for a different fact $c'$ and a different
 transaction identity and consumes $\xi$, then no three matching valid
@@ -51,7 +51,7 @@ Assume for contradiction that $c$ also has a valid three-member QC.
 The two signer sets intersect in at least two members.  Since at most
 one member is Byzantine, an honest member belongs to the intersection.
 That member would have signed two different facts that consume the
-same instance $\xi$, although honest members atomically lock ordinary
+same instance $\xi$, although honest members atomically lock principal
 and user-funded fee instances before signing and reject a different
 candidate for a locked instance.  This contradicts the approval rule.
 
@@ -157,7 +157,7 @@ Until $m$ observes the successful execution of the payment of $c$, its CAL resto
 \begin{theorem}[Potential liabilities are funded]
 \label{thm:security-coverage}
 For every CAL grant, $Q_g\le B_g$. For each reserve account $x$, its total
-open gap $D_x$ does not exceed its balance $A_x$.
+open gap $\mathsf{Gap}_x$ does not exceed its balance $A_x$.
 \end{theorem}
 \begin{IEEEproof}
 Let $\mathcal A_{m,g}$ contain all successful approvals under $g$, including those without a QC (invalidated approvals contribute zero residual), and $L_{m,g}=\sum_{c\in\mathcal A_{m,g}}r_{m,c}$ across Workers. Approval, ordinary restoration, and superseding invalidation move capacity between Available and Reserved, and top-ups add the difference in member shares, so $L_{m,g}\le s(B_{m,g})\le s(B_g)$ for the locally observed authorization $B_{m,g}$; grants only increase. Fix any three honest members $H_g$ of the organization. A QC has three distinct signers and at most one member lies outside $H_g$, so the set $\mathsf{Sig}_c$ of members of $H_g$ that signed $c$ has at least two elements. Honest members sign only after approving, so Lemma~\ref{lem:security-witness} gives $r_{m,c}\ge w_c$ for $m\in\mathsf{Sig}_c$, and
@@ -176,7 +176,7 @@ Let $R_c$ and $d_c$ be the registered remaining and discharged coverage, with $p
 Let $\mathcal G_x$ contain all grants backed by $x$; their certified CAL account is the debited issuer account. Genesis establishes $\sum_{g\in\mathcal G_x}(B_g-S_g)\le A_x$. External, non-protected top-ups raise both sides equally. Compensation raises $S_g$ and lowers $A_x$ by the same amount, repayment lowers $S_g$ and raises $A_x$ by the same amount (Lemma~\ref{lem:security-recovery}), and no other protocol operation withdraws CAL reserves. Each Open obligation corresponds to a distinct remaining promise, so
 \begin{equation}
 \begin{aligned}
-D_x&\le\sum_{g\in\mathcal G_x}V_g
+\mathsf{Gap}_x&\le\sum_{g\in\mathcal G_x}V_g
     \le\sum_{g\in\mathcal G_x}E_g\\
    &\le\sum_{g\in\mathcal G_x}(B_g-S_g)\le A_x.
 \end{aligned}
@@ -199,7 +199,7 @@ At the execution prestate, including earlier successful block commands, let $N_g
  V_g+S_g+\sum_{c\in N_g}a_c\le Q_g\le B_g.
  \label{eq:security-admission}
 \end{equation}
-Repeated uses of one certificate count once, and sequential registration sees earlier reservations, so every partial sum obeys the bound. First registration therefore cannot fail for CAL authorization capacity, even when it precedes a repayment in the same transition, since a repayment only lowers $S_g$. Likewise an Open amount $a\le D_x\le A_x$ has sufficient reserve principal. Other resource and fee checks remain separate.
+Repeated uses of one certificate count once, and sequential registration sees earlier reservations, so every partial sum obeys the bound. First registration therefore cannot fail for CAL authorization capacity, even when it precedes a repayment in the same transition, since a repayment only lowers $S_g$. Likewise an Open amount $a\le\mathsf{Gap}_x\le A_x$ has sufficient reserve principal. Other resource and fee checks remain separate.
 
 \subsection{Asset Conservation and Delay Neutrality}
 \label{sec:security-conservation}
@@ -249,6 +249,9 @@ $\mathsf{Paid}_c=\mathsf{Rec}_c$ for every certificate.
 \end{enumerate}
 Fees and FUEL are not compared.
 \end{theorem}
+Success here includes all applicable authorization, input, Intent,
+resource, and fee checks. The CAL coverage bound does not imply that
+every QC-bearing payment meets these independent execution conditions.
 \begin{IEEEproof}
 \emph{Holders.} By (i), both executions consume the same instances. In $\rho$, an output consumed before its source executes receives an obligation, and when the source executes the output is either Fulfilled, with a creation record that is already consumed, or Recovered, with no creation record; in both cases it is consumed. Outputs that no payment of $\mathcal T$ consumes are created as final and unspent in both executions. The unspent instances are therefore the genesis outputs and the outputs of $\mathcal T$ that $\mathcal T$ leaves unconsumed.
 
@@ -413,23 +416,22 @@ The decision path validates the obligation and the historical slot and performs 
 \noindent\textbf{Availability and guarantor risk.}
 Once a consumer exposes the source QC, at least two honest source
 signers retain its submission material
-(Lemma~\ref{lem:security-resubmission}). With fair delivery and
-inclusion, this supports resubmission of an executable source, but
-does not remove a permanent Intent conflict. A due obligation can
-instead close without adaptation
-(Lemma~\ref{lem:security-closure}).
-
-At every prefix,
+(Lemma~\ref{lem:security-resubmission}). Fair delivery and inclusion
+support resubmission of an executable source but cannot overcome a
+permanent Intent conflict; a due obligation can instead close without
+adaptation (Lemma~\ref{lem:security-closure}). At every prefix,
 \[
   0\le S_g=\sum_{c\in C_g}
        \bigl(p_c-\mathsf{Rec}_c\bigr)\le Q_g\le B_g .
 \]
-For a fixed grant without further funding, this bounds unrepaid
-compensation, not lifetime gross Paid or the availability of individual
-signing slices. Certification can stop while reserve principal remains.
-When the hypotheses of Theorem~\ref{thm:security-neutrality} hold,
-terminal CAL holdings and reserves coincide; permanently unexecuted
-sources fall outside that comparison. Open deployment therefore accepts
-adversarial reserve losses and retained capacity, rather than merely
-an expected rate of accidental source failures. FUEL fees do not insure
-these losses, and no CAL--FUEL exchange value is assumed.
+For a fixed grant without further funding, this bounds net unrepaid
+compensation, not lifetime gross Paid. An unexecuted certified source
+keeps $r_{m,c}=a_c$ at its honest signers, so a slice can stop issuing
+while reserve principal remains. A funded top-up increases shares
+without clearing reservations or input conflicts and exposes the new
+authorization to the same risk. Permanently unexecuted sources fall
+outside Theorem~\ref{thm:security-neutrality}. The open service in
+Section~\ref{sec:model-contract} accepts adversarial reserve loss and
+retained capacity; FUEL fees do not insure either, and no CAL--FUEL
+exchange value is assumed. Supplement~S3 gives the two-round ledger
+and its fixed-signer capacity bound.

@@ -1,0 +1,3 @@
+你的消费者定位可用，但有两处需纠正：C3仍须关联精确Revision/Task、永久决定和状态，因此不能说“无需第二类记录/不用join”；只是不再把外部资金覆盖值合成进交易正文。普通物化视图是否更便宜未实测，不能断言lower cost。同一校验例程也改为Next的既有block/part与签名验证接口，原始/修订使用不同revision和opening，不兼容未修改Comet。资金槽在fixed之外已代码核对；CanonicalizeVote签名确实包含Hash+PartSetHeader，VerifyCommit先Equals完整ID。
+我拟把场景正面写成：运行在已执行本地副本上的block-record archival review，先保存旧提交证据与坐标，赔付后导出获授权正文，重建完整身份后再沿用旧commit核验，最后从指定输入字段提取debit，同时照常关联决定/义务。索引/普通视图也能完成经济审计；它们保留原块+外部说明，C3提供可替换的区块正文表示。它不创造更强授权，不意味着唯一实现或未经修改legacy兼容。适用性是一种可选记录格式选择，prototype validates workflow，不能假装真实用户调查。
+最小测试拟保留相同H并新增：原块+索引与普通JSON物化经济行（有原BlockID指针）和C3共同答案相同；原块及C3都用真实旧commit核验；把已经完成输入适配的同一新正文用旧分片opening重建，header仍相同、PartSetHeader不同、原commit拒绝，说明fullID检查作用；回款后重复。生产协议不改，不计性能。请校正逻辑并给更紧凑、以用途为主而非通篇免责的最终英文段落（需求200词，贡献80词）。GPT尚在独立思考，稍后会将有分歧部分给你。

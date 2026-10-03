@@ -1,0 +1,32 @@
+已收到你的独立评审。我和Claude两轮讨论一致同意：C3的增量是修订正文匹配原完整身份，不是独占经济答案或无侧记录审计；场景明确为Next-aware本地归档复核，不声称已有部署需求/原生Comet兼容/实际集成成本降低。Claude也修正了“无需join/普通view更便宜”的初稿。现已按你的最小建议完成测试，测试报告如下：A用readerResolve(original)，M仅缓存由A生成的不可变资金/决定行，BlockID只是pointer；两次读取复用同一缓存字节，当前状态另从同一V_H取得；B读取Canonical和精确Task。H=4及真实repayment后H=5三者DeepEqual，显式Repaired→Recovered，decision/reference不变。原body与授权body对同一真实BlockStore.LoadBlockCommit(1)及validatorSet通过VerifyCommitLight；同一修改body使用初始part openings构造，header hash相同但partset不同，拒绝原因确认为wrong block ID。4组定向测试通过，未改生产代码，没有M性能测量。下面是综合Claude与你建议后的正文草稿，请只核对是否有实质越界或需求循环，若仍有请直接给替换句；无需扩大为新实验或整个论文审稿。
+
+
+Consider a local archival review that keeps each block's original commit
+evidence and transaction coordinates. After compensation, its input review
+must associate a reserve advance with the payment that consumed the missing
+output. An index or a materialized funding view supplies that association
+as an annotation to the unchanged original body. C3 offers a different
+record format: the designated input field itself names the historical
+reserve debit, and the authorized body remains compatible with the saved
+commit. This lets the review replace its body representation while retaining
+the block record and its existing commit evidence.
+
+The consumer reads the authorized body and exact Revision and Task from
+$V_H$, reconstructs the block and parts with that revision's openings,
+and checks the complete BlockID against the saved commit through Next's
+verification interfaces. Votes sign both the block hash and the part-set
+header. Since the funding slot is outside the fixed fields hashed for
+consensus transactions, matching the header alone does not establish
+part-set compatibility. The consumer then extracts the reserve-debit
+reference at $(h,j,k)$ and associates it with the permanent decision and
+obligation state at $H$. The old commit establishes identity compatibility;
+successful execution of the exact Task authorizes the new bytes.
+
+Our prototype exercises this workflow, including late repayment.
+Table~\ref{tab:c3-function} distinguishes its body-level requirement from
+an economic-state query, for which the index and ordinary view suffice.
+This is a Next-aware local consumer, not an unmodified CometBFT client.
+``Optional'' means that economic closure proceeds with the subsequent
+representation service stopped; the current build still uses the CH
+transaction and part encodings.
+

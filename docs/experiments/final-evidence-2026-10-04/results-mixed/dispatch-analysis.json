@@ -1,0 +1,71 @@
+{
+  "scope": "Same-host timestamps. Fast slot acquisition precedes serialized pacing; release is approximated by FastUnixNS, recorded immediately before fastDone(). Population samples are not runtime traces.",
+  "runs": [
+    {
+      "case": "r1-P",
+      "send_limit_hits": 0,
+      "total_limit_hits": 7,
+      "sum_fast_slot_presend_ms": 96003.939,
+      "sum_fast_slot_sent_to_receipt_ms": 475236.39400000003,
+      "presend_share_of_slot_time": 0.16806225585615292,
+      "presend_ms": {
+        "p50": 0.008,
+        "p95": 90.311,
+        "max": 91.824
+      },
+      "pacing_wait_ms": {
+        "p50": 0.000333,
+        "p95": 90.304167,
+        "max": 91.818709
+      }
+    },
+    {
+      "case": "r2-P",
+      "send_limit_hits": 0,
+      "total_limit_hits": 29,
+      "sum_fast_slot_presend_ms": 355699.054,
+      "sum_fast_slot_sent_to_receipt_ms": 465833.526,
+      "presend_share_of_slot_time": 0.4329701130051348,
+      "presend_ms": {
+        "p50": 0.008,
+        "p95": 245.276,
+        "max": 250.898
+      },
+      "pacing_wait_ms": {
+        "p50": 0.000375,
+        "p95": 245.2695,
+        "max": 250.890916
+      }
+    },
+    {
+      "case": "r3-P",
+      "send_limit_hits": 917,
+      "total_limit_hits": 143,
+      "sum_fast_slot_presend_ms": 803520.15,
+      "sum_fast_slot_sent_to_receipt_ms": 465704.236,
+      "presend_share_of_slot_time": 0.6330796657101103,
+      "presend_ms": {
+        "p50": 0.009,
+        "p95": 589.422,
+        "max": 622.345
+      },
+      "pacing_wait_ms": {
+        "p50": 0.000375,
+        "p95": 589.417667,
+        "max": 622.334833
+      },
+      "at_send_limit_check": {
+        "presend": {
+          "p50": 59,
+          "p95": 61,
+          "max": 63
+        },
+        "sent_awaiting_receipt": {
+          "p50": 5,
+          "p95": 12,
+          "max": 18
+        }
+      }
+    }
+  ]
+}

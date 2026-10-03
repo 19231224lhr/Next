@@ -24,6 +24,8 @@
 
 ## 本轮评审修订与验证
 
+**第四轮最终补证与复审（2026-10-04）：** 当前冻结节点构建完成600笔连续支付、21,048笔混合P及2,006笔自动来源恢复，全部闭合。100跳认证到账中位数 **4.707s**，逐跳等待对照 **64.479s**；版本、重试与回压口径单列。补齐服务契约、同授权历史消费者、证明—代码入口及轮换签署者回归，英文正文18页。[最新论文与双语交付](docs/paper/review-2026-10-02/fourth-revision-2026-10-04/README.md) · [完整实验报告](docs/experiments/final-evidence-2026-10-04/README.md) · [逐项评审处理](docs/paper/review-2026-10-02/fourth-revision-2026-10-04/revision-closure.md)
+
 **完整大修补证（2026-10-03）：** 在生产快照 `9879f64` 上完成有限容量/Intent 冲突账目、持久重启与原始历史重放、真实历史导出，以及 **12 轮时延与独立故障注入**。全部 **15,840 笔**闭合、四委员状态一致；单委员暂停的公共等待代价与恢复过程单列。既有 `721800c` 性能数据保持原版本归属。[完整报告](docs/experiments/major-revision-2026-10-03/README.md) · [逐项审稿关闭表](docs/experiments/major-revision-2026-10-03/review-closure.md) · [论文与交付状态](docs/paper/review-2026-10-02/build-verification.md)
 
 **局部批准额度回收（`fix/partial-approval-reclamation`，尚未合并）：** 补丁 `bf71c4d` 修复同输入冲突付款成功上链后，旧局部批准仍占成员额度的问题。定点回归验证原 Worker 容量恢复、重新形成三签、重复及重启不二次退款；独立输入同 Intent 的证书责任继续保留。Mac 100 TPS × 10 s 的 1,000 笔付款和 100 跳续花全部闭合、四委员会一致。该短回归不替换以下冻结构建的性能结果。[修复与验证报告 →](docs/experiments/partial-reclaim-2026-10-03/README.md)

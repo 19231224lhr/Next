@@ -1,0 +1,328 @@
+ [level=4]
+  - heading "本轮结论" [level=2]
+  - paragraph:
+    - strong: 在已提供的生产源码中，我没有确认需要修改运行逻辑的安全错误。
+    - text: 上一轮关于“关键实现只有映射说明、尚未看到实际代码”的疑问，现已大部分消除。剩余工作可以收敛为：
+    - strong: 准确限定服务契约、补齐 R 与三轮边界的证据、补少量尚未附上的接口实现，以及清理版本文字。
+  - paragraph: 本轮是源码静态核对与测试断言审查；我没有在这里重建并运行整个工程。你报告的 R 结果暂按“已完成、待原始记录核验”处理。
+  - paragraph:
+    - strong: 我不认为这种限定后的服务缺乏研究价值。
+    - text: C2 仍是主要贡献；C3 按“可信本地副本的授权区块记录导出”定位成立，不需要为尚未主张的功能追加大矩阵。
+  - heading "一、依据代码修正的判断" [level=2]
+  - table:
+    - rowgroup:
+      - row "核对项 本轮判断":
+        - columnheader "核对项"
+        - columnheader "本轮判断"
+    - rowgroup:
+      - row "完整区块身份与共识接口 overlay 确实将相关 Locked/Proposal 比较改为完整 BlockID，并约束 Proposal/POL 对应关系。测试不是只比较函数返回值，而是构造“稳定哈希相同、原始 parts 不同”的候选，检查不得误锁、误提升 Valid 或误送入 Finalize。不能再将上游局部 HashesTo 写法直接视为当前实现的缺陷。 Open preview of implementation-comet-overlay.txt Open preview of implementation-comet-overlay.txt":
+        - cell "完整区块身份与共识接口":
+          - strong: 完整区块身份与共识接口
+        - cell "overlay 确实将相关 Locked/Proposal 比较改为完整 BlockID，并约束 Proposal/POL 对应关系。测试不是只比较函数返回值，而是构造“稳定哈希相同、原始 parts 不同”的候选，检查不得误锁、误提升 Valid 或误送入 Finalize。不能再将上游局部 HashesTo 写法直接视为当前实现的缺陷。 Open preview of implementation-comet-overlay.txt Open preview of implementation-comet-overlay.txt":
+          - text: overlay 确实将相关 Locked/Proposal 比较改为完整 BlockID，并约束 Proposal/POL 对应关系。测试不是只比较函数返回值，而是构造“稳定哈希相同、原始 parts 不同”的候选，检查不得误锁、误提升 Valid 或误送入 Finalize。
+          - strong: 不能再将上游局部 HashesTo 写法直接视为当前实现的缺陷。
+          - button "Open preview of implementation-comet-overlay.txt":
+            - generic: implementation-comet-overlay
+          - button "Open preview of implementation-comet-overlay.txt":
+            - generic: implementation-comet-overlay
+      - row "历史材料与 catch-up replay、blocksync 服务端和共识补块入口确实接入原始材料读取；OriginalBlockPart 在修订读锁内选择并读取原始版本，测试检查了已改写块仍返回原始 parts。原始材料选择已有实现和局部测试支持，不再是只有论文声明。 Open preview of implementation-comet-overlay.txt Open preview of implementation-comet-overlay.txt Open preview of implementation-comet-overlay.txt":
+        - cell "历史材料与 catch-up":
+          - strong: 历史材料与 catch-up
+        - cell "replay、blocksync 服务端和共识补块入口确实接入原始材料读取；OriginalBlockPart 在修订读锁内选择并读取原始版本，测试检查了已改写块仍返回原始 parts。原始材料选择已有实现和局部测试支持，不再是只有论文声明。 Open preview of implementation-comet-overlay.txt Open preview of implementation-comet-overlay.txt Open preview of implementation-comet-overlay.txt":
+          - text: replay、blocksync 服务端和共识补块入口确实接入原始材料读取；OriginalBlockPart 在修订读锁内选择并读取原始版本，测试检查了已改写块仍返回原始 parts。
+          - strong: 原始材料选择已有实现和局部测试支持，不再是只有论文声明。
+          - button "Open preview of implementation-comet-overlay.txt":
+            - generic: implementation-comet-overlay
+          - button "Open preview of implementation-comet-overlay.txt":
+            - generic: implementation-comet-overlay
+          - button "Open preview of implementation-comet-overlay.txt":
+            - generic: implementation-comet-overlay
+      - row "签名前持久化与局部回收 ApproveDirectBytes 在事务成功返回后签名；reclaimPartial 检查共享输入实例、不同交易及没有经济进度等条件，只恢复原借记的剩余量并记录 Invalidated。未见它释放真实 QC 责任的代码路径。维持对 Lemma 3 与资金覆盖连接的认可。 Open preview of implementation-payment.txt Open preview of implementation-payment.txt":
+        - cell "签名前持久化与局部回收":
+          - strong: 签名前持久化与局部回收
+        - cell "ApproveDirectBytes 在事务成功返回后签名；reclaimPartial 检查共享输入实例、不同交易及没有经济进度等条件，只恢复原借记的剩余量并记录 Invalidated。未见它释放真实 QC 责任的代码路径。维持对 Lemma 3 与资金覆盖连接的认可。 Open preview of implementation-payment.txt Open preview of implementation-payment.txt":
+          - text: ApproveDirectBytes 在事务成功返回后签名；reclaimPartial 检查共享输入实例、不同交易及没有经济进度等条件，只恢复原借记的剩余量并记录 Invalidated。未见它释放真实 QC 责任的代码路径。
+          - strong: 维持对 Lemma 3 与资金覆盖连接的认可。
+          - button "Open preview of implementation-payment.txt":
+            - generic: implementation-payment
+          - button "Open preview of implementation-payment.txt":
+            - generic: implementation-payment
+      - row "公开执行与初始资金覆盖 NewEngine 确实按账户累计 CAL/FUEL grants 后检查余额；ABCI 最终执行逐笔使用包含前序成功修改的 overlay，失败交易不合入业务变化。负向测试确实向实际 ABCI 入口发送篡改后的字节，不能再归类为“仅编码器拒绝”。 Open preview of implementation-payment.txt Open preview of implementation-payment.txt Open preview of implementation-boundary-tests.txt":
+        - cell "公开执行与初始资金覆盖":
+          - strong: 公开执行与初始资金覆盖
+        - cell "NewEngine 确实按账户累计 CAL/FUEL grants 后检查余额；ABCI 最终执行逐笔使用包含前序成功修改的 overlay，失败交易不合入业务变化。负向测试确实向实际 ABCI 入口发送篡改后的字节，不能再归类为“仅编码器拒绝”。 Open preview of implementation-payment.txt Open preview of implementation-payment.txt Open preview of implementation-boundary-tests.txt":
+          - text: NewEngine 确实按账户累计 CAL/FUEL grants 后检查余额；ABCI 最终执行逐笔使用包含前序成功修改的 overlay，失败交易不合入业务变化。负向测试确实向实际 ABCI 入口发送篡改后的字节，不能再归类为“仅编码器拒绝”。
+          - button "Open preview of implementation-payment.txt":
+            - generic: implementation-payment
+          - button "Open preview of implementation-payment.txt":
+            - generic: implementation-payment
+          - button "Open preview of implementation-boundary-tests.txt":
+            - generic: implementation-boundary-tests
+      - row "输入证据去重与登记 你的解释与代码一致：证据以 OutputID 为键，不同 Index 可以分别作为输入；register 以父证书 fact 为键，已登记即返回。这是正文精确化事项，不是需要修补的重复登记漏洞。 Open preview of implementation-payment.txt Open preview of implementation-payment.txt":
+        - cell "输入证据去重与登记":
+          - strong: 输入证据去重与登记
+        - cell "你的解释与代码一致：证据以 OutputID 为键，不同 Index 可以分别作为输入；register 以父证书 fact 为键，已登记即返回。这是正文精确化事项，不是需要修补的重复登记漏洞。 Open preview of implementation-payment.txt Open preview of implementation-payment.txt":
+          - text: 你的解释与代码一致：证据以 OutputID 为键，不同 Index 可以分别作为输入；register 以父证书 fact 为键，已登记即返回。
+          - strong: 这是正文精确化事项，不是需要修补的重复登记漏洞。
+          - button "Open preview of implementation-payment.txt":
+            - generic: implementation-payment
+          - button "Open preview of implementation-payment.txt":
+            - generic: implementation-payment
+      - row "赔付、归还与表示隔离 决策先检查永久记录，重复决定无经济效果；源执行遇到 Repaired 输出时归还发行方并跳过用户输出创建；表示命令的写集不包含这些经济转移。未发现需要推翻 Lemma 6—10 的具体实现反例。 Open preview of implementation-representation.txt Open preview of implementation-payment.txt Open preview of implementation-representation.txt":
+        - cell "赔付、归还与表示隔离":
+          - strong: 赔付、归还与表示隔离
+        - cell "决策先检查永久记录，重复决定无经济效果；源执行遇到 Repaired 输出时归还发行方并跳过用户输出创建；表示命令的写集不包含这些经济转移。未发现需要推翻 Lemma 6—10 的具体实现反例。 Open preview of implementation-representation.txt Open preview of implementation-payment.txt Open preview of implementation-representation.txt":
+          - text: 决策先检查永久记录，重复决定无经济效果；源执行遇到 Repaired 输出时归还发行方并跳过用户输出创建；表示命令的写集不包含这些经济转移。未发现需要推翻 Lemma 6—10 的具体实现反例。
+          - button "Open preview of implementation-representation.txt":
+            - generic: implementation-representation
+          - button "Open preview of implementation-payment.txt":
+            - generic: implementation-payment
+          - button "Open preview of implementation-representation.txt":
+            - generic: implementation-representation
+  - button "Copy table":
+  - button "Expand table":
+  - paragraph:
+    - text: 对 catch-up 再作一个准确区分：固定 v0.38.26 的 blocksync 接收端会从下载正文重建 parts，构造完整 BlockID 后验证提交。因此这里不仅有服务端“选择原始正文”的约定，也有接收端身份检查。
+    - strong: 但现有 catchup_test.go 仍是存储读取测试，不应改称实际远程下载实验；这一实验未做，不等于实现缺少身份保护。
+    - link "GitHub, https://raw.githubusercontent.com/cometbft/cometbft/v0.38.26/blocksync/reactor.go":
+      - /url: https://raw.githubusercontent.com/cometbft/cometbft/v0.38.26/blocksync/reactor.go
+      - generic: GitHub
+  - paragraph:
+    - text: 实际看到的一处明确错误是
+    - strong: 注释过时
+    - text: ：LoadOriginalBlock 上方仍称赔付发生在 RepairInput 的高度，应改为 CompensationDecision。函数本身只读取原始材料，因此这不是重复赔付或错误重放的实现漏洞。
+    - button "Open preview of implementation-comet-overlay.txt":
+      - generic: implementation-comet-overlay
+  - heading "二、服务限制应怎样写，不需要怎样改协议" [level=2]
+  - heading "1. 全局 Intent：可以保留，但必须限定“至多一次”的对象" [level=3]
+  - paragraph: 建议在 III-B 或 III-E 集中写成：
+  - blockquote:
+    - paragraph: 全局 Intent 是本协议选择的操作去重语义：对于相同的 Network、Subject 和 Nonce，公共账本至多成功执行一个 TxID。跨组织认证不预先协调这一选择，因此不同组织仍可能为相互冲突的交易签发有效 QC。QC 确定认证内容及相应责任，但不保证该交易最终公开执行。失败方证书若已被成功公开执行的后继消费，其直接发行方责任仍然成立。
+  - paragraph:
+    - text: 这与本地 Intent 检查、公共 Intent 检查及原子绑定相符。
+    - button "Open preview of implementation-payment.txt":
+      - generic: implementation-payment
+    - button "Open preview of implementation-payment.txt":
+      - generic: implementation-payment
+    - button "Open preview of implementation-payment.txt":
+      - generic: implementation-payment
+  - paragraph:
+    - strong: 还需避免一个容易误读的推广：它不等于“同一业务只能产生一次经济给付”。
+    - text: 不同冲突 QC 的后继具有自己的交易身份；已经成功执行的后继不会因源交易输掉 Intent 而撤销。这是现有担保语义的推论，并非新发现的漏洞。正文 Lemma 5 已包含失败源的后继仍可继续使用价值的情形。
+    - button "Open preview of Next-fourth-revision-English.pdf":
+      - generic: Next-fourth-revision-English
+  - paragraph:
+    - text: 不需要声称某类真实客户已经要求这种设计。写明
+    - strong: 选择了什么语义、付出了什么代价
+    - text: 即可；没有业务调研证据，就不要把设计选择包装成已验证需求。
+  - heading "2. 终端持证人：明确没有退出保证即可，不强制新增接口" [level=3]
+  - paragraph: 建议紧接 Table II 补一句：
+  - blockquote:
+    - paragraph: 仅持有 TXCer 不产生可请求赔付的公开义务。若其源交易永久无法执行，且该持证人无法获得并公开执行一个合法后继，当前协议不提供凭证直接赔付或无条件退出路径；等待本身也不会产生该权利。
+  - paragraph:
+    - text: 这不是修改协议，而是将现有“收据—公开消费—责任闭合”契约的终端边界说完整。Table II 已经明确收据本身不产生公开赔付义务，新增句子只是补齐这个组合情形。
+    - button "Open preview of Next-fourth-revision-English.pdf":
+      - generic: Next-fourth-revision-English
+  - paragraph:
+    - text: 相应的适用定位可以是：
+    - strong: 研究允许条件性续付、并保护已成功公开消费之缺失输入的责任机制，而非面向每位持证人的无条件兑现服务。
+    - text: 发行方愿意承担缺源损失、参与方接受认证与最终结算不同，是部署条件；不能据此声称系统已经具备开放环境下的持续可用性。
+  - paragraph: 我不再要求本轮新增直接赔付 API、改变 Intent 作用域、实现自动解锁，或处理永久冲突 outbox 的终止。尤其不能为了停止重试而释放尚存的 QC 责任。
+  - heading "三、小型追加证据：保留两项即可" [level=2]
+  - heading "R：补齐因果链，不必重跑完整性能矩阵" [level=3]
+  - paragraph:
+    - text: 你报告的
+    - strong: 2,006 笔闭合、四委员一致
+    - text: ，方向上正好对应上一轮缺口。但闭合总数本身不能排除客户端补投或已有 INSTALL 备用提交。
+  - paragraph: 最小交付可以是一张三行表，每个父子对一行，关联以下证据：
+  - paragraph:
+    - strong: 父 fact/QC 与原批准材料 → 子交易公开执行 → 原批准成员重建并提交 outbox → 父交易成功执行 → 本地借记恢复与 outbox 清空。
+  - paragraph:
+    - text: 同时附冻结二进制指纹、-recover-source 驱动分支及能排除父交易提前 Persist/INSTALL/Submit 的记录。已有认证高度、数据库快照和发送记录能够确定顺序时，
+    - strong: 不要求再造一套精细计时系统
+    - text: 。生产函数确实只组合既有批准材料和公开 QC、重新验证后写 outbox，不新增批准或借记；现有跨组织、多层测试也检查了材料与额度不变。
+    - button "Open preview of implementation-payment.txt":
+      - generic: implementation-payment
+    - button "Open preview of implementation-boundary-tests.txt":
+      - generic: implementation-boundary-tests
+    - button "Open preview of implementation-boundary-tests.txt":
+      - generic: implementation-boundary-tests
+  - paragraph:
+    - text: R 不必再强行触发赔付；正常恢复得到 Fulfilled 即可。三个父子对是三个恢复目标，
+    - strong: 不要表述成三次独立性能重复实验
+    - text: 。
+  - heading "三轮达到 ：需要明确模拟一个拜占庭签署者" [level=3]:
+    - text: 三轮达到
+    - math:
+      - generic: B
+      - generic: =
+      - generic: "300"
+    - generic: B =
+    - generic: "300"
+    - text: ：需要明确模拟一个拜占庭签署者
+  - paragraph: 这里补正我上轮建议的一个实施细节：
+  - math:
+    - generic: "{"
+    - generic: b
+    - generic: ","
+    - generic: h
+    - generic: "1"
+    - generic: ","
+    - generic: h
+    - generic: "2"
+    - generic: "}"
+    - generic: ","
+    - generic: "{"
+    - generic: b
+    - generic: ","
+    - generic: h
+    - generic: "1"
+    - generic: ","
+    - generic: h
+    - generic: "3"
+    - generic: "}"
+    - generic: ","
+    - generic: "{"
+    - generic: b
+    - generic: ","
+    - generic: h
+    - generic: "2"
+    - generic: ","
+    - generic: h
+    - generic: "3"
+    - generic: "}"
+    - generic: .
+  - text: "{b,"
+  - text: h
+  - generic: "1"
+  - text: ","
+  - text: h
+  - generic: "2"
+  - text: "}, {b,"
+  - text: h
+  - generic: "1"
+  - text: ","
+  - text: h
+  - generic: "3"
+  - text: "}, {b,"
+  - text: h
+  - generic: "2"
+  - text: ","
+  - text: h
+  - generic: "3"
+  - text: "}."
+  - paragraph:
+    - text: 每轮100 CAL，则三个诚实成员各累计预留200；
+    - strong:
+      - text: 共同成员
+      - math:
+        - generic: b
+      - generic: b
+      - text: 累计签署300，超过其诚实实现的200容量。
+    - text: 因而第三轮不能要求它仍通过正常 ApproveDirect：应明确让这个拜占庭测试角色用自己的密钥签名，诚实成员继续走真实批准路径。否则，测试会错误地把拜占庭边界写成全诚实轨迹。现有批准代码确实拒绝 Available 不足的请求。
+    - button "Open preview of implementation-payment.txt":
+      - generic: implementation-payment
+  - paragraph:
+    - text: 这个回归只需核对：三份有效 QC、诚实成员各保留200、累计净赔付300、储备归零、守恒关系成立、重复赔付无效果，以及后续请求不能再获得所需诚实批准。
+    - strong: 不需要收益率、攻击速率或盈利实验。
+  - paragraph:
+    - text: 现有额度碎片化和 2/2 输入分裂测试已经直接覆盖“有资金也可能无法形成 QC”“增资不等于解锁”。本轮不再要求围绕它们扩展负载、找零、延迟的完整参数扫描。
+    - button "Open preview of implementation-boundary-tests.txt":
+      - generic: implementation-boundary-tests
+  - heading "四、C3：撤回超出主张的必做要求" [level=2]
+  - paragraph:
+    - text: 正文其实已经把 C3 限定为本地授权记录格式，并明确普通索引和物化视图能够给出等价经济答案。这不是本轮才新增的让步。
+    - strong: 上一轮若将 M 的性能测试、外部部署需求或远程证明当作必做条件，要求过宽，应撤回。
+    - button "Open preview of Next-fourth-revision-English.pdf":
+      - generic: Next-fourth-revision-English
+    - button "Open preview of Next-fourth-revision-English.pdf":
+      - generic: Next-fourth-revision-English
+  - paragraph:
+    - text: TestHistoricalExportConsumer 的断言与当前主张匹配：同前缀 A/M/C3 经济答案一致；原正文和授权正文均核对保存的原始提交；未适配 parts 的负向对照被拒绝；归还之后历史引用不变、当前义务状态变化。
+    - button "Open preview of implementation-representation.txt":
+      - generic: implementation-representation
+  - paragraph:
+    - text: 因此，
+    - strong: 保留该功能测试、现有成本数据及其范围说明即可
+    - text: 。不要求新增 M 性能矩阵、远程验证者、商业采用案例或长周期维护实验。仍须保留“旧 commit 证明身份兼容，不单独授予修改权限”，以及“可停止表示服务，不等于当前构建不再使用 CH 编码”这两项区别。
+  - heading "五、最后的材料缺口与最小收敛集" [level=2]
+  - paragraph:
+    - text: 还有一项不能误报为已经完成：
+    - strong: 包内各文件完整，不等于所有被调用的接口实现都已附上。
+    - text: 当前支付包中的 engine.go 包含 Check/Execute，但没有 verifyV3/ExecuteAt/BeginBlock 的定义；补资函数和跟随游标提交也主要出现为调用或映射说明。
+    - button "Open preview of implementation-payment.txt":
+      - generic: implementation-payment
+    - button "Open preview of implementation-payment.txt":
+      - generic: implementation-payment
+    - button "Open preview of implementation-boundary-tests.txt":
+      - generic: implementation-boundary-tests
+  - paragraph:
+    - text: 为关闭上一轮已经提出的接口问题，只需补三组对应源文件：
+    - strong: 定时执行分派与 repair 装配；EvaluateReserveIncrease/ApplyReserveIncrease；认证跟块与 blockfollow.Commit 的游标原子提交。
+    - text: 这是补实现证据，不是要求修改这些实现，也不是重新索取整个项目。
+  - paragraph: 最终修改范围可以固定为：
+  - table:
+    - rowgroup:
+      - row "类别 最小动作":
+        - columnheader "类别"
+        - columnheader "最小动作"
+    - rowgroup:
+      - row "生产逻辑 目前没有已确认必须修改的项；不预设存在漏洞。":
+        - cell "生产逻辑":
+          - strong: 生产逻辑
+        - cell "目前没有已确认必须修改的项；不预设存在漏洞。"
+      - row "论文文字 补终端无直接兑现边界、精确限定 Intent 的“至多一次”、明确 OutputID 去重；清理过时版本、符号及注释。C3 不扩展主张。":
+        - cell "论文文字":
+          - strong: 论文文字
+        - cell "补终端无直接兑现边界、精确限定 Intent 的“至多一次”、明确 OutputID 去重；清理过时版本、符号及注释。C3 不扩展主张。"
+      - row "追加证据 完成当前 R 的因果与回收审计；增加明确含一个拜占庭角色的三轮 回归。":
+        - cell "追加证据":
+          - strong: 追加证据
+        - cell "完成当前 R 的因果与回收审计；增加明确含一个拜占庭角色的三轮 回归。":
+          - text: 完成当前 R 的因果与回收审计；增加明确含一个拜占庭角色的三轮
+          - math:
+            - generic: B
+            - generic: =
+            - generic: "300"
+          - generic: B =
+          - generic: "300"
+          - text: 回归。
+      - row "接口核验 补上述少量源文件，并关联冻结版本的既有定向测试日志；不要求新建大规模实验。":
+        - cell "接口核验":
+          - strong: 接口核验
+        - cell "补上述少量源文件，并关联冻结版本的既有定向测试日志；不要求新建大规模实验。"
+  - button "Copy table":
+  - button "Expand table":
+  - paragraph:
+    - strong: 总体意见改为倾向小修后接收，待上述材料一致性核验。
+    - text: 我不再以“没有无条件兑现接口”或“C3 没有证明经济索引不够用”为理由要求结构性大修。论文的成立点应保持清楚：
+    - strong: 它解决的是条件性续付中的直接责任、隐藏证书资金覆盖和经济闭合，而不是所有持证人的退出活性，也不是任意业务操作的恰好一次经济结果。
+  - button "Copy":
+  - button "Rate response":
+  - button "Share":
+  - button "Read aloud":
+  - button "Regenerate response":
+  - button "More actions":
+  - button "Sources":
+  - complementary "Do you like this personality?":
+    - generic: Do you like this personality?
+    - button "Yes":
+    - button "No":
+    - button "Dismiss rating prompt":
+  - generic: ChatGPT can make mistakes. Check important info.
+  - button "Scroll to bottom":
+  - heading "Latest response" [level=4]
+  - status
+  - button "Add files and more":
+  - textbox "Ask ChatGPT":
+    - paragraph: Ask ChatGPT
+  - button "Select ChatGPT model":
+    - generic: Pro
+  - button "Dictate":
+  - button "Start Voice":
+- status
+- status
+- status
+- status
+- status
+- status: Response complete

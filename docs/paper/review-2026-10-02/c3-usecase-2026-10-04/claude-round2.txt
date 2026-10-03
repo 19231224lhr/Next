@@ -1,0 +1,55 @@
+Claude responded: 你的两处纠正我都接受，并据此修订上一轮的表述。
+Drafting the archival-review use case and its contribution summary.
+
+Drafting the archival-review use case and its contribution summary.
+
+你的两处纠正我都接受，并据此修订上一轮的表述。
+
+关联不可避免。 C3 仍然必须关联精确的 Revision/Task、永久决定和义务状态，所以“只凭正文、无需关联”这一说法要删掉。C3 改变的只是“资金引用出现在哪份记录里”：A 和 B 保存的是原始区块加一份外部说明，C3 提供的是一份可以替代原正文的区块正文。
+
+成本不作比较。 普通视图更便宜这一点没有实测，删掉。能如实陈述的只有两件事：A 和 B 不需要门限设置和表示记录；C3 的成本已经测得。上一轮实验解释里“materialized view could adopt a similar layout”这句也属于推测，一并删除。
+
+校验例程。 统一改为“Next 既有的 block、part 和签名验证接口”。原始正文与修订正文使用不同的 revision 和 opening，与未修改的 CometBFT 不兼容。
+
+对照表。 上一轮表中“Funding readable from verified body alone”一行改为“Funding reference in block record”，A、B、C3 三列分别填写：original body + external annotation、original body + external annotation、replaced body。
+
+对测试方案的逻辑复核
+
+整体可行。以下四点需要落实。
+
+1. 物化视图只物化不可变字段。 如果 JSON 行同时物化了义务状态，回款后这一行就会过期，前后两次比较就失去意义。建议视图行只保存坐标、TxID、OutputID、原 BlockID 指针、决定高度和扣款身份；义务状态与另外两条路径一样，在同一个 V_H 中读取。所谓“共同答案”应定义为这组字段加上义务状态，不包括资金表示本身。另外，C3 从输入字段提取出的 debit 应当与决定记录和视图行中的扣款身份逐一相等。
+
+2. 反例要确认拒绝发生在哪一步。 “新正文 + 旧分片 opening”这个反例的意义在于：头部哈希相同，只有 PartSetHeader 不同。因为 VerifyCommit 会先做完整 ID 的 Equals 比较，断言应当明确检查三件事：Hash 相等，PartSetHeader 不相等，拒绝来自完整 ID 比较。这样可以排除解码或其他错误恰好导致失败的情况。
+
+3. 核验要用真实保留的 commit。 原始正文和 C3 正文都应对照同一份为高度 h 真实保存的 commit 进行核验，这份 commit 来自 seen commit 或 h+1 的 LastCommit。请确认测试夹具里确实存在这份证据，而不是在测试中现场重新构造的。
+
+4. 回款后的重复。 回款后再做一次时，应当断言：C3 正文字节不变，三条路径的义务状态都变为 Recovered，决定记录不变。
+
+最终英文段落
+
+需求与用途（约 205 词）
+
+
+latex
+\noindent\textbf{Use: block-record archival review.}
+Consider a review that runs on an executed local replica and keeps one record per historical block. Before compensation, it saves the commit evidence and the coordinates $(h,j,k)$ of a consuming payment. After the decision and its representation commit, it exports the authorized body with the exact Revision and Task, rebuilds the complete BlockID through Next's block, part, and signature verification interfaces, using each version's revision and openings, and checks the body against the saved commit, whose votes sign the block hash together with the part-set header. It then reads the reserve-debit reference from the designated input field and joins it with the permanent decision and the obligation state at $H$. Because the funding slot lies outside the fields covered by consensus transaction hashes, the header hash alone does not bind it; the complete identity does. The original block with the decision index, or a materialized funding view, supports the same economic review by keeping the original body and an external annotation. C3 instead provides a replaceable body representation of that block. It confers no stronger authorization, is not needed for economic closure, and is not verifiable by unmodified CometBFT; it is an optional record format whose workflow our prototype exercises.
+
+C3 贡献（约 80 词）
+
+
+latex
+\noindent\textbf{C3: Optional authorized block-body representation.}
+After a compensation decision commits, restricted chameleon-hash commands can replace the funding reference of the compensated input with its reserve-debit reference while preserving owner authorizations, successor references, and the complete BlockID. A local replica can then export, at the original coordinates, a block body that names the actual funding and verifies against the original commit, together with the Revision, Task, decision, and obligation state that authorize and interpret it. Economic closure does not depend on this layer.
+
+“prototype exercises”是有意的措辞：它表示原型走通了这个工作流程，既不暗示存在用户需求调查，也不暗示有真实部署。
+
+Claude works directly with your codebase
+Install
+
+
+
+
+
+
+
+just now

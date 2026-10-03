@@ -1,0 +1,132 @@
+Claude responded: 我还在读追加的接口源码和 R、三轮测试的日志，下一步看 protocol/v3.go 和 member.go，再读结果文件和版本桥。 我在读最后几份材料：payctl 驱动里的 R 分支、版本桥和 repair_runtime，然后核对 R 的因果链，再写回答。 我在核对 VerifyInitial 是否包含所有者签…
+Ran 5 commands
+
+Ran 5 commands
+
+我还在读追加的接口源码和 R、三轮测试的日志，下一步看 protocol/v3.go 和 member.go，再读结果文件和版本桥。
+
+Ran 6 commands
+
+Ran 6 commands
+
+我在读最后几份材料：payctl 驱动里的 R 分支、版本桥和 repair_runtime，然后核对 R 的因果链，再写回答。
+
+Ran 17 commands, created a file, shared files
+
+Ran 17 commands, created a file, shared files
+
+你的两点反驳成立，我撤回 AO-CR 游戏和我上一轮提的"只读区块库的消费者类 𝒞"，也撤回"非 CAL 资源是真实缺口"这一说法。新追加的材料里我没有找到需要改动生产逻辑的问题。可直接采用的中英 LaTeX 在文件 revision-snippets.tex 里，EN 与 CN 两版均已用 pdflatex/xelatex 试编译。
+
+1. 我撤回的内容
+
+AO-CR 游戏。 你的两点我都在代码里核对过：
+
+我写的 ctx(h,idx,rev) 不对。RedactionContext(height, index)（types/redaction.go）不含修订号，FundingContext 绑定的是 network 和 tx，也不含修订号。补充材料 S3-C 也写明 part 上下文与修订计数无关。
+同一上下文里 m0→m1 和 m1→m2 的开口可以复合出 m0→m2。因为 r↦rᵉ 是置换，(ctx, m, C) 的开口唯一，复合结果就等于逐次适配的结果。我写的"未被直接查询的消息对"这个获胜条件因此是空的。
+正确的允许集合是闭包，而闭包由账本的 Base/Previous/Task 状态机定义，不由哈希定义。哈希层的游戏表达不了它，除非把账本谓词嵌进去，那就是你不想引入的新假设。
+
+我重新走了一遍请求方有自由度的路径，没有找到反例：
+
+InputShare 只接收输出标识。
+BatchPartShares/CompleteBatchParts 的各项里，唯一由请求方提供的是资金槽开口，且必须能被 p.Key.Verify 对精确承诺验证。
+batchBody 从 InputTarget 重推目标和 ReserveDebitIdentity。
+分块请求从 Canonical 正文推导。
+ExecuteBatch 重算分块集合，并要求头与原 meta.BlockID 完全相等。
+
+所以现有的条件化授权性质已足够，Lemma 9/11 和 S3-C 不用改。
+
+消费者类 𝒞。 你说得对。只读区块库的读者无法验证授权：保存的提交只是身份检查，表 IV 里 B 也标了需要公开授权与状态。我提的测试会造出一个比论文自己的读者契约更弱的读者。TestHistoricalExportConsumer 已经覆盖论文所主张的：
+
+A、M、B 的经济答案用 reflect.DeepEqual 比较。
+原始体和授权体都对保存的提交做 VerifyCommitLight。
+未适配 parts 的负对照报 "wrong block ID"。
+还款后授权体与缓存行不变，状态由 Repaired 变 Recovered。
+
+C3 不需要追加用例论据。
+
+R1 非 CAL 资源。 定理 3 的假设里已写明"每笔支付与增资都成功"，所以这不是定理缺步骤，只是需要把边界写出来，这就是文件里的对照表。顺带说明：从 updateUsage（settle.go）看，非 CAL 的登记与释放（公开 closeFee，成员 finishLocal）对称，类似的双签署者计数很可能成立。我没有去构造反例，论文也不主张这一点，所以表里写"无对应主张"，不加引理。
+
+ErrMissing 假设。 没有证据，撤回。版本桥说失败后固定休眠 50 ms，不分原因，我同意：114×50 ms = 5.7 s，与 40/38/36 次对应。文件里的措辞是"含重试，不推导无重试数字"。
+
+2. 与 GPT 复核的比较
+
+一致的地方：
+
+生产逻辑无需修改。
+Lemma 1 的接口比较已落实到完整 BlockID。
+R 是三个恢复目标，不是三次重复。
+轮换测试必须明确让拜占庭角色自己签名。
+C3 不扩大主张。
+
+GPT 说缺的三组文件（verifyV3/ExecuteAt/BeginBlock、补资函数、跟随游标）这次已补齐。我读过：
+
+ExecuteAt 的分派覆盖补资、时钟、修复与赔付、完整提交。
+EvaluateReserveIncrease 拒绝受保护来源，要求目的账户受保护，并用 seen 保证幂等。
+ApplyReserveIncrease 按累计份额差额分给各 Worker，已达目标则返回空。
+blockfollow.Commit 在同一次 Update 里应用业务并写游标，同高度同哈希为空操作，并检查前一区块哈希。
+
+我与 GPT 不同或需要补充的地方：
+
+过时注释会破坏版本桥的哈希。 GPT 指出 LoadOriginalBlock 上方注释写错（应为 CompensationDecision）。我确认了。但 store/redaction.go 的 SHA-256 正是版本桥里"三版相同"的那几个文件之一。若在冻结基线上改注释，这条论断会失效。建议只在后续提交里改，并在桥里写明范围是 f856c7b。
+我上轮的 N1–N3 加固（回退读取、vote-extension 断言、裁剪断言）同理，会改生产文件。我建议不做，写入未来工作。
+rules.AnchorDirectDeadlines 和 DirectAnchorKey 仍没有源码。 义务的截止期由 BeginBlock 调用它设定（支付时 Deadline=0，AnchorHeight=h+1）。Lemma 6/12 里"区块时间到期"这一前提，我没有代码核对过。只补这个文件就够了，不补则在文中说明该前提未经审查。
+对"小修后接收"这类档位，我不给。我这边没有剩余的结构性反对点，剩下的都在第 5 节。
+3. 对其余新材料的核对结果
+
+轮换测试。 测试里成员 3 用 SignSpend 直接签名，不走 ApproveDirect，诚实成员走真实批准。日志（300→200→100→0；[100,100,0]→[200,100,100]→[200,200,200]）与你的描述一致。此时 Q_g=300=B_g，定理 1 的链条 2Q ≤ ΣL ≤ 3·200 ≤ 2B 每一环都取等号，所以这是紧的。第四笔只在成员 0–2 处断言 ErrLimited，成员 3 没被查询，这点与文稿"三个诚实成员"一致。
+
+R 的因果链。
+
+驱动代码里，withhold 分支只调用 CollectDirect；-recover-source 时驱动从不调用 public.Submit，只轮询义务直到 Fulfilled。
+审计里 gateway0 的 RetainedPayments=2000，只含普通付款，与父交易没有经过该网关一致；四个成员各有 2003 个批准（2000+3）；委员会 Fulfilled=3、Repaired=0、Gap=0，四副本哈希相同。
+R 的子公开执行与来源 Fulfilled 之间相隔约 1.15–1.38 s（由你的表差得），Fulfilled 远早于 30 s 截止，赔付不可能先发生。
+当前构建的 P 运行在同样扣留、关闭恢复的条件下，24/24 都走了赔付，可作为同构建的间接对照。我没有看到 R 与 P 的 build.json 并排。
+没有记录 outbox 创建时间，所以链条里"成员重建并入 outbox"这一环只能由代码路径和结果推断，不是计时观测。文里已这样写。
+
+版本桥。 我用你包里的文本重算 SHA-256，10 个中有 9 个完全匹配：block_identity.go、store/redaction.go、types/redaction.go、catchup_test.go、README.md、repair.go、batch.go、decision.go、block_identity_test.go。overlay.py 在我试过的换行与结尾变体下都不匹配，可能是打包时换行不同，请在 git blob 上跑一次 sha256sum 再引用。我另外用 GitHub 的 v0.38.26 标签源码重放了 overlay.py 的补丁锚点，全部匹配（不是 Go proxy 的校验和，但内容应同）。
+
+4. 请你确认的几处
+版本桥的检查范围。 桥的说明里"所检查"的目录列出了 member、committee、rules、redaction、transport、wallet、protocol、finality、Comet，没有 cmd/committee、cmd/gateway、cmd/member 和 go.mod/go.sum。建议在桥里加一行 git diff --stat 721800c 9879f64 -- cmd/committee cmd/gateway cmd/member go.mod go.sum 的结果，否则"五个成员生产文件"在 cmd 层面没有支撑。
+309 与 305。 reviewer-materials 和桥里写 309 个源文件，R 的 build.json 里是 305 个。请说明差异（可能是新增的测试文件）。
+二进制。 R 的 build.json 里有 member 和 member-real 两个成员二进制，请说明实际用的是哪个。"R 与链/P 用同一节点二进制"这一点，我只拿到 R 的 build.json，无法比对；引用时可写 committee cba6a04f、member-real 127ca692、gateway cdc4db54、payctl d0b30f82。
+未完成峰值。 analysis.json 里 max_pending 是 256（配置上限），采样峰值是 193，限制命中为 0。文中应写"采样峰值 193"。
+5. 文件内容与措辞决定
+①终端边界与 Intent： 英文 82 词。第一句只说"仅持有 TXCer 不产生可兑付的公开义务"，没有声称存在任何兑付接口。
+②对照表（补充）：
+D 类：三行确定性检查，两侧调用同一个 PrepareDirectVector。
+S 类：输入实例、Intent、授权与额度与费用。S1 一行写明"QC 排除不同事实对其输入的公开消费；成员落后只会拒绝，不会误批"。
+L 类：纳入、传送、补交，无完成时限。
+表注明确：定理 3 只比较全部成功的历史，不主张带 QC 的支付一定执行；S3 写"非 CAL、FUEL 余额、费用输入可花费性：无对应主张"。
+③ R 一段加三行表：
+用"扣留发送，不是进程崩溃注入"。
+列只用你有的四个观察值，注明是客户端观察点。
+没有写 outbox 创建时间。
+没有写普通流延迟，因为那会被读成性能结论。
+③轮换一段： 写明"达到 Q_g=B_g，所以表 S4 的两轮即止只对固定签署者集合成立；不度量攻击者收益或成本"。
+④结论： 英文 90 词。
+版本桥与重试： 额外写进去，因为你说要如实写。只用你给出的事实。
+6. 前轮问题的处理状态
+前轮问题	状态
+M1 开放部署亏损	已用轮换测试和 S4 补上"上界可达"；攻击者成本不度量，已写明。
+M2 成员/公共检查差异	已成表（文件②）。
+M3 C3 需求与密码学	撤回新用例与 AO-CR；沿用现有条件化授权和现有读者检查。
+M4 版本与基线	版本桥已补，另有三点需确认（见第 4 节）；重试如实写含重试。
+M5 资本	降级。
+M6 形式化	工具要求已撤回；R1 降为表中的范围声明。
+M7 负载与终端边界	R 补齐了自动补交；终端边界和 Intent 已写入①；P 中 917 次快速并发上限命中的根因仍未解释。
+
+本轮新增的事项： 过时注释与版本桥哈希的冲突；AnchorDirectDeadlines 缺源码；版本桥未覆盖 cmd/ 与依赖文件；overlay.py 哈希未复现；305/309；两个成员二进制；max_pending 与采样峰值。
+
+Files are in /mnt/user-data/outputs/:
+
+revision-snippets.tex
+
+Revision snippets
+TEX 
+Download
+
+
+
+
+
+just now

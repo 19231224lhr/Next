@@ -1,0 +1,547 @@
+{
+  "endpoint_note": "Complete successful BlockData retrieval includes next-height signed header, block and results. Commit-to-fetch includes evidence availability, polling, transport and replica lag.",
+  "runs": [
+    {
+      "case": "r1-fast",
+      "mode": "fast",
+      "metrics": {
+        "commit_to_complete_fetch_ms": {
+          "n": 100,
+          "p50": 387.458,
+          "p95": 400.413,
+          "min": 271.696,
+          "max": 412.98
+        },
+        "commit_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 396.645,
+          "p95": 424.436,
+          "min": 272.397,
+          "max": 427.637
+        },
+        "driver_observe_to_next_build_ms": {
+          "n": 99,
+          "p50": -900.143,
+          "p95": -700.119,
+          "min": -1150.02,
+          "max": -595.263
+        },
+        "next_build_to_send_ms": {
+          "n": 99,
+          "p50": 0.27,
+          "p95": 11.787,
+          "min": 0.227,
+          "max": 38.821
+        },
+        "prepare_and_record_ms": {
+          "n": 100,
+          "p50": 5.2364999999999995,
+          "p95": 27.496,
+          "min": 0.146,
+          "max": 37.376
+        },
+        "ready_to_next_send_ms": {
+          "n": 99,
+          "p50": 0.271,
+          "p95": 11.789,
+          "min": 0.228,
+          "max": 38.824
+        },
+        "record_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 2.3895,
+          "p95": 4.575,
+          "min": 0.054,
+          "max": 4.833
+        },
+        "send_to_commit_ms": {
+          "n": 100,
+          "p50": 573.703,
+          "p95": 777.81,
+          "min": 306.5,
+          "max": 817.853
+        },
+        "successful_fetch_ms": {
+          "n": 100,
+          "p50": 13.731,
+          "p95": 26.355,
+          "min": 0.847,
+          "max": 26.435
+        },
+        "verify_ms": {
+          "n": 100,
+          "p50": 0.114,
+          "p95": 0.341,
+          "min": 0.097,
+          "max": 0.379
+        }
+      }
+    },
+    {
+      "case": "r1-wait",
+      "mode": "wait_final",
+      "metrics": {
+        "commit_to_complete_fetch_ms": {
+          "n": 100,
+          "p50": 283.438,
+          "p95": 313.041,
+          "min": 242.46,
+          "max": 328.436
+        },
+        "commit_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 286.18449999999996,
+          "p95": 316.816,
+          "min": 246.835,
+          "max": 329.969
+        },
+        "driver_observe_to_next_build_ms": {
+          "n": 99,
+          "p50": 0.002,
+          "p95": 0.009,
+          "min": 0.001,
+          "max": 0.015
+        },
+        "next_build_to_send_ms": {
+          "n": 99,
+          "p50": 0.231,
+          "p95": 10.258,
+          "min": 0.203,
+          "max": 23.468
+        },
+        "prepare_and_record_ms": {
+          "n": 100,
+          "p50": 0.1245,
+          "p95": 0.403,
+          "min": 0.101,
+          "max": 14.807
+        },
+        "ready_to_next_send_ms": {
+          "n": 99,
+          "p50": 580.525,
+          "p95": 625.777,
+          "min": 450.39,
+          "max": 636.73
+        },
+        "record_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 2.7225,
+          "p95": 4.713,
+          "min": 0.012,
+          "max": 5.486
+        },
+        "send_to_commit_ms": {
+          "n": 100,
+          "p50": 363.6835,
+          "p95": 381.553,
+          "min": 180.981,
+          "max": 387.196
+        },
+        "successful_fetch_ms": {
+          "n": 100,
+          "p50": 0.553,
+          "p95": 7.685,
+          "min": 0.4,
+          "max": 13.089
+        },
+        "verify_ms": {
+          "n": 100,
+          "p50": 0.0825,
+          "p95": 0.236,
+          "min": 0.069,
+          "max": 0.451
+        }
+      }
+    },
+    {
+      "case": "r2-fast",
+      "mode": "fast",
+      "metrics": {
+        "commit_to_complete_fetch_ms": {
+          "n": 100,
+          "p50": 395.096,
+          "p95": 440.92,
+          "min": 306.184,
+          "max": 440.957
+        },
+        "commit_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 397.4155,
+          "p95": 473.544,
+          "min": 309.351,
+          "max": 474.745
+        },
+        "driver_observe_to_next_build_ms": {
+          "n": 99,
+          "p50": -905.118,
+          "p95": -630.176,
+          "min": -1285.068,
+          "max": -555.09
+        },
+        "next_build_to_send_ms": {
+          "n": 99,
+          "p50": 0.263,
+          "p95": 19.811,
+          "min": 0.229,
+          "max": 40.923
+        },
+        "prepare_and_record_ms": {
+          "n": 100,
+          "p50": 0.94,
+          "p95": 29.822,
+          "min": 0.117,
+          "max": 39.322
+        },
+        "ready_to_next_send_ms": {
+          "n": 99,
+          "p50": 0.266,
+          "p95": 19.812,
+          "min": 0.231,
+          "max": 40.925
+        },
+        "record_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 2.694,
+          "p95": 4.649,
+          "min": 0.008,
+          "max": 5.151
+        },
+        "send_to_commit_ms": {
+          "n": 100,
+          "p50": 560.777,
+          "p95": 826.449,
+          "min": 288.3,
+          "max": 879.247
+        },
+        "successful_fetch_ms": {
+          "n": 100,
+          "p50": 6.686,
+          "p95": 31.509,
+          "min": 0.706,
+          "max": 31.608
+        },
+        "verify_ms": {
+          "n": 100,
+          "p50": 0.114,
+          "p95": 0.496,
+          "min": 0.076,
+          "max": 0.945
+        }
+      }
+    },
+    {
+      "case": "r2-wait",
+      "mode": "wait_final",
+      "metrics": {
+        "commit_to_complete_fetch_ms": {
+          "n": 100,
+          "p50": 286.50350000000003,
+          "p95": 315.311,
+          "min": 252.065,
+          "max": 328.395
+        },
+        "commit_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 289.6675,
+          "p95": 317.726,
+          "min": 257.2,
+          "max": 330.125
+        },
+        "driver_observe_to_next_build_ms": {
+          "n": 99,
+          "p50": 0.002,
+          "p95": 0.006,
+          "min": 0.001,
+          "max": 0.007
+        },
+        "next_build_to_send_ms": {
+          "n": 99,
+          "p50": 0.237,
+          "p95": 12.166,
+          "min": 0.198,
+          "max": 24.765
+        },
+        "prepare_and_record_ms": {
+          "n": 100,
+          "p50": 0.128,
+          "p95": 1.343,
+          "min": 0.101,
+          "max": 27.092
+        },
+        "ready_to_next_send_ms": {
+          "n": 99,
+          "p50": 585.527,
+          "p95": 630.993,
+          "min": 465.692,
+          "max": 635.526
+        },
+        "record_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 3.099,
+          "p95": 5.035,
+          "min": 0.01,
+          "max": 5.519
+        },
+        "send_to_commit_ms": {
+          "n": 100,
+          "p50": 363.47,
+          "p95": 387.571,
+          "min": 173.264,
+          "max": 393.99
+        },
+        "successful_fetch_ms": {
+          "n": 100,
+          "p50": 0.558,
+          "p95": 7.048,
+          "min": 0.427,
+          "max": 24.97
+        },
+        "verify_ms": {
+          "n": 100,
+          "p50": 0.0835,
+          "p95": 0.248,
+          "min": 0.071,
+          "max": 0.516
+        }
+      }
+    },
+    {
+      "case": "r3-fast",
+      "mode": "fast",
+      "metrics": {
+        "commit_to_complete_fetch_ms": {
+          "n": 100,
+          "p50": 399.035,
+          "p95": 463.421,
+          "min": 267.383,
+          "max": 463.611
+        },
+        "commit_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 404.181,
+          "p95": 467.585,
+          "min": 268.42,
+          "max": 470.843
+        },
+        "driver_observe_to_next_build_ms": {
+          "n": 99,
+          "p50": -945.17,
+          "p95": -610.197,
+          "min": -1260.123,
+          "max": -475.122
+        },
+        "next_build_to_send_ms": {
+          "n": 99,
+          "p50": 0.265,
+          "p95": 15.224,
+          "min": 0.224,
+          "max": 25.876
+        },
+        "prepare_and_record_ms": {
+          "n": 100,
+          "p50": 0.908,
+          "p95": 21.266,
+          "min": 0.274,
+          "max": 27.259
+        },
+        "ready_to_next_send_ms": {
+          "n": 99,
+          "p50": 0.269,
+          "p95": 15.228,
+          "min": 0.226,
+          "max": 25.878
+        },
+        "record_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 2.669,
+          "p95": 4.816,
+          "min": 0.034,
+          "max": 5.005
+        },
+        "send_to_commit_ms": {
+          "n": 100,
+          "p50": 590.7165,
+          "p95": 814.807,
+          "min": 243.366,
+          "max": 859.975
+        },
+        "successful_fetch_ms": {
+          "n": 100,
+          "p50": 9.228,
+          "p95": 24.525,
+          "min": 0.613,
+          "max": 24.632
+        },
+        "verify_ms": {
+          "n": 100,
+          "p50": 0.114,
+          "p95": 0.399,
+          "min": 0.079,
+          "max": 0.595
+        }
+      }
+    },
+    {
+      "case": "r3-wait",
+      "mode": "wait_final",
+      "metrics": {
+        "commit_to_complete_fetch_ms": {
+          "n": 100,
+          "p50": 285.884,
+          "p95": 314.509,
+          "min": 247.556,
+          "max": 324.736
+        },
+        "commit_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 289.12649999999996,
+          "p95": 321.326,
+          "min": 248.992,
+          "max": 329.937
+        },
+        "driver_observe_to_next_build_ms": {
+          "n": 99,
+          "p50": 0.002,
+          "p95": 0.006,
+          "min": 0.001,
+          "max": 0.014
+        },
+        "next_build_to_send_ms": {
+          "n": 99,
+          "p50": 0.238,
+          "p95": 11.539,
+          "min": 0.209,
+          "max": 16.994
+        },
+        "prepare_and_record_ms": {
+          "n": 100,
+          "p50": 0.129,
+          "p95": 7.323,
+          "min": 0.101,
+          "max": 15.68
+        },
+        "ready_to_next_send_ms": {
+          "n": 99,
+          "p50": 585.442,
+          "p95": 620.764,
+          "min": 435.552,
+          "max": 640.476
+        },
+        "record_to_driver_observe_ms": {
+          "n": 100,
+          "p50": 3.1535,
+          "p95": 4.641,
+          "min": 0.044,
+          "max": 5.159
+        },
+        "send_to_commit_ms": {
+          "n": 100,
+          "p50": 358.725,
+          "p95": 379.019,
+          "min": 154.35,
+          "max": 395.06
+        },
+        "successful_fetch_ms": {
+          "n": 100,
+          "p50": 0.557,
+          "p95": 7.593,
+          "min": 0.436,
+          "max": 22.305
+        },
+        "verify_ms": {
+          "n": 100,
+          "p50": 0.085,
+          "p95": 0.188,
+          "min": 0.07,
+          "max": 0.418
+        }
+      }
+    }
+  ],
+  "medians_of_run_quantiles": {
+    "fast": {
+      "commit_to_complete_fetch_ms": {
+        "p50": 395.096,
+        "p95": 440.92
+      },
+      "commit_to_driver_observe_ms": {
+        "p50": 397.4155,
+        "p95": 467.585
+      },
+      "driver_observe_to_next_build_ms": {
+        "p50": -905.118,
+        "p95": -630.176
+      },
+      "next_build_to_send_ms": {
+        "p50": 0.265,
+        "p95": 15.224
+      },
+      "prepare_and_record_ms": {
+        "p50": 0.94,
+        "p95": 27.496
+      },
+      "ready_to_next_send_ms": {
+        "p50": 0.269,
+        "p95": 15.228
+      },
+      "record_to_driver_observe_ms": {
+        "p50": 2.669,
+        "p95": 4.649
+      },
+      "send_to_commit_ms": {
+        "p50": 573.703,
+        "p95": 814.807
+      },
+      "successful_fetch_ms": {
+        "p50": 9.228,
+        "p95": 26.355
+      },
+      "verify_ms": {
+        "p50": 0.114,
+        "p95": 0.399
+      }
+    },
+    "wait_final": {
+      "commit_to_complete_fetch_ms": {
+        "p50": 285.884,
+        "p95": 314.509
+      },
+      "commit_to_driver_observe_ms": {
+        "p50": 289.12649999999996,
+        "p95": 317.726
+      },
+      "driver_observe_to_next_build_ms": {
+        "p50": 0.002,
+        "p95": 0.006
+      },
+      "next_build_to_send_ms": {
+        "p50": 0.237,
+        "p95": 11.539
+      },
+      "prepare_and_record_ms": {
+        "p50": 0.128,
+        "p95": 1.343
+      },
+      "ready_to_next_send_ms": {
+        "p50": 585.442,
+        "p95": 625.777
+      },
+      "record_to_driver_observe_ms": {
+        "p50": 3.099,
+        "p95": 4.713
+      },
+      "send_to_commit_ms": {
+        "p50": 363.47,
+        "p95": 381.553
+      },
+      "successful_fetch_ms": {
+        "p50": 0.557,
+        "p95": 7.593
+      },
+      "verify_ms": {
+        "p50": 0.0835,
+        "p95": 0.236
+      }
+    }
+  }
+}

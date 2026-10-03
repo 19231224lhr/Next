@@ -1,0 +1,242 @@
+\begingroup
+\small
+\setlength{\tabcolsep}{3pt}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\setlength{\LTcapwidth}{\textwidth}
+\renewcommand{\arraystretch}{1.10}
+
+\begin{longtable}{@{}
+    >{\raggedright\arraybackslash}p{0.22\textwidth}
+    >{\raggedright\arraybackslash}p{\dimexpr0.48\textwidth-2\tabcolsep\relax}
+    >{\raggedright\arraybackslash}p{\dimexpr0.30\textwidth-2\tabcolsep\relax}
+    @{}}
+\caption{生产基线 \texttt{f856c7b} 的主要证明--实现对应。
+共享生产守卫的命题合并列出。完整路径、调用边界和测试断言
+保留在工件索引中；本表不代替逐入口清单。}
+\label{tab:proof-implementation}\\
+\toprule
+命题（正文英文名称） &
+生产入口与证明相关职责 &
+代表性回归证据 \\
+\midrule
+\endfirsthead
+
+\multicolumn{3}{@{}l}{表~\thetable\ （续）}\\
+\toprule
+命题（正文英文名称） &
+生产入口与证明相关职责 &
+代表性回归证据 \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{3}{r@{}}{续下页}\\
+\endfoot
+
+\bottomrule
+\endlastfoot
+
+Original-execution agreement
+&
+Comet overlay 与 \texttt{matchesBlockID} 比较区块哈希和
+part-set header。原始分片校验及候选状态转移保持正文与分片配对；
+共识、同步和重放保留原始正文及其高度、时间等执行上下文。
+&
+稳定哈希下的完整身份检查、重标开口及未认证修订拒绝、
+保留原始材料的重放测试。Comet 专项证据保留各自记录的构建版本。
+\\
+\addlinespace[3pt]
+
+Authenticated, unique consumption;
+public authorization
+&
+\texttt{ApproveDirectBytes} 在签名前原子提交锁、Intent、
+批准和 debits。
+\texttt{CheckTx}、\texttt{ProcessProposal} 和
+\texttt{FinalizeBlock} 进入
+\texttt{Engine.Check} 及提交验证。
+\texttt{Check}/\texttt{ExecuteAt} 固定分派 wire4 的
+\texttt{ReserveIncrease}、\texttt{ClockTick}、
+\texttt{RepairInput}、\texttt{RepairBatch}、
+\texttt{CompensationDecision} 和 \texttt{DirectSubmission}；
+\texttt{Execute} 在 direct 模式拒绝 legacy。
+完整原始字节缓存不替代
+\texttt{EvaluateDirectPaymentAt} 的当前账本检查。
+&
+\texttt{TestPublicAuthorization\allowbreak AtABCIEntry}；
+\texttt{TestDirectModeRejects\allowbreak AlternatePaymentEnvelopes}；
+不同签名成员、相同字节缓存、当前账本重检、
+批准持久化及重放测试。
+\\
+\addlinespace[3pt]
+
+Superseded partial approval;
+Residual capacity
+&
+经认证且成功、Applied 的结果进入
+\texttt{reclaimPartial} 和 \texttt{finishLocal}。
+正常 CAL 恢复要求已观察到来源成功执行；
+局部失效另须满足同配置下共享输入冲突的守卫。
+两者均只恢复原始 debits 的剩余部分，
+累计进度与跟随游标原子提交。
+失效不适用于输入不相交的 Intent 输家。
+&
+部分批准冲突、多输入重复处理、失败结果不释放、
+矛盾原子拒绝、迟到效果拒绝、原始 debit 定位，
+以及累计恢复跨重启测试。
+\\
+\addlinespace[3pt]
+
+Resubmission preserves authorization;
+Certificates bound liability, not execution
+&
+\texttt{recoverExposedSources} 将保留的批准材料与公开 QC
+重建并重新验证后入队，不创建批准或 debit。
+\texttt{EvaluateDirectPaymentAt} 保留成功交易建立的
+全局 Intent 绑定，不因补交而解除冲突。
+&
+跨组织、多层来源重建与重复暴露；
+Subject 隔离；
+两轮 Intent 冲突赔付及完整账目检查。
+\\
+\addlinespace[3pt]
+
+Potential liabilities are funded
+&
+\texttt{PrepareDirectVector}、提交验证和成员批准绑定
+issuer、配置、grant 及 Worker 可用额度。
+\texttt{Engine.NewEngine} 按 \texttt{AccountKey}
+累计所有 CAL/FUEL grants，并检查各账户授权总额不超过余额。
+受保护 CAL 集合覆盖全部组织账户及 CAL grant 账户。
+\texttt{GrantShare}、
+\texttt{EvaluateReserveIncrease} 和
+\texttt{ApplyReserveIncrease} 使用外部非受保护资金及
+累计份额差额，不清除已有 debits。
+&
+无 QC 容量碎片化、补资后完成、补资不解除 2/2 输入分裂、
+受保护来源拒绝、共享外部资金及累计取整测试。
+隐藏证书集合仍由数学论证覆盖。
+\\
+\addlinespace[3pt]
+
+Compensation takes effect at most once;
+Source repayment
+&
+\texttt{ExecuteDecision} 对已记录的相同决定返回无新效果，
+对不同决定拒绝；无记录时检查 Open、公开到期及原坐标。
+\texttt{targetSlot} 仅接受与原 \texttt{OutputID}、
+金额及消费者固定字段相符的 \texttt{OriginalFunding}。
+赔付与决定记录原子提交。
+\texttt{recoverOutput} 在成功来源执行内偿还原 issuer，
+使累计回款不超过赔付，且不创建第二份用户输出。
+&
+重复及冲突决定、迟到来源回款、部分输出赔付、
+四跳到达顺序及分叉--合并顺序测试。
+\\
+\addlinespace[3pt]
+
+CAL conservation;
+CAL delay neutrality
+&
+付款、赔付、回款及补资通过 Overlay 和公共提交生效；
+失败转换不写入业务状态。
+终态 CAL 比较保留定理的初始状态、
+无冲突且来源闭合的付款集合，以及各付款和补资均成功一次的条件，
+不比较 FUEL。
+&
+多种交错与重放下的金额投影；
+当前构建 600 笔连续付款和 21,048 笔代表性 P 付款的
+逐副本金额审计。
+\\
+\addlinespace[3pt]
+
+Decision-gated representation authority;
+Representation is economically inert
+&
+\texttt{RepairInput} 和 \texttt{RepairBatch}
+均受成功决定及目标槽守卫约束。
+\texttt{InputTarget} 及批路径的
+\texttt{batchBody}/\texttt{ExecuteBatch}
+派生目标替换，保持非目标字节，
+检查开口、版本摘要和原完整 BlockID。
+写集仅涉及表示状态。
+\texttt{EvaluateDirectPaymentAt} 不读取历史
+\texttt{Canonical}；
+决定已有记录时先作幂等或冲突处理，
+否则其他已修订槽不改变其未决定目标槽及固定字段。
+这些读侧职责支撑相同高度、时间下后续经济结果不变；
+\texttt{DecodePublicExecution} 不产生表示引起的本金效果。
+&
+双输入原子批次、跨分片批次、适配前赔付，
+以及付款--表示金额重放测试。
+\\
+\addlinespace[3pt]
+
+Identity preservation and installation independence;
+local reader contract
+&
+\texttt{Canonical} 在已执行前缀 $V_H$ 中选择逻辑修订；
+\texttt{PrepareMaterialization} 提供精确 Task 材料。
+物理版本守卫禁止回滚，重放使用保留的原始材料。
+原提交证据验证完整身份相容，不单独授权修订正文。
+&
+修订顺序、交错队列、原始历史重放、读取等价，
+以及真实回款前后 $H=4,5$ 的
+\texttt{same\_consumer\_views}：
+经济答案一致，原始与授权正文匹配原完整身份，
+未适配分片的修改正文被拒绝。
+\\
+\addlinespace[3pt]
+
+Protected continuation;
+Economic closure does not wait for adaptation
+&
+\texttt{wallet.ReceiveDirect} 检查注册配置、network、
+\texttt{Recipient.Owner} 并调用 \texttt{c.VerifyOutput}；
+在 \texttt{Update} 内写入 \texttt{DirectCoin}，
+拒绝同一 \texttt{OutputID} 对应不一致正文。
+\texttt{member.InstallDirectClassified} 先调用
+\texttt{VerifyDirectPayment}，再于事务内拒绝
+\texttt{Invalidated}，对 \texttt{Observed} 返回无新效果，
+检查并保存全部输入及费用输入的 \texttt{Consumed}、
+完整 install 材料和 outbox，不新增 reserve。
+\texttt{finality.VerifyBlock}、
+\texttt{PrepareBlock} 与 \texttt{blockfollow.Commit}
+连接认证结果和原子跟随；
+\texttt{FreshRecv} 仍是历史前提，不由收款检查单独推出。
+经济闭合经 \texttt{ExecuteDecision} 完成，不访问适配服务。
+&
+批准持久化与后台 INSTALL；
+六轮连续链的 297 个提前后继；
+P 的 96 次副本--目标检查：
+均在表示尚未提交、物化时确认回款完成。
+\\
+
+\end{longtable}
+\endgroup
+
+\noindent\textbf{前提与证据层级。}
+证明覆盖所述模型下的有限轨迹，生产守卫标明实现职责，
+回归测试检查具体接受与拒绝轨迹。
+四成员组织和四委员、三票法定人数、每组至多一个静态 Byzantine、
+一致配置及诚实签名状态不回滚，仍是模型或部署前提；
+创世合计备付和受保护 CAL 账户限制另与
+\texttt{Engine.NewEngine}、固定命令分派及账户守卫对应。
+签名不可伪造、原始承诺绑定及可信 dealer 正确生成并分发
+门限 RSA 参数，不由功能测试证明；
+固定目标集合的正文与开口收敛还要求唯一有效开口。
+历史读取信任一个已验证、已执行且保留相关历史的前缀 $V_H$；
+进展仍依赖可用容量、资源及公平传送和包含。
+新 \texttt{TestPublicAuthorizationAtABCIEntry}
+将编码后再篡改授权字段的字节直接送入三个 ABCI 接口，
+检查拒绝、\texttt{pendingChanges} 为空及业务库不变。
+发送端编码拒绝与接收端拒绝分开记录；
+接收端的解码、绑定检查和签名验证属于不同层级，
+只按实际到达的拒绝守卫报告，
+不将编解码拒绝写成已经执行验签。
+既有缓存回归区分相同字节复用与当前账本重检。
+当前八包回归通过，客户端和测试增量与生产基线分别记录指纹。
+Comet 接口、持久重启、网络证据及门限测试保留原有版本和范围，
+不被改称为本轮远程下载实验、任意 Byzantine 调度穷举
+或机械化证明。

@@ -1,0 +1,121 @@
+Claude responded: 以下三段可以直接替换使用。为了控制篇幅，我把 §III-A 中的“Collector access and deployment conditions”一段并入了新小节；§III-B 的 TXCer 段也相应收短了一句，去掉与新表重复的免责表述。
+Checking the fee split across funding scenarios.
+
+Checking the fee split across funding scenarios.
+
+以下三段可以直接替换使用。为了控制篇幅，我把 §III-A 中的“Collector access and deployment conditions”一段并入了新小节；§III-B 的 TXCer 段也相应收短了一句，去掉与新表重复的免责表述。
+
+1. 模型节：新增 Service Contract（放在 §III-D 示例之后）
+
+latex
+\subsection{Service Contract}
+\label{sec:model-contract}
+Table~\ref{tab:model-contract} states what each stage of a payment establishes for its recipient and issuer.
+
+\begin{table}[!t]
+\caption{Service contract by stage.}
+\label{tab:model-contract}
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}p{0.19\columnwidth}p{0.38\columnwidth}p{0.37\columnwidth}@{}}
+\toprule
+Stage & Establishes & Does not establish \\
+\midrule
+Certified receipt &
+An owner-bound output fixed by the issuer's QC; a successor request may follow at once. &
+Execution of the source or of a successor; a public compensation claim; capacity for the successor. \\
+Public consumption &
+A successor that consumes a missing certified output atomically registers a direct obligation against its issuer and creates final child outputs. &
+Source execution. The successor itself must pass the public fee, authorization, consumption, and Intent checks. \\
+Liability closure &
+Source arrival fulfills the obligation; otherwise an included post-deadline decision debits the issuer's CAL reserve, and a later source repays it. Child principal is credited once. &
+Compensation at the deadline instant; inclusion depends on public submission and execution. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Admission.}
+Any client may act as collector; this grants neither spending authority nor organization-funded fees. Each member decides each request locally: in one transaction it checks its Intent record, every input lock, the fee, the grant, and its Worker slice. If the slice cannot cover $a_T$, the member rejects the request, commits nothing, and returns no signature. It signs only after a successful commit, and an idempotent retry reuses the stored signature without new capacity. A wallet records a certified receipt only after verifying three matching approvals, the organization configuration, the network, its own ownership, and the output commitment. One member's refusal is not a global admission decision, and the absence of a QC does not imply the absence of reservations at members that approved.
+
+\noindent\textbf{Unenforced conditions.}
+The protocol enforces neither Subject-level admission for CAL guarantees nor a bound on unfinished approvals across collectors; gateway concurrency limits and fee-sponsorship policies provide neither. The capacity condition of Section~\ref{sec:security-composition} therefore holds only under a controlled workload or an external deployment restriction, which this paper assumes rather than implements.
+
+
+\noindent\textbf{Residual risk.}
+The direct issuer bears the CAL of a consumed output whose source never executes, including a source rejected publicly by an Intent conflict that its members could not observe. Section~\ref{sec:security-composition} bounds this exposure; FUEL fees do not insure it.
+
+配套的两处删改：
+
+§III-A：删除整段“Collector access and deployment conditions”。
+§III-B TXCer 段末句，原文为“The certificate authenticates the issuer's guarantee and is neither an asset, a registered public obligation, nor an unconditional guarantee of public execution or repayment.”，改为：
+
+latex
+The certificate authenticates the issuer's guarantee and is not an asset; Table~\ref{tab:model-contract} states what it does and does not establish.
+2. 安全节：替换“Availability and guarantor risk”整段
+
+latex
+\noindent\textbf{Availability and guarantor risk.}
+Once a consumer exposes the source QC, at least two honest source signers retain its submission material (Lemma~\ref{lem:security-resubmission}), but resubmission cannot overcome a permanent Intent conflict; a due obligation can instead close without adaptation (Lemma~\ref{lem:security-closure}). At every prefix,
+\[
+  0\le S_g=\sum_{c\in C_g}\bigl(p_c-\mathsf{Rec}_c\bigr)\le Q_g\le B_g .
+\]
+For a fixed grant without further funding, this bounds net unrepaid compensation, not lifetime gross Paid. An unexecuted source keeps $r_{m,c}=a_c$ at each honest signer, so certification from a slice can stop while reserve principal remains. A top-up raises member shares without clearing these reservations, and the added authorization is exposed in the same way. Permanently unexecuted sources fall outside Theorem~\ref{thm:security-neutrality}. Without the restriction of Section~\ref{sec:model-contract}, an issuer therefore accepts adversarially induced reserve loss and retained capacity, not only accidental source failures; Supplement~S3 records one such trajectory.
+3. 补充 S3：风险台账与解析关系（替换“Finite-capacity and Intent boundaries”中的 Intent 两轮部分）
+
+latex
+\noindent\textbf{Intent-conflict risk ledger.}
+With $B_A=300$, each member holds $\lfloor 2B_A/3\rfloor=200$ in one Worker, and each A-side source reserves $a=100$. In each of two cross-organization rounds, a QC-bearing A-side source and a B-side payment share one Intent and spend disjoint inputs; the B side executes first. Table~\ref{tab:s3-ledger} lists the state after each round's compensation.
+
+\begin{table}[!h]
+\caption{Intent-conflict ledger under A's grant (CAL).}
+\label{tab:s3-ledger}
+\centering\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+ & Start & Round 1 & Round 2 \\
+\midrule
+A reserve & 300 & 200 & 100 \\
+Public Spent / Reserved & 0/0 & 100/0 & 200/0 \\
+Retained, each source signer & 0 & 100 & 200 \\
+Available, fourth member & 200 & 200 & 200 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Public Reserved returning to zero does not restore source-signer capacity, and the fourth member alone cannot complete a quorum. The rejected sources' inputs stay publicly unspent and locally locked. Each later A-side request spends the preceding descendant and needs a fresh Intent, a usable route, and fees; the final descendant is spent through B. In the user-funded trace, both rejected sources keep their complete 10{,}000-FUEL inputs locked, not only their 1{,}000-FUEL escrow maxima. The two rounds and the final descendant spend 480 FUEL (430 rewards, 50 burned) from 5{,}000 of escrow maxima, and 4{,}520 is refunded. In the organization-funded trace, B's authorized fee account pays the 480 FUEL, A's public FUEL is unchanged, A's local fee reservations remain, and the CAL loss stays with A. CAL and FUEL are reported separately.
+
+For the same three source signers, one fixed Worker, no other reservations, no release, and reservation $a$ per round, those signers can approve $\lfloor\lfloor 2B/3\rfloor/a\rfloor$ rounds, here two, ending with $S_g=Q_g=200\le B_A$. This describes the trajectory, not a maximum over other signer sets or schedules. A top-up adds the share difference without clearing retained reservations.
+中文要点
+
+服务契约。 认证到账只说明收款人持有一个由 QC 固定、归本人所有的输出，可以立即请求后继；它不等于公共执行，不产生公共赔付请求权，也不保证后继能获得签发容量。只有后继交易公开消费一个尚未创建的认证输出时，系统才原子地登记针对直接发行者的义务。到期并不等于立即赔付，赔付取决于公共提交和执行。成员拒绝是逐请求的本地决定：额度不足时不提交、不签名，幂等重试复用旧签名，不占用新额度。某个成员拒绝不构成全局闸门；没有 QC 也不等于没有局部占用。协议没有 Subject 级的 CAL 准入，也没有跨收集器的未完成上限，费用赞助政策也不是 CAL 准入。容量条件属于外部假设，不是已实现的机制。
+
+风险边界。 证明给出的界是每个前缀的净未偿赔付满足 S ≤ Q ≤ B，不是终身累计的 gross Paid。来源未执行时，签名者保留 a_c，所以储备尚有余额时签发也可能停止。补资会增加份额，但不清除已有占用，新增的授权同样暴露在风险下。永久不执行的来源不在延迟中性定理的范围内。
+
+S3 台账。 两轮实验中，A 储备 300→200→100；三名源签名者各保留 100→200；公开 Reserved 归零，但源签名者的容量不恢复；第四名成员虽有容量，也凑不齐法定人数。用户付费模式下，两笔完整的 10,000 FUEL 输入被锁定。实际花费 480 FUEL（节点奖励 430，销毁 50），预留 5,000，退回 4,520。组织付费模式下，这 480 FUEL 由 B 支付，CAL 损失仍由 A 承担。解析式 ⌊⌊2B/3⌋/a⌋ = 2 只描述这一条特定轨迹，不是任意调度下的最大轮数。文中不计算 CAL 与 FUEL 的兑换比。
+
+请你在代码或日志中核对的四点：
+
+台账中第 1 轮的 Public Spent = 100，以及第四成员初值 200，是我根据储备变化和容量公式推出的，需要与日志逐项对照。
+“S_g = Q_g = 200”成立的前提是 A 的授权下没有其他未执行的事实，请对照测试夹具确认。
+Lemma 标签沿用了你给出的段落中的现有标签；
+𝑟
+𝑚
+,
+𝑐
+r
+m,c
+	​
+
+ 的符号来自引理 8，没有新增引用。
+契约中“three matching approvals”对应钱包实际核验 QC 签名的逻辑，请确认 ReceiveDirect 的核验与这一表述一致。
+Claude works directly with your codebase
+Install
+
+
+
+
+
+
+
+just now

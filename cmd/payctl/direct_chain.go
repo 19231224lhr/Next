@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 	cfg "utxo/cmd/internal/config"
+	"utxo/finality"
 	"utxo/internal/blockfollow"
 	"utxo/internal/member"
 	"utxo/internal/requesttrace"
@@ -216,8 +217,18 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 	if e5 {
 		client = transport.NewHTTPClient(2 * time.Second)
 	}
+	var followTiming [3]*chainTimingSource
+	var stopFollowers []func()
 	for i := range wallets {
-		defer blockfollow.Start(ctx, cancel, dbs[i], transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, wallets[i].PrepareBlock)()
+		s := &chainTimingSource{Source: transport.NewCommitteeClient(n.CommitteeURLs[0])}
+		followTiming[i] = s
+		w := wallets[i]
+		stop := blockfollow.Start(ctx, cancel, dbs[i], s, trust, func(b finality.VerifiedBlock) (blockfollow.Apply, error) {
+			s.verified(b.Height())
+			return w.PrepareBlock(b)
+		}, s.committed)
+		stopFollowers = append(stopFollowers, stop)
+		defer stop()
 	}
 	batchCtx, stopBatches := context.WithCancel(ctx)
 	var batches [4]*progressBatcher
@@ -242,6 +253,16 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 	defer func() {
 		cancel()
 		observers.Wait()
+		for _, stop := range stopFollowers {
+			stop()
+		}
+		var timing [3][]chainFollowTiming
+		for i, s := range followTiming {
+			timing[i] = s.snapshot()
+		}
+		if e := cfg.Write(filepath.Join(dir, "reports", "chain-follow-timing.json"), timing); err == nil {
+			err = e
+		}
 		if err == nil {
 			select {
 			case err = <-observerErrors:

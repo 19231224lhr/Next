@@ -1,0 +1,65 @@
+=== RUN   TestRealBlockStoreRewriteAndOriginalReplay
+    comet_test.go:426: rewrote real stored tx and 2 parts; original 3/4 commit, owner signature and inclusion proof valid
+--- PASS: TestRealBlockStoreRewriteAndOriginalReplay (0.05s)
+=== RUN   TestHistoricalExportConsumer
+    history_export_test.go:178: original-coordinate export verified: authorization, full BlockID, owner signatures, direct certificates, immutable outputs, and paid provenance after repayment
+    history_export_test.go:179: same-prefix index/materialized-row/C3 economic answers agree; original and revised bodies reuse the retained commit; equal header with unadapted parts is rejected
+--- PASS: TestHistoricalExportConsumer (0.06s)
+=== RUN   TestPaymentRepairMonetaryReplay
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-output
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-revision
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-transaction
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-part
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-same-height
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-valid-opening-wrong-reserve
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-owner-auth
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-organization-auth
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-input-certificate
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/same-block-parent-first
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/same-block-repair-first
+=== RUN   TestPaymentRepairMonetaryReplay/representation-before-repayment/warm-cache-after-authorized-repair
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-output
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-revision
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-transaction
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-part
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-same-height
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-valid-opening-wrong-reserve
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-owner-auth
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-organization-auth
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-input-certificate
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/same-block-parent-first
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/same-block-repair-first
+=== RUN   TestPaymentRepairMonetaryReplay/repayment-before-representation/warm-cache-after-authorized-repair
+--- PASS: TestPaymentRepairMonetaryReplay (0.20s)
+    --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment (0.10s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-output (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-revision (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-transaction (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-part (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-same-height (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-valid-opening-wrong-reserve (0.01s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-owner-auth (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-organization-auth (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/reject-input-certificate (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/same-block-parent-first (0.01s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/same-block-repair-first (0.01s)
+        --- PASS: TestPaymentRepairMonetaryReplay/representation-before-repayment/warm-cache-after-authorized-repair (0.00s)
+    --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation (0.10s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-output (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-revision (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-transaction (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-part (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-same-height (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-valid-opening-wrong-reserve (0.01s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-owner-auth (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-organization-auth (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/reject-input-certificate (0.00s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/same-block-parent-first (0.01s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/same-block-repair-first (0.01s)
+        --- PASS: TestPaymentRepairMonetaryReplay/repayment-before-representation/warm-cache-after-authorized-repair (0.00s)
+=== RUN   TestHistoricalReaderEquivalence
+--- PASS: TestHistoricalReaderEquivalence (0.06s)
+PASS
+ok  	utxo/internal/redaction	0.509s

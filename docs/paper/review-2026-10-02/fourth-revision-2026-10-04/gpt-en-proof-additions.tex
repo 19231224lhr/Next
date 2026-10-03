@@ -1,0 +1,79 @@
+% Authenticated, unique consumption / public authorization:
+% Append to the production-entry cell.
+The fixed wire4 cases in \texttt{Check}/\texttt{ExecuteAt} are
+\texttt{ReserveIncrease}, \texttt{ClockTick}, \texttt{RepairInput},
+\texttt{RepairBatch}, \texttt{CompensationDecision}, and
+\texttt{DirectSubmission}; \texttt{Execute} rejects legacy commands
+in direct mode.
+
+% Append to the regression-evidence cell.
+\texttt{TestDirectModeRejects\allowbreak AlternatePaymentEnvelopes}
+also covers rejection of alternative payment envelopes.
+
+
+% Potential liabilities are funded:
+% Append to the production-entry cell.
+\texttt{Engine.NewEngine} aggregates all CAL/FUEL grants by
+\texttt{AccountKey} and checks each account's total authorization
+against its balance. The protected-CAL set includes all organization
+accounts and CAL-grant accounts.
+
+
+% Compensation takes effect at most once / Source repayment:
+% Append to the production-entry cell.
+An identical recorded decision returns no new effect, while a
+different decision is rejected. Only the no-record branch reaches
+\texttt{targetSlot}, which requires \texttt{OriginalFunding}
+matching the original \texttt{OutputID}, amount, and fixed
+consumer fields.
+
+
+% Decision-gated representation authority /
+% Representation is economically inert:
+% Append to the production-entry cell.
+Both \texttt{RepairInput} and \texttt{RepairBatch} remain subject
+to the decision and target-slot guards.
+\texttt{EvaluateDirectPaymentAt} does not read historical
+\texttt{Canonical} bodies. A decision with an existing record
+is handled before historical access; otherwise, revisions to
+other slots leave its undecided target and fixed fields unchanged.
+These read-side obligations support unchanged subsequent economic
+results at the same height and time.
+
+
+% Protected continuation /
+% Economic closure does not wait for adaptation:
+% Append to the production-entry cell.
+\texttt{wallet.ReceiveDirect} checks the registered configuration,
+network, and \texttt{Recipient.Owner}, calls \texttt{c.VerifyOutput},
+and records \texttt{DirectCoin} within \texttt{Update}, rejecting
+inconsistent bodies for the same \texttt{OutputID}.
+\texttt{member.InstallDirectClassified} first calls
+\texttt{VerifyDirectPayment}; its transaction rejects
+\texttt{Invalidated}, treats \texttt{Observed} as a no-op, and
+checks and stores consumption records for all inputs and fee inputs
+together with complete install material and the outbox, without
+a new reservation. These receipt checks do not themselves establish
+the historical \texttt{FreshRecv} premise.
+
+
+% Premises paragraph:
+% Replace the sentence grouping model premises and implemented guards.
+Fixed four-member organizations and a four-validator committee,
+three-vote quorums, at most one static Byzantine participant per
+group, consistent configuration, and non-rollback of honest signing
+state remain model or deployment premises. Aggregate genesis backing
+and protected-CAL account restrictions are mapped separately to
+\texttt{Engine.NewEngine}, the fixed command dispatcher, and the
+account guards above.
+
+% Replace the ABCI rejection-level explanation.
+The new \texttt{TestPublicAuthorizationAtABCIEntry} submits encoded
+bytes whose authorization fields were subsequently tampered with
+directly to the three ABCI interfaces, checking rejection, empty
+\texttt{pendingChanges}, and unchanged business state.
+Sender-side encoding failures are recorded separately from
+receiver-side rejection. Receiver-side decoding, binding checks,
+and signature verification are distinct layers: each case is
+attributed to the guard actually reached, and a codec rejection
+is not reported as evidence that signature verification executed.

@@ -1,0 +1,93 @@
+
+  - paragraph:
+    - strong: 最后的装配入口疑问可以关闭，未发现必须修改生产逻辑的问题。
+    - text: EnableRepair 将三类命令分别接入对应执行器；AnchorDirectDeadlines 只为达到锚定高度、仍为 Open 且尚未设置 Deadline 的义务赋值，并清除已处理锚定项，不会重复延长期限。
+    - button "Open preview of final-small-checks.txt":
+      - generic: final-small-checks
+    - button "Open preview of final-small-checks.txt":
+      - generic: final-small-checks
+  - paragraph:
+    - text: 最终片段中，
+    - strong: 仍需修改的是补充材料检查表的三处文字
+    - text: 。
+  - heading "1. S1：“Member lag can refuse, not mis-approve”仍然过强" [level=3]
+  - paragraph:
+    - text: 落后且未签过赢家的成员，可能尚不知道某输入已经被公共消费，因而为冲突请求给出
+    - strong: 单个局部批准
+    - text: ；其他赢家签署者的锁阻止它形成冲突 QC。交集证明保证的是后者，不是每次局部批准都符合最新公共状态。现有批准代码读取本地 Candidate/Consumed，确实允许这种状态滞后情形。
+    - button "Open preview of implementation-payment.txt":
+      - generic: implementation-payment
+  - paragraph: 建议将关系栏末句替换为：
+  - blockquote:
+    - paragraph: Local lag may cause rejection or permit a partial conflicting approval at a member that did not sign the publicly executed payment; quorum intersection still prevents a conflicting QC.
+  - paragraph:
+    - text: 成员检查栏也应明确：
+    - strong: 最终本金输入和用户费用输入需要本地认证创建记录；证书输入使用匹配证书。签名前写入的是输入锁，不是新建这些创建记录。
+    - text: 当前一概写“lock and local creation record … written before signing”容易误读。
+    - button "Open preview of final-edited-sections.txt":
+      - generic: final-edited-sections
+  - heading "2. D 类遗漏“当前付款 QC”的检查差异" [level=3]
+  - paragraph:
+    - text: D3 写的是
+    - strong: 父输入证书
+    - text: ，不能代替公共路径对
+    - strong: 当前付款自身 QC
+    - text: 的检查。VerifyDirectSubmission 明确调用 protocol.VerifyQC(payment.Authorization, cfg)；成员批准则在本地提交成功后产生自己的单签。
+    - button "Open preview of implementation-payment.txt":
+      - generic: implementation-payment
+    - button "Open preview of implementation-payment.txt":
+      - generic: implementation-payment
+  - paragraph: 不必增加整行，表下注明即可：
+  - blockquote:
+    - paragraph: Member approval produces an individual vote after local commit; public submission additionally verifies the current payment’s SpendQC.
+  - heading "3. S3：首次覆盖登记与赔付扣款应分开表述" [level=3]
+  - paragraph:
+    - text: 现句将“reserve failure”也挂在“at first registration”上，混淆了阶段，并有 theorem exclude 的语法错误。
+    - strong: 首次登记增加覆盖预留，并不扣储备；赔付时才需要储备本金。
+    - button "Open preview of final-edited-sections.txt":
+      - generic: final-edited-sections
+    - button "Open preview of final-edited-sections.txt":
+      - generic: final-edited-sections
+  - paragraph: 建议直接替换为：
+  - blockquote:
+    - paragraph: CAL coverage excludes grant-capacity failure at first registration and reserve-principal shortfall when compensating an Open obligation. Other resource and fee checks remain separate execution conditions.
+  - paragraph:
+    - text: 这只是准确对应既有 Theorem 1，
+    - strong: 不引入非 CAL 可执行性的新主张
+    - text: 。
+  - separator
+  - paragraph:
+    - text: 其余新增文字未见需要纠正的实质事实。917 段与所附汇总一致：63.31%是
+    - strong: 累计槽占用时间
+    - text: 中的发送前比例，不是请求比例；59与5是分别计算的中位数，也不应视为每个检查点都恰好如此。当前文字已说明收据时间近似释放时间，以及没有据此归因 CPU、存储或跟块，范围适当。
+    - button "Open preview of final-small-checks.txt":
+      - generic: final-small-checks
+    - button "Open preview of final-edited-sections.txt":
+      - generic: final-edited-sections
+  - paragraph:
+    - strong: 修正上述三处检查表文字即可收尾。
+    - text: 装配、期限锚定、非 CAL、AO-CR、C3及本轮追加证据不再保留结构性异议；不需要修改冻结代码、补新机制或重新启动实验矩阵。
+  - button "Copy":
+  - button "Rate response":
+  - button "Share":
+  - button "Read aloud":
+  - button "Regenerate response":
+  - button "More actions":
+  - button "Sources":
+  - generic: ChatGPT can make mistakes. Check important info.
+  - button "Scroll to bottom":
+  - heading "Latest response" [level=4]
+  - status
+  - button "Add files and more":
+  - textbox "Ask ChatGPT":
+    - paragraph: Ask ChatGPT
+  - button "Select ChatGPT model":
+    - generic: Pro
+  - button "Dictate":
+  - button "Start Voice":
+- status
+- status
+- status
+- status
+- status
+- status: Response complete

@@ -1,6 +1,11 @@
 \section{Results from Earlier Builds}
 \label{sec:archive-results}
-These results retain their original builds, storage modes, and measurement endpoints. The main paper reports the three core experiments on frozen evaluation build \texttt{721800c}. Earlier performance and CPU measurements use different builds and workloads and are not combined into a capacity estimate for one configuration.
+These archived results retain their original builds, storage modes,
+and measurement endpoints. The main paper reports continuous-payment
+and representative P results on \texttt{f856c7b}; historical-reader
+results retain \texttt{721800c}, and the injected-latency study retains
+\texttt{9879f64}. Results from different builds and workloads are not
+combined into a capacity estimate for one configuration.
 
 \subsection{Continuous Spending Without Per-Hop Settlement}
 \label{archive:sec:eval-continuation}
@@ -54,8 +59,9 @@ instead shortens continuation. At 200
 payments/s for 30\,s, three paired runs per mode each complete 6,000
 payments, and the median of run-level receipt P50s falls from 2.167\,ms with
 the gate to 1.300\,ms (40.0\%). Separate 100-hop trials fall from 287.983 to
-200.356\,ms (30.43\%). Authorization is unchanged, and the supplement lists
-the paired runs.
+200.356\,ms (30.43\%). Authorization is unchanged.
+Fig.~\ref{fig:delivery-gate} shows the run-level results;
+Section~\ref{sec:supp-methods} gives the methods.
 
 \subsection{Funded Closure and Repayment}
 \label{archive:sec:eval-liabilities}
@@ -80,7 +86,7 @@ Open or Repaired, the gap is zero, net Spent and Reserved are zero, and the
 reserve is back at 60,000\,CAL (Table~\ref{archive:tab:eval-audit}). The lowest
 sampled reserve is 59,800--59,900\,CAL at 1\% and 59,600\,CAL at 5\%. It
 reflects the driver's release schedule rather than a reserve-sizing result,
-and the supplement plots the three 5\% trajectories. Run-level receipt P50s
+and Fig.~\ref{fig:reserve-recovery} shows the three 5\% trajectories. Run-level receipt P50s
 for normal child payments are 1.185--1.251\,ms. Measured from the deadline, the
 committee commit, which in this build carries the representation, is observed
 at a median of 1.003--1.254\,s, and physical installation of the revised
@@ -207,7 +213,7 @@ show backup submission 2.503--2.508\,s after INSTALL.
 Conflict controls produce neither dual conflicting QCs nor repeated
 principal/fee effects, while partial approvals remain a capacity cost.
 
-The multi-identity measurements in supplementary Section~S2 report
+The multi-identity measurements in Section~\ref{sec:supp-methods} report
 per-payment CPU and HTTP-payload costs; 2,048 identities share clients.
 Historical memory growth is reported separately from backlog. The same
 section gives an LND regtest reference, whose completion event,

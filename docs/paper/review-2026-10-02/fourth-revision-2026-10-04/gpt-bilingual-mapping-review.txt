@@ -1,0 +1,329 @@
+
+一、Evaluation 中文 LaTeX 对应版
+LaTeX
+% 替换版本说明段；保留现有公共 setup、图及 subsection 标签。
+\noindent\textbf{构建版本与统计方法。}
+当前构建系列基于 \texttt{f856c7b}：两种续花模式各运行三轮
+100 跳链，另运行三轮代表性的暂停适配处理 P。九轮使用同一节点构建；
+新增计时点仅位于 \texttt{payctl}，六轮连续链均已启用，
+未修改生产节点路径。\texttt{721800c} 的完整 N/R/C/P 矩阵
+保留为历史结果；历史读取实验仍标注 \texttt{721800c}，
+注入延迟实验仍标注 \texttt{9879f64}。
+连续链报告三轮总时长的中位数与范围；混合负载报告三轮轮内统计量
+的中位数。阶段计时先逐笔求时间差，在各轮内分别计算 P50/P95，
+再对三轮对应统计量取中位数，不混池计算。
+
+\subsection{无需逐跳结算等待的连续付款}
+
+三个相互独立的 NoSync 钱包在线构造 100 跳付款链，
+循环转移 100~CAL；成员采用同步提交，费用使用用户的最终 FUEL。
+fast 模式在认证到账后继续，wait 模式还要求驱动观察到钱包已验证的
+公共执行，才构造下一跳。两者均测量
+$\mathsf{Sent}_1 \rightarrow \mathsf{Ready}_{100}$，
+包含后继构造与重试，不包含首笔付款的构造。
+wait 模式增加的是 99 次跳间等待，不包含最后一笔的公共确认。
+
+两种模式的链时长中位数分别为 4.707\,s 和 64.479\,s，
+中位数之比为 13.70；三轮范围分别为 4.700--4.726\,s
+和 64.387--64.670\,s。fast 为 300 笔付款发起 300 次尝试，
+wait 发起 414 次。全部 297 个 fast 后继均使用前一笔的 TXCer，
+且首次发送早于四个副本中最早的父交易应用提交完成时间，
+最小提前量为 183.439\,ms。
+三轮实际产生的子交易先于来源执行的义务数分别为 2、4 和 1；
+仅提前发送不计作错序执行。
+
+全部 600 笔付款完成闭合，并通过金额、输入、副本一致性、
+费用及 outbox 审计。以首次发送为起点，fast 模式第 100 笔付款的
+公共观察时间中位数为 5.477\,s，全部付款的成员闭合时间中位数
+为 5.526\,s。前者专指第 100 笔，不以全部付款公共观察时间的最大值
+替代其定义。每条链支出 9,400~FUEL。
+对于该固定交易形状，TXCer 为 779~B；
+首跳请求为 1,979~B，后续请求为 2,766~B。
+
+\noindent\textbf{客户端阶段计时。}
+记录按接收钱包、区块高度和付款事实匹配。
+阶段分解采用取数端 \texttt{committee0} 的应用提交完成时间，
+而非上述提前量检查所用的四副本最早时间。
+一般阶段每轮包含 100 个付款样本，跳间过渡每轮包含 99 个；
+六轮合计分别为 600 和 594 个，每种模式分别为 300 和 297 个。
+同一接收钱包、同一高度的多个付款复用观察点，并按付款展开统计，
+不将其视为相互独立的区块高度样本。
+
+对于目标高度 $h$，\texttt{BlockData} 先取得 $h+1$ 的签名头，
+再获取 $h$ 的区块和执行结果。获取 $h+1$ 提交证据时，
+RPC 对最新高度读取 \texttt{LoadSeenCommit}，
+对较早高度读取 \texttt{LoadBlockCommit}；
+接口不要求额外等待 $h+2$。
+因此，从应用提交到完整取数返回仍是包含后继证据、
+副本推进、轮询和取数的联合区间，不能解释为纯查询开销，
+成功返回也不标识证据最早可得的时刻。
+
+wait 模式下，该联合区间的 P50/P95 为
+285.884/314.509\,ms。
+另行观察的取数后验证、准备与本地记录、
+以及事务完成后回调至驱动观察三个区间，
+P95 分别为 0.236、1.343 和 4.713\,ms。
+验证后的检查点位于 \texttt{VerifyBlock} 成功返回后的
+\texttt{PrepareBlock} 入口；
+回调发生在本地事务完成后，不等待耐久刷盘。
+单次成功获取调用的耗时与上述联合区间重叠，单独报告而不相加；
+各阶段分位数同样不相加。
+
+跨进程区间使用同机 Unix 纳秒时间戳相减，
+整链时长使用单调时钟。
+驱动轮询、跟随器轮询和 commit 设置仍分别为
+5、25 和 250\,ms。
+fast 后继可以早于公共观察开始构造，
+因此负的“公共观察至下一跳构造”差值表示执行重叠，
+不是负等待时间。
+13.70 是所测配置下两种端到端模式的时长比，
+包含重试和证据观察。
+
+\subsection{代表性混合负载下的来源闭合}
+
+十四服务的 P 处理在 70\,s 内按每秒 100 笔安排
+7,000 笔普通付款，同时运行八组相互独立的跨组织父子付款，
+费用使用明确授权的组织 FUEL。
+实验扣留父交易的公开提交及 \texttt{INSTALL}，
+关闭自动来源补交，并暂停全部适配端点；
+共识和赔付决定继续运行。
+每个迟到来源在观察到其赔付后单独释放。
+普通流量覆盖注入故障及恢复的全部时段。
+
+三轮共 21,048 笔付款全部闭合，其中包括
+21,000 笔普通付款和 24 组父子付款。
+每轮赔付并收回 800~CAL。
+恢复适配之前，四个委员会副本均报告八个目标已
+\texttt{Recovered}，而对应表示的
+\texttt{Committed} 和 \texttt{Materialized} 标志均为 false。
+这 96 次副本--目标检查确认，在所测执行中，
+赔付和回款均先于适配恢复完成。
+每轮委员会状态哈希在共同高度一致，
+CAL/FUEL、输入、费用、预留及 outbox 审计全部通过。
+每轮费用为 659,544~FUEL，其中
+589,384 为奖励，70,160 被销毁。
+
+表~\ref{tab:current-p} 同时报告普通付款到账延迟、
+发送前回压和发送后排空。
+轮内到账 P50/P95 的三轮中位数分别为
+54.538/147.549\,ms；
+公共观察和成员观察 P95 的三轮中位数分别为
+2.187 和 2.255\,s。
+三轮均触及 256 笔未完成付款的驱动上限。
+发送滞后 P95 最高为 780.727\,ms，
+计划时刻至到账 P95 最高为 851.742\,ms；
+后者逐笔计算，并非两个分位数相加。
+实际发送跨度为 70.080--70.771\,s，
+最后一笔普通付款发送后再经 0.955--1.115\,s 排空。
+该代表性 P 系列展示了普通流量期间、适配不可用时的经济闭合，
+不构成当前构建下 N/R/C/P 的干扰对照。
+
+\begin{table*}[t]
+\centering
+\caption{构建 \texttt{f856c7b} 上代表性 P 处理的普通付款结果。
+每轮包含 7,000 笔普通付款及八组父子付款。
+到账从实际发送起计；发送滞后从计划时刻计至实际发送；
+计划至到账直接逐笔计算。排空从最后一笔普通付款的实际发送起计。
+末行分别取各列三轮统计量的中位数。}
+\label{tab:current-p}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrrrrrr}
+\toprule
+轮次 &
+\shortstack{到账 P50\\(ms)} &
+\shortstack{到账 P95\\(ms)} &
+\shortstack{发送滞后 P95\\(ms)} &
+\shortstack{计划至到账 P95\\(ms)} &
+\shortstack{发送跨度\\(s)} &
+\shortstack{排空\\(s)} \\
+\midrule
+P-1 & 54.538 & 156.680 &  90.335 & 189.591 & 70.080 & 1.090 \\
+P-2 & 54.007 & 147.549 & 245.315 & 326.828 & 70.235 & 0.955 \\
+P-3 & 55.001 & 141.424 & 780.727 & 851.742 & 70.771 & 1.115 \\
+\midrule
+中位数 & 54.538 & 147.549 & 245.315 & 326.828 & 70.235 & 1.090 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+二、证明映射的逻辑核对
+
+所列主干相互一致，未发现新的证明矛盾；但“关键对应点”仍不应写成“全部入口已经穷尽”。 以下依据你提供的代码核对报告，不是本轮独立源码审计。明细还宜补齐三处：
+
+1. 收款与 INSTALL 入口。 目前组合安全行只写了“钱包身份及 owner 授权约束”，未列实际处理函数。应补上收款端的 QC／输出／owner 检查与原子记录，以及 INSTALL 的验证入口、已失效批准拒绝和本地消费写入边界。ApproveDirectBytes 不能替代这些入口的对应；原证明也明确使用了 INSTALL 保留本地消费效果这一性质。
+Next-overleaf-English
+
+2. 公共分派与备付账户边界。 ABCI 三入口已补强，但还应在明细连接既有 wire4 白名单、legacy 排除及单项 RepairInput 到共享表示守卫的路径。覆盖定理还依赖创世时共享账户下所有 grant 的合计备付检查，以及其他生产命令不能任意扣减受保护 CAL 储备；仅列补资来源检查，尚不能代表这两个前提已经逐入口对应。
+Next-overleaf-English
+
+3. 表示无经济效果的读侧义务。 lem:security-representation 不只有“当前命令不写经济状态”，还有“相同高度和时间下，后续付款／决定的结果不变”。明细应补到相关读分支：付款执行不依赖修订正文；决定已有记录时直接幂等返回，否则读取的未决定目标槽仍为原资金表示。固定目标集合的正文／开口收敛，还须保留唯一有效开口这一条件。
+Next-overleaf-English
+
+新 ABCI 测试可以称为实际入站拒绝覆盖。等宽修改保证绕过了发送端编码器，但不自动说明接收端一定执行到了密码学验签；工件分别记录解码、绑定检查或验签拒绝的位置即可。已有冷／热缓存和当前账本重检测试无需重复新增。
+
+补充材料英文 LaTeX：10 行映射表
+
+表中使用原有命题标签；补充材料沿用现有正文标签导入方式。完整函数路径和逐项断言留在详细工件索引中。
+
+LaTeX
+\begin{table*}[t]
+\centering
+\caption{Selected proof--implementation correspondences for production
+baseline \texttt{f856c7b}. Rows group claims sharing production guards.
+Detailed file paths, caller boundaries, and test assertions remain in
+the artifact index; this table is not an exhaustive ingress inventory.}
+\label{tab:proof-implementation}
+\small
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{@{}p{0.18\textwidth}
+                    p{0.49\textwidth}
+                    p{0.29\textwidth}@{}}
+\toprule
+Claims &
+Production entry and proof-relevant obligation &
+Representative regression evidence \\
+\midrule
+
+Lemma~\ref{lem:security-original} &
+The Comet overlay and \texttt{matchesBlockID} compare both identity
+components. Original-part validation and candidate transfers preserve
+body--parts pairing and execution context through consensus and replay. &
+Stable-hash identity cases, rejected relabelled openings and uncertified
+revisions, and retained-original replay; Comet-specific evidence keeps
+its recorded build. \\
+
+Lemma~\ref{lem:security-consumption};
+public authorization &
+\texttt{ApproveDirectBytes} commits locks, Intent, approval, and debits
+before signing. \texttt{CheckTx}, \texttt{ProcessProposal}, and
+\texttt{FinalizeBlock} reach \texttt{Engine.Check} and submission
+verification. Full-byte caching does not replace current-ledger checks
+in \texttt{EvaluateDirectPaymentAt}. &
+\texttt{TestPublicAuthorization\allowbreak AtABCIEntry};
+distinct-voter, identical-byte-cache, current-ledger, durable-approval,
+and replay tests. \\
+
+Lemmas~\ref{lem:security-superseded}
+and~\ref{lem:security-witness} &
+Authenticated successful, applied results reach
+\texttt{reclaimPartial} and \texttt{finishLocal}.
+Normal CAL restoration requires observed source settlement;
+invalidation separately requires the guarded same-configuration input
+conflict. Both restore only original residual debits, with cumulative
+progress and the follower cursor committed atomically. &
+Partial-conflict, multiple-input, failed-result, contradiction,
+late-effect, original-debit, and cumulative-restart tests. \\
+
+Lemmas~\ref{lem:security-resubmission}
+and~\ref{lem:security-intent} &
+\texttt{recoverExposedSources} reconstructs retained approved material
+with the public QC and verifies it before queuing; it creates no
+approval or debit. \texttt{EvaluateDirectPaymentAt} preserves the global
+Intent binding established by successful execution. &
+Cross-organization and multi-depth source reconstruction, duplicate
+exposure, Subject separation, and the two-round Intent-compensation
+ledger. \\
+
+Theorem~\ref{thm:security-coverage} &
+\texttt{PrepareDirectVector}, submission verification, and approval
+bind issuer, configuration, grant, and Worker availability.
+\texttt{GrantShare}, \texttt{EvaluateReserveIncrease}, and
+\texttt{ApplyReserveIncrease} use external unprotected funding and
+cumulative share differences without erasing existing debits. &
+Capacity fragmentation, funded completion, persistent 2/2 input split,
+protected-source rejection, shared external funding, and cumulative
+rounding tests. \\
+
+Lemmas~\ref{lem:security-decision}
+and~\ref{lem:security-recovery} &
+\texttt{ExecuteDecision} checks the recorded decision, Open status,
+public deadline, position, and amount before atomic compensation.
+\texttt{recoverOutput} repays the original issuer within successful
+source execution, bounds recovery by payment, and creates no second
+user output. &
+Repeated and conflicting decisions, late-source repayment, partial-output
+repair, four-hop orders, and split--merge orders. \\
+
+Theorems~\ref{thm:security-conservation}
+and~\ref{thm:security-neutrality} &
+Payment, compensation, repayment, and reserve-increase transitions
+apply through overlays and public commit. Failed transitions contribute
+no business changes. Terminal CAL comparison retains the theorem's
+initial-state and successful source-closed payment-set conditions;
+it does not compare FUEL. &
+Monetary projections across interleavings and replay; current-build
+audits of 600 chain payments and 21,048 representative P payments. \\
+
+Lemmas~\ref{lem:security-repair}
+and~\ref{lem:security-representation} &
+\texttt{InputTarget}, \texttt{batchBody}, and \texttt{ExecuteBatch}
+derive decided slots, preserve non-target bytes, and check openings,
+version digests, and the original complete BlockID.
+Representation-only writes and unchanged subsequent economic reads
+are separate obligations; \texttt{DecodePublicExecution} adds no
+representation-induced principal effect. &
+Atomic two-input and cross-part batches, compensation before adaptation,
+and payment--repair monetary replay. \\
+
+Lemma~\ref{lem:security-installation};
+local reader contract &
+\texttt{Canonical} selects the logical revision in $V_H$.
+\texttt{PrepareMaterialization} supplies exact Task material;
+physical revision guards prevent rollback, and replay uses originals.
+Saved-commit compatibility does not itself authorize a revision. &
+Revision-order and interleaved-queue tests, original-history replay,
+reader equivalence, and \texttt{same\_consumer\_views} across real
+repayment at $H=4,5$. \\
+
+Theorem~\ref{thm:security-continuation};
+Lemma~\ref{lem:security-closure} &
+Shared authorization guards compose with
+\texttt{finality.VerifyBlock}, \texttt{PrepareBlock}, and
+\texttt{blockfollow.Commit}.
+\texttt{FreshRecv} remains a history premise.
+Economic closure uses \texttt{ExecuteDecision} without adaptation
+access; business updates and follower progress commit together. &
+Durable approval/background installation, 297 early successors in six
+chains, and 96 replica--target P checks showing repayment before
+representation commitment or materialization. \\
+
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\noindent\textbf{Premises and evidence levels.}
+The proofs cover finite traces under the stated model; production
+guards identify implementation responsibilities, and regressions
+exercise particular acceptance and rejection traces.
+Fixed four-member groups with three-vote quorums and at most one static
+Byzantine participant per group, consistent configuration, aggregate
+genesis backing, protected-reserve withdrawal restrictions, and
+non-rollback of honest signing state remain explicit premises.
+Signature unforgeability, binding original commitments, and correctly
+generated dealer-based threshold RSA parameters are not established by
+functional tests; fixed-target opening convergence additionally requires
+unique valid openings.
+Historical reads trust one verified, executed prefix $V_H$ with retained
+history, while progress retains its capacity, resource, and fair-delivery
+conditions.
+The new \texttt{TestPublicAuthorizationAtABCIEntry} sends already encoded,
+tampered authorization bytes directly through the three ABCI interfaces
+and checks rejection without business-state changes.
+Sender-side encoding failures are separate; receiver-side decoding,
+binding, and signature-verification rejections are distinct outcomes.
+Existing cache regressions distinguish byte-identical reuse from
+current-ledger validation.
+The current eight-package regression passes, with client and test
+additions fingerprinted separately from the production baseline.
+Comet-interface, persistent-restart, network-evidence, and threshold
+tests retain their recorded versions and scope; they are not new
+remote-download experiments, exhaustive Byzantine-scheduling tests,
+or mechanized proofs.
+ChatGPT can make mistakes. Check important info.
+Latest response
+
+
+
+
+Pro

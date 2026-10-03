@@ -1,0 +1,34 @@
+{
+  "command": "go test -tags comet_v3 ./internal/redaction -run ^TestRevisionIntentTwoRoundCompensation$ -count=1 -v",
+  "passed_subtests": [
+    "TestRevisionIntentTwoRoundCompensation (0.13s)",
+    "TestRevisionIntentTwoRoundCompensation/owner_fee_true (0.07s)",
+    "TestRevisionIntentTwoRoundCompensation/owner_fee_false (0.06s)"
+  ],
+  "snapshots": [
+    {
+      "height": 12,
+      "label": "round1_paid_duplicate_noop"
+    },
+    {
+      "height": 24,
+      "label": "round2_paid_duplicate_noop"
+    },
+    {
+      "height": 26,
+      "label": "two_round_stop_original_signers"
+    },
+    {
+      "height": 12,
+      "label": "round1_paid_duplicate_noop"
+    },
+    {
+      "height": 24,
+      "label": "round2_paid_duplicate_noop"
+    },
+    {
+      "height": 26,
+      "label": "two_round_stop_original_signers"
+    }
+  ]
+}

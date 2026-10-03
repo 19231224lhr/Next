@@ -1,0 +1,154 @@
+Claude responded: 一、独立判断
+Sketching assertion code to verify matching provenance fields.
+
+Sketching assertion code to verify matching provenance fields.
+一、独立判断
+1. 哪个消费者、在哪一步确实需要 C3
+
+我只找到一个经得起推敲的消费者：以完整 BlockID 为键的区块归档消费者。
+
+它在两个步骤上用到 C3：
+
+入库校验步骤：对每个区块正文，用与原始区块相同的校验例程，对照随提交证书保存的完整 BlockID（区块哈希加 PartSetHeader）进行校验。
+来源提取步骤：只解析这份已经通过校验的正文，在原坐标 (h,j,k) 读出这个输入是由什么资金支付的，不再与第二类记录做关联。
+
+对这个消费者，C3 的作用是让同一条校验加解析流程直接得到储备引用。下面三种消费者则不需要 C3：接受“正文 + 决定记录”联合导出的消费者；直接查询副本状态的消费者；只关心经济结果的消费者。
+
+为什么必须是“完整” BlockID。 按 §IV-G 和读者契约第 5 节，共识层的 Tx.Hash 只覆盖 UTXO4CH 的头部和固定字段，资金引用与开口是单独编码的。因此只校验区块头哈希或 DataHash 包含证明，无法确定资金槽里是哪一种表示；把资金槽字节绑定到区块的是分片 CH 承诺（PartSetHeader），以及相对于所有者签名的输入承诺所做的输入 CH 校验。这一推论来自论文和契约的文字描述，请 Codex 对照封装代码确认：资金槽确实不在 fixed 字段内。
+
+2. 三种方案的比较
+
+两种替代方案分别是：A，原始区块加决定索引（论文中已实现的读取策略 A）；B，按 (h,j,k) 建立的普通物化资金视图（未实现，以下判断依据其构造方式）。
+
+经济答案。 A 和 B 都能给出与 C3 相同的经济答案：决定、决定高度、扣款身份、截至 H 的义务状态。C3 自己也必须读取同一份永久决定和义务状态。
+
+身份指针与审计。 A 和 B 都可以保存 (h,j,k)、TxID、OutputID、完整 BlockID 和决定高度，因此都能审计，原始正文也都能对原 BlockID 校验。
+
+后继与重放。 三者都不影响后继交易，也都不改变重放结果。C2 的经济闭合完全不依赖 C3。
+
+真正的差异只在一处：资金答案存放在哪里。 A 和 B 把答案放在需要与区块正文关联的另一份记录里；C3 把答案嵌入正文本身，而这份正文仍然通过与原始版本相同的身份校验。
+
+授权保证。 三者完全相同，都来自本地已执行的状态。C3 导出的字节本身并不携带授权。
+
+3. 如何避免循环需求，以及现有代码证据能证明到哪里
+
+不能把需求写成“必须能对原 BlockID 校验”，因为原始正文本来就满足这一点。需求应当写成一个条件命题：如果消费者的流程以 BlockID 为键，并且只从正文提取资金来源，那么 A 和 B 都需要新增一类带有自己 schema、关联键和校验的产物，而 C3 不需要。同时要明确承认：只要消费者接受关联记录，A 或 B 就同样够用，而且更便宜。目前我们知道的部署中没有这样的消费者。
+
+现有代码证据能证明的范围：
+
+TestHistoricalExportConsumer 证明了，在本地验证过的副本上，授权正文通过项目自己的 NewRedactablePartSet 对原完整 BlockID 校验通过，所有者签名、输入 CH、TxID 和输出都不变，资金类型由 Original 变为 Reserve，回款后正文字节不变而义务状态改变。
+TestRealBlockStoreRewriteAndOriginalReplay 证明了真实重写保持提交证据和包含关系。
+
+现有证据不能证明的事项：
+
+未修改的 CometBFT 通用工具可以直接校验修订正文。实际上原始分片本身就使用 CH 承诺，消费者必须使用 Next 的校验器；所以准确的说法是“原始正文与修订正文走同一条校验例程”。
+字节本身能证明授权。
+存在真实的外部消费者。
+
+还有一点不建议写入本轮论文：在门限持有者只为已提交决定生成适配材料的前提下，“修订正文能对原 BlockID 校验通过”或许蕴含“存在已提交的决定”。但这需要对持有者策略和比值重用做单独证明，已经接近远端证明协议，超出本轮范围。
+
+仍然存在的缺口。 即使不使用 C3，CH 编码和分片承诺也一直在运行。这部分成本本轮不做 benchmark，只能写为未单独测量的限制。审稿人仍可能追问。
+
+二、可直接使用的 LaTeX
+
+1. 引言 C3（约 95 词，替换原 C3 段）
+
+
+latex
+\noindent\textbf{C3: Optional identity-preserving funding representation.} After a compensation decision commits, restricted chameleon-hash commands can replace the funding reference of the compensated input with the reserve-debit reference. The stored body at the original coordinates $(h,j,k)$ then names the actual funding and still verifies, by the same routine as the original body, against the original complete BlockID; owner authorizations and successor references are unchanged. A decision index already gives the same economic answer. C3 adds format compatibility for block-keyed consumers, not authorization or economic closure, at the cost of threshold setup, extra records, and maintenance.
+
+2. 需求、消费者与替代方案（约 330 词，建议作为 §IV-H 末尾的段落组，放在“Executable archival consumer”之前）
+
+
+latex
+\noindent\textbf{When representation is useful.}
+Two alternatives answer the same economic question without modifying history: (A) the original block plus the decision index, which our evaluation implements, and (B) a materialized funding view keyed by $(h,j,k)$. Each can store the coordinates, TxID, OutputID, complete BlockID, decision height, and reserve-debit identity, so both are auditable, keep original bodies verifiable, and leave successors and replay unchanged. Economic closure never depends on C3.
+
+The alternatives differ from C3 only in where the funding answer resides: in a record joined to the block, or in the block body itself. Consider an archival consumer whose ingest step verifies each body against the complete BlockID retained with its commit, and whose provenance step extracts input funding by parsing that body alone. Because consensus transaction hashes cover only fixed fields, the funding slot is bound by part commitments and input openings, so this consumer must check the complete BlockID, not only the header hash. Under A or B it must add a second artifact class with its own schema, join key, and verification; under C3 the same verification and parsing yield the reserve reference.
+
+This need is conditional. Verifying against the BlockID alone does not motivate C3, since the original body already does so. A consumer that accepts a joined record is served equally by A or B at lower cost, and we know of no deployed consumer with the block-only constraint. The representation also carries no authorization: as with A and B, the consumer relies on the exporting replica's executed state, including the Revision and Task, and still needs the permanent decision and current obligation state for the economic answer. We therefore claim functional compatibility for block-keyed consumers, not necessity for all readers, and report C3's costs alongside it (Table~\ref{tab:c3-compare}).
+
+3. 功能对照表（双栏）
+
+
+latex
+\begin{table*}[!t]
+\caption{Historical funding answers at original coordinates. A: original block plus decision index; B: materialized funding view (by construction, not implemented); C3: authorized representation.}
+\label{tab:c3-compare}
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{0.27\textwidth}p{0.14\textwidth}p{0.14\textwidth}p{0.17\textwidth}p{0.21\textwidth}@{}}
+\toprule
+Property & A & B & C3 & Evidence \\
+\midrule
+Economic answer at $H$ (decision, debit, obligation) & Yes & Yes & Yes, via the same records & Identical answers in 21{,}600 timed reads (Sec.~\ref{sec:eval-reader}) \\
+Identity pointers $(h,j,k)$, TxID, OutputID, BlockID & Stored & Stored & In body and records & Reader fixtures \\
+Successor validity and replay & Unchanged & Unchanged & Unchanged & Replay regressions \\
+Body verifiable against original complete BlockID & Original body & Original body & Authorized body & Export consumer test \\
+Funding readable from verified body alone & No (join) & No (join) & Yes & Export consumer test \\
+Authorization as of $H$ & Local state & Local state & Local state & Reader contract \\
+Additional trust and machinery & None & None & Dealer, threshold CH, Task & Sec.~\ref{sec:protocol-reader} \\
+Measured cost per repaired block & Index records & Not measured & 0.28--2.19\,MiB; 43--214\,ms & Table~III; CH encoding not separately measured \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+4. 实验解释（约 100 词，替换 §VI-C 末段；同步修改两处措辞）
+
+
+latex
+\noindent\textbf{Interpretation.}
+Strategies A and C3 read the same committed state, consult the same permanent decision and obligation, and return identical answers; the study therefore establishes functional equivalence, not a need for C3. The 7.44--12.32\% lower point-read P50 reflects record layout and reconstruction in this configuration and could change with decoded-object caching, and a materialized view could adopt a similar layout without modifying history. We report these figures, with 0.28--2.19\,MiB and 43--214\,ms per repaired block, as the cost of the optional layer. The archival consumer test, not the timing, demonstrates the body-level property.
+
+需要同步修改的两处：
+
+引言倒数第二句改为：In local reads, representation returns the same answers as an optimized decision index and costs 0.28--2.19\,MiB and one 43--214\,ms maintenance step per repaired block.
+§IV-G 末句中的 “reports the read benefit” 改为 “reports the read equivalence”。
+三、TestHistoricalExportConsumer 的最小新增断言
+
+现有测试缺少一项同一消费者内的 A 路径对照。在同一个读取闭包、同一个 V_H 内，只需补三组断言，不涉及计时：
+
+
+go
+// A path in the same read view: original body + decision index.
+// Codex: confirm helper names and readerResolve's strategy flag.
+origParts, err := types.NewRedactablePartSet(raw, types.BlockPartSizeBytes, 1, 0, nil) // revision 0, opening 1, as in ValidateOriginal
+if err != nil { return err }
+if !id.Equals(types.BlockID{Hash: original.Hash(), PartSetHeader: origParts.Header()}) {
+	return protocol.ErrAuth // both bodies verify against one complete BlockID
+}
+dec, found, err := rules.LoadDirectRepair(v, before.Tx.Body.Claims[0].Output) // via DirectRepairKey
+if err != nil || !found || dec.Height != 1 || dec.Tx != 0 || dec.Input != 0 {
+	return protocol.ErrAuth
+}
+if dec.DebitRef != pay.Tx.Funding[0].Ref { // embedded reference equals the decision's debit identity
+	return protocol.ErrAuth
+}
+viaIndex, err := readerResolve(v, f.policy, before, 1, 0, f.height, false, nil) // index strategy
+if err != nil || !sameEconomic(viaIndex[0], answers[0]) { // compare all fields except representation
+	return protocol.ErrAuth
+}
+
+现有的回款前后两次读取会自动覆盖 Repaired 和 Recovered 两种状态。可以选择在导出 JSON 中增加 DecisionDebit 字段，便于人工对照，但这不是必需的。
+
+四、中文要点
+消费者与步骤。 唯一成立的消费者是以完整 BlockID 为键的区块归档消费者，作用发生在入库校验和只凭正文提取来源这两步。这个需求是条件性的，目前没有已知的部署。
+替代方案。 原始区块加决定索引，以及普通物化视图，都给出相同的经济答案，都能保存身份指针，都可审计，也都不影响后继交易和重放。C3 的区别只在于“答案嵌在可校验的正文里”。
+三个维度分开陈述。 功能相容性：同一校验例程，正文本身即可读出来源。授权保证：三者相同，都来自本地状态，字节本身不携带授权。成本：门限设置、额外记录和维护开销已测量，CH 编码的常开成本未单独测量。
+避免循环需求。 不以“能对 BlockID 校验”作为需求，因为原始正文本来就满足；明确写出接受关联记录的消费者用 A 或 B 就够了，而且更便宜。
+证据边界。 导出测试使用项目自己的校验器，不能写成“通用 Comet 工具可直接校验”。持有者策略可能蕴含的“存在已提交决定”这一性质，本轮不主张。
+请 Codex 核对的四点：
+资金槽确实不在 Tx.Hash 的 fixed 字段内，这关系到“必须校验完整 BlockID”这句话是否成立。
+NewRedactablePartSet 构造原始分片时的参数含义。
+决定记录读取函数和字段的实际名称。
+readerResolve 第七个参数是否就是读取策略的开关。
+Claude works directly with your codebase
+Install
+
+
+
+
+
+
+
+just now

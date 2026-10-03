@@ -1,0 +1,271 @@
+% =====================================================================
+% Next -- minimal revision snippets (EN for main/supplement, CN for reading edition)
+% Packages assumed: tabularx, array.  No journal-class-specific commands.
+% Define once in the preamble (used by the two wide tables):
+%   \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+% Every number below is taken from the supplied packet (README, analysis.json,
+% audit.json, rotating-quorum-regression.log, version-bridge.{md,json}).
+% =====================================================================
+ 
+% ---------------------------------------------------------------------
+% [1] MAIN TEXT, directly after Table II (Sec. III-E).  EN: 82 words.
+% ---------------------------------------------------------------------
+% --- EN ---
+\paragraph{Terminal holders and Intent.}
+A verified TXCer alone creates no redeemable public obligation. If its source
+does not execute and the holder cannot obtain a valid successor that executes
+publicly, the protocol offers no direct redemption or unconditional exit, and
+waiting does not create one. Intent is a global deduplication choice: for one
+Network, Subject and Nonce, the ledger executes at most one TxID.
+Organizations do not coordinate it during certification, so conflicting
+payments can both obtain QCs; a QC fixes content and liability, not execution.
+ 
+% --- CN ---
+\paragraph{终端持证人与 Intent。}
+仅持有已验证的 TXCer 不产生可请求兑付的公开义务。若其来源交易不执行，且持证人无法获得并公开执行一个合法后继，
+协议不提供直接兑付或无条件退出路径，等待本身也不会产生该权利。Intent 是全局去重语义的选择：对同一 Network、
+Subject 与 Nonce，账本至多执行一个 TxID。各组织在认证阶段不预先协调该选择，因此相互冲突的支付可以各自获得有效 QC；
+QC 固定内容与责任，而不保证执行。
+ 
+% ---------------------------------------------------------------------
+% [2] SUPPLEMENT: member approval vs public execution (new table).
+% ---------------------------------------------------------------------
+% --- EN ---
+\begin{table*}[!t]
+\caption{Member approval versus public execution. D: deterministic functions of the
+submitted bytes and static configuration. S: checks against two different states.
+L: delivery and scheduling assumptions. Theorem~3 compares only histories in which every
+payment and increase succeeds; the table does not claim that a QC-bearing payment
+always executes.}
+\label{tab:sup-checks}
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{2.6cm}YYY@{}}
+\hline
+Check & Member approval (\texttt{ApproveDirectBytes}) & Public execution (\texttt{VerifyDirectSubmission}, \texttt{EvaluateDirectPaymentAt}) & Relation and claim \\
+\hline
+\multicolumn{4}{@{}l}{\textit{D. Deterministic}} \\
+D1 Encoding, owner authorization, initial funding openings, rule IDs, network, configuration, epoch
+ & \texttt{PrepareDirectVector}; identity equals own organization
+ & Same \texttt{PrepareDirectVector}; organization looked up by configuration
+ & Same function on the same bytes and static configuration. \\
+D2 Admission vector and caps (CAL cap includes change; escrow floor includes one compensation charge per certificate input)
+ & \texttt{PrepareDirectVector}
+ & \texttt{PrepareDirectVector}
+ & Identical caps on both sides. \\
+D3 Direct input certificates; value conservation
+ & Issuer configuration, rules and output checked; one certificate per certificate input, no duplicate or unused certificate; $\sum$in $=\sum$out
+ & The same checks, plus network equality; $\sum$in $=\sum$out at evaluation
+ & Equivalent checks; the member also lies in a validated single-network configuration. \\
+\hline
+\multicolumn{4}{@{}l}{\textit{S. State}} \\
+S1 Input instances
+ & Per-instance candidate/consumed lock and local creation record (derived from authenticated blocks), written before signing
+ & Consumed flag; final creation record, or a direct certificate for a missing output
+ & Lemma~2: no two conflicting QCs. A QC excludes public consumption by a different fact. Member lag can refuse, not mis-approve. \\
+S2 Intent
+ & Organization-local Intent $\to$ TxID
+ & Global Intent $\to$ TxID, written on successful execution
+ & Independent states; conflict is possible with valid QCs (Lemma~5). \\
+S3 Grants, capacity, fees
+ & Worker-slice \texttt{Available} $\ge$ cap for every resource; fee inputs and grants checked in member state
+ & CAL: registration within the grant (\texttt{Reserved}+\texttt{Spent} $\le B_g$); non-CAL: \texttt{updateUsage}; FUEL account or fee-input UTXOs
+ & CAL: Theorem~1 and Eq.~(7) exclude a CAL-capacity or reserve failure at first registration. Non-CAL resources, FUEL balance and fee-input spendability: no corresponding claim. \\
+\hline
+\multicolumn{4}{@{}l}{\textit{L. Liveness}} \\
+L1 Inclusion, delivery, resubmission
+ & Original signer keeps the approval and follows the chain
+ & Honest inclusion and fair delivery; no global Intent conflict for the source
+ & No completion bound and no timeout unlocking; adaptation is not required for closure. \\
+\hline
+\end{tabularx}
+\end{table*}
+ 
+% --- CN ---
+\begin{table*}[!t]
+\caption{成员批准与公开执行的对照。D：只取决于提交字节与静态配置的确定性函数；S：对两个不同状态的检查；
+L：传送与调度假设。定理~3 仅比较每笔支付与增资都成功的历史；本表不主张带 QC 的支付一定执行。}
+\label{tab:sup-checks-cn}
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{2.6cm}YYY@{}}
+\hline
+检查项 & 成员批准（\texttt{ApproveDirectBytes}） & 公开执行（\texttt{VerifyDirectSubmission}、\texttt{EvaluateDirectPaymentAt}） & 关系与主张 \\
+\hline
+\multicolumn{4}{@{}l}{\textit{D. 确定性检查}} \\
+D1 编码、所有者授权、初始资金开口、规则标识、网络/配置/纪元
+ & \texttt{PrepareDirectVector}；身份等于本组织
+ & 同一 \texttt{PrepareDirectVector}；按配置查组织
+ & 相同字节与静态配置下是同一函数。 \\
+D2 准入向量与额度（CAL 额度含找零；托管下限含每个证书输入一次赔付费用）
+ & \texttt{PrepareDirectVector}
+ & \texttt{PrepareDirectVector}
+ & 两侧额度相同。 \\
+D3 直接输入证书；价值守恒
+ & 核对发行组织配置、规则与输出；每个证书输入恰一个证书，无重复、无多余证书；$\sum$输入 $=\sum$输出
+ & 同样检查，另加网络相等；评估时 $\sum$输入 $=\sum$输出
+ & 等价检查；成员处于已验证的单网络配置内。 \\
+\hline
+\multicolumn{4}{@{}l}{\textit{S. 状态检查}} \\
+S1 输入实例
+ & 逐实例候选/已消费锁与本地创建记录（来自已认证区块），签名前写入
+ & 已消费标记；最终创建记录，或对缺失输出的直接证书
+ & 引理~2：不存在两个冲突 QC；QC 排除不同事实对其输入的公开消费。成员落后只会拒绝，不会误批。 \\
+S2 Intent
+ & 组织本地 Intent $\to$ TxID
+ & 全局 Intent $\to$ TxID，成功执行时写入
+ & 状态相互独立；可在两方都有效 QC 时冲突（引理~5）。 \\
+S3 授权、额度、费用
+ & 各资源的 Worker 切片 \texttt{Available} $\ge$ 额度；费用输入与授权按成员状态检查
+ & CAL：登记不超授权（\texttt{Reserved}+\texttt{Spent} $\le B_g$）；非 CAL：\texttt{updateUsage}；FUEL 账户或费用输入 UTXO
+ & CAL：定理~1 与式~(7) 排除首次登记时 CAL 额度或储备不足。非 CAL 资源、FUEL 余额与费用输入可花费性：无对应主张。 \\
+\hline
+\multicolumn{4}{@{}l}{\textit{L. 活性}} \\
+L1 纳入、传送、补交
+ & 原签署者保留批准并跟随区块链
+ & 诚实纳入与公平传送；来源无全局 Intent 冲突
+ & 无完成时限，不以超时解锁；闭合不需要适配。 \\
+\hline
+\end{tabularx}
+\end{table*}
+ 
+% ---------------------------------------------------------------------
+% [3] SUPPLEMENT S4: automatic source resubmission (R).
+% ---------------------------------------------------------------------
+% --- EN ---
+\paragraph{Automatic source resubmission (R).}
+On the frozen build, one run schedules 2,000 ordinary payments (100/s for 20\,s)
+plus three cross-organization parent--child pairs, 2,006 payments in total, with
+automatic resubmission enabled and adaptation not paused. For each pair, the driver
+obtains the parent's three signatures through a collector that neither persists,
+installs nor submits it, and the driver never submits the parent itself; the collector
+stays alive and observes, so this is withholding, not process-crash injection. The
+child spends the parent's TXCer. After the child's public execution exposes that
+certificate, the parent's original signers rebuild and submit the parent. All three
+obligations end Fulfilled and none is compensated; all 2,006 payments close,
+committee state hashes agree, outboxes are empty, and member CAL, execution and
+storage reservations return to zero. The three pairs are three recovery targets,
+not repetitions. Times are client observations; outbox creation times were not
+recorded.
+ 
+\begin{table}[!t]
+\caption{Pair-level observations in R (ms). Receipt times start at each payment's own
+first send; the last two columns start at the child's first send and are client
+observations, not internal recovery times.}
+\label{tab:sup-r}
+\centering\footnotesize
+\begin{tabular}{@{}rrrrr@{}}
+\hline
+Pair & Parent & Child & Child & Source \\
+ & receipt & receipt & public & Fulfilled \\
+\hline
+0 & 100.146 & 116.559 & 1391.849 & 2767.211 \\
+1 &  82.988 &  61.749 & 1806.036 & 2958.003 \\
+2 &  75.033 & 135.119 & 1286.147 & 2442.890 \\
+\hline
+\end{tabular}
+\end{table}
+ 
+% --- CN ---
+\paragraph{来源自动补交（R）。}
+在冻结构建上，一轮计划 2,000 笔普通付款（100/s，20\,s）与三个跨组织父子对，共 2,006 笔，
+自动补交开启、适配不暂停。每个父子对中，驱动通过一个既不持久化、不 INSTALL、也不提交的收集器取得父交易三个签名，
+驱动自身从不提交父交易；收集器保持在线并继续观察，因此这是扣留发送，不是进程崩溃注入。子交易花费父交易的 TXCer；
+子交易公开执行并暴露该证书后，父交易的原签署成员重建并提交父交易。三个义务均以 Fulfilled 结束，无一赔付；
+2,006 笔全部闭合，委员会状态哈希一致，outbox 清空，成员 CAL、执行与存储预留归零。三个父子对是三个恢复目标，
+不是重复实验。时间为客户端观察值；未记录 outbox 的内部创建时间。
+ 
+\begin{table}[!t]
+\caption{R 中各父子对的观察值（ms）。到账时间自各笔付款自身首次发送起算；
+后两列自子交易首次发送起算，为客户端观察点，不是内部恢复时间。}
+\label{tab:sup-r-cn}
+\centering\footnotesize
+\begin{tabular}{@{}rrrrr@{}}
+\hline
+父子对 & 父到账 & 子到账 & 子公开 & 来源 Fulfilled \\
+\hline
+0 & 100.146 & 116.559 & 1391.849 & 2767.211 \\
+1 &  82.988 &  61.749 & 1806.036 & 2958.003 \\
+2 &  75.033 & 135.119 & 1286.147 & 2442.890 \\
+\hline
+\end{tabular}
+\end{table}
+ 
+% ---------------------------------------------------------------------
+% [3b] SUPPLEMENT S3: rotating-signer boundary (one paragraph).
+% ---------------------------------------------------------------------
+% --- EN ---
+\paragraph{Rotating-signer bound.}
+A deterministic regression uses production approvals, public execution and
+compensation. One Byzantine member signs without applying its local limit; the three
+honest members co-sign in the pairs $(0,1)$, $(0,2)$, $(1,2)$. Each round certifies a
+100-CAL source that loses on global Intent; a valid child then consumes its output and
+the issuer is compensated. With $B_g=300$ the reserve falls $300\to200\to100\to0$,
+honest reservations are $(100,100,0)$, $(200,100,100)$, $(200,200,200)$, and the fourth
+request is refused by all three honest members. A repeated decision changes nothing and
+CAL/FUEL are conserved. The run attains $Q_g=B_g$, so the two-round stop in
+Table~S4 is specific to a fixed signer set. It measures neither attacker profit nor
+cost: the source inputs stay locked and FUEL is spent.
+ 
+% --- CN ---
+\paragraph{轮换签署者边界。}
+一个确定性回归使用生产批准、公开执行与赔付入口。一个拜占庭成员绕过自身本地额度签名；三个诚实成员按
+$(0,1)$、$(0,2)$、$(1,2)$ 轮换共同签署。每轮认证一个 100 CAL、在全局 Intent 上落败的来源，
+再由合法子交易消费其输出并赔付发行方。取 $B_g=300$，备付依次 $300\to200\to100\to0$，诚实成员累计预留为
+$(100,100,0)$、$(200,100,100)$、$(200,200,200)$，第四笔请求被三个诚实成员全部拒绝。重复决定无任何变化，
+CAL/FUEL 守恒。该运行达到 $Q_g=B_g$，故表~S4 中两轮即止只对固定签署者集合成立。
+它既不度量攻击者收益，也不度量成本：来源输入仍被锁定，FUEL 已花费。
+ 
+% ---------------------------------------------------------------------
+% [4] CONCLUSION (compressed).  EN: see word count in reply.
+% ---------------------------------------------------------------------
+% --- EN ---
+Next separates continuation, economic closure and historical record. On one host
+with synchronous member commits, certified continuation reaches the last receipt of a
+100-hop chain in 4.707\,s, against 64.479\,s when each hop waits for public execution
+(retries included). Reserve-backed signing capacity covers certificate liability,
+original signers can resubmit exposed sources, and a due compensation decision closes
+an obligation that a late source repays, even with adaptation paused. Optional
+representation records the reserve debit under the original block identity. Terminal
+holders have no direct redemption; open deployment accepts bounded reserve loss.
+ 
+% --- CN ---
+Next 将续付、经济闭合与历史记录分开。在单机、成员同步提交的配置下，凭证续付使 100 跳链的最后一次收据在
+4.707\,s 到达，逐跳等待公开执行为 64.479\,s（均含重试）。以备付支撑的签名额度覆盖证书责任，原签署成员可补交已暴露的来源，
+到期的赔付决定可闭合义务并由迟到来源归还，适配暂停时亦然。可选的授权表示把备付借记记录在原区块身份之下。
+终端持证人没有直接兑付路径；开放部署接受有界的备付损失。
+ 
+% ---------------------------------------------------------------------
+% [5] SUPPLEMENT: version bridge and wait-retry wording.
+% ---------------------------------------------------------------------
+% --- EN ---
+\paragraph{Version bridge.}
+Between 721800c and 9879f64, five member production files changed
+(\texttt{blocks.go}, \texttt{direct.go}, \texttt{outcome.go}, \texttt{partial\_reclaim.go},
+\texttt{source\_recovery.go}); the 721800c N/R/C/P and capital results therefore keep their
+original build and are not inherited. Between 9879f64 and f856c7b, the checked member,
+committee, rules, redaction, transport, wallet, protocol, finality and Comet production
+files are unchanged; only client and test files differ. The three redaction core files and
+the listed Comet overlay files have identical SHA-256 digests in all three builds. No
+older number is relabelled.
+ 
+\paragraph{Retries in wait mode.}
+Wait mode uses 414 attempts for 300 payments (140, 138 and 136 per run). The client
+sleeps 50\,ms after every failed attempt, whatever the cause (transport, HTTP status or
+read error), and the original logs do not classify failures. The 114 extra attempts
+therefore include at least 5.7\,s of fixed sleep over the three runs, plus unmeasured
+service time. We report the $13.70\times$ ratio with retries included and derive no
+retry-free figure.
+ 
+% --- CN ---
+\paragraph{版本桥接。}
+721800c 至 9879f64 之间，五个成员生产文件有变动（\texttt{blocks.go}、\texttt{direct.go}、\texttt{outcome.go}、
+\texttt{partial\_reclaim.go}、\texttt{source\_recovery.go}）；因此 721800c 的 N/R/C/P 与资本结果保留其原构建，不被继承。
+9879f64 至 f856c7b 之间，所检查的成员、委员会、规则、表示、传输、钱包、协议、终局与 Comet 生产文件无变化，
+仅客户端与测试文件不同。三个表示核心文件及所列 Comet overlay 文件在三个构建中的 SHA-256 完全相同。旧数字均不改标。
+ 
+\paragraph{等待模式的重试。}
+等待模式 300 笔付款共 414 次尝试（每轮 140、138、136）。客户端在每次失败尝试后固定休眠 50\,ms，
+不论原因是传输、HTTP 状态还是读取错误；原日志没有逐次分类。因此 114 次额外尝试在三轮中至少含 5.7\,s 的固定休眠，
+另有未测量的服务时间。我们报告含重试的 $13.70\times$，不推导无重试数字。
+ 

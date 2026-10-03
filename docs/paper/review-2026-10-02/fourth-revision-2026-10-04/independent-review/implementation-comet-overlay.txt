@@ -1,0 +1,1218 @@
+Project source snapshot; production baseline f856c7b. Files are complete unless explicitly stated. This package does not include generated keys, local runtime configuration, or credentials.
+
+
+===== FILE: third_party/cometbft/README.md =====
+# Pinned CometBFT adaptation
+
+Run `python3 third_party/cometbft/overlay.py` with Go on PATH before the first
+build. It materializes CometBFT v0.38.26 into `.scratch/comet-src`, checks every
+upstream patch anchor and sets the root module's local replace. It does not edit
+the module cache. Source additions are kept here; generated upstream code is
+ignored. Build the payment application with `-tags=comet_v3`.
+
+The fork changes transaction commitments, block-part commitments/wire encoding,
+authenticated historical BlockStore revision, original-version replay and
+catch-up, and the node's pre-replay application hook. It preserves normal BFT
+rounds and quorum rules. It is not wire-compatible with an unmodified network.
+
+Consensus compares the full BlockID (stable hash and original part header) for
+locks, valid candidates and commits. A matching current-round polka can advance
+its exact candidate without a Proposal message; normal proposal/POL checks bind
+the same full identity. Existing round/step guards prevent signing a second
+precommit. `TestStableHashIdentity` covers aliases, arrival orders and execution
+of the exact committed bytes in an isolated process. See the
+[security connection and evidence](../../docs/research/security-analysis-validation-2026-09-27/hardening.md).
+
+An application-committed exact RepairInput or RepairBatch authorizes the
+historical representation and its materialization. CompensationDecision first
+executes the monetary change at its own new public height, independently of
+adaptation. Representation and installation do not execute that change again.
+Original bytes are retained for replay; current parts are genuinely rewritten.
+The internal Canonical reader uses a verified application-state snapshot, not
+hash compatibility alone. See the [reader contract](../../docs/design/historical-reader-contract.md).
+
+The cryptographic package is supplied by this application's root module. This
+directory is a patch source bundle, not a standalone Comet distribution.
+See [implementation and evidence](../../docs/archive/development/implementation-v1.2.md).
+
+For local profiling, set both `UTXO_SETTLEMENT_TRACE=1` and
+`UTXO_COMET_PROFILE=1` before starting committee processes. The optional
+`libs/operationtrace` hook records proposal construction, WAL synchronization,
+validator signing-state saves, and BlockStore saves in the existing bounded
+in-memory timeline. It adds no diagnostic disk writes and changes no durability
+or consensus rule. Signature timing includes the nested signing-state save;
+do not add the two measurements together. The hook stays nil in normal runs.
+
+The hook also records actual flow-rate limiter waits (only when its wait branch
+executes), FinalizeBlock response persistence, consensus-state persistence, and
+mempool lock/flush waits. Concurrent or nested operation durations must not be
+summed as critical-path latency. Committee JSON accepts optional `P2PSendRate`
+and `P2PRecvRate` in bytes/second: zero keeps Comet's default; negative values are
+rejected before either override is applied. Earlier low-load trials retained
+5,120,000 bytes/second and 10/10 ms flush/gossip after
+[controlled trials](../../docs/experiments/consensus-propagation-2026-09-20/README.md)
+found no stable total-completion benefit from smaller intervals or higher limits.
+The later sustained-load trials found real bandwidth limiting at higher rates;
+new loopback v4 laboratories use 51,200,000 bytes/second and 10/10 ms. Other
+deployments retain the configured rate or the upstream default when unset.
+See [TPS trials](../../docs/experiments/consensus-tps-2026-09-21/README.md).
+
+OriginalBlockPart holds the revision read lock through its decision and read.
+For blocks with no historical revision it reads the requested stored part
+directly, instead of decoding and rebuilding every part of the entire block.
+Revised blocks still reconstruct immutable original execution bytes for replay
+and catch-up; no current rewritten part is substituted into that path.
+
+FinalizeBlock history and its latest recovery record use one database batch and
+`WriteSync` per height, before App.Commit. Keys and encoded values are unchanged;
+discard mode still writes only the recovery record. This removes a separate
+database write operation, not a second fsync (the original path had only one
+explicit sync). A write error is returned without rollback or retry: storage may
+already contain the batch, so existing halt/handshake recovery rules still apply.
+See [storage trials](../../docs/experiments/committee-storage-2026-09-20/README.md).
+
+Optional profiling also splits response encoding, database writes, FilePV
+encoding, and atomic-file open / O_SYNC write / close / rename. The synchronous
+write measurement combines kernel write and sync costs. No signing-state
+durability or atomic-replacement rule is changed.
+
+AutoFile avoids repeating Sync on the same open handle after a successful Sync
+with no intervening Write. Writes (including errors) and reopening invalidate
+that state under the existing mutex. Group still flushes first, so an empty
+buffer is never mistaken for durable data. WAL ordering/format and all syncs
+covering new writes are preserved. This assumes the WAL has its normal exclusive
+process writer; external modification of an active WAL is unsupported.
+See [measurement and validation](../../docs/experiments/wal-sync-2026-09-20/README.md).
+
+The local consensus queue batches already-ready proposal/part records only in
+the current Propose step, bounded by 16 messages and 512 KiB of part bodies.
+Actual missing-part count limits each batch so block completion can happen only
+at its tail, preserving intervening state-record order on replay. Records are
+synced before handling; partial durable prefixes remain replayable after errors.
+Votes and all other messages keep the single-record durable path. There is no
+batch-fill timer. See [tests and paired results](../../docs/experiments/proposal-batch-2026-09-20/README.md),
+including the foreground latency tradeoff in this single-host workload.
+
+
+===== FILE: third_party/cometbft/overlay.py =====
+#!/usr/bin/env python3
+"""Materialize the small pinned Comet fork; never edit Go's module cache."""
+import json
+import pathlib
+import subprocess
+import shutil
+import os
+
+root = pathlib.Path(__file__).resolve().parents[2]
+module = json.loads(subprocess.check_output(
+    ["go", "mod", "download", "-json", "github.com/cometbft/cometbft@v0.38.26"], cwd=root))
+source = pathlib.Path(module["Dir"])
+out = root / ".scratch/comet-src"
+if not out.exists():
+    shutil.copytree(source, out)
+    for parent, dirs, files in os.walk(out):
+        os.chmod(parent, 0o755)
+        for name in files:
+            os.chmod(pathlib.Path(parent) / name, 0o644)
+
+def patch(name, edits):
+    text = (source / name).read_text(encoding="utf-8")
+    for edit in edits:
+        before, after = edit[:2]
+        expected = edit[2] if len(edit) == 3 else 1
+        if text.count(before) != expected:
+            raise RuntimeError(f"pinned source mismatch: {name}: {before[:70]}")
+        text = text.replace(before, after, expected)
+    target = out / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+
+patch("types/tx.go", [
+    ("return tmhash.Sum(tx)", "return redactionTxHash(tx)"),
+    ("return sha256.Sum256(tx)", "var key TxKey; copy(key[:], tx.Hash()); return key"),
+    ('\n\t"github.com/cometbft/cometbft/crypto/tmhash"', ''),
+])
+patch("types/part_set.go", [
+    ('type PartSet struct {', 'type PartSet struct {\n redactionSeen bool\n redactionHeight int64\n redactionRevision uint64'),
+    ('type Part struct {', 'type Part struct {\n Redaction *PartRedaction `json:"redaction,omitempty"`'),
+    ('pb.Bytes = part.Bytes', 'pb.Bytes = encodeRedactionPart(part)'),
+    ('part.Bytes = pb.Bytes', 'if err := decodeRedactionPart(part, pb.Bytes); err != nil { return nil, err }'),
+    ('if part.Proof.Verify(ps.Hash(), part.Bytes) != nil {',
+     'leaf, err := partCommitment(part)\n if err != nil || part.Proof.Verify(ps.Hash(), leaf) != nil {'),
+    ('// Add part\n', '// Add part\n if !ps.acceptRedaction(part) { return false, ErrPartSetInvalidProof }\n'),
+])
+patch("types/block.go", [
+    ('return NewPartSetFromData(bz, partSize), nil',
+     'if redactionKey != nil { return NewRedactablePartSet(bz, partSize, b.Height, 0, nil) }; return NewPartSetFromData(bz, partSize), nil'),
+])
+patch("store/store.go", [
+    ('type BlockStore struct {', 'type BlockStore struct {\n revisionMtx cmtsync.RWMutex'),
+    ('func (bs *BlockStore) LoadBlock(height int64) *types.Block {',
+     'func (bs *BlockStore) LoadBlock(height int64) *types.Block {\n bs.revisionMtx.RLock(); defer bs.revisionMtx.RUnlock(); return bs.loadBlock(height)\n}\nfunc (bs *BlockStore) loadBlock(height int64) *types.Block {'),
+])
+patch("consensus/replay.go", [
+    ('block := h.store.LoadBlock(i)', 'block := h.store.LoadBlock(i)\n if original, ok := h.store.(interface { LoadOriginalBlock(int64) (*types.Block,error) }); ok { block, err = original.LoadOriginalBlock(i); if err != nil { return nil, err } }'),
+    ('block := h.store.LoadBlock(height)', 'block := h.store.LoadBlock(height)\n if original, ok := h.store.(interface { LoadOriginalBlock(int64) (*types.Block,error) }); ok { var e error; block, e = original.LoadOriginalBlock(height); if e != nil { return sm.State{}, e } }'),
+])
+patch("blocksync/reactor.go", [
+    ('block := bcR.store.LoadBlock(msg.Height)', 'block := bcR.store.LoadBlock(msg.Height)\n if original, ok := bcR.store.(interface { LoadOriginalBlock(int64) (*types.Block,error) }); ok { var e error; block, e = original.LoadOriginalBlock(msg.Height); if e != nil { bcR.Logger.Error("load original block", "err", e); return false } }'),
+])
+patch("consensus/reactor.go", [
+    ('part := conR.conS.blockStore.LoadBlockPart(prs.Height, index)', 'part := conR.conS.blockStore.LoadBlockPart(prs.Height, index)\n if original, ok := conR.conS.blockStore.(interface { OriginalBlockPart(int64,int) (*types.Part,error) }); ok { var e error; part, e = original.OriginalBlockPart(prs.Height,index); if e != nil { logger.Error("load original part", "err", e); return } }'),
+    ('if err := m.Part.ValidateBasic(); err != nil {', 'if err := m.Part.ValidateOriginal(m.Height); err != nil { return err }\n if err := m.Part.ValidateBasic(); err != nil {'),
+])
+patch("node/node.go", [
+    (') (*Node, error) {\n\tblockStore, stateDB, err := initDBs(config, dbProvider)\n\tif err != nil {\n\t\treturn nil, err\n\t}', ') (*Node, error) {\n\tblockStore, stateDB, err := initDBs(config, dbProvider)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n if BeforeReplay != nil { if err := BeforeReplay(blockStore); err != nil { return nil, err } }'),
+])
+# Opt-in timings around the pinned implementation's real synchronous calls.
+# The hook is nil in normal runs; no extra log or storage writes are introduced.
+trace_import = ('import (', 'import (\n "github.com/cometbft/cometbft/libs/operationtrace"')
+patch("libs/flowrate/flowrate.go", [trace_import,
+    ('now = m.waitNextSample(now)',
+     'endWait := operationtrace.Start("p2p_rate_limit_wait", 0)\n now = m.waitNextSample(now)\n endWait()'),
+])
+patch("state/store.go", [trace_import,
+    ('func (store dbStore) SaveFinalizeBlockResponse(height int64, resp *abci.ResponseFinalizeBlock) error {',
+     'func (store dbStore) SaveFinalizeBlockResponse(height int64, resp *abci.ResponseFinalizeBlock) error {\n defer operationtrace.Start("finalize_response_save", height)()\n batch := store.db.NewBatch()\n defer batch.Close()'),
+    ('func (store dbStore) Save(state State) error {',
+     'func (store dbStore) Save(state State) error {\n defer operationtrace.Start("consensus_state_save", state.LastBlockHeight)()'),
+    ('bz, err := resp.Marshal()',
+     'endEncode := operationtrace.Start("finalize_history_encode", height)\n bz, err := resp.Marshal()\n endEncode()'),
+    ('if err := store.db.Set(calcABCIResponsesKey(height), bz); err != nil {',
+     'endSet := operationtrace.Start("finalize_history_batch_set", height)\n setErr := batch.Set(calcABCIResponsesKey(height), bz)\n endSet()\n if err := setErr; err != nil {'),
+    ('bz, err := response.Marshal()',
+     'endLastEncode := operationtrace.Start("finalize_recovery_encode", height)\n bz, err := response.Marshal()\n endLastEncode()'),
+    ('return store.db.SetSync(lastABCIResponseKey, bz)',
+     'if err := batch.Set(lastABCIResponseKey, bz); err != nil { return err }\n endSync := operationtrace.Start("finalize_batch_write_sync", height)\n syncErr := batch.WriteSync()\n endSync()\n return syncErr'),
+])
+patch("state/execution.go", [trace_import,
+    ('blockExec.mempool.Lock()\n\tdefer blockExec.mempool.Unlock()',
+     'endLock := operationtrace.Start("commit_mempool_lock", block.Height)\n blockExec.mempool.Lock()\n endLock()\n defer blockExec.mempool.Unlock()'),
+    ('err := blockExec.mempool.FlushAppConn()',
+     'endFlush := operationtrace.Start("commit_mempool_flush", block.Height)\n err := blockExec.mempool.FlushAppConn()\n endFlush()'),
+])
+patch("libs/autofile/autofile.go", [trace_import,
+    ('file *os.File', 'file *os.File\n synced bool // Protected by mtx; invalidated by writes and every reopen.'),
+    ('n, err = af.file.Write(b)', 'af.synced = false\n n, err = af.file.Write(b)'),
+    ('return af.file.Sync()', '''// No new writes since this handle's last successful sync.
+ // Flush still runs in Group, including writes that outgrew its buffer.
+ if af.synced {
+  defer operationtrace.Start("autofile_sync_skipped", 0)()
+  return nil
+ }
+ defer operationtrace.Start("autofile_sync_needed", 0)()
+ err := af.file.Sync()
+ af.synced = err == nil
+ return err'''),
+    ('af.file = file\n', 'af.file = file\n af.synced = false\n'),
+])
+patch("privval/file.go", [trace_import,
+    ('func (lss *FilePVLastSignState) Save() {',
+     'func (lss *FilePVLastSignState) Save() {\n defer operationtrace.Start("filepv_save", lss.Height)()'),
+    ('jsonBytes, err := cmtjson.MarshalIndent(lss, "", "  ")',
+     'endEncode := operationtrace.Start("filepv_encode", lss.Height)\n jsonBytes, err := cmtjson.MarshalIndent(lss, "", "  ")\n endEncode()'),
+])
+patch("libs/tempfile/tempfile.go", [trace_import,
+    ('f, err = os.OpenFile(name, atomicWriteFileFlag, perm)',
+     'endOpen := operationtrace.Start("atomic_file_open", 0)\n f, err = os.OpenFile(name, atomicWriteFileFlag, perm)\n endOpen()'),
+    ('if n, err := f.Write(data); err != nil {',
+     'endWrite := operationtrace.Start("atomic_file_write_sync", 0)\n n, writeErr := f.Write(data)\n endWrite()\n if err := writeErr; err != nil {'),
+    ('\tf.Close()\n',
+     '\tendClose := operationtrace.Start("atomic_file_close", 0)\n f.Close()\n endClose()\n'),
+    ('return os.Rename(f.Name(), filename)',
+     'endRename := operationtrace.Start("atomic_file_rename", 0)\n renameErr := os.Rename(f.Name(), filename)\n endRename()\n return renameErr'),
+])
+patch("consensus/state.go", [trace_import,
+    ('cs.LockedBlock.HashesTo(blockID.Hash)',
+     'matchesBlockID(cs.LockedBlock, cs.LockedBlockParts, blockID)', 3),
+    ('cs.ProposalBlock.HashesTo(blockID.Hash)',
+     'matchesBlockID(cs.ProposalBlock, cs.ProposalBlockParts, blockID)', 5),
+    ('if cs.Proposal == nil || cs.ProposalBlock == nil {', 'if !cs.hasProposalBlock() {'),
+    ('return cs.Votes.Prevotes(cs.Proposal.POLRound).HasTwoThirdsMajority()',
+     'id, ok := cs.Votes.Prevotes(cs.Proposal.POLRound).TwoThirdsMajority()\n return ok && id.Equals(cs.Proposal.BlockID)'),
+    ('// If ProposalBlock is nil, prevote nil.\n\tif cs.ProposalBlock == nil {\n\t\tlogger.Debug("prevote step: ProposalBlock is nil")',
+     '// A timeout does not authorize another proposal identity. The locked path above is independent.\n if !cs.hasProposalBlock() {\n logger.Debug("prevote step: matching proposal block is unavailable")'),
+    ('if ok && (cs.isProposalComplete() || len(blockID.Hash) == 0) {',
+     'if ok && (matchesBlockID(cs.ProposalBlock, cs.ProposalBlockParts, blockID) || len(blockID.Hash) == 0) {'),
+    ('\n\tif cs.Step <= cstypes.RoundStepPropose && cs.isProposalComplete() {',
+     '''
+ // A current-round polka authorizes its own exact candidate independently
+ // of a missing or conflicting Proposal. enterPrecommit retains step/round
+ // guards, so late parts cannot cause a second precommit in the same round.
+ if cs.Step != cstypes.RoundStepCommit && hasTwoThirds && !blockID.IsZero() && matchesBlockID(cs.ProposalBlock, cs.ProposalBlockParts, blockID) {
+     cs.enterPrecommit(blockHeight, cs.Round)
+     return
+ }
+
+	if cs.Step <= cstypes.RoundStepPropose && cs.isProposalComplete() {'''),
+    ('block, err = cs.createProposalBlock(context.TODO())',
+     'endBuild := operationtrace.Start("proposal_build", height)\n block, err = cs.createProposalBlock(context.TODO())\n endBuild()'),
+    ('blockParts, err = block.MakePartSet(types.BlockPartSizeBytes)',
+     'endParts := operationtrace.Start("proposal_parts", height)\n blockParts, err = block.MakePartSet(types.BlockPartSizeBytes)\n endParts()'),
+    ('if err := cs.wal.FlushAndSync(); err != nil {\n\t\tcs.Logger.Error("failed flushing WAL to disk")\n\t}',
+     'endFlush := operationtrace.Start("proposal_wal_flush", height)\n if err := cs.wal.FlushAndSync(); err != nil {\n cs.Logger.Error("failed flushing WAL to disk")\n }\n endFlush()'),
+    ('if err := cs.privValidator.SignProposal(cs.state.ChainID, p); err == nil {',
+     'endSign := operationtrace.Start("proposal_sign", height)\n signErr := cs.privValidator.SignProposal(cs.state.ChainID,p)\n endSign()\n if err := signErr; err == nil {'),
+    ('if err := cs.wal.FlushAndSync(); err != nil {\n\t\treturn nil, err\n\t}',
+     'endFlush := operationtrace.Start("vote_wal_flush", cs.Height)\n flushErr := cs.wal.FlushAndSync()\n endFlush()\n if flushErr != nil { return nil, flushErr }'),
+    ('recoverable, err := types.SignAndCheckVote(vote, cs.privValidator, cs.state.ChainID, extEnabled && (msgType == cmtproto.PrecommitType))',
+     'endSign := operationtrace.Start("vote_sign", cs.Height)\n recoverable, err := types.SignAndCheckVote(vote, cs.privValidator, cs.state.ChainID, extEnabled && (msgType == cmtproto.PrecommitType))\n endSign()'),
+    ('''case mi = <-cs.internalMsgQueue:
+			err := cs.wal.WriteSync(mi) // NOTE: fsync
+			if err != nil {
+				panic(fmt.Sprintf(
+					"failed to write %v msg to consensus WAL due to %v; check your file system and restart the node",
+					mi, err,
+				))
+			}
+
+			if _, ok := mi.Msg.(*VoteMessage); ok {
+				// we actually want to simulate failing during
+				// the previous WriteSync, but this isn't easy to do.
+				// Equivalent would be to fail here and manually remove
+				// some bytes from the end of the wal.
+				fail.Fail() // XXX
+			}
+
+			// handles proposals, block parts, votes
+			cs.handleMsg(mi)''',
+     'case mi = <-cs.internalMsgQueue:\n cs.handleInternalMessage(mi)'),
+    ('// Save to blockStore.\n', '// Save to blockStore.\n endStore := operationtrace.Start("blockstore_save", height)\n'),
+    ('\n\tfail.Fail() // XXX\n\n\t// Write EndHeightMessage', '\n endStore()\n\tfail.Fail() // XXX\n\n\t// Write EndHeightMessage'),
+    ('endMsg := EndHeightMessage{height}', 'endEndHeight := operationtrace.Start("endheight_wal", height)\n endMsg := EndHeightMessage{height}'),
+    ('\n\tfail.Fail() // XXX\n\n\t// Create a copy of the state', '\n endEndHeight()\n\tfail.Fail() // XXX\n\n\t// Create a copy of the state'),
+])
+
+for name in ["types/redaction.go", "store/redaction.go", "node/redaction.go", "libs/operationtrace/trace.go", "libs/autofile/sync_test.go", "consensus/proposal_batch.go", "consensus/proposal_batch_test.go", "consensus/block_identity.go", "consensus/block_identity_test.go", "state/results_batch_test.go", "store/catchup_test.go"]:
+    (out / name).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(root / "third_party/cometbft" / name, out / name)
+subprocess.check_call(["go", "mod", "edit", "-replace",
+                      "github.com/cometbft/cometbft=./.scratch/comet-src"], cwd=root)
+print(out)
+
+
+===== FILE: third_party/cometbft/consensus/block_identity.go =====
+package consensus
+
+import "github.com/cometbft/cometbft/types"
+
+// The stable hash omits replaceable funding bytes. Live consensus identifies
+// original bytes by the full BlockID; historical adaptation is a separate path.
+func matchesBlockID(block *types.Block, parts *types.PartSet, id types.BlockID) bool {
+	return block != nil && parts != nil && block.HashesTo(id.Hash) && parts.HasHeader(id.PartSetHeader)
+}
+
+func (cs *State) hasProposalBlock() bool {
+	return cs.Proposal != nil && matchesBlockID(cs.ProposalBlock, cs.ProposalBlockParts, cs.Proposal.BlockID)
+}
+
+
+===== FILE: third_party/cometbft/consensus/block_identity_test.go =====
+package consensus
+
+import (
+	"bytes"
+	"context"
+	"crypto/x509"
+	"encoding/pem"
+	"os"
+	"os/exec"
+	"testing"
+
+	"github.com/cometbft/cometbft/abci/example/kvstore"
+	abci "github.com/cometbft/cometbft/abci/types"
+	cstypes "github.com/cometbft/cometbft/consensus/types"
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	"github.com/cometbft/cometbft/types"
+	"utxo/crypto/chameleon"
+)
+
+// Two authentic original part sets, equal stable hashes, distinct mutable bytes.
+// This tests consensus identity handling, not application transaction validity.
+type identityApplication struct {
+	abci.Application
+	observe func(*abci.RequestFinalizeBlock)
+}
+
+func (a identityApplication) FinalizeBlock(ctx context.Context, r *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
+	a.observe(r)
+	return a.Application.FinalizeBlock(ctx, r)
+}
+
+func identityFixture(t *testing.T, observers ...func(*abci.RequestFinalizeBlock)) (*State, []*validatorStub, *types.Block, *types.PartSet, *types.Block, *types.PartSet) {
+	t.Helper()
+	var app abci.Application = kvstore.NewInMemoryApplication()
+	if len(observers) > 0 {
+		app = identityApplication{Application: app, observe: observers[0]}
+	}
+	cs, validators := randStateWithApp(4, app)
+	t.Cleanup(func() { _ = cs.eventBus.Stop() })
+	raw, err := os.ReadFile("../../../crypto/chameleon/testdata/rsa2048.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, _ := pem.Decode(raw)
+	key, err := x509.ParsePKCS1PrivateKey(encoded.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := chameleon.NewPublic(&key.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = types.ConfigureRedaction(cs.state.ChainID, pub); err != nil {
+		t.Fatal(err)
+	}
+	base, err := cs.createProposalBlock(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeBlock := func(mutable string) (*types.Block, *types.PartSet) {
+		pb, err := base.ToProto()
+		if err != nil {
+			t.Fatal(err)
+		}
+		block, err := types.BlockFromProto(pb)
+		if err != nil {
+			t.Fatal(err)
+		}
+		block.Data = types.Data{Txs: types.Txs{types.EncodeRedactableTx([]byte("fixed="), []byte(mutable))}}
+		block.Header.DataHash = nil
+		_ = block.Hash()
+		parts, err := block.MakePartSet(types.BlockPartSizeBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < int(parts.Total()); i++ {
+			if err = parts.GetPart(i).ValidateOriginal(block.Height); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return block, parts
+	}
+	a, pa := makeBlock("aaa")
+	b, pb := makeBlock("bbb")
+	if !bytes.Equal(a.Hash(), b.Hash()) || pa.HasHeader(pb.Header()) {
+		t.Fatal("not distinct original identities")
+	}
+	for _, v := range validators {
+		v.Height, v.Round = cs.Height, cs.Round
+	}
+	return cs, validators, a, pa, b, pb
+}
+
+func identityVotes(t *testing.T, cs *State, validators []*validatorStub, kind cmtproto.SignedMsgType, b *types.Block, parts *types.PartSet) []*types.Vote {
+	t.Helper()
+	extensions := kind == cmtproto.PrecommitType && cs.state.ConsensusParams.ABCI.VoteExtensionsEnabled(cs.Height)
+	return signVotes(kind, b.Hash(), parts.Header(), extensions, validators[1:]...)
+}
+
+// The fork's redaction key is startup-only process state. Isolate these tests
+// from upstream tests that deliberately build non-redactable networks.
+func TestStableHashIdentity(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=^TestStableHashIdentityCases$", "-test.v")
+	cmd.Env = append(os.Environ(), "NEXT_COMET_IDENTITY_TEST=1")
+	output, err := cmd.CombinedOutput()
+	t.Logf("%s", output)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStableHashIdentityCases(t *testing.T) {
+	if os.Getenv("NEXT_COMET_IDENTITY_TEST") != "1" {
+		t.Skip("run in isolated key-configured process")
+	}
+	t.Run("commit_fetch", identityCommitFetch)
+	t.Run("finalize_waits", identityTryFinalizeWaits)
+	t.Run("precommit", identityPrecommitDoesNotRelockAlias)
+	t.Run("valid_block", identityValidBlockNotAliased)
+	t.Run("pol_rounds", identityPOLRounds)
+	t.Run("exact_precommit", identityExactPrecommit)
+	t.Run("proposal_binding", identityProposalBinding)
+	t.Run("qc_without_matching_proposal", identityQCWithoutMatchingProposal)
+	t.Run("late_parts_after_nil_precommit", identityLatePartsAfterNilPrecommit)
+}
+
+func identityCommitFetch(t *testing.T) {
+	var finalized [][]byte
+	cs, vals, a, pa, b, pb := identityFixture(t, func(r *abci.RequestFinalizeBlock) {
+		if len(r.Txs) != 1 {
+			t.Fatal("unexpected execution body")
+		}
+		finalized = append(finalized, bytes.Clone(r.Txs[0]))
+	})
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrecommitType, b, pb) {
+		if added, err := cs.Votes.Precommits(cs.Round).AddVote(vote); err != nil || !added {
+			t.Fatalf("vote: %v %v", added, err)
+		}
+	}
+	cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+	cs.LockedBlock, cs.LockedBlockParts, cs.LockedRound = a, pa, cs.Round
+	cs.enterCommit(cs.Height, cs.Round)
+	if cs.ProposalBlock != nil || !cs.ProposalBlockParts.HasHeader(pb.Header()) || cs.ProposalBlockParts.IsComplete() {
+		t.Fatal("must fetch the exact committed identity instead of executing its hash alias")
+	}
+	if len(finalized) != 0 {
+		t.Fatal("alias reached FinalizeBlock before fetching committed bytes")
+	}
+	// Delayed parts from A cannot satisfy B's root. B needs no Proposal message:
+	// the already verified commit identifies what to fetch and apply.
+	height, round := cs.Height, cs.Round
+	if _, err := cs.addProposalBlockPart(&BlockPartMessage{Height: height, Round: round, Part: pa.GetPart(0)}, "alias-peer"); err == nil {
+		t.Fatal("mixed an alias part into the committed block")
+	}
+	for i := 0; i < int(pb.Total()); i++ {
+		msg := &BlockPartMessage{Height: height, Round: round, Part: pb.GetPart(i)}
+		if err := msg.ValidateBasic(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cs.addProposalBlockPart(msg, "commit-peer"); err != nil {
+			t.Fatal(err)
+		}
+		if added, err := cs.addProposalBlockPart(msg, "duplicate-peer"); err != nil || added {
+			t.Fatalf("duplicate part %v %v", added, err)
+		}
+	}
+	cs.handleCompleteProposal(height)
+	if cs.Height != height+1 || cs.blockStore.Height() != height {
+		t.Fatal("exact committed block did not advance")
+	}
+	stored := cs.blockStore.LoadBlock(height)
+	meta := cs.blockStore.LoadBlockMeta(height)
+	if !bytes.Equal(stored.Txs[0], b.Txs[0]) || !meta.BlockID.PartSetHeader.Equals(pb.Header()) {
+		t.Fatal("applied/stored a different block")
+	}
+	if len(finalized) != 1 || !bytes.Equal(finalized[0], b.Txs[0]) {
+		t.Fatal("FinalizeBlock did not receive exactly B once")
+	}
+	for _, vote := range signVotes(cmtproto.PrecommitType, b.Hash(), pb.Header(), true, vals[1:]...) {
+		if _, err := cs.addVote(vote, "duplicate-commit-peer"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(finalized) != 1 {
+		t.Fatal("duplicate commit reapplied block")
+	}
+}
+
+func identityTryFinalizeWaits(t *testing.T) {
+	cs, vals, a, pa, b, pb := identityFixture(t)
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrecommitType, b, pb) {
+		if added, err := cs.Votes.Precommits(cs.Round).AddVote(vote); err != nil || !added {
+			t.Fatalf("vote: %v %v", added, err)
+		}
+	}
+	cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+	cs.CommitRound, cs.Step = cs.Round, cstypes.RoundStepCommit
+	height := cs.Height
+	cs.tryFinalizeCommit(height)
+	if cs.Height != height || cs.blockStore.Height() != 0 {
+		t.Fatal("executed a different identity")
+	}
+}
+
+func identityPrecommitDoesNotRelockAlias(t *testing.T) {
+	for _, locked := range []bool{false, true} {
+		cs, vals, a, pa, b, pb := identityFixture(t)
+		for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+			if added, err := cs.Votes.Prevotes(cs.Round).AddVote(vote); err != nil || !added {
+				t.Fatalf("vote: %v %v", added, err)
+			}
+		}
+		cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+		if locked {
+			cs.LockedBlock, cs.LockedBlockParts, cs.LockedRound = a, pa, cs.Round
+		}
+		cs.enterPrecommit(cs.Height, cs.Round)
+		if cs.LockedBlock != nil || cs.ProposalBlock != nil || !cs.ProposalBlockParts.HasHeader(pb.Header()) {
+			t.Fatal("locked or retained a hash alias of the polka")
+		}
+		select {
+		case msg := <-cs.internalMsgQueue:
+			vote, ok := msg.Msg.(*VoteMessage)
+			if !ok || !vote.Vote.BlockID.IsZero() {
+				t.Fatal("must precommit nil without the exact block")
+			}
+		default:
+			t.Fatal("missing nil precommit")
+		}
+	}
+}
+
+func identityValidBlockNotAliased(t *testing.T) {
+	cs, vals, a, pa, b, pb := identityFixture(t)
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+		if added, err := cs.Votes.Prevotes(cs.Round).AddVote(vote); err != nil || !added {
+			t.Fatalf("vote: %v %v", added, err)
+		}
+	}
+	cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+	cs.Step = cstypes.RoundStepPrecommit
+	cs.handleCompleteProposal(cs.Height)
+	if cs.ValidBlock != nil {
+		t.Fatal("promoted a different identity to ValidBlock")
+	}
+}
+
+func identityPOLRounds(t *testing.T) {
+	for _, voteRound := range []int32{0, 1, 2} {
+		cs, vals, a, pa, b, pb := identityFixture(t)
+		cs.Round, cs.Step = 2, cstypes.RoundStepPrecommit
+		cs.Votes.SetRound(2)
+		cs.LockedBlock, cs.LockedBlockParts, cs.LockedRound = a, pa, 1
+		cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+		for _, v := range vals {
+			v.Round = voteRound
+		}
+		for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+			if added, err := cs.addVote(vote, "pol-peer"); err != nil || !added {
+				t.Fatalf("round %d: %v %v", voteRound, added, err)
+			}
+		}
+		if voteRound <= 1 {
+			if cs.LockedBlock != a || cs.LockedRound != 1 {
+				t.Fatal("old or same-round POL unlocked a newer lock")
+			}
+		} else if cs.LockedBlock != nil || cs.ValidBlock != nil || cs.ProposalBlock != nil || !cs.ProposalBlockParts.HasHeader(pb.Header()) {
+			t.Fatal("new POL did not unlock the alias and fetch the exact candidate")
+		}
+	}
+}
+
+func identityExactPrecommit(t *testing.T) {
+	cs, vals, _, _, b, pb := identityFixture(t)
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+		if added, err := cs.Votes.Prevotes(cs.Round).AddVote(vote); err != nil || !added {
+			t.Fatalf("vote: %v %v", added, err)
+		}
+	}
+	cs.ProposalBlock, cs.ProposalBlockParts = b, pb
+	cs.enterPrecommit(cs.Height, cs.Round)
+	if cs.LockedBlock != b || !cs.LockedBlockParts.HasHeader(pb.Header()) {
+		t.Fatal("exact candidate did not lock")
+	}
+	select {
+	case msg := <-cs.internalMsgQueue:
+		vote, ok := msg.Msg.(*VoteMessage)
+		if !ok || !vote.Vote.BlockID.Equals(types.BlockID{Hash: b.Hash(), PartSetHeader: pb.Header()}) {
+			t.Fatal("wrong precommit identity")
+		}
+	default:
+		t.Fatal("missing precommit")
+	}
+}
+
+func identityProposalBinding(t *testing.T) {
+	cs, vals, a, pa, b, pb := identityFixture(t)
+	idA := types.BlockID{Hash: a.Hash(), PartSetHeader: pa.Header()}
+	idB := types.BlockID{Hash: b.Hash(), PartSetHeader: pb.Header()}
+	cs.Proposal = types.NewProposal(cs.Height, cs.Round, -1, idA)
+	cs.ProposalBlock, cs.ProposalBlockParts = b, pb
+	if cs.isProposalComplete() {
+		t.Fatal("different full identity counted as complete proposal")
+	}
+	cs.defaultDoPrevote(cs.Height, cs.Round)
+	select {
+	case msg := <-cs.internalMsgQueue:
+		vote, ok := msg.Msg.(*VoteMessage)
+		if !ok || !vote.Vote.BlockID.IsZero() {
+			t.Fatal("timeout prevote used another proposal's identity")
+		}
+	default:
+		t.Fatal("missing nil prevote")
+	}
+	cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+	if !cs.isProposalComplete() {
+		t.Fatal("matching proposal incomplete")
+	}
+	cs.Round = 1
+	cs.Votes.SetRound(1)
+	cs.Proposal = types.NewProposal(cs.Height, 1, 0, idA)
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+		if added, err := cs.Votes.Prevotes(0).AddVote(vote); err != nil || !added {
+			t.Fatalf("POL: %v %v", added, err)
+		}
+	}
+	if cs.isProposalComplete() {
+		t.Fatal("unrelated POL authorized proposal")
+	}
+	cs.Proposal = types.NewProposal(cs.Height, 1, 0, idB)
+	cs.ProposalBlock, cs.ProposalBlockParts = b, pb
+	if !cs.isProposalComplete() {
+		t.Fatal("matching POL/proposal incomplete")
+	}
+}
+
+func identityQCWithoutMatchingProposal(t *testing.T) {
+	for _, partsFirst := range []bool{false, true} {
+		cs, vals, a, pa, b, pb := identityFixture(t)
+		cs.Step = cstypes.RoundStepPrevote
+		cs.Proposal = types.NewProposal(cs.Height, cs.Round, -1, types.BlockID{Hash: a.Hash(), PartSetHeader: pa.Header()})
+		if partsFirst {
+			cs.ProposalBlock, cs.ProposalBlockParts = b, pb
+		} else {
+			cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+		}
+		for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+			if added, err := cs.addVote(vote, "qc-peer"); err != nil || !added {
+				t.Fatalf("QC: %v %v", added, err)
+			}
+		}
+		if !partsFirst {
+			for i := 0; i < int(pb.Total()); i++ {
+				if _, err := cs.addProposalBlockPart(&BlockPartMessage{Height: cs.Height, Round: cs.Round, Part: pb.GetPart(i)}, "qc-peer"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cs.handleCompleteProposal(cs.Height)
+		}
+		if cs.LockedBlock == nil || !cs.LockedBlockParts.HasHeader(pb.Header()) || cs.Step != cstypes.RoundStepPrecommit {
+			t.Fatalf("partsFirst=%v: matching QC/candidate stalled behind old proposal", partsFirst)
+		}
+	}
+}
+
+func identityLatePartsAfterNilPrecommit(t *testing.T) {
+	cs, vals, a, pa, b, pb := identityFixture(t)
+	cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+		if added, err := cs.Votes.Prevotes(cs.Round).AddVote(vote); err != nil || !added {
+			t.Fatalf("vote: %v %v", added, err)
+		}
+	}
+	cs.enterPrecommit(cs.Height, cs.Round)
+	select {
+	case msg := <-cs.internalMsgQueue:
+		vote, ok := msg.Msg.(*VoteMessage)
+		if !ok || !vote.Vote.BlockID.IsZero() {
+			t.Fatal("expected first nil precommit")
+		}
+	default:
+		t.Fatal("missing first precommit")
+	}
+	for i := 0; i < int(pb.Total()); i++ {
+		if _, err := cs.addProposalBlockPart(&BlockPartMessage{Height: cs.Height, Round: cs.Round, Part: pb.GetPart(i)}, "late-peer"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cs.handleCompleteProposal(cs.Height)
+	if cs.LockedBlock != nil || cs.Step != cstypes.RoundStepPrecommit {
+		t.Fatal("late parts changed a completed precommit step")
+	}
+	select {
+	case <-cs.internalMsgQueue:
+		t.Fatal("late parts produced a second precommit")
+	default:
+	}
+}
+
+
+===== FILE: third_party/cometbft/types/redaction.go =====
+// Experimental wire-v3 extension, compiled against CometBFT v0.38.26.
+package types
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
+	"errors"
+	"sync"
+
+	"github.com/cometbft/cometbft/crypto/merkle"
+	"github.com/cometbft/cometbft/libs/bits"
+	"utxo/crypto/chameleon"
+)
+
+var redactionKey *chameleon.Public
+var redactionChain string
+var redactionConfig sync.Mutex
+var txMagic = []byte{'U', 'T', 'X', 'O', '4', 'C', 'H', 0}
+var partMagic = []byte{'P', 'A', 'R', 'T', '3', 'C', 'H', 0}
+var ErrRedaction = errors.New("invalid wire-v3 redaction")
+
+// ConfigureRedaction is a startup-only setting for a new genesis network.
+func ConfigureRedaction(chain string, key *chameleon.Public) error {
+	redactionConfig.Lock()
+	defer redactionConfig.Unlock()
+	if chain == "" || key == nil {
+		return ErrRedaction
+	}
+	if redactionKey != nil {
+		if redactionChain == chain && redactionKey.KeyID() == key.KeyID() {
+			return nil
+		}
+		return ErrRedaction
+	}
+	redactionKey, redactionChain = key, chain
+	return nil
+}
+
+// EncodeRedactableTx is the consensus envelope, not a payment validator.
+// Fixed must include commitments to every mutable slot and its allowed policy.
+func EncodeRedactableTx(fixed, mutable []byte) Tx {
+	b := make([]byte, 16+len(fixed)+len(mutable))
+	copy(b, txMagic)
+	binary.BigEndian.PutUint32(b[8:12], uint32(len(fixed)))
+	binary.BigEndian.PutUint32(b[12:16], uint32(len(mutable)))
+	copy(b[16:], fixed)
+	copy(b[16+len(fixed):], mutable)
+	return Tx(b)
+}
+
+func redactionTxHash(tx Tx) []byte {
+	data := []byte(tx)
+	// Wire identity is self-describing; readers need no repair-key setup.
+	if len(tx) >= 16 && bytes.Equal(tx[:8], txMagic) {
+		n, m := uint64(binary.BigEndian.Uint32(tx[8:12])), uint64(binary.BigEndian.Uint32(tx[12:16]))
+		if n+m+16 == uint64(len(tx)) {
+			data = tx[:16+n]
+		}
+	}
+	h := sha256.Sum256(data)
+	return h[:]
+}
+
+type PartRedaction struct {
+	Height   int64             `json:"height"`
+	Revision uint64            `json:"revision"`
+	Opening  chameleon.Opening `json:"opening"`
+}
+
+// ValidateOriginal admits only canonical execution parts into live consensus.
+// Revision is metadata, so checking its zero label alone is insufficient.
+// Historical storage and generic inclusion use the separate revision path.
+func (p *Part) ValidateOriginal(height int64) error {
+	if p == nil {
+		return ErrRedaction
+	}
+	if redactionKey == nil && p.Redaction == nil {
+		return nil
+	}
+	var initial chameleon.Opening
+	initial[chameleon.Size-1] = 1
+	if p.Redaction == nil || p.Redaction.Height != height || p.Redaction.Revision != 0 || p.Redaction.Opening != initial {
+		return ErrRedaction
+	}
+	return nil
+}
+
+func RedactionContext(height int64, index uint32) []byte {
+	h := sha256.New()
+	h.Write([]byte("BLOCK_PART_V3"))
+	h.Write([]byte(redactionChain))
+	keyID := redactionKey.KeyID()
+	h.Write(keyID[:])
+	var b [12]byte
+	binary.BigEndian.PutUint64(b[:8], uint64(height))
+	binary.BigEndian.PutUint32(b[8:], index)
+	h.Write(b[:])
+	return h.Sum(nil)
+}
+
+func partCommitment(p *Part) ([]byte, error) {
+	if p.Redaction == nil {
+		if redactionKey != nil {
+			return nil, ErrRedaction
+		}
+		return p.Bytes, nil
+	}
+	if redactionKey == nil || p.Redaction.Height < 1 {
+		return nil, ErrRedaction
+	}
+	c, err := redactionKey.Digest(RedactionContext(p.Redaction.Height, p.Index), p.Bytes, p.Redaction.Opening)
+	if err != nil {
+		return nil, err
+	}
+	h := sha256.Sum256(c[:])
+	return h[:], nil
+}
+
+func encodeRedactionPart(p *Part) []byte {
+	if p.Redaction == nil {
+		return p.Bytes
+	}
+	b := make([]byte, 24+chameleon.Size+len(p.Bytes))
+	copy(b, partMagic)
+	binary.BigEndian.PutUint64(b[8:16], uint64(p.Redaction.Height))
+	binary.BigEndian.PutUint64(b[16:24], p.Redaction.Revision)
+	copy(b[24:], p.Redaction.Opening[:])
+	copy(b[24+chameleon.Size:], p.Bytes)
+	return b
+}
+
+func decodeRedactionPart(p *Part, wire []byte) error {
+	if redactionKey == nil {
+		p.Bytes = wire
+		return nil
+	}
+	if len(wire) < 24+chameleon.Size || !bytes.Equal(wire[:8], partMagic) {
+		return ErrRedaction
+	}
+	p.Redaction = &PartRedaction{Height: int64(binary.BigEndian.Uint64(wire[8:16])), Revision: binary.BigEndian.Uint64(wire[16:24])}
+	copy(p.Redaction.Opening[:], wire[24:24+chameleon.Size])
+	p.Bytes = wire[24+chameleon.Size:]
+	_, err := partCommitment(p)
+	return err
+}
+
+func (ps *PartSet) acceptRedaction(p *Part) bool {
+	if p.Redaction == nil {
+		return redactionKey == nil
+	}
+	if ps.redactionSeen {
+		return ps.redactionHeight == p.Redaction.Height && ps.redactionRevision == p.Redaction.Revision
+	}
+	ps.redactionSeen = true
+	ps.redactionHeight, ps.redactionRevision = p.Redaction.Height, p.Redaction.Revision
+	return true
+}
+
+// Nil openings mean the canonical initial opening 1. Fresh block commitments
+// must be deterministic when the proposer and validators independently rebuild.
+func NewRedactablePartSet(data []byte, partSize uint32, height int64, revision uint64, openings []chameleon.Opening) (*PartSet, error) {
+	if redactionKey == nil || partSize == 0 || height < 1 {
+		return nil, ErrRedaction
+	}
+	total := (len(data) + int(partSize) - 1) / int(partSize)
+	if total == 0 || (openings != nil && len(openings) != total) || (revision != 0 && openings == nil) {
+		return nil, ErrRedaction
+	}
+	parts, leaves := make([]*Part, total), make([][]byte, total)
+	for i := range parts {
+		var r chameleon.Opening
+		r[chameleon.Size-1] = 1
+		if openings != nil {
+			r = openings[i]
+		}
+		end := min((i+1)*int(partSize), len(data))
+		parts[i] = &Part{Index: uint32(i), Bytes: bytes.Clone(data[i*int(partSize) : end]), Redaction: &PartRedaction{Height: height, Revision: revision, Opening: r}}
+		leaf, err := partCommitment(parts[i])
+		if err != nil {
+			return nil, err
+		}
+		leaves[i] = leaf
+	}
+	root, proofs := merkle.ProofsFromByteSlices(leaves)
+	set := &PartSet{total: uint32(total), hash: root, parts: parts, partsBitArray: bits.NewBitArray(total), count: uint32(total), byteSize: int64(len(data)), redactionSeen: true, redactionHeight: height, redactionRevision: revision}
+	for i := range parts {
+		parts[i].Proof = *proofs[i]
+		set.partsBitArray.SetIndex(i, true)
+	}
+	return set, nil
+}
+
+
+===== FILE: third_party/cometbft/store/redaction.go =====
+package store
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
+	"fmt"
+	"io"
+
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	"github.com/cometbft/cometbft/types"
+)
+
+func revisionKey(height int64) []byte { return []byte(fmt.Sprintf("RV:%d", height)) }
+func originalKey(height int64) []byte { return []byte(fmt.Sprintf("RO:%d", height)) }
+
+// ReviseBlock writes the actual stored Part payloads in a single database batch.
+// authorize must verify an already-finalized RepairInput and its exact byte diff.
+// This method never changes account balances or rewrites historical AppHash.
+func (bs *BlockStore) ReviseBlock(height int64, base uint64, parts *types.PartSet, authorize func(*types.Block, *types.Block) error) error {
+	if base == ^uint64(0) {
+		return types.ErrRedaction
+	}
+	return bs.installRevision(height, base+1, parts, authorize, true)
+}
+
+// InstallCommittedRevision installs an exact, already-authorized snapshot.
+// The callback must use copied committed data, never acquire application locks.
+func (bs *BlockStore) InstallCommittedRevision(height int64, revision uint64, parts *types.PartSet, authorize func(*types.Block, *types.Block) error) error {
+	return bs.installRevision(height, revision, parts, authorize, false)
+}
+
+func (bs *BlockStore) installRevision(height int64, target uint64, parts *types.PartSet, authorize func(*types.Block, *types.Block) error, sequential bool) error {
+	if target == 0 {
+		return types.ErrRedaction
+	}
+
+	if parts == nil || !parts.IsComplete() || authorize == nil {
+		return types.ErrRedaction
+	}
+	bs.revisionMtx.Lock()
+	defer bs.revisionMtx.Unlock()
+	meta := bs.LoadBlockMeta(height)
+	if meta == nil || !parts.Header().Equals(meta.BlockID.PartSetHeader) {
+		return types.ErrRedaction
+	}
+	data, err := io.ReadAll(parts.GetReader())
+	if err != nil {
+		return err
+	}
+	pb := new(cmtproto.Block)
+	if err = pb.Unmarshal(data); err != nil {
+		return err
+	}
+	next, err := types.BlockFromProto(pb)
+	if err != nil {
+		return err
+	}
+	if next.Height != height || !bytes.Equal(next.Hash(), meta.BlockID.Hash) {
+		return types.ErrRedaction
+	}
+	current := bs.loadBlock(height)
+	if err = authorize(current, next); err != nil {
+		return err
+	}
+	state, err := bs.db.Get(revisionKey(height))
+	if err != nil {
+		return err
+	}
+	var rev uint64
+	if len(state) != 0 {
+		if len(state) != 40 {
+			return types.ErrRedaction
+		}
+		rev = binary.BigEndian.Uint64(state[:8])
+	}
+	digest := sha256.Sum256(data)
+	checked := types.NewPartSetFromHeader(meta.BlockID.PartSetHeader)
+	for i := 0; i < int(parts.Total()); i++ {
+		p := parts.GetPart(i)
+		if p.Redaction == nil || p.Redaction.Height != height || p.Redaction.Revision != target {
+			return types.ErrRedaction
+		}
+		if err = p.ValidateBasic(); err != nil {
+			return err
+		}
+		if _, err = checked.AddPart(p); err != nil {
+			return err
+		}
+	}
+
+	if rev == target {
+		if len(state) != 40 || !bytes.Equal(state[8:], digest[:]) {
+			return types.ErrRedaction
+		}
+		for i := 0; i < int(parts.Total()); i++ {
+			old := bs.LoadBlockPart(height, i)
+			if old == nil || old.Redaction == nil || *old.Redaction != *parts.GetPart(i).Redaction || !bytes.Equal(old.Bytes, parts.GetPart(i).Bytes) {
+				return types.ErrRedaction
+			}
+		}
+		return nil
+	}
+	if !sequential && rev > target {
+		return nil
+	}
+	if sequential && rev != target-1 {
+		return types.ErrRedaction
+	}
+	batch := bs.db.NewBatch()
+	defer batch.Close()
+	if rev == 0 {
+		origin, err := current.ToProto()
+		if err != nil {
+			return err
+		}
+		b, err := origin.Marshal()
+		if err != nil {
+			return err
+		}
+		if err = batch.Set(originalKey(height), b); err != nil {
+			return err
+		}
+	}
+	for i := 0; i < int(parts.Total()); i++ {
+		part, err := parts.GetPart(i).ToProto()
+		if err != nil {
+			return err
+		}
+		b, err := part.Marshal()
+		if err != nil {
+			return err
+		}
+		if err = batch.Set(calcBlockPartKey(height, i), b); err != nil {
+			return err
+		}
+	}
+	state = make([]byte, 40)
+	binary.BigEndian.PutUint64(state[:8], target)
+	copy(state[8:], digest[:])
+	if err = batch.Set(revisionKey(height), state); err != nil {
+		return err
+	}
+	return batch.WriteSync()
+}
+
+// LoadOriginalBlock supplies the original execution bytes for deterministic
+// replay. Compensation is applied only when replay reaches RepairInput's height.
+func (bs *BlockStore) LoadOriginalBlock(height int64) (*types.Block, error) {
+	bs.revisionMtx.RLock()
+	defer bs.revisionMtx.RUnlock()
+	b, err := bs.db.Get(originalKey(height))
+	if err != nil {
+		return nil, err
+	}
+	if len(b) == 0 {
+		return bs.loadBlock(height), nil
+	}
+	p := new(cmtproto.Block)
+	if err = p.Unmarshal(b); err != nil {
+		return nil, err
+	}
+	return types.BlockFromProto(p)
+}
+
+// OriginalBlockPart serves consensus catch-up with original execution bytes.
+// Current redacted parts remain available through LoadBlockPart for inspection.
+func (bs *BlockStore) OriginalBlockPart(height int64, index int) (*types.Part, error) {
+	bs.revisionMtx.RLock()
+	defer bs.revisionMtx.RUnlock()
+	raw, err := bs.db.Get(originalKey(height))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		meta := bs.LoadBlockMeta(height)
+		if meta == nil {
+			return nil, nil
+		}
+		if index < 0 || uint64(index) >= uint64(meta.BlockID.PartSetHeader.Total) {
+			return nil, types.ErrRedaction
+		}
+		return bs.LoadBlockPart(height, index), nil
+	}
+	// Rewritten history still serves the immutable original execution bytes.
+	pb := new(cmtproto.Block)
+	if err = pb.Unmarshal(raw); err != nil {
+		return nil, err
+	}
+	block, err := types.BlockFromProto(pb)
+	if err != nil {
+		return nil, err
+	}
+	parts, err := block.MakePartSet(types.BlockPartSizeBytes)
+	if err != nil {
+		return nil, err
+	}
+	if index < 0 || index >= int(parts.Total()) {
+		return nil, types.ErrRedaction
+	}
+	return parts.GetPart(index), nil
+}
+
+
+===== FILE: third_party/cometbft/store/catchup_test.go =====
+package store
+
+import (
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"os"
+	"os/exec"
+	"testing"
+
+	dbm "github.com/cometbft/cometbft-db"
+	"github.com/cometbft/cometbft/types"
+	cmttime "github.com/cometbft/cometbft/types/time"
+	"github.com/stretchr/testify/require"
+	"utxo/crypto/chameleon"
+)
+
+type catchupReadDB struct {
+	dbm.DB
+	gets []string
+}
+
+func (d *catchupReadDB) Get(key []byte) ([]byte, error) {
+	d.gets = append(d.gets, string(key))
+	return d.DB.Get(key)
+}
+
+func catchupFixture(t *testing.T) (*BlockStore, *catchupReadDB, *types.Block, *types.PartSet) {
+	t.Helper()
+	state, _, cleanup := makeStateAndBlockStore()
+	t.Cleanup(cleanup)
+	db := &catchupReadDB{DB: dbm.NewMemDB()}
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	bs := NewBlockStore(db)
+	block, err := state.MakeBlock(1, []types.Tx{bytes.Repeat([]byte{3}, int(types.BlockPartSizeBytes)*4)}, new(types.Commit), nil, state.Validators.GetProposer().Address)
+	require.NoError(t, err)
+	parts, err := block.MakePartSet(types.BlockPartSizeBytes)
+	require.NoError(t, err)
+	require.Greater(t, parts.Total(), uint32(3))
+	bs.SaveBlockWithExtendedCommit(block, parts, makeTestExtCommit(block.Height, cmttime.Now()))
+	return bs, db, block, parts
+}
+
+func TestCatchupCandidateReadsOneUnchangedPart(t *testing.T) {
+	bs, db, block, parts := catchupFixture(t)
+	// The old path rebuilds a canonical PartSet from the complete original block.
+	original, err := bs.LoadOriginalBlock(block.Height)
+	require.NoError(t, err)
+	rebuilt, err := original.MakePartSet(types.BlockPartSizeBytes)
+	require.NoError(t, err)
+	db.gets = nil
+	part, err := bs.OriginalBlockPart(block.Height, 2)
+	require.NoError(t, err)
+	require.Equal(t, rebuilt.GetPart(2), part) // bytes, proof, and CH metadata if enabled.
+	require.Equal(t, []string{string(originalKey(1)), string(calcBlockMetaKey(1)), string(calcBlockPartKey(1, 2))}, db.gets)
+	for _, index := range []int{-1, int(parts.Total())} {
+		_, err := bs.OriginalBlockPart(block.Height, index)
+		require.ErrorIs(t, err, types.ErrRedaction)
+	}
+	missing, err := bs.OriginalBlockPart(99, -1)
+	require.NoError(t, err)
+	require.Nil(t, missing)
+}
+
+func TestCatchupCandidateRewrittenBlockStillServesOriginal(t *testing.T) {
+	bs, db, block, originalParts := catchupFixture(t)
+	original, err := block.ToProto()
+	require.NoError(t, err)
+	raw, err := original.Marshal()
+	require.NoError(t, err)
+	// Seed the persisted original/current layout; repair authorization is tested
+	// separately by the redaction suite. This test checks the reader's selection.
+	require.NoError(t, db.Set(originalKey(1), raw))
+	changedPart := *originalParts.GetPart(2)
+	changedPart.Bytes = bytes.Repeat([]byte{9}, len(changedPart.Bytes))
+	changed, err := changedPart.ToProto()
+	require.NoError(t, err)
+	changedBytes, err := changed.Marshal()
+	require.NoError(t, err)
+	require.NoError(t, db.Set(calcBlockPartKey(1, 2), changedBytes))
+	require.NotEqual(t, originalParts.GetPart(2).Bytes, bs.LoadBlockPart(1, 2).Bytes)
+	db.gets = nil
+	part, err := bs.OriginalBlockPart(1, 2)
+	require.NoError(t, err)
+	require.Equal(t, originalParts.GetPart(2), part)
+	require.Equal(t, []string{string(originalKey(1))}, db.gets)
+	_, err = bs.OriginalBlockPart(1, int(originalParts.Total()))
+	require.ErrorIs(t, err, types.ErrRedaction)
+}
+
+func TestCatchupCandidateRedactableSubprocess(t *testing.T) {
+	// ConfigureRedaction is process-global, so leave the other store tests unchanged.
+	if os.Getenv("UTXO_CATCHUP_CH_TEST") != "1" {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestCatchupCandidateRedactableSubprocess$")
+		cmd.Env = append(os.Environ(), "UTXO_CATCHUP_CH_TEST=1")
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(output))
+		return
+	}
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	public, err := chameleon.NewPublic(&key.PublicKey)
+	require.NoError(t, err)
+	require.NoError(t, types.ConfigureRedaction("catchup-candidate", public))
+	t.Run("unchanged", TestCatchupCandidateReadsOneUnchangedPart)
+	t.Run("rewritten", TestCatchupCandidateRewrittenBlockStillServesOriginal)
+}
