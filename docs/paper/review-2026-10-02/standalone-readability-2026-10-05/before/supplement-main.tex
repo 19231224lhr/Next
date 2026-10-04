@@ -1,0 +1,29 @@
+\RequirePackage[OT1]{fontenc}
+\documentclass[letterpaper,11pt,onecolumn,journal]{IEEEtran}
+\usepackage{amsmath,amssymb,booktabs,array,longtable,graphicx,algorithmic}
+\graphicspath{{figures/}{./}}
+\usepackage[hidelinks]{hyperref}
+\hypersetup{pdftitle={Supplementary Material for Next: Enabling Continuous UTXO Payments with Direct Guarantees},pdfauthor={Lu Hengrun}}
+\renewcommand{\thesection}{S\arabic{section}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\theequation}{S\arabic{equation}}
+\title{Supplementary Material for\\Next: Enabling Continuous UTXO Payments with Direct Guarantees}
+\author{Lu Hengrun}
+\begin{document}
+\maketitle
+\noindent\textbf{Reading guide.} Current-build experiment records and the proof-to-entry-point map are in Section~\ref{supp:final-evidence}; the consensus and fee correspondence is in Section~\ref{supp:interface-fee-evidence}. Other sections preserve the explicitly labelled earlier builds and their measurements. In this supplement, Compensated denotes the economic obligation status named \texttt{Repaired} in the implementation.
+
+
+\input{supplement-security}
+\input{supplement-current}
+\input{supplement-revision}
+\input{supplement-final-evidence}
+\input{supplement-methods}
+\input{supplement-archived}
+\clearpage
+\section{Per-Run Experimental Records}
+\input{supplement-tables}
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+\end{document}

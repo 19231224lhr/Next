@@ -43,3 +43,52 @@ Applied向量防止重启后再次入账。成员存储Schema相应升级，避�
 上述失效规则：其QC责任、输入锁和签发容量继续保留。当前Relay可能
 持续重试该来源；终止此类重试属于独立的工程后续工作，并不得因此
 释放已获证责任。
+
+\subsection{实际入口与费用证据}
+\label{supp:interface-fee-evidence}
+工件中的 2026-10-04 接口审计保存源码指纹、命令与断言日志。测试补充基于检出版本 \texttt{863952d}；节点生产逻辑相对被测基线 \texttt{f856c7b} 不变。本地回归使用 Windows amd64 上的 Go 1.27.1，提供正确性证据，不替换性能测量。
+
+\noindent\textbf{涉及身份的转移。}
+固定版本的 CometBFT overlay 将八处区块体哈希比较替换为 \texttt{matches\allowbreak BlockID}，同时检查体哈希与配对的部件集头。剩余 Finalize 哈希检查位于部件头检查之后，投票扩展调用方已受完整身份匹配守卫约束。\texttt{Test\allowbreak Stable\allowbreak Hash\allowbreak Identity} 调用真实共识状态方法，覆盖提交目标替换、旧部件、精确最终化、Locked/Valid 配对、POL 轮次，以及法定票先于或后于区块体到达。polka 先于部件的场景还从 Propose 步骤开始：补齐候选后只针对精确身份预提交一次，此后的尝试既不产生迟到预投票，也不产生第二次预提交。独立的 nil 预提交场景确认迟到部件不产生第二次投票。这同时检查新增的当前轮 polka 转移与比较守卫。
+
+\noindent\textbf{共识 overlay：保持的条件。}
+表~\ref{tab:supp-consensus-map} 区分语义修改及其回归证据。在论文的完整身份前提下，overlay 保持上游的锁/POL 论证：正文与 part-set 头构成同一身份，当前轮 polka 支持该身份，轮次/步骤守卫使每轮至多产生一次 precommit。存储修改保持耐久证据对执行可见的先后顺序。
+
+\begin{longtable}{@{}p{0.22\textwidth}p{0.43\textwidth}p{0.29\textwidth}@{}}
+\caption{共识与持久化修改及其保持的条件。}\label{tab:supp-consensus-map}\\
+\toprule
+修改 & 保持的条件 & 现有回归证据 \\
+\midrule\endfirsthead
+\toprule 修改 & 保持的条件 & 现有回归证据 \\
+\midrule\endhead
+完整 BlockID 与当前轮 polka &
+Locked/Valid 正文始终与其 part 根配对。匹配的当前轮 polka 之后正文可用时，在轮次/步骤守卫下可进入 precommit，包括从 Propose 进入；迟到正文不能产生第二次投票。 &
+\texttt{TestStableHashIdentity}：旧 parts、commit 目标、POL、锁配对、polka 先到及 nil-precommit 后正文迟到。 \\
+提案 WAL 合批 &
+仅合并已就绪的本地提案材料，最多 16 条消息、512\,KiB。所有写入与 \texttt{FlushAndSync} 均在首个 \texttt{handleMsg} 之前完成；任一步失败即停止处理。投票保留独立的 \texttt{WriteSync}。崩溃可能留下可重放前缀，而非全成或全败的 WAL 批次。 &
+\texttt{TestProposalBatch}：边界、同步前不应用、写入/同步失败、真实文件耐久前缀重放及签名复用。 \\
+Finalize 响应合批 &
+历史响应与最后响应恢复记录暂存于同一数据库批次，经 \texttt{WriteSync} 提交。存储错误返回调用者；耐久写入后的不确定错误不表示回滚。 &
+\texttt{results\_batch\_test.go}：写入前失败不发布半份记录；不确定同步返回错误；磁盘重启检查配对的恢复数据。 \\
+Autofile 清洁同步省略 &
+仅在同一文件句柄已成功同步且之后没有写入时跳过 Sync。写入和重新打开会重置标志，同步失败不置位，缓冲刷新先于该判断。 &
+\texttt{sync\_test.go}：首次同步、重复清洁同步、写入、失败、重新打开、轮换及并发组写入。 \\
+原始执行与历史安装 &
+准入验证原始 opening。重放和追块保留原始正文及 parts；修订须具有精确的已提交 Task，不能转化为新的支付执行。 &
+重标记 opening 拒绝、真实 BlockStore 改写/重放与原始 part 追块测试。 \\
+\bottomrule
+\end{longtable}
+
+边界与合批策略改变调度及存储工作，不改变投票阈值或支付授权。制品保留的断言日志覆盖这些入口；安全性仍由不变式论证支持，而不声称测试穷尽全部执行。
+
+\noindent\textbf{期限入口接线。}
+生产 \texttt{Engine.BeginBlock} 以当前高度和区块时间调用 \texttt{AnchorDirectDeadlines}，委员会入口将其传入 \texttt{NewTimedApp}。高度 $h$ 创建的 Open 义务在 $h+1$ 锚定；锚定之前来源已闭合时，该条目失效。截止期检查使用已提交区块时间。当前连续链、混合负载及恢复实验的创世模板均设置 \texttt{TimeoutSeconds=30}。
+
+\noindent\textbf{原始材料与应用认证。}
+\texttt{Test\allowbreak Consensus\allowbreak Rejects\allowbreak Relabelled\allowbreak Opening} 将重标记为修订零的兼容适配送入共识消息的 \texttt{Validate\allowbreak Basic} 与 \texttt{Msg\allowbreak From\allowbreak Proto}；原始准入拒绝非原始开口。部件集的包含性验证本身会接收已签名根下的重标记部件；对非原始开口的拒绝发生在共识消息边界。真实 BlockStore 改写/重放与追块测试确认修订后仍保留、提供原始区块体和部件。\texttt{Test\allowbreak Public\allowbreak Authorization\allowbreak At\allowbreak ABCIEntry} 先预热有效验证缓存，再检查 \texttt{CheckTx}、\texttt{ProcessProposal} 与 \texttt{FinalizeBlock} 拒绝且业务状态不变。伪 QC 场景中，解码、所有者授权、准入准备和摘要绑定均通过，随后 QC 认证返回 \texttt{ErrAuth}；无关 QC 与伪所有者场景在更早的守卫拒绝。独立的缓存测试要求复用字节完全相同，并重新检查当前账本有效性。
+
+\noindent\textbf{托管与关闭。}
+\texttt{PrepareDirectVector} 以溢出检查核算基础费用及每个认证输入的一次赔付费用。\texttt{feeStage} 应用累计托管差量，\texttt{endObligation} 只在离开 Open 时允许一次赔付扣费，\texttt{closeFee} 在准入上限内核算实付费用。\texttt{Test\allowbreak Fee\allowbreak Closure\allowbreak Multiple\allowbreak Obligations} 包含十二个规则层场景：两种付费模式、零至两个赔付输入、最低或富余托管。断言覆盖每步托管与资产守恒、精确最终费用和退款、Pending 归零时关闭及重复操作幂等。\texttt{Test\allowbreak Fee\allowbreak Closure\allowbreak Fulfillment\allowbreak Before\allowbreak Compensation} 的另外两个场景使用不同父交易：一个正常到达，另一个随后赔付触发消费方关闭，第二个父交易迟到不改变已关闭托管。公开决定与多槽位测试另行覆盖应用边界。成员跟块测试在赔付与来源到达后比较本地托管与公共支付状态，并检查累计恢复和已消耗 FUEL 不循环恢复。
+
+\noindent\textbf{观测所支持的结论。}
+这些测试将证明中的转移假设对应到实际入口，不替代锁定或会计论证。无义务决定守卫拒绝且不返回变更或效果，对应服务契约不提供仅凭证书兑付。最终混合负载资本审计读取每轮八名成员的已记录计数和资源终点：三轮资源不足计数均为零，最终 CAL/工作资源预留为零，而实际 FUEL 支出仍保留。该终点审计与未公开证书的理论覆盖、持续准入的负载条件分别陈述。

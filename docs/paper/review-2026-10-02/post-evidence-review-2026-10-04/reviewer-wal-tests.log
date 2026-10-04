@@ -1,0 +1,138 @@
+Fresh review-response verification: go test -count=1 github.com/cometbft/cometbft/consensus -run ProposalBatch -v (from utxo module root; no race flag)
+=== RUN   TestProposalBatchAlreadyReady
+I[2026-10-04|22:20:31.153] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.162] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.163] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.163] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+--- PASS: TestProposalBatchAlreadyReady (0.01s)
+=== RUN   TestProposalBatchBoundaries
+=== RUN   TestProposalBatchBoundaries/completion_leaves_vote_queued
+I[2026-10-04|22:20:31.165] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.165] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.165] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.165] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchBoundaries/peer_parts_reduce_remaining_budget
+I[2026-10-04|22:20:31.168] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.168] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.168] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.168] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchBoundaries/duplicate_counts_conservatively
+I[2026-10-04|22:20:31.170] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.170] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.171] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.171] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchBoundaries/vote_boundary_is_retained
+I[2026-10-04|22:20:31.173] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.173] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.174] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.174] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchBoundaries/other_round_is_not_batched
+I[2026-10-04|22:20:31.175] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.175] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.175] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.175] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchBoundaries/late_phase_uses_original_path
+I[2026-10-04|22:20:31.177] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.177] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.177] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.177] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchBoundaries/byte_bound
+I[2026-10-04|22:20:31.179] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.179] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.180] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.180] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchBoundaries/message_bound
+I[2026-10-04|22:20:31.182] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.183] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.183] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.183] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+--- PASS: TestProposalBatchBoundaries (0.02s)
+    --- PASS: TestProposalBatchBoundaries/completion_leaves_vote_queued (0.00s)
+    --- PASS: TestProposalBatchBoundaries/peer_parts_reduce_remaining_budget (0.00s)
+    --- PASS: TestProposalBatchBoundaries/duplicate_counts_conservatively (0.00s)
+    --- PASS: TestProposalBatchBoundaries/vote_boundary_is_retained (0.00s)
+    --- PASS: TestProposalBatchBoundaries/other_round_is_not_batched (0.00s)
+    --- PASS: TestProposalBatchBoundaries/late_phase_uses_original_path (0.00s)
+    --- PASS: TestProposalBatchBoundaries/byte_bound (0.00s)
+    --- PASS: TestProposalBatchBoundaries/message_bound (0.00s)
+=== RUN   TestProposalBatchStorageFailureDoesNotApply
+=== RUN   TestProposalBatchStorageFailureDoesNotApply/1
+I[2026-10-04|22:20:31.187] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.187] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.188] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.188] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchStorageFailureDoesNotApply/2
+I[2026-10-04|22:20:31.191] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.191] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.191] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.191] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchStorageFailureDoesNotApply/3
+I[2026-10-04|22:20:31.194] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.194] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.195] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.195] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchStorageFailureDoesNotApply/4
+I[2026-10-04|22:20:31.197] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.197] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.197] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.197] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+--- PASS: TestProposalBatchStorageFailureDoesNotApply (0.01s)
+    --- PASS: TestProposalBatchStorageFailureDoesNotApply/1 (0.00s)
+    --- PASS: TestProposalBatchStorageFailureDoesNotApply/2 (0.00s)
+    --- PASS: TestProposalBatchStorageFailureDoesNotApply/3 (0.00s)
+    --- PASS: TestProposalBatchStorageFailureDoesNotApply/4 (0.00s)
+=== RUN   TestProposalBatchDurableReplay
+=== RUN   TestProposalBatchDurableReplay/none
+I[2026-10-04|22:20:31.201] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.201] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.237] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.237] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.238] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.238] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.238] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.238] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchDurableReplay/write_prefix
+I[2026-10-04|22:20:31.241] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.241] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.270] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.270] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.273] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.273] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.273] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.273] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchDurableReplay/sync_error
+I[2026-10-04|22:20:31.276] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.276] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.312] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.312] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.315] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.315] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.315] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.315] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchDurableReplay/after_sync
+I[2026-10-04|22:20:31.318] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.318] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.343] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.343] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.345] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.345] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.345] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.345] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+=== RUN   TestProposalBatchDurableReplay/after_proposal
+I[2026-10-04|22:20:31.347] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.347] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.378] service start                                module=events msg="Starting EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.378] service start                                module=pubsub msg="Starting PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.381] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.381] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+I[2026-10-04|22:20:31.381] service stop                                 module=events msg="Stopping EventBus service" impl=EventBus
+I[2026-10-04|22:20:31.381] service stop                                 module=pubsub msg="Stopping PubSub service" impl=PubSub
+--- PASS: TestProposalBatchDurableReplay (0.18s)
+    --- PASS: TestProposalBatchDurableReplay/none (0.04s)
+    --- PASS: TestProposalBatchDurableReplay/write_prefix (0.03s)
+    --- PASS: TestProposalBatchDurableReplay/sync_error (0.04s)
+    --- PASS: TestProposalBatchDurableReplay/after_sync (0.03s)
+    --- PASS: TestProposalBatchDurableReplay/after_proposal (0.04s)
+PASS
+ok  	github.com/cometbft/cometbft/consensus	0.400s
+exit_code=0

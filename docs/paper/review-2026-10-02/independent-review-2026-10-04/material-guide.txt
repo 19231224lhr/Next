@@ -1,0 +1,18 @@
+Next: material guide for independent manuscript review
+
+Manuscript: Next: Enabling Continuous UTXO Payments with Direct Guarantees.
+The English main paper (18 pages) and English supplementary material (27 pages) are attached in full. The supplementary material contains proofs, implementation correspondence, configurations, run-level data and archived-version experiments. They should be read together.
+
+Artifact repository: https://github.com/19231224lhr/Next
+Snapshot: 863952d605b9410338a242145f959df7ad506940, branch fix/partial-approval-reclamation.
+Measured node-production baseline: f856c7b3d6265f7275a15767bdced52d40dafada. The snapshot adds client timing, tests and manuscript/evidence files; the final chain/P/R node binaries are identical. Earlier measurements keep their own recorded versions (721800c and 9879f64).
+
+Evidence navigation within the repository:
+- docs/experiments/final-evidence-2026-10-04/README.md: final chain, mixed P and automatic resubmission R experiments; original records and analysis scripts reside in its subdirectories.
+- docs/experiments/history-reader-2026-10-02/README.md: timed historical reading comparison and maintenance/storage costs.
+- docs/design/payment-service-contract.md: receipt, public obligation, resource checks and service conditions.
+- docs/design/historical-reader-contract.md: index, ordinary materialized view and authorized historical-body consumer interfaces.
+- docs/research/proof-code-map-wire4.md: theorem/guard/test correspondence.
+- protocol/, internal/member/, internal/rules/, internal/redaction/, internal/committee/: implementation.
+
+No previous review or acceptance recommendation is included in this packet. If a source detail or raw observation is required to assess a claim, identify it and it can be supplied. Authors' affiliation is still a placeholder, not a completed submission metadata field.

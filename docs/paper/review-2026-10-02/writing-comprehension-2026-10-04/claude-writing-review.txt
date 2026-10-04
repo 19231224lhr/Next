@@ -1,0 +1,117 @@
+Claude responded: Next 的可理解性问题：对照三篇样本论文
+Ran 3 commands
+
+Ran 3 commands
+Next 的可理解性问题：对照三篇样本论文
+先回答"为什么需要作者补充解释"
+
+回看前几轮里需要作者澄清的事项，原因可以分成三类，比例大致相当：
+
+论文或补充材料确实没写。 例如截止期如何锚定、共识层除身份比较以外的修改、最坏情形下攻击者本金不变这一刻画。
+内容写了，但分散在各处，或术语过载。 例如保证所附带的条件、状态维度的区分、C3 的用途说明。
+我自己读错了。 例如 Theorem 3 的前提、Reader scope、补偿对接收者的保护作用。这些内容现稿其实已经写对了。
+
+所以写作确实是主要原因之一，但不是唯一原因。下面逐项说明，并标明每项属于哪一类。
+
+1. 样本论文如何组织"问题—机制—保证—条件"
+论文	问题	机制	保证	条件与局限
+Sui Lutris	p.1–2 引言先说明 consensusless 系统为什么没有投入生产：操作受限、无法重配置、客户端一旦等价提交资产就被永久锁定。再列三项挑战。	p.5–6 §3.3，Fig. 3 用编号 ➊–➑ 标出交易生命周期，图上直接标注 finality 与 settlement 两个时刻，正文按编号逐步说明。	p.3 §2.2 在讲任何机制之前给出 Validity、Safety、Liveness 三条性质。§2.3 借用 BIS 的定义，一次性区分 finality 与 settlement，此后全文沿用。	条件写在性质内部：Liveness "only holds for a correct client that does not equivocate"（§2.2）。等价提交的后果单独成节（§3.5）。细节放进扩展版 [8]。
+Narwhal & Tusk	p.2 用粗体写出可检验的假设："a better Mempool … is the key enabler"。	p.3–4 §2.2 分五步演化设计，每一步对应前一步遗留的一个具体问题。§3.1 用编号列出合法区块的四个条件。	p.3 §2.1 先给出抽象接口（write、valid、read、read_causal），再给出五条命名性质（Integrity、Block-Availability、Containment、2/3-Causality、1/2-Chain Quality）。p.5 用一段 "Intuitions behind security argument" 说明直观理由。	p.5 Table 1 按网络条件比较延迟和吞吐；§8.4 单列 Limitations（客户端需要重提交、慢节点等同故障节点、执行引擎是新的负担）；证明放在附录 A。
+CryptoMaze	p.1 用四条 bullet 列出挑战，每条配一个具体后果；Fig. 1 给出共享边的数值例子。	§4.4 先把"路径集合映射为边集合"这一个核心思想单独讲清；§5（p.6–8）用 M→N、5.1 units 的完整数值例子走完三个阶段。	p.4 §4.3 给出七条命名目标（Correctness、Balance Security、Atomicity 等），每条都是可以检查的陈述。	§4.2 明确声明不处理拥塞等"正交问题"。
+
+可以借鉴的共同做法：
+
+保证先于机制出现，并且带名字、带条件。 三篇论文都在讲机制之前就把性质列出来，条件写在性质内部，后文按名字证明。
+一张图、一组编号步骤和一个完整例子，三者互相对应。 读者读机制时始终知道当前这一步服务于哪条性质。
+局限有固定的位置。 要么是一条带条件的性质，要么是单独的 Limitations 小节，不会埋在证明段落里。
+核心术语只定义一次，全文只用一个意思。 例如 Sui 的 finality 和 settlement。
+
+这些论文同样把细节放到了附录或扩展版里，也并非没有瑕疵。例如 CryptoMaze §4.2 中 gain 的定义两项都写成 t₀，§5 的例子里 e_{A,B} 的下标前后不一致，释放阶段还把接收方的动作写成了"payer computes"。可见这些论文好读，靠的不是文字无错，而是结构让读者知道每一段在回答什么问题。
+
+Next 已经做得好的地方也应保留：引言中"Our insight is that the party answerable…"一句、Table II 的分阶段服务契约、§III-D 中三种结局的例子、§IV-H 的状态维度表，以及 §V-E 的 Reader scope。问题主要在于这些内容出现的位置和使用的术语，而不在于内容本身。
+
+2. Next 的具体写作问题
+W1. 摘要和引言把两套机制以及全部条件压在一起【概念过载】
+位置： 摘要（p.1）中，C2 与 C3 的机制、三条定理的全部前提、实验数字并列出现。读者在知道"谁受保护"之前，就先遇到了 "Decision-authorized funding-reference repair … under the original block identity" 这样的长串术语。
+读者会怎样误解： 把 C3 当作经济安全的一部分，或者认为 C2 依赖 C3。我首轮的 M5 有一部分就是这样形成的。
+改法： 摘要只保留"问题、核心思想、分阶段保证、关键条件、主要数字"五个要素，C3 用一句话交代，并标为可选。
+W2. "repair"一词两用：经济补偿和历史表示共用同一个词【概念过载，最需要改】
+位置： 补偿后的义务状态叫 Repaired（§IV-E），补偿费用记作 f_repair（§V-D）；但 C3 的标题是 "funding-reference repair"，表示命令叫 RepairBatch 和 RepairInput（§IV-F）。
+读者会怎样误解： 论文最想强调的恰恰是"经济闭合与历史表示相互独立"，而同一个词同时指这两件事，正好把它们混在了一起。
+改法： 正文统一改用 Compensated / compensation charge 指经济补偿，用 representation 指 C3。代码中的标识符可以保留，在符号表中注明对应关系即可。
+W3. 保证与条件分散在五处，最坏情形写在证明里【位置分散 + 内容缺失；其中一部分是我的误读】
+位置： 相关内容分布在以下五处：
+Table II 与 §III-E 的 "Terminal holders"、"Deployment and risk bearer"（p.5）；
+Lemma 5 证明的第二段（p.11）：Intent 失败者的后继消耗签发方储备；
+§V-F 的 "Availability and guarantor risk"（p.15）；
+S3 的两轮台账；
+S4-B(b) 中能达到上界的轨迹。
+读者会怎样误解： Lemma 5 的结论说的是"至多一个执行"，读者自然认为它在讲执行唯一性；但签发方风险的关键事实就藏在它的证明里。现稿也从未写出两件事：攻击者的可用本金前后不变；路由组织容量耗尽后，第三方持有的最终输出也无法花费。
+我的误读： 我把"任一 B_g 都能恰好耗尽"写成了无条件结论，这是我的问题。原文只给出上界 S_g ≤ Q_g ≤ B_g（§V-F）。
+改法： 仿照 Sui §2.2，在机制之前设"Guarantees and their limits"一节。把上述五处合并成命名性质及其条件，最坏情形写成一条带可达实例的命题。Lemma 5 只保留执行唯一性的内容。
+W4. 状态概念出现得太晚，同名异义【位置分散 + 概念过载；其中一部分是我的误读】
+位置：
+"Four state dimensions"表直到 §IV-H（p.9）才出现，而这些状态从 §III-C 起就已经在使用。
+Table I 只有 9 行，没有收录 Q_g、w_c、S_g、V_g、r_{m,c}、Promise、coverage、Settled 和 Pending 等符号。
+"Reserved"既指成员本地 slice 的预留，又指公共授权的使用量。
+x 既表示输出，又出现在 Gap_x 和 A_x 中表示储备账户。
+读者会怎样误解： Table II 第二行写的是 "registers its direct issuer's obligation"，但没有说明这一步登记要经过授权容量检查，也没有说明式 (7) 保证它不会因 CAL 授权不足而失败。这一点只在 §V-C 的 "CAL admission consequence" 中出现。我首轮说"接收者的保护与储备无关"，主要是我把这两处连错了；但该连接点确实离 Table II 很远，读者需要自己把两处对上。
+改法：
+把状态维度表移到 §III-C，即首次介绍公共执行的位置。
+把 Table I 扩展为按层分组的术语表：成员本地、公共经济、表示层。
+区分两种"Reserved"，例如本地的称为 held capacity。
+储备账户换一个符号。
+在 Table II 第二行加一句："registration is capacity-checked and cannot fail for CAL authorization (Thm. 1)"。
+W5. C3 的动机先让步、用途后出现，必要性没有写明【内容缺失 + 位置分散；其中一部分是我的误读】
+位置： 引言 p.1 先提出"record question"，紧接着就承认 "An index supplies the same economic answer"。具体用途（"Use: exception review and historical re-export"）直到 §IV-H 才出现。全文没有说明：为什么下游需要拿到修订后的区块正文本身，而不是"原始正文加决定记录"。
+我的误读： 我首轮用"逐 part 混合体"来质疑 C3。但 §V-E 的 Reader scope 已经写明 BlockID 相等不等于获得授权，所以那是我的误读。
+改法： 把引言中的 C3 动机段与 §IV-H 的 Use 段合并为一段，顺序是"需求 → 机制 → 与索引相比的取舍"。补写一句必要性需求；如果写不出来，就明确称 C3 为可选的记录层服务。
+W6. 证据叙述被构建谱系和否定句淹没【位置分散 + 少量真实错误】
+位置：
+§VI 第一段 "Builds and measurement" 就出现三个提交哈希；正文多处是"This is not …"式的限定句。
+补充材料先给归档证据（S2），当前构建的证据（S4）反而在后。
+S3-A 中的 14.15 倍实际来自 721800c，却放在 9879f64 一节里。
+读者会怎样误解： 怀疑各组数据来自不同版本、无法对应。我首轮的 M9 就是这样产生的，其中大部分后来证明只是附件打包的问题，但 14.15 倍的构建归属标错是真实错误。
+改法： 正文只称"current build"，归档结果统一用一个标记标出；把所有"未测量什么"集中写成 §VI 开头的一段 "Scope of measurements"；补充材料把当前构建的证据放在最前面。
+W7. 两处实现语义没写【内容缺失，篇幅很小】
+§IV-B 只写了 "public block time anchors its deadline"，没有写出截止期 = 创建高度下一块的时间 + timeout，也没有给出 timeout 的取值；ClockTick 只在 S3 和 S5 中顺带提到。
+对 CometBFT 的修改中，除身份比较以外的语义修改（proposal batch 的 WAL、autofile 的 Sync 跳过、ABCI 响应的批量写入），正文和补充材料都没有提及。
+3. 审稿意见归类
+类别	项目
+确实需要作者修改文字	W1–W7 的全部内容。具体包括：最坏情形命题（本金中性、可达实例的条件、第三方冻结）；"repair"一词的拆分；性质前置；状态表和术语表；C3 的必要性陈述，以及把 A/B 计时定位为成本刻画；截止期锚定写法和 timeout 取值；补充材料中的共识层修改说明；S3-A 的构建标注；作者单位；Table I 的符号。
+只是评审附件缺失，不是论文缺陷	ApproveDirectBytes、reclaimPartial、recoverExposedSources 等代码；309 项清单；source_sha256 的含义；回归测试命令与构建标签；WAL 和截止期的生产接线代码。论文不需要包含这些，补充材料中给出证据索引即可。
+我初评的误判或过度要求	C3 混合体被当作反例；"补偿只保护供应完整性"；把 Theorem 3 称为"诚实执行"并建议降级；"任一 B_g 都能恰好耗尽"；B3（BlockID 只是必要条件）和 B4（历史存储前提）——现稿 §V-E 和 Lemma 12 已经写明；首轮要求的多机部署、强基线和无 CH 构建等，都超出了现稿的主张范围。
+4. 最小重组方案
+
+总原则：只做移动、合并和删除重复，不新增防御性的解释，篇幅应当持平或略短。
+
+摘要： 删去 C3 的机制细节和构建细节，按"问题 → 核心思想 → 三阶段保证 → 关键条件 → 两个主要数字"重写。
+新设 §II "Model, stages, and guarantees"，相关内容来源如下：
+§III-A 的模型；
+Table II 和 §III-E 的三段；
+Lemma 5 证明的第二段；
+§V-F 的 "Availability and guarantor risk"；
+新写的命名性质列表：Unique consumption、Liability coverage、CAL conservation、Delay neutrality、Representation inertness，每条都附上条件。
+原 §II 相关工作后移，并压缩与 C3 有关的部分。
+机制部分： 保留 Fig. 1 和 §III-D 的例子，在图上标注 receipt、consumption、closure 三个阶段；把状态维度表移到这里；删去 §III-C 与 §IV-D 至 §IV-G 之间的重复叙述，§III-C 只保留一页概览。
+术语： 统一使用 compensation 和 representation；区分两种 Reserved；扩展 Table I 并按层分组。
+§V： 每条引理和定理都对应 §II 中的一条命名性质。Lemma 5 只保留执行唯一性；最坏情形命题放在 Theorem 1 之后。
+§VI： 开头一段 "Scope of measurements"，删去分散在各处的否定句；构建谱系全部移入补充材料的一张表。
+补充材料重新排序： 证明扩展 → 当前构建证据与证明—实现映射 → 边界台账（含 S4-B(b)）→ 实现说明（截止期、共识层修改）→ 归档构建。
+5. 英文机制概览示例
+
+Overview. Next separates a payment into three stages with different guarantees.
+Certified receipt. Each member of the consuming organization locks the inputs and reserves signing capacity equal to all CAL outputs, change included, before signing; three matching signatures form a TXCer. A recipient that verifies the TXCer may immediately request a successor, which still needs its own admission, fees, and capacity. Receipt alone creates no public claim.
+Public consumption. If the successor executes before its source, the committee atomically consumes the missing certified output, registers the source certificate's full CAL amount against its issuer's grant, opens an obligation against that direct issuer, and creates the successor's outputs as final. Registration cannot fail for lack of CAL authorization (Thm. 1). The successor's block exposes the source certificate, so the original signers can resubmit the source unchanged.
+Liability closure. The obligation closes when the source executes. Otherwise, after a deadline that starts at the time of the next block, a public decision debits the issuer's reserve; a source that arrives later repays the reserve and creates no second output.
+Limits. A holder whose source never executes and who cannot get a successor executed has no redemption path. A user who signs two payments with the same Intent through different organizations can make one source permanently unexecutable; its issuer then bears the compensated amount, bounded by its grant, and its signers keep the capacity reserved, which can stop all new certification on that route until a top-up.
+Optional representation. A later command records the reserve debit in the historical input under the original BlockID. It changes no balance and is authorized only by the committed decision and an exact task.
+
+
+Create a Word document
+
+
+
+
+
+just now

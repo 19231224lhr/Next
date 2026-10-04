@@ -1,0 +1,32 @@
+C:/Users/Bocchi/Desktop/Next/.e8-worktree/internal/rules/direct.go:492
+func (e *directEval) closeFee(p *directPayment) error {
+	if p.Pending != 0 || p.Fee.Closed {
+		return nil
+	}
+	if err := e.feeStage(p, FeeClose); err != nil {
+		return err
+	}
+	paid, err := protocol.Add(p.Fee.Rewards, p.Fee.Burned)
+	if err != nil {
+		return err
+	}
+	for i, a := range p.Summary.Admission {
+		if a.Key.Kind == protocol.ResourceCAL {
+			continue
+		}
+		spent := uint64(0)
+		if a.Key.Kind == protocol.ResourceFUEL || a.Key.Kind == protocol.ResourcePolicy {
+			spent = paid
+		}
+		g, err := e.grant(p.Summary, i)
+		if err != nil {
+			return err
+		}
+		if err = updateUsage(e.o, a.Key, a.Cap, spent, g.Amount, false); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+

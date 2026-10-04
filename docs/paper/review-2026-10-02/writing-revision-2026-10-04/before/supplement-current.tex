@@ -1,0 +1,72 @@
+\section{Archived Per-Run Evidence: Build 721800c}
+\label{sec:supp-current}
+This section records frozen evaluation build \texttt{721800c}, retained as historical evidence; current-build continuation and representative P results are reported separately. Continuation and mixed-load trials share node binaries and Comet sources. The subsequent historical methods and archived tables retain their original build identities and are not throughput measurements of this build.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Archived build-721800c continuation; times in seconds from first actual send.}
+\label{tab:supp-final-chain}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Run & Last receipt & All public & Members closed & Attempts & Gaps \\
+\midrule
+r1-fast & 4.497998 & 5.228984 & 5.293857 & 100 & 3 \\
+r1-wait & 64.626603 & 65.232083 & 65.284395 & 149 & 0 \\
+r2-fast & 4.739972 & 5.253720 & 5.295722 & 100 & 2 \\
+r2-wait & 64.475560 & 65.105699 & 65.154442 & 116 & 0 \\
+r3-fast & 4.556805 & 5.114055 & 5.129723 & 100 & 4 \\
+r3-wait & 64.460699 & 65.075768 & 65.124437 & 142 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[htbp]
+\centering\small
+\caption{Ordinary payments per mixed-load run; latencies in ms, span and drain in s. Final columns count outstanding-limit and fast-concurrency-limit hits.}
+\label{tab:supp-final-mixed}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Run & Receipt P50 & Receipt P95 & Dispatch P95 & Span & Drain & Total cap & Fast cap \\
+\midrule
+r1-C & 53.435 & 136.221 & 201.339 & 70.191 & 1.029 & 1 & 0 \\
+r1-N & 55.259 & 152.766 & 255.396 & 70.245 & 1.015 & 16 & 0 \\
+r1-P & 55.102 & 154.780 & 895.879 & 70.886 & 1.356 & 63 & 935 \\
+r1-R & 53.034 & 139.894 & 0.239 & 69.990 & 0.815 & 0 & 0 \\
+r2-C & 54.011 & 136.490 & 700.329 & 70.690 & 0.906 & 68 & 760 \\
+r2-N & 53.653 & 143.869 & 110.389 & 70.416 & 0.820 & 18 & 0 \\
+r2-P & 52.892 & 134.963 & 0.242 & 69.990 & 1.066 & 0 & 0 \\
+r2-R & 53.832 & 144.903 & 0.218 & 69.990 & 1.125 & 0 & 0 \\
+r3-C & 55.682 & 159.437 & 405.296 & 70.395 & 1.046 & 65 & 2 \\
+r3-N & 55.132 & 155.992 & 0.242 & 69.977 & 1.200 & 5 & 0 \\
+r3-P & 54.996 & 144.206 & 586.541 & 70.576 & 1.155 & 81 & 549 \\
+r3-R & 52.706 & 126.355 & 0.186 & 69.984 & 0.890 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[htbp]
+\centering\small
+\caption{Historical representation per process; maintenance and common decision execution/commit in ms, net additional KV in bytes.}
+\label{tab:supp-final-reader}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Process & Payments & Compensated & Representation & Net extra KV & Common decision \\
+\midrule
+1 & 32 & 1 & 43.322 & 292136 & 8.926 \\
+2 & 32 & 1 & 43.664 & 292200 & 8.917 \\
+3 & 32 & 1 & 42.035 & 292162 & 9.013 \\
+1 & 32 & 8 & 97.183 & 329118 & 11.919 \\
+2 & 32 & 8 & 94.461 & 329126 & 11.984 \\
+3 & 32 & 8 & 93.591 & 329059 & 12.029 \\
+1 & 256 & 1 & 64.826 & 2258078 & 9.052 \\
+2 & 256 & 1 & 66.931 & 2258044 & 9.989 \\
+3 & 256 & 1 & 65.323 & 2258085 & 8.993 \\
+1 & 256 & 8 & 214.398 & 2294947 & 20.119 \\
+2 & 256 & 8 & 213.902 & 2294910 & 21.027 \\
+3 & 256 & 8 & 214.781 & 2294980 & 20.967 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+These costs come from offline successful-execution fixtures. Representation work includes sequential adaptation, assembly, Finalize, synchronous application Commit, and materialization; common compensation decisions are reported separately. Network and consensus waits, public-block saving, and commit-signature construction are outside this timer. KV is the logical increase in encoded records, not the physical disk-space difference between two deployments.
+
+\noindent\textbf{Subsequent reclamation regression.}
+Build \texttt{bf71c4d} adds the superseded-partial-approval transition. Directed tests cover exact ordinary and fee-input conflicts, duplicate processing, restart, refusal to re-sign, and the disjoint-input Intent counterexample. A separate fresh-start nine-service run with synchronous member storage completes 1,000 user-funded payments offered at 100 payments/s (9.990-s send span, 10.879-s total), and a 100-hop fast chain reaches its last certified receipt in 4.422 s and closes in 5.014 s. Both runs have matching committee state and empty outboxes. These correctness regressions do not replace the performance measurements of \texttt{721800c}.

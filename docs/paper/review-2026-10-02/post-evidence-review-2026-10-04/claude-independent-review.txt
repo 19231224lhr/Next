@@ -1,0 +1,249 @@
+Claude responded: IEEE TDSC 审稿意见
+Ran 15 commands, read a file
+
+Ran 15 commands, read a file
+撰写一篇TDSC投稿的独立评审意见。
+Read file-reading skill before reading uploaded file
+SKILL.md
+
+Ran a command
+
+Reviewing source files and evidence logs for the investigation.
+Ran a command
+
+Checking test log timings for signs of caching.
+Ran a command
+
+Auditing manuscript claims against discrepancies in source hashes.
+
+Ran a command
+
+Investigating why production diverges from the measured baseline.
+
+Ran a command
+
+Weighing safety of precommitting without a matching prevote step.
+
+Ran a command
+
+Checking whether funding references are actually authenticated by signatures.
+
+Ran a command
+
+Verifying escrow fee limits and charge allocation logic.
+Ran a command
+
+Ran a command
+
+Calculating net attacker cost across repeated griefing rounds.
+
+Ran a command
+
+Ran a command
+
+Tracing payment logic and accounting error conditions.
+Ran a command
+
+Tracing how a build tag links to historical block data.
+Ran a command
+
+Flagging single points of failure in recipient and liveness guarantees.
+
+Ran a command
+
+Spotting manifest and build-source discrepancies across runs.
+
+Ran a command
+
+评估追偿机制是否真正保护接收方权益。
+
+IEEE TDSC 审稿意见
+
+稿件：Next: Enabling Continuous UTXO Payments with Direct Guarantees
+审阅材料：正文 19 页、补充材料 28 页、implementation-evidence.txt（源码与测试摘录、测试日志、资本审计、源清单）、material-guide.txt
+
+说明：我没有仓库，也无法重新构建或运行任何东西。下文对实现的判断只基于证据文件中的摘录和记录下来的输出，不构成独立复现。凡是需要作者补充的材料，我都在第五部分逐项列出。
+
+一、论文概述
+
+本文提出原生 UTXO 账本 Next。注册组织由 4 名成员组成，3 票签发输出证书 TXCer，接收者经过一轮认证即可继续支付。若后继交易先于来源交易公开执行，委员会对直接签发方登记一项义务，并以签名容量覆盖该义务。截止期后，公开补偿决定从签发方储备中扣款；来源交易迟到时偿还储备。可选的 C3 用 RSA 变色龙哈希把储备扣款引用写回历史区块，同时保持完整 BlockID 不变。
+
+形式化结果包括：唯一消费（Lemma 2）、潜在负债有资金覆盖（Theorem 1）、CAL 守恒（Theorem 2），以及有限、无环、来源闭合、无冲突且每笔支付恰好成功一次的集合上的延迟中立性（Theorem 3）。
+
+实验均在单台 M4 Max 上完成：100 跳链中位 4.707 s，逐跳等待为 64.479 s；三次 P 运行共 21,048 笔支付，在适配暂停的情况下完成补偿与偿还。
+
+二、主要优点
+服务契约分层清晰。 Table II 把"收到证书"、"公开消费"和"负债关闭"三种保证分开陈述，并明确承认终端持有者没有赎回路径（§III-E）。这种坦诚在同类工作中不常见。
+核心记账论证基本可靠。 Theorem 1 的计数论证沿用 Stingray 的重叠预算思想，并扩展到未公开证书、补偿和偿还。我逐步检查了式 (4)–(7)：每个 QC 在任意三名诚实成员中至少有两名签名者，因此 2Q_g ≤ 3⌊2B_g/3⌋ ≤ 2B_g。该推理在所述模型下成立。
+实现与证明有对应关系。 Table S9 的证明–代码映射和构建谱系管理（S4-c、Table S12）细致。我核对的源码与正文描述一致：
+EvaluateDirectPaymentAt 在 overlay 中原子地完成缺失输入消费、义务登记和缺口累加；
+register 按事实整体登记覆盖；
+endObligation 对每个义务至多收取一次修复费；
+成员侧 finishLocal 的 CAL 释放目标是 Cap − (Paid − Recovered)，且仅在 Settled 后释放，与式 (3) 一致。
+数字可追溯且一致。 我抽查了大量数字，均能相互对上（见第六部分）。
+三、主要意见
+M1. 零 CAL 净成本的储备耗尽与路由冻结攻击：开放部署的核心安全问题被低估
+
+这一风险可以直接由论文自己的 Lemma 5、§V-F、Table S4 和 S4-B(b) 推出，但正文没有把它当作首要威胁来分析。
+
+攻击过程：
+
+攻击者持有分别路由到 G1、G2 的输入 J、I（各 a CAL），用同一 Intent 签两笔支付：T1（J→自己）和 T2（I→自己），两者都获得 QC。
+T1 先执行；T2 因全局 Intent 冲突永久无法执行。
+攻击者用 T2 的输出构造子交易并公开执行，得到最终输出 d1（a CAL）。截止期后 G2 储备被扣 a。
+I 在公开账本上仍未花费，但被 G2 成员永久锁定（S3 已确认）。
+
+结果：
+
+攻击者可用余额前后都是 2a，净 CAL 成本为零，只花费 FUEL。
+G2 储备永久损失 a，同时 3 名签名者各自永久保留 a 的容量。
+用 d1 和 T1 的输出可以重复上述过程。Table S4 与 rotating-signer 测试表明，在 B_g = 300 时储备可降到 0，且 Q_g = B_g，界是紧的。
+
+后果比"储备损失"更严重。 在 wire4/direct 模式下，legacy 委员会路由被排除（S3），而且即使输入全部是最终输出，每笔支付也要按 a_T 预留容量（§IV-A）。因此组织容量耗尽后，所有路由到该组织的输出都无法再被花费，直到外部注资；而注资后同样的攻击可以再次进行。
+
+这直接削弱了标题中的 "Direct Guarantees" 和 Theorem 4：收到证书的接收者无法被"重新解释"，却可以被以近乎零成本变成没有赎回路径的终端持有者。
+
+请作者：
+
+(a) 在正文中明确给出该攻击的成本/损失比（攻击者需要的临时资本、FUEL 成本、每轮储备损失、可重复次数）。
+(b) 论证全局 Intent 绑定为何必要。由于 T1、T2 都需要所有者本人签名，全局去重保护的只是所有者自己免于跨组织重复执行，代价却是给签发方开放了 grief 攻击向量。
+(c) 考虑缓解措施。例如：同一 (Subject, Nonce) 上两个不同 TxID 的所有者签名本身就是可公开验证的"等价提交"证据，协议可以据此把被锁定的 T2 输入没收给 G2，或在输入不相交时允许 Intent 失败者照常执行，或要求主体保证金。
+(d) 讨论路由组织不可用时（容量耗尽，或 2 名成员离线）用户资金的退出路径。
+M2. 补偿机制实际保护的对象需要重新表述；永久不可执行来源的成因应完整列举
+
+依据 §IV-B 和 EvaluateDirectPaymentAt 源码，子交易输出在输入义务仍为 Pending 时就已是最终输出。因此接收者的保护来自后继交易的执行本身，与储备是否充足无关。补偿扣款维护的是供应完整性（式 (8) 中的 D），即"以储备为界的临时无担保发行"。
+
+正文多处称"funded obligation that protects the executed successor"，这容易误导读者。建议把设计明确表述为"以储备为上限的信用预支"，并与 Snappy 的抵押保护对象做对比。
+
+此外，补偿路径之所以必要，取决于来源交易可能永久不可执行。按源码推断，可能的成因包括：
+
+全局 Intent 冲突；
+规则或 epoch 变更：VerifyDirectSubmission 要求父证书的 Rules 等于当前规则；
+组织出资的 FUEL 账户在执行时余额不足（可能是暂时性的）；
+扣留：可由重提交处理。
+
+请完整列举这些成因，并说明哪些属于设计本身固有、哪些可以通过在认证阶段的检查消除。若主要成因只是全局 Intent，那么补偿机制在很大程度上是在为自身设计引入的风险兜底，这与 M1 直接相关。
+
+M3. 贡献与新颖性定位
+
+C1（一轮认证续付、只携带直接输入证书）。 这与 FastPay（附带缺失的传入证书）、Zef 和 Sui Lutris 的 owned-object 路径非常接近，新颖性有限，应定位为工程整合而非独立贡献。
+
+C2 是本文真正的贡献：允许公开账本消费"已认证但未执行"的输出，并把 Stingray 式的预算记账扩展到隐藏证书负债、动态补偿与偿还。但需要回答一个根本问题：既然 FastPay 中证书本身就具有终局性，为什么 Next 要把认证与执行分离，并允许执行拒绝已认证交易？若能在认证阶段保证可执行性，C2 的大部分机制就不再需要。
+
+Theorem 3 的假设过强。 无冲突、来源闭合、每笔支付恰好成功一次，这些条件排除了所有对抗情形。结论接近"诚实执行下的顺序无关性"，作为主要定理分量不足。建议把它降为命题，并补一个刻画对抗情形下终态差异的结果，例如损失恰好等于永久缺失来源的已补偿金额。
+
+M4. C3 的动机与安全价值不足
+功能上可被替代。 作者自己承认（Table IV、§VI-C、§IV-H），索引或物化视图可以给出完全相同的经济答案。读者仍须信任本地已执行的前缀，远程读者不受支持。B 唯一独有的能力（Table IV 第 4 行）几乎是由定义得出的。
+BlockID 校验不具排他性。 每个 part 有独立的变色龙承诺，原始 part 的 opening 为 1，各修订版本的 opening 都会公开。因此原始区块体、任一历史修订、以及不同修订之间逐 part 混合得到的区块体，都能通过同一个完整 BlockID 校验。S1-B 也只声称"不检测任意可解码的篡改"。可见"修订体满足原始 BlockID"并不能证明某个修订获得了授权，这一点进一步削弱了 C3 与 Reparo 式"另行认证修订副本"的区别。
+代价可观：
+每个修复区块额外增加 0.28–2.19 MiB 逻辑 KV（Table V）；
+需要可信 dealer；
+需要修改 CometBFT；
+共识交易哈希（overlay 中的 redactionTxHash）与 DataHash 不覆盖 funding 字节，这些字节只受 part 级变色龙承诺约束，影响轻客户端和交易包含证明的语义。
+点查询仅改善 7–12%。
+
+建议：要么给出必须在原位修改记录的具体场景（例如审计或监管要求），并正面分析第 2 点；要么把 C3 降级为附录或扩展，让论文聚焦于 C2。
+
+M5. 确定性执行依赖区块存储，C2 与 C3 在实现上耦合
+
+internal/redaction/decision.go 带有 //go:build comet_v3 构建标签。ExecuteDecision 通过 CompensationTarget(v, bs, …) 读取 cmtstore.BlockStore 中的历史原始区块，并检查 funding 字段是否可以等宽替换。这意味着：
+
+应用状态转移依赖于不属于复制状态的数据。 如果某个副本通过 state sync 加入或裁剪了历史，执行同一条决定就可能失败，导致 app hash 分歧。§III-A 只是把"保留历史"列为假设，没有讨论 state sync、裁剪或新节点加入的情形。
+经济关闭与表示机制耦合。 补偿决定之所以要读历史区块，仅仅是为了 C3 的可表示性检查；当前构建也仍在使用 CH 编码（§IV-H 末尾）。Lemma 12 所说的"不等待适配"在功能上成立，但架构上并未解耦。
+
+请说明能否在去掉 C3 的构建中运行 C2，并说明节点加入与历史裁剪的策略。
+
+M6. 共识层修改的论证与证据不足
+
+Lemma 1 的证明只是草图（S1 有所展开），但 overlay.py 显示的修改不止于把身份比较换成 matchesBlockID：
+
+新增转移。 在 Propose 步骤，若存在当前轮 polka 且区块完整，可以跳过本节点的 prevote 直接 precommit，即使没有匹配的 Proposal。这在安全性上大概率可行，但它偏离了 Tendermint 原算法第 36 行的前置条件，需要严格论证，包括活性。
+WAL 行为可能改变。 上游在处理内部消息（本节点自己的投票和提案）之前会执行 cs.wal.WriteSync(mi)，这里被替换为 cs.handleInternalMessage(mi)。该函数应位于 proposal_batch.go，但证据中没有提供。此外 autofile 增加了"无新写入则跳过 fsync"的优化。这些都关系到崩溃后的重复签名防护，但正文和补充材料完全没有提及。
+测试覆盖有限。 TestStableHashIdentity 只覆盖了若干特定的调度场景。
+
+建议：用现有的 CometBFT/Tendermint TLA+ 规约对修改后的转移做模型检查，或给出逐条精化论证；并说明 WAL 的语义是否与上游等价。
+
+M7. 模型与假设
+参数特例化。 所有结果都只针对 n = 4、f = 1。对于 n = 3f+1，容量份额应为 s(B) = ⌊(f+1)B/(2f+1)⌋，推广看起来是直接的。请给出一般形式，或说明为何必须限定为 4。
+假设较强。 静态腐化、诚实签名状态永不回滚、可信 dealer、配置与成员固定。实验所用的内存配置本身就违反"不回滚"假设（作者已承认）。请讨论成员密钥轮换、组织重配置、规则升级对未执行证书和锁的影响（例如 Lemma 3 依赖"同一配置"）。
+截止期的时间来源未说明。 源码中带 height > 0 的执行路径会把 Deadline 设为 0，并改为锚定在 height + 1；补充材料则提到由 ClockTick 推进"公开时间"。正文只说"由公开区块时间锚定"。请说明谁发出 ClockTick、时间能被拜占庭验证者偏移多少、截止期如何最终确定，以及当前构建使用的截止期参数值。
+组织的激励。 组织凭什么愿意签发？费用收益与 M1 中的风险如何权衡？没有激励分析，开放部署的可行性难以评价。
+M8. 实验设计
+部署环境。 全部实验运行在单机上，注入延迟也只是单机代理（单向 25 ms）。缺少多机或广域网部署。
+基线偏弱。 逐跳等待公开执行的基线本质上是"共识延迟对比证书延迟"，13.70 倍的提升基本可以预期。更有意义的对比对象是 FastPay 式"证书即终局"或 Sui owned-object 路径，或者同一系统中"认证后等待来源公开执行"的变体。
+核心机制几乎没有被压测。 当前构建的 P 系列只有 24 个补偿目标，且由驱动程序控制释放时机；授权额度设为 10¹²，容量约束从未生效。快速链中实际出现的子先于父义务每轮只有 1–4 个。
+缺少资本效率模型。 按 Little 定律，所需授权约为 B ≳ 1.5 × λ × ā × L_settle，再加上损失项。现有资本实验（S5、Table S15）只在旧构建上做过单次运行，也没有补偿。
+缺少对抗实验。 应针对 M1 测量攻击成本、损失与服务中断时长。
+方差较大，样本少。 Table III 中 Dispatch P95 在三次运行间从 90 ms 变到 781 ms。每个条件只有 3 次运行，以中位数做结论不够，建议增加重复次数并报告置信区间或完整分布。
+吞吐数据过时。 吞吐（约 2,000 笔/秒）只在旧构建、NoSync 成员存储下测得，当前构建（同步提交）没有吞吐数据。
+M9. 证据包与稿件的一致性问题
+14.15 倍比值的来源。 S3-A "Waiting-Mode Timestamp Audit" 给出的 14.15 倍，对应的是归档构建 721800c 的中位数（64.476/4.557），但这一节放在 9879f64 小节下，而正文用的是 13.70 倍。请标明构建来源。
+清单条目数不符。 S4-e 称清单有 309 项（305 个源文件 + 2 个运行脚本 + go.mod/go.sum），而 final-source-manifest.json 只有 167 个 production 项和 4 个测试文件，不含 go.mod/go.sum 和运行脚本，也不含二进制指纹。我因此无法核实"二进制完全一致"的说法。
+source_sha256 含义不明。 capital-audit.json 中三次 P 运行的 source_sha256 各不相同，而正文称"All nine runs share the same node build"。请说明该字段的含义。
+回归日志缺少命令。 regression-final.log 只有 8 行包级 ok，没有命令行、-count=1、构建标签和 Go 环境信息。decision.go 需要 comet_v3 标签才会被编译，请确认回归测试是否带了该标签。
+关键代码未提供。 支撑 Lemma 2/3/4/7 和 Theorem 1 的若干关键函数不在证据包中：ApproveDirectBytes、recoverOutput、reclaimPartial/partial_reclaim.go、recoverExposedSources、CompensationTarget、Engine.NewEngine、direct_deadline.go、proposal_batch.go。
+M10. 论文表达
+
+论文信息密度极高，大量使用内部术语（INSTALL、Worker slice、Canonical、Task、wire4、N/R/C/P、CAL/FUEL），在正文中混入了许多构建哈希和防御性限定语（"this is not …"）。摘要几乎无法让非作者读懂。
+
+建议：
+
+正文用协议级伪代码描述成员审批、公开执行、补偿三个核心转移，配一张义务状态机图，并贯穿一个运行实例。
+把构建谱系、计时细节和反面声明移到补充材料。
+摘要只保留问题、核心思想、主要定理和关键数字。
+四、次要意见
+作者单位只写了 "University."，信息不完整。
+Table I 缺少 Q_g、w_c、S_g、V_g、E_g、r_{m,c}、s(B) 等关键符号。式 (3) 中 p̂、Rec 的帽子符号排版错乱（"Rec dm,T"）。
+Lemma 10 称 "Payment execution never reads the canonical body"，但补偿决定会读取原始历史区块，请区分"规范体"与"原始体"的读取。
+Theorem 4 的证明只有一句"induction over joint local and public transitions composes these properties"，过于简略。
+正文没有给出当前构建 P 运行所用的义务截止期（补充材料中旧构建为 30 s）。
+Fig. 2 第 17 行把多种情形压在一行里，建议拆开。
+补充材料结构混乱：S1 后半部分是可执行接口证据；S2 中混入了 bf71c4d 的回归结果；Table S3 属于历史读取部分。建议按"证明补充 / 当前构建证据 / 归档证据"重新组织。
+Lemma 5 中"user-funded mode 下锁定完整 FUEL 输入而非只锁 escrow 上限"这一点很重要，应移入 §III-E 的风险承担者段落。
+VerifyDirectSubmission 要求父证书规则 ID 等于当前规则。请说明规则升级时在途证书如何处理。
+请确认 Stingray [9] 是否已有正式发表版本。致谢中对 AI 辅助的披露应符合 IEEE 的相关政策；目前的披露方式本身是恰当的。
+请核对稿件长度是否符合 TDSC 对常规论文的页数要求。
+五、需要作者补充或澄清的具体材料
+proposal_batch.go 中的 handleInternalMessage 实现，以及内部消息 WAL fsync 语义与上游是否等价的说明（M6）。
+direct_deadline.go、ClockTick 的签发与约束规则、锚定高度如何确定截止期（M7-3）。
+ApproveDirectBytes、partial_reclaim.go、recoverOutput、recoverExposedSources、CompensationTarget、Engine.NewEngine 的源码，以及授权的支撑账户与 AccountKey(Issuer, CAL) 恒等的证明或检查位置（Theorem 1 依赖于此）。
+309 项完整清单、二进制 SHA-256、运行脚本；source_sha256 字段的定义（M9）。
+回归测试的完整命令（构建标签、-count、-race）和 Go 环境信息。
+state sync 或历史裁剪下补偿决定的行为（M5）。
+永久不可执行来源的完整成因列表（M2）。
+M1 攻击的成本模型和至少一个实验。
+六、我核对过的内容
+
+以下数字在正文、补充材料和证据之间一致：
+
+13.70 = 64.479/4.707，且与 Table S6 的中位数吻合。
+21,048 = 3 × (7,000 + 16)；96 = 3 × 8 × 4。
+每次 P 运行费用 659,544 = 658,752（org0）+ 792（org1），与 capital-audit.json 一致。
+每条链 9,400 FUEL = 100 × 94，分为 8,400 奖励和 1,000 销毁。
+Table III、VI 的中位数与 Table S5 的逐运行数据一致。
+Table V 与 Table S3 一致（例如 292,162 B ≈ 0.279 MiB）。
+7.44–12.32% 与 1.49–3.88% 的区间计算正确。
+15,840 = 12 × 1,320；14.5 ≈ 65.013/4.471；114 × 50 ms = 5.7 s。
+
+唯一的不一致是 M9 第 1 点中的 14.15 倍。
+
+七、总体建议：大修（Major Revision）
+
+本文工程量大，对模型边界的陈述诚实，核心记账论证在所述模型下基本正确，证据组织也明显高于平均水平。
+
+但目前有三方面问题需要解决后才适合在 TDSC 发表：
+
+开放部署下存在可以近乎零 CAL 成本耗尽储备并冻结组织路由资金的攻击，而正文没有把它作为首要威胁来分析和缓解（M1、M2）。这对一篇以"保证"为题的可信与安全期刊论文是根本性问题。
+贡献定位需要收敛。 C1 新颖性有限；C3 的安全价值和必要性不足，且与 C2 在实现上耦合（M3–M5）。
+共识层修改缺乏充分论证，实验缺少多机部署、强基线和对抗评估，表达过于密集（M6、M8、M10）。
+
+若作者能给出 M1 的缓解方案或严格的风险界定，把论文聚焦到 C2，并补齐第五部分列出的材料，我愿意再审修改稿。
+
+
+Create a Word document
+
+
+
+
+
+2 minutes ago

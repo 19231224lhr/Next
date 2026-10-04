@@ -1,0 +1,29 @@
+\begin{abstract}
+When UTXO recipients wait for public execution before spending, every
+payment hop adds a confirmation delay. Next lets a recipient continue after
+one certification round. Our insight is that the certificate traveling with
+an output names who answers for a missing source: its direct issuer.
+Members of the consuming organization lock inputs and reserve capacity for
+all certified outputs; a recipient that verifies their quorum certificate
+(TXCer) may request a successor, subject to successor admission and
+capacity. If the successor executes first, public execution consumes the
+certified output and records a funded obligation against that issuer.
+Source execution fulfills the obligation; otherwise an included, valid post-deadline
+public decision compensates the gap from the issuer's reserve, a later
+source repays it, and a source that never executes leaves the loss with the
+issuer. Authorized historical repair records that debit in the consuming
+input under the original block identity, without re-executing payments or making economic closure wait for
+historical repair. For four-member organizations and a four-validator
+committee, each with at most one static Byzantine member, we prove unique
+consumption, coverage of every certificate's outstanding liability, CAL
+conservation, and order-independent terminal CAL holdings for finite,
+acyclic, source-closed, conflict-free payment sets whose payments each
+succeed exactly once. On one host with synchronous member commits and NoSync wallets, a
+100-hop chain reaches its last certified receipt in a median 4.707\,s,
+versus 64.479\,s with per-hop waiting.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Blockchain, certified payments, collateral, Byzantine fault tolerance,
+chameleon hash.
+\end{IEEEkeywords}

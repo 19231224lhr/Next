@@ -1,0 +1,2168 @@
+
+FILE third_party/cometbft/consensus/block_identity_test.go SHA256 469c758b0e576717e1eb2688129a58c6b1993de5a6fc4dc2d7b22c1fdc8b9584
+package consensus
+
+import (
+	"bytes"
+	"context"
+	"crypto/x509"
+	"encoding/pem"
+	"os"
+	"os/exec"
+	"testing"
+
+	"github.com/cometbft/cometbft/abci/example/kvstore"
+	abci "github.com/cometbft/cometbft/abci/types"
+	cstypes "github.com/cometbft/cometbft/consensus/types"
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	"github.com/cometbft/cometbft/types"
+	"utxo/crypto/chameleon"
+)
+
+// Two authentic original part sets, equal stable hashes, distinct mutable bytes.
+// This tests consensus identity handling, not application transaction validity.
+type identityApplication struct {
+	abci.Application
+	observe func(*abci.RequestFinalizeBlock)
+}
+
+func (a identityApplication) FinalizeBlock(ctx context.Context, r *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
+	a.observe(r)
+	return a.Application.FinalizeBlock(ctx, r)
+}
+
+func identityFixture(t *testing.T, observers ...func(*abci.RequestFinalizeBlock)) (*State, []*validatorStub, *types.Block, *types.PartSet, *types.Block, *types.PartSet) {
+	t.Helper()
+	var app abci.Application = kvstore.NewInMemoryApplication()
+	if len(observers) > 0 {
+		app = identityApplication{Application: app, observe: observers[0]}
+	}
+	cs, validators := randStateWithApp(4, app)
+	t.Cleanup(func() { _ = cs.eventBus.Stop() })
+	raw, err := os.ReadFile("../../../crypto/chameleon/testdata/rsa2048.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, _ := pem.Decode(raw)
+	key, err := x509.ParsePKCS1PrivateKey(encoded.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := chameleon.NewPublic(&key.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = types.ConfigureRedaction(cs.state.ChainID, pub); err != nil {
+		t.Fatal(err)
+	}
+	base, err := cs.createProposalBlock(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeBlock := func(mutable string) (*types.Block, *types.PartSet) {
+		pb, err := base.ToProto()
+		if err != nil {
+			t.Fatal(err)
+		}
+		block, err := types.BlockFromProto(pb)
+		if err != nil {
+			t.Fatal(err)
+		}
+		block.Data = types.Data{Txs: types.Txs{types.EncodeRedactableTx([]byte("fixed="), []byte(mutable))}}
+		block.Header.DataHash = nil
+		_ = block.Hash()
+		parts, err := block.MakePartSet(types.BlockPartSizeBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < int(parts.Total()); i++ {
+			if err = parts.GetPart(i).ValidateOriginal(block.Height); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return block, parts
+	}
+	a, pa := makeBlock("aaa")
+	b, pb := makeBlock("bbb")
+	if !bytes.Equal(a.Hash(), b.Hash()) || pa.HasHeader(pb.Header()) {
+		t.Fatal("not distinct original identities")
+	}
+	for _, v := range validators {
+		v.Height, v.Round = cs.Height, cs.Round
+	}
+	return cs, validators, a, pa, b, pb
+}
+
+func identityVotes(t *testing.T, cs *State, validators []*validatorStub, kind cmtproto.SignedMsgType, b *types.Block, parts *types.PartSet) []*types.Vote {
+	t.Helper()
+	extensions := kind == cmtproto.PrecommitType && cs.state.ConsensusParams.ABCI.VoteExtensionsEnabled(cs.Height)
+	return signVotes(kind, b.Hash(), parts.Header(), extensions, validators[1:]...)
+}
+
+// The fork's redaction key is startup-only process state. Isolate these tests
+// from upstream tests that deliberately build non-redactable networks.
+func TestStableHashIdentity(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=^TestStableHashIdentityCases$", "-test.v")
+	cmd.Env = append(os.Environ(), "NEXT_COMET_IDENTITY_TEST=1")
+	output, err := cmd.CombinedOutput()
+	t.Logf("%s", output)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStableHashIdentityCases(t *testing.T) {
+	if os.Getenv("NEXT_COMET_IDENTITY_TEST") != "1" {
+		t.Skip("run in isolated key-configured process")
+	}
+	t.Run("commit_fetch", identityCommitFetch)
+	t.Run("finalize_waits", identityTryFinalizeWaits)
+	t.Run("precommit", identityPrecommitDoesNotRelockAlias)
+	t.Run("valid_block", identityValidBlockNotAliased)
+	t.Run("pol_rounds", identityPOLRounds)
+	t.Run("exact_precommit", identityExactPrecommit)
+	t.Run("proposal_binding", identityProposalBinding)
+	t.Run("qc_without_matching_proposal", identityQCWithoutMatchingProposal)
+	t.Run("late_parts_after_nil_precommit", identityLatePartsAfterNilPrecommit)
+}
+
+func identityCommitFetch(t *testing.T) {
+	var finalized [][]byte
+	cs, vals, a, pa, b, pb := identityFixture(t, func(r *abci.RequestFinalizeBlock) {
+		if len(r.Txs) != 1 {
+			t.Fatal("unexpected execution body")
+		}
+		finalized = append(finalized, bytes.Clone(r.Txs[0]))
+	})
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrecommitType, b, pb) {
+		if added, err := cs.Votes.Precommits(cs.Round).AddVote(vote); err != nil || !added {
+			t.Fatalf("vote: %v %v", added, err)
+		}
+	}
+	cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+	cs.LockedBlock, cs.LockedBlockParts, cs.LockedRound = a, pa, cs.Round
+	cs.enterCommit(cs.Height, cs.Round)
+	if cs.ProposalBlock != nil || !cs.ProposalBlockParts.HasHeader(pb.Header()) || cs.ProposalBlockParts.IsComplete() {
+		t.Fatal("must fetch the exact committed identity instead of executing its hash alias")
+	}
+	if len(finalized) != 0 {
+		t.Fatal("alias reached FinalizeBlock before fetching committed bytes")
+	}
+	// Delayed parts from A cannot satisfy B's root. B needs no Proposal message:
+	// the already verified commit identifies what to fetch and apply.
+	height, round := cs.Height, cs.Round
+	if _, err := cs.addProposalBlockPart(&BlockPartMessage{Height: height, Round: round, Part: pa.GetPart(0)}, "alias-peer"); err == nil {
+		t.Fatal("mixed an alias part into the committed block")
+	}
+	for i := 0; i < int(pb.Total()); i++ {
+		msg := &BlockPartMessage{Height: height, Round: round, Part: pb.GetPart(i)}
+		if err := msg.ValidateBasic(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cs.addProposalBlockPart(msg, "commit-peer"); err != nil {
+			t.Fatal(err)
+		}
+		if added, err := cs.addProposalBlockPart(msg, "duplicate-peer"); err != nil || added {
+			t.Fatalf("duplicate part %v %v", added, err)
+		}
+	}
+	cs.handleCompleteProposal(height)
+	if cs.Height != height+1 || cs.blockStore.Height() != height {
+		t.Fatal("exact committed block did not advance")
+	}
+	stored := cs.blockStore.LoadBlock(height)
+	meta := cs.blockStore.LoadBlockMeta(height)
+	if !bytes.Equal(stored.Txs[0], b.Txs[0]) || !meta.BlockID.PartSetHeader.Equals(pb.Header()) {
+		t.Fatal("applied/stored a different block")
+	}
+	if len(finalized) != 1 || !bytes.Equal(finalized[0], b.Txs[0]) {
+		t.Fatal("FinalizeBlock did not receive exactly B once")
+	}
+	for _, vote := range signVotes(cmtproto.PrecommitType, b.Hash(), pb.Header(), true, vals[1:]...) {
+		if _, err := cs.addVote(vote, "duplicate-commit-peer"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(finalized) != 1 {
+		t.Fatal("duplicate commit reapplied block")
+	}
+}
+
+func identityTryFinalizeWaits(t *testing.T) {
+	cs, vals, a, pa, b, pb := identityFixture(t)
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrecommitType, b, pb) {
+		if added, err := cs.Votes.Precommits(cs.Round).AddVote(vote); err != nil || !added {
+			t.Fatalf("vote: %v %v", added, err)
+		}
+	}
+	cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+	cs.CommitRound, cs.Step = cs.Round, cstypes.RoundStepCommit
+	height := cs.Height
+	cs.tryFinalizeCommit(height)
+	if cs.Height != height || cs.blockStore.Height() != 0 {
+		t.Fatal("executed a different identity")
+	}
+}
+
+func identityPrecommitDoesNotRelockAlias(t *testing.T) {
+	for _, locked := range []bool{false, true} {
+		cs, vals, a, pa, b, pb := identityFixture(t)
+		for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+			if added, err := cs.Votes.Prevotes(cs.Round).AddVote(vote); err != nil || !added {
+				t.Fatalf("vote: %v %v", added, err)
+			}
+		}
+		cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+		if locked {
+			cs.LockedBlock, cs.LockedBlockParts, cs.LockedRound = a, pa, cs.Round
+		}
+		cs.enterPrecommit(cs.Height, cs.Round)
+		if cs.LockedBlock != nil || cs.ProposalBlock != nil || !cs.ProposalBlockParts.HasHeader(pb.Header()) {
+			t.Fatal("locked or retained a hash alias of the polka")
+		}
+		select {
+		case msg := <-cs.internalMsgQueue:
+			vote, ok := msg.Msg.(*VoteMessage)
+			if !ok || !vote.Vote.BlockID.IsZero() {
+				t.Fatal("must precommit nil without the exact block")
+			}
+		default:
+			t.Fatal("missing nil precommit")
+		}
+	}
+}
+
+func identityValidBlockNotAliased(t *testing.T) {
+	cs, vals, a, pa, b, pb := identityFixture(t)
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+		if added, err := cs.Votes.Prevotes(cs.Round).AddVote(vote); err != nil || !added {
+			t.Fatalf("vote: %v %v", added, err)
+		}
+	}
+	cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+	cs.Step = cstypes.RoundStepPrecommit
+	cs.handleCompleteProposal(cs.Height)
+	if cs.ValidBlock != nil {
+		t.Fatal("promoted a different identity to ValidBlock")
+	}
+}
+
+func identityPOLRounds(t *testing.T) {
+	for _, voteRound := range []int32{0, 1, 2} {
+		cs, vals, a, pa, b, pb := identityFixture(t)
+		cs.Round, cs.Step = 2, cstypes.RoundStepPrecommit
+		cs.Votes.SetRound(2)
+		cs.LockedBlock, cs.LockedBlockParts, cs.LockedRound = a, pa, 1
+		cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+		for _, v := range vals {
+			v.Round = voteRound
+		}
+		for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+			if added, err := cs.addVote(vote, "pol-peer"); err != nil || !added {
+				t.Fatalf("round %d: %v %v", voteRound, added, err)
+			}
+		}
+		if voteRound <= 1 {
+			if cs.LockedBlock != a || cs.LockedRound != 1 {
+				t.Fatal("old or same-round POL unlocked a newer lock")
+			}
+		} else if cs.LockedBlock != nil || cs.ValidBlock != nil || cs.ProposalBlock != nil || !cs.ProposalBlockParts.HasHeader(pb.Header()) {
+			t.Fatal("new POL did not unlock the alias and fetch the exact candidate")
+		}
+	}
+}
+
+func identityExactPrecommit(t *testing.T) {
+	cs, vals, _, _, b, pb := identityFixture(t)
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+		if added, err := cs.Votes.Prevotes(cs.Round).AddVote(vote); err != nil || !added {
+			t.Fatalf("vote: %v %v", added, err)
+		}
+	}
+	cs.ProposalBlock, cs.ProposalBlockParts = b, pb
+	cs.enterPrecommit(cs.Height, cs.Round)
+	if cs.LockedBlock != b || !cs.LockedBlockParts.HasHeader(pb.Header()) {
+		t.Fatal("exact candidate did not lock")
+	}
+	select {
+	case msg := <-cs.internalMsgQueue:
+		vote, ok := msg.Msg.(*VoteMessage)
+		if !ok || !vote.Vote.BlockID.Equals(types.BlockID{Hash: b.Hash(), PartSetHeader: pb.Header()}) {
+			t.Fatal("wrong precommit identity")
+		}
+	default:
+		t.Fatal("missing precommit")
+	}
+}
+
+func identityProposalBinding(t *testing.T) {
+	cs, vals, a, pa, b, pb := identityFixture(t)
+	idA := types.BlockID{Hash: a.Hash(), PartSetHeader: pa.Header()}
+	idB := types.BlockID{Hash: b.Hash(), PartSetHeader: pb.Header()}
+	cs.Proposal = types.NewProposal(cs.Height, cs.Round, -1, idA)
+	cs.ProposalBlock, cs.ProposalBlockParts = b, pb
+	if cs.isProposalComplete() {
+		t.Fatal("different full identity counted as complete proposal")
+	}
+	cs.defaultDoPrevote(cs.Height, cs.Round)
+	select {
+	case msg := <-cs.internalMsgQueue:
+		vote, ok := msg.Msg.(*VoteMessage)
+		if !ok || !vote.Vote.BlockID.IsZero() {
+			t.Fatal("timeout prevote used another proposal's identity")
+		}
+	default:
+		t.Fatal("missing nil prevote")
+	}
+	cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+	if !cs.isProposalComplete() {
+		t.Fatal("matching proposal incomplete")
+	}
+	cs.Round = 1
+	cs.Votes.SetRound(1)
+	cs.Proposal = types.NewProposal(cs.Height, 1, 0, idA)
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+		if added, err := cs.Votes.Prevotes(0).AddVote(vote); err != nil || !added {
+			t.Fatalf("POL: %v %v", added, err)
+		}
+	}
+	if cs.isProposalComplete() {
+		t.Fatal("unrelated POL authorized proposal")
+	}
+	cs.Proposal = types.NewProposal(cs.Height, 1, 0, idB)
+	cs.ProposalBlock, cs.ProposalBlockParts = b, pb
+	if !cs.isProposalComplete() {
+		t.Fatal("matching POL/proposal incomplete")
+	}
+}
+
+func identityQCWithoutMatchingProposal(t *testing.T) {
+	for _, step := range []cstypes.RoundStepType{cstypes.RoundStepPropose, cstypes.RoundStepPrevote} {
+		for _, partsFirst := range []bool{false, true} {
+			// The new early-step case targets handleCompleteProposal: polka
+			// before parts. Parts-first at Propose follows the normal timeout.
+			if step == cstypes.RoundStepPropose && partsFirst {
+				continue
+			}
+			cs, vals, a, pa, b, pb := identityFixture(t)
+			cs.Step = step
+			cs.Proposal = types.NewProposal(cs.Height, cs.Round, -1, types.BlockID{Hash: a.Hash(), PartSetHeader: pa.Header()})
+			if partsFirst {
+				cs.ProposalBlock, cs.ProposalBlockParts = b, pb
+			} else {
+				cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+			}
+			for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+				if added, err := cs.addVote(vote, "qc-peer"); err != nil || !added {
+					t.Fatalf("QC: %v %v", added, err)
+				}
+			}
+			if !partsFirst {
+				for i := 0; i < int(pb.Total()); i++ {
+					if _, err := cs.addProposalBlockPart(&BlockPartMessage{Height: cs.Height, Round: cs.Round, Part: pb.GetPart(i)}, "qc-peer"); err != nil {
+						t.Fatal(err)
+					}
+				}
+				cs.handleCompleteProposal(cs.Height)
+			}
+			if cs.LockedBlock == nil || !cs.LockedBlockParts.HasHeader(pb.Header()) || cs.Step != cstypes.RoundStepPrecommit {
+				t.Fatalf("partsFirst=%v: matching QC/candidate stalled behind old proposal", partsFirst)
+			}
+			// Once the precise polka has caused precommit, an old proposal or
+			// duplicate completion cannot cause a late prevote or another precommit.
+			cs.enterPrevote(cs.Height, cs.Round)
+			cs.handleCompleteProposal(cs.Height)
+			select {
+			case msg := <-cs.internalMsgQueue:
+				vote, ok := msg.Msg.(*VoteMessage)
+				if !ok || vote.Vote.Type != cmtproto.PrecommitType || !vote.Vote.BlockID.Equals(types.BlockID{Hash: b.Hash(), PartSetHeader: pb.Header()}) {
+					t.Fatalf("step=%v partsFirst=%v: expected exact precommit, got %v", step, partsFirst, msg)
+				}
+			default:
+				t.Fatal("missing exact precommit")
+			}
+			select {
+			case msg := <-cs.internalMsgQueue:
+				t.Fatalf("step=%v partsFirst=%v: extra vote after precommit: %v", step, partsFirst, msg)
+			default:
+			}
+		}
+
+	}
+}
+
+func identityLatePartsAfterNilPrecommit(t *testing.T) {
+	cs, vals, a, pa, b, pb := identityFixture(t)
+	cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+	for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+		if added, err := cs.Votes.Prevotes(cs.Round).AddVote(vote); err != nil || !added {
+			t.Fatalf("vote: %v %v", added, err)
+		}
+	}
+	cs.enterPrecommit(cs.Height, cs.Round)
+	select {
+	case msg := <-cs.internalMsgQueue:
+		vote, ok := msg.Msg.(*VoteMessage)
+		if !ok || !vote.Vote.BlockID.IsZero() {
+			t.Fatal("expected first nil precommit")
+		}
+	default:
+		t.Fatal("missing first precommit")
+	}
+	for i := 0; i < int(pb.Total()); i++ {
+		if _, err := cs.addProposalBlockPart(&BlockPartMessage{Height: cs.Height, Round: cs.Round, Part: pb.GetPart(i)}, "late-peer"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cs.handleCompleteProposal(cs.Height)
+	if cs.LockedBlock != nil || cs.Step != cstypes.RoundStepPrecommit {
+		t.Fatal("late parts changed a completed precommit step")
+	}
+	select {
+	case <-cs.internalMsgQueue:
+		t.Fatal("late parts produced a second precommit")
+	default:
+	}
+}
+
+
+FILE internal/rules/fee_closure_evidence_test.go SHA256 b1e12cd66a18e091a067ed13837ec1b4c4075d2a162e446b27c1c160fa047f88
+package rules
+
+import (
+	"bytes"
+	"fmt"
+	"reflect"
+	"sort"
+	"testing"
+
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// Two certified inputs exercise both the per-input compensation budget and
+// the single per-payment close. These are rules tests, not consensus tests.
+func TestFeeClosureMultipleObligations(t *testing.T) {
+	for _, ownerFee := range []bool{false, true} {
+		for compensated := 0; compensated <= 2; compensated++ {
+			for _, surplus := range []uint64{0, 17} {
+				t.Run(fmt.Sprintf("owner=%v/paid=%d/surplus=%d", ownerFee, compensated, surplus), func(t *testing.T) {
+					f := newDirectFixture(t)
+					base := f.payment(t, f.genesis, nil, 1)
+					body := base.Tx.Body
+					half := f.output
+					half.Amount = 50
+					body.Outputs = []protocol.Output{half, half}
+					makeTx := func(b protocol.TxBody, claims []protocol.InputClaim) protocol.FastTx {
+						t.Helper()
+						b.Intent = b.IntentID()
+						tx, err := protocol.NewFastTx(b, claims, f.policy.Key)
+						if err != nil {
+							t.Fatal(err)
+						}
+						tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.owner)}
+						return tx
+					}
+					parent := f.certify(t, makeTx(body, base.Tx.Claims), nil)
+					body = base.Tx.Body
+					body.Nonce[0] = 2
+					body.Inputs = nil
+					var certs []InputCertificate
+					for i := uint32(0); i < 2; i++ {
+						body.Inputs = append(body.Inputs, protocol.Input{Kind: protocol.CertificateInput, Output: parent.Certificate.Summary.OutputID(i), Evidence: protocol.Hash(parent.Certificate.QC.Fact)})
+						certs = append(certs, InputCertificate{Certificate: parent.Certificate, Index: i})
+					}
+					plan := f.policy.Base.Fee
+					baseCost := plan.Register + plan.Settle + plan.Close
+					minimum := baseCost + 2*f.policy.RepairCost
+					body.Fee.Maximum = minimum + surplus
+					if ownerFee {
+						fee := seedOwnerFee(t, f, "two-obligations", 1500)
+						body.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: minimum + surplus, Inputs: []protocol.Input{fee}, Refund: f.output.Recipient}
+						body.Admission = nil
+						for _, g := range f.grants {
+							if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+								body.Admission = append(body.Admission, g)
+							}
+						}
+					}
+					claims := []protocol.InputClaim{{Output: half}, {Output: half}}
+					sort.Slice(body.Inputs, func(i, j int) bool { return bytes.Compare(body.Inputs[i].Output[:], body.Inputs[j].Output[:]) < 0 })
+					under := body
+					under.Fee.Maximum = minimum - 1
+					if _, err := PrepareDirectVector(makeTx(under, claims), f.policy); err != ErrLimited {
+						t.Fatalf("underfunded admission: %v", err)
+					}
+					child := f.certify(t, makeTx(body, claims), certs)
+					baseline := projectMoney(t, f.db)
+					f.settle(t, child, 100)
+					paymentKey := state.Key(keyDirectPayment, child.Certificate.QC.Fact[:])
+					check := func(pending uint32, paidCount int) {
+						t.Helper()
+						p := loadDirect[directPayment](t, f.db, paymentKey)
+						if p.Pending != pending || p.Fee.Closed != (pending == 0) || p.Fee.Validate() != nil {
+							t.Fatalf("bad fee state: %+v", p)
+						}
+						if got := projectMoney(t, f.db); got != baseline {
+							t.Fatalf("asset projection: %+v != %+v", got, baseline)
+						}
+						if pending == 0 {
+							paid := baseCost + uint64(paidCount)*f.policy.RepairCost
+							if p.Fee.Held != 0 || p.Fee.Rewards+p.Fee.Burned != paid || p.Fee.Refunded != body.Fee.Maximum-paid {
+								t.Fatalf("wrong final fee: %+v", p.Fee)
+							}
+							for _, a := range child.Certificate.Summary.Admission {
+								if a.Key.Kind == protocol.ResourceCAL {
+									continue
+								}
+								u := loadDirect[PublicUsage](t, f.db, state.Key(state.KeyUsage, a.Key.Encode()))
+								want := uint64(0)
+								if a.Key.Kind == protocol.ResourceFUEL || a.Key.Kind == protocol.ResourcePolicy {
+									want = paid
+								}
+								if u.Reserved != 0 || u.Spent != want {
+									t.Fatalf("wrong closed usage: %+v", u)
+								}
+							}
+						}
+					}
+					check(2, 0)
+					for i := 0; i < compensated; i++ {
+						id := parent.Certificate.Summary.OutputID(uint32(i))
+						for repeat := 0; repeat < 2; repeat++ {
+							err := f.db.Update(func(v state.ReadView) ([]state.Change, error) {
+								tr, err := EvaluateDirectCompensation(v, id, f.policy, 130)
+								if repeat == 1 && len(tr.Changes) != 0 {
+									t.Fatal("duplicate compensation wrote state")
+								}
+								return tr.Changes, err
+							})
+							if err != nil {
+								t.Fatal(err)
+							}
+						}
+						check(uint32(1-i), i+1)
+					}
+					f.settle(t, parent, 131)
+					p := loadDirect[directPayment](t, f.db, paymentKey)
+					if p.Pending != 0 || !p.Fee.Closed || p.Fee.Held != 0 || p.Fee.Rewards+p.Fee.Burned != baseCost+uint64(compensated)*f.policy.RepairCost || p.Fee.Refunded != body.Fee.Maximum-baseCost-uint64(compensated)*f.policy.RepairCost || p.Fee.Validate() != nil {
+						t.Fatalf("source closure: %+v", p)
+					}
+					// Parent fees legitimately add to shared Usage; the child itself
+					// must remain byte-for-byte unchanged after duplicate execution.
+					if len(f.settle(t, child, 132).Changes) != 0 || len(f.settle(t, parent, 132).Changes) != 0 {
+						t.Fatal("duplicate payment charged again")
+					}
+					if got := loadDirect[directPayment](t, f.db, paymentKey); !reflect.DeepEqual(got, p) {
+						t.Fatal("duplicate changed child fee state")
+					}
+					if got := projectMoney(t, f.db); got != baseline {
+						t.Fatal("late source changed total assets")
+					}
+				})
+			}
+		}
+	}
+}
+
+// Unlike two outputs of one parent, these obligations can close in different
+// transactions. The final compensation must close an already partially fulfilled
+// consumer and return its remaining fee budget exactly once.
+func TestFeeClosureFulfillmentBeforeCompensation(t *testing.T) {
+	for _, ownerFee := range []bool{false, true} {
+		t.Run(fmt.Sprintf("owner=%v", ownerFee), func(t *testing.T) {
+			f := newDirectFixture(t)
+			second := protocol.OutputID(protocol.Digest("second-fee-closure-input"))
+			if err := f.db.Update(func(v state.ReadView) ([]state.Change, error) {
+				o := state.NewOverlay(v)
+				err := state.Put(o, DirectCreationKey(second, 0), state.Creation{Output: f.output, Fact: protocol.Digest("genesis-fact"), Final: true})
+				return o.Changes(), err
+			}); err != nil {
+				t.Fatal(err)
+			}
+			parents := []DirectPayment{f.payment(t, f.genesis, nil, 1), f.payment(t, second, nil, 2)}
+			body := parents[0].Tx.Body
+			body.Nonce[0] = 3
+			body.Inputs = nil
+			body.Outputs = []protocol.Output{f.output}
+			body.Outputs[0].Amount = 200
+			certs := make([]InputCertificate, 2)
+			for i, p := range parents {
+				body.Inputs = append(body.Inputs, protocol.Input{Kind: protocol.CertificateInput, Output: p.Certificate.Summary.OutputID(0), Evidence: protocol.Hash(p.Certificate.QC.Fact)})
+				certs[i] = InputCertificate{Certificate: p.Certificate}
+			}
+			sort.Slice(body.Inputs, func(i, j int) bool { return bytes.Compare(body.Inputs[i].Output[:], body.Inputs[j].Output[:]) < 0 })
+			base := f.policy.Base.Fee.Register + f.policy.Base.Fee.Settle + f.policy.Base.Fee.Close
+			body.Fee.Maximum = base + 2*f.policy.RepairCost
+			if ownerFee {
+				fee := seedOwnerFee(t, f, "separate-parent-fee", 1500)
+				body.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: body.Fee.Maximum, Inputs: []protocol.Input{fee}, Refund: f.output.Recipient}
+				body.Admission = nil
+				for _, g := range f.grants {
+					if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+						body.Admission = append(body.Admission, g)
+					}
+				}
+			}
+			body.Intent = body.IntentID()
+			tx, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: f.output}, {Output: f.output}}, f.policy.Key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.owner)}
+			child := f.certify(t, tx, certs)
+			money := projectMoney(t, f.db)
+			f.settle(t, child, 100)
+			f.settle(t, parents[0], 101)
+			key := state.Key(keyDirectPayment, child.Certificate.QC.Fact[:])
+			p := loadDirect[directPayment](t, f.db, key)
+			if p.Pending != 1 || p.Fee.Closed || p.Fee.Validate() != nil {
+				t.Fatalf("premature close: %+v", p)
+			}
+			id := parents[1].Certificate.Summary.OutputID(0)
+			for i := 0; i < 2; i++ {
+				if err := f.db.Update(func(v state.ReadView) ([]state.Change, error) {
+					tr, err := EvaluateDirectCompensation(v, id, f.policy, 130)
+					if i == 1 && len(tr.Changes) != 0 {
+						t.Fatal("duplicate compensation changed state")
+					}
+					return tr.Changes, err
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			p = loadDirect[directPayment](t, f.db, key)
+			if p.Pending != 0 || !p.Fee.Closed || p.Fee.Held != 0 || p.Fee.Validate() != nil || p.Fee.Rewards+p.Fee.Burned != base+f.policy.RepairCost || p.Fee.Refunded != f.policy.RepairCost {
+				t.Fatalf("compensation close: %+v", p)
+			}
+			f.settle(t, parents[1], 131)
+			if got := loadDirect[directPayment](t, f.db, key); !reflect.DeepEqual(got, p) {
+				t.Fatal("late repayment charged closed consumer")
+			}
+			if projectMoney(t, f.db) != money {
+				t.Fatal("asset projection changed")
+			}
+		})
+	}
+}
+
+
+FILE internal/member/blocks_test.go SHA256 2f8b9ad4615f7ca13027a2f2bcd4035dd41941acb173080f5cd909e2153773e7
+package member_test
+
+import (
+	"bytes"
+	"context"
+	"crypto/x509"
+	"encoding/pem"
+	abci "github.com/cometbft/cometbft/abci/types"
+	"os"
+	"reflect"
+	"testing"
+	"utxo/crypto/chameleon"
+	"utxo/finality"
+	"utxo/internal/blockfollow"
+	"utxo/internal/committee"
+	"utxo/internal/gateway"
+	"utxo/internal/member"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/internal/store"
+	"utxo/internal/testkit"
+	"utxo/internal/wallet"
+	"utxo/protocol"
+)
+
+func TestRepairBatchMaximumFollowerResult(t *testing.T) {
+	f := testkit.NewFixture("batch-max", "org", 1)
+	f.EnableDirect()
+	pemraw, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemblock, _ := pem.Decode(pemraw)
+	key, err := x509.ParsePKCS1PrivateKey(pemblock.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := rules.DirectSettings{Modulus: key.N.Bytes(), TimeoutSeconds: 30, RepairCost: 5}
+
+	var wires [][]byte
+	var results []*abci.ExecTxResult
+	var fees []protocol.FeeOutput
+	for i := 0; i < protocol.MaxRepairItems; i++ {
+		out := protocol.OutputID{byte(i + 1)}
+		tx := protocol.TxID{byte(i + 1)}
+		c := protocol.CompensationDecision{Network: f.Org.Network, Output: out, Height: 1, Transaction: uint32(i)}
+		r := protocol.CompensationResult{Decision: c.ID(), Applied: true, Effects: []protocol.RepairEffect{{Output: out, ParentFact: protocol.SpendFactID{byte(i + 1)}, ConsumerFact: protocol.SpendFactID{byte(i + 33)}, ConsumerTx: tx, Amount: 100, Debit: protocol.ReserveDebitIdentity(f.Org.Network, out)}}}
+		fee := f.Genesis.Outputs[0].Output
+		fee.Asset = protocol.AssetFUEL
+		fee.Amount = 10
+		for _, index := range []uint32{protocol.FeeChangeIndex, protocol.FeeRefundIndex} {
+			r.FeeOutputs = append(r.FeeOutputs, protocol.FeeOutput{Transaction: tx, Index: index, Output: fee})
+		}
+		wire, e := c.MarshalBinary()
+		if e != nil {
+			t.Fatal(e)
+		}
+		result, e := r.MarshalBinary()
+		if e != nil {
+			t.Fatal(e)
+		}
+		wires = append(wires, wire)
+		results = append(results, &abci.ExecTxResult{Data: result})
+		fees = append(fees, r.FeeOutputs...)
+	}
+	trust, data := testkit.Block("batch-max", 1, nil, wires, results)
+	b, err := finality.VerifyBlock(trust, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	md, wd, gd := store.NewMemory(), store.NewMemory(), store.NewMemory()
+	defer md.Close()
+	defer wd.Close()
+	defer gd.Close()
+	m, err := member.New(member.Config{Organization: f.Org, Index: 0, Key: f.Keys[0], Peers: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Workers: 1, Direct: &settings}, md, f.Genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := wallet.New(wd, f.Org.Network, f.Genesis.Outputs[0].Output.Recipient.Owner, []protocol.OrgConfig{f.Org})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := &gateway.Relay{DB: gd}
+	for _, x := range []struct {
+		db      store.Store
+		prepare blockfollow.Prepare
+	}{{md, m.PrepareBlock}, {wd, w.PrepareBlock}, {gd, g.ObserveBlock(f.Org.Hash())}} {
+		for i := 0; i < 2; i++ {
+			if err := blockfollow.Commit(x.db, b, x.prepare); err != nil {
+				t.Fatal("32-effect block or repeat", err)
+			}
+		}
+	}
+	for _, fee := range fees {
+		id := protocol.OutputIdentity(f.Org.Network, fee.Transaction, fee.Index)
+		if ok, err := w.DirectFinal(id, 0); err != nil || !ok {
+			t.Fatal("fee output absent", err)
+		}
+		if err := md.View(func(v state.ReadView) error {
+			_, found, e := state.Load[state.Creation](v, rules.DirectCreationKey(id, 0))
+			if e == nil && !found {
+				t.Fatal("member missed fee output")
+			}
+			return e
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+type countedBlockStore struct {
+	store.Store
+	updates int
+}
+
+func (s *countedBlockStore) Update(fn func(state.ReadView) ([]state.Change, error)) error {
+	s.updates++
+	return s.Store.Update(fn)
+}
+
+func TestInvalidPaymentRejectedBeforeMemberWrite(t *testing.T) {
+	f := testkit.NewFixture("prepare", "org", 1)
+	f.EnableDirect()
+	raw, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemblock, _ := pem.Decode(raw)
+	key, err := x509.ParsePKCS1PrivateKey(pemblock.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := rules.DirectSettings{Modulus: key.N.Bytes(), TimeoutSeconds: 30, RepairCost: 5}
+	db := &countedBlockStore{Store: store.NewMemory()}
+	defer db.Close()
+	m, err := member.New(member.Config{Organization: f.Org, Index: 0, Key: f.Keys[0], Peers: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Workers: 1, Direct: &settings}, db, f.Genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, _ := (protocol.ExecutionResult{Applied: true}).MarshalBinary()
+	trust, data := testkit.Block("prepare", 1, nil, [][]byte{{0xff}}, []*abci.ExecTxResult{{Data: result}})
+	b, err := finality.VerifyBlock(trust, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.updates = 0
+	if err := blockfollow.Commit(db, b, m.PrepareBlock); err == nil {
+		t.Fatal("invalid payment accepted")
+	}
+	if db.updates != 0 {
+		t.Fatalf("static decoding entered %d write transactions", db.updates)
+	}
+}
+
+func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
+	for _, scenario := range []struct {
+		name                                                                        string
+		repair, split, sameBlock, owner, multi, alteredOpening, lateObserver, batch bool
+	}{
+		{name: "source_arrives"},
+		{name: "repair_then_late", repair: true},
+		{name: "partial_repair_then_late", repair: true, split: true},
+		{name: "child_parent_same_block", sameBlock: true},
+		{name: "owner_source", owner: true},
+		{name: "owner_repair", repair: true, owner: true},
+		{name: "batch_owner_repair", repair: true, owner: true, batch: true},
+		{name: "batch_late_signer", repair: true, owner: true, lateObserver: true, batch: true},
+		{name: "owner_same_block", sameBlock: true, owner: true},
+		{name: "owner_multiple_refunds", split: true, owner: true, multi: true},
+		{name: "projection_source", owner: true, alteredOpening: true},
+		{name: "projection_repair", repair: true, split: true, owner: true, alteredOpening: true},
+		{name: "late_extra_signer", repair: true, owner: true, lateObserver: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			repair := scenario.repair
+			f := testkit.NewFixture("follow", "org", 1)
+			f.EnableDirect()
+			raw, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
+			if err != nil {
+				t.Fatal(err)
+			}
+			pemblock, _ := pem.Decode(raw)
+			key, err := x509.ParsePKCS1PrivateKey(pemblock.Bytes)
+			if err != nil {
+				t.Fatal(err)
+			}
+			settings := rules.DirectSettings{Modulus: key.N.Bytes(), TimeoutSeconds: 30, RepairCost: 5}
+			policy, err := settings.Policy(f.Schedule, []protocol.OrgConfig{f.Org})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var feeOrigins [3]state.OriginOutput
+			if scenario.owner {
+				for i := range feeOrigins {
+					id := protocol.OutputID(protocol.Digest("owner-fee", []byte{byte(i)}))
+					out := f.Genesis.Outputs[0].Output
+					out.Asset = protocol.AssetFUEL
+					out.Amount = 1500
+					feeOrigins[i] = state.OriginOutput{ID: id, Fact: protocol.Digest("fee-genesis", id[:]), Output: out}
+					f.Genesis.Outputs = append(f.Genesis.Outputs, feeOrigins[i])
+				}
+			}
+			db := store.NewMemory()
+			defer db.Close()
+			m, err := member.New(member.Config{Organization: f.Org, Index: 0, Key: f.Keys[0], Peers: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Workers: 1, Direct: &settings}, db, f.Genesis)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var observer *member.Member
+			var observerDB store.Store
+			if scenario.owner {
+				observerDB = store.NewMemory()
+				defer observerDB.Close()
+				observer, err = member.New(member.Config{Organization: f.Org, Index: 1, Key: f.Keys[1], Peers: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Workers: 1, Direct: &settings}, observerDB, f.Genesis)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			wdb := store.NewMemory()
+			defer wdb.Close()
+			w, err := wallet.New(wdb, f.Org.Network, f.Genesis.Outputs[0].Output.Recipient.Owner, []protocol.OrgConfig{f.Org})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ledger := store.NewMemory()
+			defer ledger.Close()
+			engine, err := committee.NewEngine(committee.EngineConfig{Network: f.Org.Network, Organizations: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Genesis: f.Genesis, Direct: &settings, Accounts: []committee.GenesisAccount{{Owner: f.Org.Org, Asset: protocol.AssetCAL, Balance: 1000000000}, {Owner: f.Org.Org, Asset: protocol.AssetFUEL, Balance: 1000000000}}}, ledger)
+			if err != nil {
+				t.Fatal(err)
+			}
+			parent, err := f.FastTransaction(0, 1, policy)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if scenario.split {
+				body := parent.Body
+				body.Outputs = []protocol.Output{body.Outputs[0], body.Outputs[0]}
+				body.Outputs[0].Amount, body.Outputs[1].Amount = 40, 60
+				body.Intent = body.IntentID()
+				parent, err = protocol.NewFastTx(body, parent.Claims, policy.Key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				parent.Auth = []protocol.OwnerAuth{protocol.SignOwner(parent.ID(), f.Owner)}
+			}
+			if scenario.owner {
+				body := parent.Body
+				body.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: 1000, Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: feeOrigins[0].ID, Evidence: feeOrigins[0].Fact}}, Refund: feeOrigins[0].Output.Recipient}
+				body.Admission = nil
+				for _, g := range f.Genesis.Grants {
+					if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+						body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
+					}
+				}
+				body.Intent = body.IntentID()
+				parent, err = protocol.NewFastTx(body, parent.Claims, policy.Key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				parent.Auth = []protocol.OwnerAuth{protocol.SignOwner(parent.ID(), f.Owner)}
+			}
+			pc, err := f.DirectCertificate(parent, policy)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if scenario.lateObserver {
+				// Member 1 is outside the original witness QC. Its later vote
+				// must not be used as a witness for earlier compensation.
+				pc.QC.Votes = nil
+				for _, index := range []uint16{0, 2, 3} {
+					pc.QC.Votes = append(pc.QC.Votes, protocol.SignSpend(pc.QC.Fact, index, f.Keys[index]))
+				}
+				if err := pc.Verify(f.Org); err != nil {
+					t.Fatal(err)
+				}
+			}
+			body := parent.Body
+			body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(0), Evidence: protocol.Hash(pc.QC.Fact)}}
+			body.Outputs = []protocol.Output{parent.Body.Outputs[0]}
+			if scenario.owner {
+				body.Fee.Inputs = []protocol.Input{{Kind: protocol.FinalInput, Output: feeOrigins[1].ID, Evidence: feeOrigins[1].Fact}}
+			}
+			body.Nonce[0] = 42
+			body.Intent = body.IntentID()
+			child, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: parent.Body.Outputs[0]}}, policy.Key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			child.Auth = []protocol.OwnerAuth{protocol.SignOwner(child.ID(), f.Owner)}
+			cc, err := f.DirectCertificate(child, policy)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pp := protocol.DirectPayment{Tx: parent, Certificate: pc}
+			cp := protocol.DirectPayment{Tx: child, Certificate: cc, InputCertificates: []protocol.InputCertificate{{Certificate: pc}}}
+			var other protocol.DirectPayment
+			if scenario.multi {
+				b := child.Body
+				b.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(1), Evidence: protocol.Hash(pc.QC.Fact)}}
+				b.Outputs = []protocol.Output{parent.Body.Outputs[1]}
+				b.Nonce[0] = 43
+				b.Fee.Inputs = []protocol.Input{{Kind: protocol.FinalInput, Output: feeOrigins[2].ID, Evidence: feeOrigins[2].Fact}}
+				b.Intent = b.IntentID()
+				tx, e := protocol.NewFastTx(b, []protocol.InputClaim{{Output: b.Outputs[0]}}, policy.Key)
+				if e != nil {
+					t.Fatal(e)
+				}
+				tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.Owner)}
+				cert, e := f.DirectCertificate(tx, policy)
+				if e != nil {
+					t.Fatal(e)
+				}
+				other = protocol.DirectPayment{Tx: tx, Certificate: cert, InputCertificates: []protocol.InputCertificate{{Certificate: pc, Index: 1}}}
+			}
+			approved := make(map[protocol.SpendFactID][]byte)
+			payments := []protocol.DirectPayment{pp, cp}
+			if scenario.multi {
+				payments = append(payments, other)
+			}
+			for _, p := range payments {
+				if scenario.owner && p.Tx.ID() == child.ID() {
+					bad := child
+					bad.Body.Fee.Inputs = append([]protocol.Input(nil), parent.Body.Fee.Inputs...)
+					bad.Body.Intent = bad.Body.IntentID()
+					bad, err = protocol.NewFastTx(bad.Body, bad.Claims, policy.Key)
+					if err != nil {
+						t.Fatal(err)
+					}
+					bad.Auth = []protocol.OwnerAuth{protocol.SignOwner(bad.ID(), f.Owner)}
+					if _, err = m.ApproveDirect(context.Background(), protocol.DirectRequest{Tx: bad, InputCertificates: cp.InputCertificates}); err == nil {
+						t.Fatal("shared fee input accepted")
+					}
+					// The valid child immediately afterward proves no CAL lock escaped the failed transaction.
+				}
+
+				if _, err = m.ApproveDirect(context.Background(), protocol.DirectRequest{Tx: p.Tx, InputCertificates: p.InputCertificates}); err != nil {
+					t.Fatal(err)
+				}
+				if err = db.View(func(v state.ReadView) error {
+					var err error
+					approved[p.Certificate.QC.Fact], err = v.Get(state.Key(state.KeyApproval, p.Certificate.QC.Fact[:]))
+					return err
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			assertChildFee := func() {
+				t.Helper()
+				public, err := engine.DirectPayment(cc.QC.Fact)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := db.View(func(v state.ReadView) error {
+					local, found, err := state.Load[member.LocalProgress](v, member.ProgressKey(cc.QC.Fact))
+					if err != nil {
+						return err
+					}
+					if !found || !reflect.DeepEqual(local.Fee, public.Fee) {
+						t.Fatalf("member/public fee mismatch: local=%+v public=%+v", local.Fee, public.Fee)
+					}
+					return nil
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var previous []byte
+			height := int64(0)
+			var blockTxs [][]byte
+			var blockResults []*abci.ExecTxResult
+			apply := func(raw []byte, tr state.Transition) {
+				t.Helper()
+				blockTxs = append(blockTxs, raw)
+				blockResults = append(blockResults, &abci.ExecTxResult{Data: tr.Data})
+				if scenario.sameBlock && len(blockTxs) < 2 {
+					return
+				}
+				height++
+				trust, data := testkit.Block("follow", height, previous, blockTxs, blockResults)
+				blockTxs, blockResults = nil, nil
+				if scenario.alteredOpening {
+					for i, raw := range data.Block.Txs {
+						if protocol.IsCompensationDecision(raw) || protocol.IsRepairBatch(raw) {
+							continue // Repair commands authenticate their complete bytes.
+						}
+						pay, err := protocol.DecodeDirectSubmission(raw)
+						if err != nil {
+							t.Fatal(err)
+						}
+						pay.Tx.Funding[0].Opening[0] ^= 0x80
+						if _, err := rules.VerifyDirectSubmission(pay, policy); err == nil {
+							t.Fatal("altered opening accepted as a new payment")
+						}
+						data.Block.Txs[i], err = pay.MarshalBinary()
+						if err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				b, err := finality.VerifyBlock(trust, data)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = blockfollow.Commit(db, b, m.PrepareBlock); err != nil {
+					t.Fatal(err)
+				}
+				if observer != nil {
+					if err = blockfollow.Commit(observerDB, b, observer.PrepareBlock); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err = blockfollow.Commit(wdb, b, w.PrepareBlock); err != nil {
+					t.Fatal(err)
+				}
+				// Same block is harmless; cursor and quota share the durable transaction.
+				if err = blockfollow.Commit(db, b, m.PrepareBlock); err != nil {
+					t.Fatal(err)
+				}
+				previous = b.Hash()
+			}
+			settle := func(p protocol.DirectPayment, now int64) {
+				t.Helper()
+				v, err := rules.VerifyDirectPayment(p, policy)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var tr state.Transition
+				err = ledger.Update(func(view state.ReadView) ([]state.Change, error) {
+					var err error
+					tr, err = rules.EvaluateDirectPayment(view, v, policy, now)
+					return tr.Changes, err
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				raw, err := p.Submission().MarshalBinary()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if scenario.multi && p.Tx.ID() == parent.ID() {
+					r, e := protocol.DecodeExecution(tr.Data)
+					if e != nil || len(r.FeeOutputs) != 4 {
+						t.Fatalf("multiple child refunds lost: %d %v", len(r.FeeOutputs), e)
+					}
+				}
+				apply(raw, tr)
+			}
+			if scenario.multi {
+				settle(other, 100)
+			}
+			settle(cp, 100)
+			if !scenario.sameBlock {
+				// A public successor exposes the source QC even when the source
+				// never reached INSTALL. Its original signer must enqueue the
+				// original payment, not require another quorum or a client retry.
+				if err := db.View(func(v state.ReadView) error {
+					pending, found, err := state.Load[state.Outbox](v, state.Key(state.KeyOutbox, pc.QC.Fact[:]))
+					if err != nil {
+						return err
+					}
+					if !found {
+						t.Fatal("public successor did not recover withheld source")
+					}
+					rebuilt, err := protocol.DecodeDirectPayment(pending.Certificate)
+					if err != nil {
+						return err
+					}
+					if rebuilt.Tx.ID() != parent.ID() || rebuilt.Certificate.QC.Fact != pc.QC.Fact {
+						t.Fatal("recovery changed source identity")
+					}
+					_, err = rules.VerifyDirectPayment(rebuilt, policy)
+					return err
+				}); err != nil {
+					t.Fatal(err)
+				}
+				if ok, err := w.DirectFinal(cc.Summary.OutputID(0), 0); err != nil || !ok {
+					t.Fatal("child wallet still waits for source", err)
+				}
+				status, err := m.DirectStatus(cc.QC.Fact)
+				if err != nil || !status.Observed || status.Closed {
+					t.Fatal("missing-input fee closed early", status, err)
+				}
+				if repair {
+					var tr state.Transition
+					err = ledger.Update(func(v state.ReadView) ([]state.Change, error) {
+						var err error
+						tr, err = rules.EvaluateDirectCompensation(v, pc.Summary.OutputID(0), policy, 131)
+						return tr.Changes, err
+					})
+					if err != nil {
+						t.Fatal(err)
+					}
+					command := protocol.CompensationDecision{Network: f.Org.Network, Output: pc.Summary.OutputID(0), Height: 1}
+					raw, err := command.MarshalBinary()
+					if err != nil {
+						t.Fatal(err)
+					}
+					result, e := protocol.DecodeExecution(tr.Data)
+					if e != nil {
+						t.Fatal(e)
+					}
+					tr.Data, err = (protocol.CompensationResult{Decision: command.ID(), Applied: true, Effects: []protocol.RepairEffect{{Output: pc.Summary.OutputID(0), ParentFact: pc.QC.Fact, ConsumerFact: cc.QC.Fact, ConsumerTx: child.ID(), Amount: parent.Body.Outputs[0].Amount, Debit: protocol.ReserveDebitIdentity(f.Org.Network, pc.Summary.OutputID(0))}}, FeeOutputs: result.FeeOutputs}).MarshalBinary()
+					if err != nil {
+						t.Fatal(err)
+					}
+					apply(raw, tr)
+					assertChildFee()
+					// Representation success is not a second public credit event.
+					beforeProgress, e := store.Scan(db, state.Key(122), nil, 100)
+					if e != nil {
+						t.Fatal(e)
+					}
+					beforeSlices, e := store.Scan(db, state.Key(state.KeySlice), nil, 100)
+					if e != nil {
+						t.Fatal(e)
+					}
+					representation := protocol.RepairBatch{Network: f.Org.Network, Height: 1, Items: []protocol.RepairItem{{Output: command.Output}}, Parts: []chameleon.Opening{{}}}
+					reprRaw, e := representation.MarshalBinary()
+					if e != nil {
+						t.Fatal(e)
+					}
+					reprResult, e := (protocol.RepairResult{Command: representation.ID(), Applied: true}).MarshalBinary()
+					if e != nil {
+						t.Fatal(e)
+					}
+					apply(reprRaw, state.Transition{Data: reprResult})
+					afterProgress, e := store.Scan(db, state.Key(122), nil, 100)
+					if e != nil {
+						t.Fatal(e)
+					}
+					afterSlices, e := store.Scan(db, state.Key(state.KeySlice), nil, 100)
+					if e != nil {
+						t.Fatal(e)
+					}
+					if !reflect.DeepEqual(beforeProgress, afterProgress) || !reflect.DeepEqual(beforeSlices, afterSlices) {
+						t.Fatal("representation changed credit or Worker budgets")
+					}
+				}
+			}
+			if scenario.lateObserver {
+				if _, err := observer.ApproveDirect(context.Background(), protocol.DirectRequest{Tx: parent}); err != nil {
+					t.Fatal(err)
+				}
+				before, err := observer.Quota(f.Genesis.Grants[0].Key, 0)
+				if err != nil || before.Reserved != 100 {
+					t.Fatalf("late approval did not occupy its cap: %+v %v", before, err)
+				}
+			}
+			settle(pp, 132)
+			assertChildFee()
+			if scenario.lateObserver {
+				// The observer had no approval when the repair was followed.
+				// It releases its own later debit; the original signer below
+				// also recovers its paid amount from actual source repayment.
+				// Before repayment, the coverage proof therefore uses
+				// an early witness QC, not every eventual signature.
+				after, err := observer.Quota(f.Genesis.Grants[0].Key, 0)
+				if err != nil || after.Reserved != 0 {
+					t.Fatalf("unexpected late-signer accounting: %+v %v", after, err)
+				}
+			}
+			if scenario.owner {
+				refund := protocol.OutputIdentity(f.Org.Network, child.ID(), protocol.FeeRefundIndex)
+				if ok, err := w.DirectFinal(refund, 0); err != nil || !ok {
+					t.Fatal("wallet missed final FUEL refund", err)
+				}
+				expected := uint64(906)
+				if repair {
+					expected = 901
+				}
+				for _, db := range []store.Store{db, ledger, observerDB} {
+					if err := db.View(func(v state.ReadView) error {
+						c, ok, e := state.Load[state.Creation](v, rules.DirectCreationKey(refund, 0))
+						if !ok || c.Output.Asset != protocol.AssetFUEL || c.Output.Amount != expected {
+							t.Fatalf("refund missing in ledger/member: %+v", c)
+						}
+						return e
+					}); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+
+			if scenario.multi {
+				id := protocol.OutputIdentity(f.Org.Network, other.Tx.ID(), protocol.FeeRefundIndex)
+				if ok, e := w.DirectFinal(id, 0); e != nil || !ok {
+					t.Fatal("other child wallet refund missing", e)
+				}
+				for _, target := range []store.Store{db, observerDB, ledger} {
+					if e := target.View(func(v state.ReadView) error {
+						c, ok, e := state.Load[state.Creation](v, rules.DirectCreationKey(id, 0))
+						if !ok || c.Output.Amount != 906 {
+							t.Fatal("other child refund identity lost")
+						}
+						return e
+					}); e != nil {
+						t.Fatal(e)
+					}
+				}
+			}
+			status, err := m.DirectStatus(cc.QC.Fact)
+			if err != nil || !status.Closed {
+				t.Fatal("child fee not closed", status, err)
+			}
+			cal, err := m.Quota(f.Genesis.Grants[0].Key, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			expected := uint64(0)
+			if cal.Reserved != expected {
+				t.Fatalf("CAL residual=%d expected=%d", cal.Reserved, expected)
+			}
+			// Public settlement preceded any INSTALL; late replication must not
+			// reopen the outbox or change the already applied budget.
+			if err = m.InstallDirect(pp); err != nil {
+				t.Fatal(err)
+			}
+			after, err := m.Quota(f.Genesis.Grants[0].Key, 0)
+			if err != nil || after.Reserved != expected {
+				t.Fatal("late INSTALL changed quota", after, err)
+			}
+			if err = db.View(func(v state.ReadView) error {
+				_, found, err := state.Load[state.Outbox](v, state.Key(state.KeyOutbox, pc.QC.Fact[:]))
+				if found {
+					t.Fatal("late INSTALL reopened outbox")
+				}
+				return err
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if repair {
+				if ok, err := w.DirectRecovered(pc.Summary.OutputID(0)); err != nil || !ok {
+					t.Fatal("wallet missed reserve recovery", err)
+				}
+				if ok, err := w.DirectFinal(pc.Summary.OutputID(0), 1); err != nil || ok {
+					t.Fatal("wallet gained a second user output", err)
+				}
+			} else if ok, err := w.DirectFinal(pc.Summary.OutputID(0), 0); err != nil || !ok {
+				t.Fatal("source output not final", err)
+			}
+			// A fast certificate arriving after its block must not overwrite finality.
+			if err = w.ReceiveDirect(parent.Body.Outputs[0], pc, 0); err != nil {
+				t.Fatal(err)
+			}
+			if repair {
+				if ok, err := w.DirectRecovered(pc.Summary.OutputID(0)); err != nil || !ok {
+					t.Fatal("late certificate revived recovered output", err)
+				}
+				if ok, err := w.DirectFinal(pc.Summary.OutputID(0), 0); err != nil || ok {
+					t.Fatal("recovered output became final", err)
+				}
+				if err := w.SaveDirectRequest(protocol.DirectRequest{Tx: child, InputCertificates: cp.InputCertificates}); err == nil {
+					t.Fatal("wallet authorized spending recovered output")
+				}
+			}
+			err = db.View(func(v state.ReadView) error {
+				for fact, original := range approved {
+					current, err := v.Get(state.Key(state.KeyApproval, fact[:]))
+					if err != nil {
+						return err
+					}
+					if !bytes.Equal(original, current) {
+						t.Fatal("settlement rewrote immutable approval")
+					}
+				}
+				a, _, err := state.Load[state.Approval](v, state.Key(state.KeyApproval, cc.QC.Fact[:]))
+				if err != nil {
+					return err
+				}
+				p, _, err := state.Load[member.LocalProgress](v, member.ProgressKey(cc.QC.Fact))
+				if err != nil {
+					return err
+				}
+				applied, err := member.AppliedDebits(v, a)
+				if err != nil {
+					return err
+				}
+				for i, d := range a.Debits {
+					if d.Key.Kind == protocol.ResourceFUEL && d.Cap-applied[i] != p.Fee.Rewards+p.Fee.Burned {
+						t.Fatal("real fees were recycled")
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+
+FILE internal/member/blocks.go SHA256 d6912eace364ce7eb20d220940e3f2e0fcec9484b6c07a66ae1bce8eb043490a
+package member
+
+import (
+	"utxo/finality"
+	"utxo/internal/blockfollow"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// LocalProgress contains only this member's own signed obligations and fee plan.
+type LocalProgress struct {
+	Settled           bool
+	Pending           uint32
+	Paid              uint64
+	Recovered         uint64
+	Fee               rules.Escrow
+	Height            int64
+	Invalidated       bool                 `json:",omitempty"`
+	SupersededBy      protocol.SpendFactID `json:",omitempty"`
+	InvalidatedHeight int64                `json:",omitempty"`
+	// Positional entries bind to the immutable Approval.Debits (resource,
+	// grant version, worker and cap). Only this record changes during settlement.
+	Applied []uint64 `json:",omitempty"`
+}
+
+// DirectStoreSchema prevents old binaries from ignoring cumulative credits or
+// invalidated approvals and re-signing after their capacity was reclaimed.
+const DirectStoreSchema uint64 = 8
+
+func localApplied(a state.Approval, p LocalProgress) ([]uint64, error) {
+	values := p.Applied
+	if values == nil {
+		values = make([]uint64, len(a.Debits))
+		for i, d := range a.Debits {
+			values[i] = d.Applied
+		}
+	}
+	if len(values) != len(a.Debits) {
+		return nil, rules.ErrAccounting
+	}
+	for i, d := range a.Debits {
+		if values[i] < d.Applied || values[i] > d.Cap {
+			return nil, rules.ErrAccounting
+		}
+	}
+	return values, nil
+}
+
+// AppliedDebits is the shared read path for status and offline accounting.
+// Old approvals retain their recorded cumulative amount; it is never reset.
+func AppliedDebits(v state.ReadView, a state.Approval) ([]uint64, error) {
+	var p LocalProgress
+	if a.Direct != nil {
+		var err error
+		p, _, err = state.Load[LocalProgress](v, ProgressKey(a.Fact))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return localApplied(a, p)
+}
+
+func ProgressKey(f protocol.SpendFactID) []byte { return state.Key(122, f[:]) }
+func waitingKey(id protocol.OutputID) []byte    { return state.Key(123, id[:]) }
+
+func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgress) error {
+	if p.Invalidated {
+		return rules.ErrAccounting
+	}
+	var err error
+	p.Applied, err = localApplied(*a, *p)
+	if err != nil {
+		return err
+	}
+	if p.Settled && p.Pending == 0 && !p.Fee.Closed {
+		next, err := p.Fee.Complete(rules.FeeClose)
+		if err != nil {
+			return err
+		}
+		p.Fee = next
+	}
+	for i := range a.Debits {
+		d := &a.Debits[i]
+		target := uint64(0)
+		if d.Key.Kind == protocol.ResourceCAL && p.Settled {
+			net, err := protocol.Sub(p.Paid, p.Recovered)
+			if err != nil {
+				return err
+			}
+			target, err = protocol.Sub(d.Cap, net)
+			if err != nil {
+				return err
+			}
+		}
+		if d.Key.Kind != protocol.ResourceCAL && p.Fee.Closed {
+			target = d.Cap
+			if d.Key.Kind == protocol.ResourceFUEL || d.Key.Kind == protocol.ResourcePolicy {
+				paid, err := protocol.Add(p.Fee.Rewards, p.Fee.Burned)
+				if err != nil {
+					return err
+				}
+				target, err = protocol.Sub(target, paid)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if target < p.Applied[i] || target > d.Cap {
+			return rules.ErrAccounting
+		}
+		delta := target - p.Applied[i]
+		if delta == 0 {
+			continue
+		}
+		key := state.SliceKey(d.Key, d.Worker)
+		slice, found, err := state.Load[state.Slice](o, key)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return rules.ErrMissing
+		}
+		slice.Reserved, err = protocol.Sub(slice.Reserved, delta)
+		if err != nil {
+			return err
+		}
+		slice.Available, err = protocol.Add(slice.Available, delta)
+		if err != nil {
+			return err
+		}
+		p.Applied[i] = target
+		if err = state.Put(o, key, slice); err != nil {
+			return err
+		}
+	}
+	return state.Put(o, ProgressKey(a.Fact), *p)
+}
+func (m *Member) resolveLocal(o *state.Overlay, id protocol.OutputID, paid bool) error {
+	fact, found, err := state.Load[protocol.SpendFactID](o, waitingKey(id))
+	if err != nil || !found {
+		return err
+	}
+	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+	if err != nil {
+		return err
+	}
+	if !found {
+		return rules.ErrMissing
+	}
+	p, found, err := state.Load[LocalProgress](o, ProgressKey(fact))
+	if err != nil {
+		return err
+	}
+	if !found || p.Pending == 0 {
+		return rules.ErrAccounting
+	}
+	p.Pending--
+	if paid {
+		p.Fee.Held, err = protocol.Sub(p.Fee.Held, m.direct.RepairCost)
+		if err != nil {
+			return err
+		}
+		p.Fee.Rewards, err = protocol.Add(p.Fee.Rewards, m.direct.RepairCost)
+		if err != nil {
+			return err
+		}
+	}
+	if err = m.finishLocal(o, &a, &p); err != nil {
+		return err
+	}
+	o.Apply([]state.Change{{Key: waitingKey(id), Delete: true}})
+	return nil
+}
+
+// PrepareBlock decodes and authenticates owned block bytes before entering the writer.
+func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, error) {
+	if m.direct == nil {
+		return nil, protocol.ErrUnsupported
+	}
+	var updates []blockfollow.Apply
+	for _, entry := range b.Transactions() {
+		if entry.Code == 0 && protocol.IsReserveIncrease(entry.Bytes) {
+			c, err := protocol.DecodeReserveIncrease(entry.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			if c.Network != m.cfg.Organization.Network {
+				return nil, protocol.ErrAuth
+			}
+			updates = append(updates, func(o *state.Overlay) error {
+				return rules.ApplyReserveIncrease(o, c, m.cfg.Organization.Hash(), m.cfg.Workers)
+			})
+			continue
+		}
+		if entry.Code != 0 || len(entry.Data) == 0 {
+			continue
+		}
+		result, effects, err := protocol.DecodePublicExecution(m.cfg.Organization.Network, entry.Bytes, entry.Data)
+		if err != nil {
+			return nil, err
+		}
+		if !result.Applied {
+			continue
+		}
+		for _, fee := range result.FeeOutputs {
+			if fee.Output.Recipient.Verify(m.cfg.Organization.Network) != nil {
+				return nil, protocol.ErrAuth
+			}
+			if fee.Output.Recipient.Route.Org != m.cfg.Organization.Org {
+				continue
+			}
+			updates = append(updates, func(o *state.Overlay) error {
+				id := protocol.OutputIdentity(m.cfg.Organization.Network, fee.Transaction, fee.Index)
+				c := state.Creation{Output: fee.Output, Final: true, Fact: protocol.CreationIdentity(m.cfg.Organization.Network, fee.Transaction, fee.Index, 0)}
+				return state.Put(o, rules.DirectCreationKey(id, 0), c)
+			})
+		}
+		if protocol.IsCompensationDecision(entry.Bytes) {
+			for _, effect := range effects {
+				updates = append(updates, func(o *state.Overlay) error { return m.applyRepairEffect(o, effect) })
+			}
+
+		} else {
+			pay, err := protocol.DecodeDirectSubmission(entry.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			updates = append(updates, func(o *state.Overlay) error { return m.applyPayment(o, pay, result, b.Height()) })
+		}
+	}
+	return func(o *state.Overlay) error {
+		for _, apply := range updates {
+			if err := apply(o); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, nil
+}
+
+func (m *Member) applyRepairEffect(o *state.Overlay, effect protocol.RepairEffect) error {
+	if waiting, found, err := state.Load[protocol.SpendFactID](o, waitingKey(effect.Output)); err != nil {
+		return err
+	} else if found && waiting != effect.ConsumerFact {
+		return rules.ErrAccounting
+	}
+	fact := effect.ParentFact
+	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+	if err != nil {
+		return err
+	}
+	if found {
+		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+		if err != nil {
+			return err
+		}
+		p.Paid, err = protocol.Add(p.Paid, effect.Amount)
+		if err != nil {
+			return err
+		}
+		if err = m.finishLocal(o, &a, &p); err != nil {
+			return err
+		}
+	}
+	if err = m.resolveLocal(o, effect.Output, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, result protocol.ExecutionResult, height int64) error {
+	tx := pay.Tx
+	fact := pay.Authorization.Fact
+	if tx.Body.Network != m.cfg.Organization.Network {
+		return protocol.ErrAuth
+	}
+	if err := m.recoverExposedSources(o, pay.InputCertificates); err != nil {
+		return err
+	}
+	recovered := make(map[uint32]bool, len(result.RecoveredOutputs))
+	var returned uint64
+	for _, i := range result.RecoveredOutputs {
+		if int(i) >= len(tx.Body.Outputs) || recovered[i] {
+			return protocol.ErrRule
+		}
+		recovered[i] = true
+		var err error
+		returned, err = protocol.Add(returned, tx.Body.Outputs[i].Amount)
+		if err != nil {
+			return err
+		}
+	}
+	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+	if err != nil {
+		return err
+	}
+	if found {
+		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+		if err != nil {
+			return err
+		}
+		if p.Settled {
+			return rules.ErrConflict
+		}
+		if p.Paid > returned {
+			return rules.ErrAccounting
+		}
+		// A signer joining after compensation never occupied the earlier paid
+		// amount. Restore only its own recorded loss, not another member's.
+		p.Recovered = p.Paid
+		p.Settled = true
+		p.Height = height
+		p.Pending = uint32(len(result.MissingInputs))
+		p.Fee, err = rules.NewEscrow(tx.Body.Fee.Maximum, m.direct.Base.Fee)
+		if err != nil {
+			return err
+		}
+		for _, stage := range []rules.FeeAction{rules.FeeRegister, rules.FeeSettle} {
+			p.Fee, err = p.Fee.Complete(stage)
+			if err != nil {
+				return err
+			}
+		}
+		for _, i := range result.MissingInputs {
+			if int(i) >= len(tx.Body.Inputs) {
+				return protocol.ErrRule
+			}
+			if err = state.Put(o, waitingKey(tx.Body.Inputs[i].Output), fact); err != nil {
+				return err
+			}
+		}
+		if err = m.finishLocal(o, &a, &p); err != nil {
+			return err
+		}
+	}
+	if tx.Body.Config == m.cfg.Organization.Hash() {
+		if err = state.Put(o, state.Key(state.KeyObserved, fact[:]), true); err != nil {
+			return err
+		}
+		o.Apply([]state.Change{{Key: state.Key(state.KeyOutbox, fact[:]), Delete: true}})
+		for i, in := range tx.Body.Inputs {
+			if err = m.consumePublicInput(o, pay, in.Output, tx.Claims[i].Instance, height); err != nil {
+				return err
+			}
+		}
+	}
+	if tx.Body.Config == m.cfg.Organization.Hash() {
+		for _, in := range tx.Body.Fee.Inputs {
+			if err = m.consumePublicInput(o, pay, in.Output, 0, height); err != nil {
+				return err
+			}
+		}
+	}
+	for i, out := range tx.Body.Outputs {
+		id := pay.Summary().OutputID(uint32(i))
+		if err = m.resolveLocal(o, id, false); err != nil {
+			return err
+		}
+		if recovered[uint32(i)] || out.Recipient.Route.Org != m.cfg.Organization.Org {
+			continue
+		}
+		creation := state.Creation{Output: out, Fact: protocol.CreationIdentity(tx.Body.Network, tx.ID(), uint32(i), 0), Source: protocol.Hash(fact), Final: true}
+		if err = state.Put(o, rules.DirectCreationKey(id, 0), creation); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+
+EVIDENCE consensus-order-final.log
+ok  	github.com/cometbft/cometbft/consensus	0.382s
+
+
+EVIDENCE fee-order-final.log
+=== RUN   TestFeeClosureMultipleObligations
+=== RUN   TestFeeClosureMultipleObligations/owner=false/paid=0/surplus=0
+=== RUN   TestFeeClosureMultipleObligations/owner=false/paid=0/surplus=17
+=== RUN   TestFeeClosureMultipleObligations/owner=false/paid=1/surplus=0
+=== RUN   TestFeeClosureMultipleObligations/owner=false/paid=1/surplus=17
+=== RUN   TestFeeClosureMultipleObligations/owner=false/paid=2/surplus=0
+=== RUN   TestFeeClosureMultipleObligations/owner=false/paid=2/surplus=17
+=== RUN   TestFeeClosureMultipleObligations/owner=true/paid=0/surplus=0
+=== RUN   TestFeeClosureMultipleObligations/owner=true/paid=0/surplus=17
+=== RUN   TestFeeClosureMultipleObligations/owner=true/paid=1/surplus=0
+=== RUN   TestFeeClosureMultipleObligations/owner=true/paid=1/surplus=17
+=== RUN   TestFeeClosureMultipleObligations/owner=true/paid=2/surplus=0
+=== RUN   TestFeeClosureMultipleObligations/owner=true/paid=2/surplus=17
+--- PASS: TestFeeClosureMultipleObligations (0.06s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=false/paid=0/surplus=0 (0.01s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=false/paid=0/surplus=17 (0.01s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=false/paid=1/surplus=0 (0.00s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=false/paid=1/surplus=17 (0.00s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=false/paid=2/surplus=0 (0.00s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=false/paid=2/surplus=17 (0.00s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=true/paid=0/surplus=0 (0.00s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=true/paid=0/surplus=17 (0.00s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=true/paid=1/surplus=0 (0.00s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=true/paid=1/surplus=17 (0.00s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=true/paid=2/surplus=0 (0.00s)
+    --- PASS: TestFeeClosureMultipleObligations/owner=true/paid=2/surplus=17 (0.00s)
+=== RUN   TestFeeClosureFulfillmentBeforeCompensation
+=== RUN   TestFeeClosureFulfillmentBeforeCompensation/owner=false
+=== RUN   TestFeeClosureFulfillmentBeforeCompensation/owner=true
+--- PASS: TestFeeClosureFulfillmentBeforeCompensation (0.01s)
+    --- PASS: TestFeeClosureFulfillmentBeforeCompensation/owner=false (0.00s)
+    --- PASS: TestFeeClosureFulfillmentBeforeCompensation/owner=true (0.00s)
+PASS
+ok  	utxo/internal/rules	0.506s
+
+
+EVIDENCE member-fee-final.log
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/source_arrives
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/repair_then_late
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/partial_repair_then_late
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/child_parent_same_block
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/owner_source
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/owner_repair
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/batch_owner_repair
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/batch_late_signer
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/owner_same_block
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/owner_multiple_refunds
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/projection_source
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/projection_repair
+=== RUN   TestBlockFollowerMissingRepairLateAndDuplicate/late_extra_signer
+--- PASS: TestBlockFollowerMissingRepairLateAndDuplicate (0.13s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/source_arrives (0.01s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/repair_then_late (0.01s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/partial_repair_then_late (0.01s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/child_parent_same_block (0.01s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/owner_source (0.01s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/owner_repair (0.02s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/batch_owner_repair (0.01s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/batch_late_signer (0.01s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/owner_same_block (0.01s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/owner_multiple_refunds (0.01s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/projection_source (0.01s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/projection_repair (0.01s)
+    --- PASS: TestBlockFollowerMissingRepairLateAndDuplicate/late_extra_signer (0.01s)
+PASS
+ok  	utxo/internal/member	0.344s
+
+
+EVIDENCE capital-audit.json
+[
+  {
+    "run": "r1-P",
+    "source_sha256": "c321214c74de1cb529740d518966b01cfe9a2413260efdb14a88cb9613e4d20b",
+    "members": [
+      {
+        "node": "org0-member0",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org0-member1",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org0-member2",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org0-member3",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org1-member0",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      },
+      {
+        "node": "org1-member1",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      },
+      {
+        "node": "org1-member2",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      },
+      {
+        "node": "org1-member3",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      }
+    ]
+  },
+  {
+    "run": "r2-P",
+    "source_sha256": "a472c2125accce97cd8635a5e6566cc17cb8574e4eaba584af5cd5ae4d04003e",
+    "members": [
+      {
+        "node": "org0-member0",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org0-member1",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org0-member2",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org0-member3",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org1-member0",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      },
+      {
+        "node": "org1-member1",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      },
+      {
+        "node": "org1-member2",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      },
+      {
+        "node": "org1-member3",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      }
+    ]
+  },
+  {
+    "run": "r3-P",
+    "source_sha256": "cf6c0e0998259fd6990f75214d6870878a7dbb5be5864ddd93e6887c15286e59",
+    "members": [
+      {
+        "node": "org0-member0",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org0-member1",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org0-member2",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org0-member3",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 658752
+      },
+      {
+        "node": "org1-member0",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      },
+      {
+        "node": "org1-member1",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      },
+      {
+        "node": "org1-member2",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      },
+      {
+        "node": "org1-member3",
+        "Limited": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "CAL_grant": 1000000000000,
+        "CAL_reserved": 0,
+        "work_reserved": 0,
+        "FUEL_retained": 792
+      }
+    ]
+  }
+]

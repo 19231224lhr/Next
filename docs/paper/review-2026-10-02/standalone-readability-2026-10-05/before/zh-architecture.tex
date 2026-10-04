@@ -1,0 +1,28 @@
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,font=\footnotesize,
+box/.style={draw=black!55,rounded corners=2pt,align=center,minimum height=1.05cm,text width=2.65cm,fill=white},
+flow/.style={-{Stealth[length=2mm]},thick,draw=blue!60!black},
+bgflow/.style={-{Stealth[length=2mm]},draw=black!65,dashed},
+lab/.style={font=\scriptsize,align=center,fill=white,inner sep=2pt}]
+\node[box] (sender) at (0,0) {付款方钱包\\\textbf{授权付款}};
+\node[box,fill=blue!4] (org) at (4.1,0) {消费裁决组织\\4名独立成员\\\textbf{3份匹配签名}};
+\node[box,fill=blue!4] (wallet) at (8.2,0) {收款方钱包\\验证并记录TXCer\\\textbf{可发起后继付款}};
+\node[box] (next) at (12.3,0) {后继付款\\相同或其他\\已注册组织};
+\draw[flow] (sender) -- node[lab,above]{交易} (org);
+\draw[flow] (org) -- node[lab,above]{输出 + TXCer} (wallet);
+\draw[flow] (wallet) -- node[lab,above]{直接证据} (next);
+\node[box,fill=green!4] (recover) at (0,-2.5) {原签署成员\\补交已保存付款\\\textbf{沿用原授权}};
+\node[box,fill=green!4] (comm) at (4.1,-2.5) {公共委员会\\执行子付款\\\textbf{记录直接缺口}};
+\node[box,fill=orange!6] (decision) at (8.2,-2.5) {公共赔付决定\\扣除发行组织备付\\\textbf{关闭经济缺口}};
+\node[box,fill=orange!6] (repair) at (12.3,-2.5) {授权历史修复\\适配受限输入槽\\\textbf{安装已提交修订}};
+\draw[bgflow] (org) -- node[lab,right]{公共提交} (comm);
+\draw[bgflow] (comm) -- node[lab,above]{被消费输入\\的公开QC} (recover);
+\draw[bgflow] (recover.south) -- ++(0,-.7) -| node[lab,pos=.25,below]{原付款补交} (comm.south);
+\draw[bgflow] (comm) -- node[lab,above]{到期仍\\未成立} (decision);
+\draw[bgflow] (decision) -- node[lab,above]{不可变\\赔付决定} (repair);
+\node[lab] at (10.25,-1.2) {经济关闭不等待适配服务};
+\end{tikzpicture}
+\caption{单轮续花与公开证据驱动的来源处理。实线表示收款人路径，虚线表示后台工作。后继公开证据使原签署成员能够补交已保存的授权材料。来源到期仍未成立时，入块且有效的决定完成赔付，不依赖适配服务。后续授权历史修复保持付款身份和完整区块身份。}
+\label{fig:architecture}
+\end{figure*}

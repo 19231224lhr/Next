@@ -1,0 +1,102 @@
+Next: consensus interface, fee closure, service contract, and capital evidence
+Audit date: 2026-10-04
+
+Scope and versions
+The checkout is based on 863952d605b9410338a242145f959df7ad506940.
+The final network experiments remain labelled f856c7b. This audit changes tests
+and manuscript text, not node production logic. Between that measured baseline
+and HEAD, the non-test source changes are payctl chain-timing instrumentation;
+they are not node consensus, fee, member-accounting, or repair changes.
+The current regression environment is Windows amd64, Go 1.27.1. Its test timings
+are not substituted for the Mac network experiment measurements.
+
+1. Original execution and public authorization
+Tracked Comet patches: third_party/cometbft/overlay.py and consensus/block_identity.go.
+The overlay preserves original body/parts pairs, compares complete BlockID at
+identity-sensitive state transitions, clears an old body when the download
+target changes, rejects nonoriginal part openings at original admission, and
+uses original materials for catch-up/replay. Stable hash equality alone is not
+the accepted identity predicate. A hash comparison elsewhere is not, by itself,
+evidence of a vulnerability: the surrounding part binding must be examined.
+
+TestStableHashIdentity exercises real consensus state methods. Its assertions
+cover commit fetch and stale parts, exact Finalize bytes executed once, locked
+and valid candidates, POL rounds, proposal/part binding, both arrival orders of
+a matching quorum, and no second precommit after a nil precommit.
+TestCatchupCandidateRewrittenBlockStillServesOriginal and the original-storage tests
+retain original bodies and original parts after historical rewriting.
+TestConsensusRejectsRelabelledOpening checks the real consensus message
+ValidateBasic and MsgFromProto entry points, including a compatible revised
+opening relabelled as revision zero. TestRealBlockStoreRewriteAndOriginalReplay
+checks the stored original against the rewrite/replay path.
+
+TestPublicAuthorizationAtABCIEntry exercises CheckTx, ProcessProposal and
+FinalizeBlock with unrelated QC, forged QC, and forged owner authorization,
+including a warmed valid-entry cache. The new forged-QC assertions establish
+that decoding, owner authorization, admission preparation, summary validation,
+and fact/configuration binding succeed before QC authentication fails with
+ErrAuth. The other cases establish rejection, not that every earlier guard
+passed. Cached verification is byte-specific and does not cache ledger validity.
+
+2. Fees and multi-obligation closure
+Production entry points: rules.PrepareDirectVector, feeStage, Escrow.Complete,
+endObligation and closeFee; redaction.ExecuteDecision supplies the public guard.
+For k certified inputs, admission requires Maximum >= Register + Settle +
+Close + k*RepairCost, with checked arithmetic. Stage bits prevent repeated base
+fees, and leaving Open prevents a second repair charge for an obligation.
+Held + Rewards + Burned + Refunded = Maximum. Final closure returns the residual
+Held and accounts for actual paid fees against FUEL/Policy admission caps.
+This excludes fee-budget exhaustion on valid admitted trajectories; it does
+not assert that corrupt state, missing history, or any arbitrary decision succeeds.
+
+New TestFeeClosureMultipleObligations has 12 cases: owner-funded/sponsored fees,
+zero/one/two compensated inputs, and exact-minimum/+17 escrow. It uses two
+outputs of one source, then a two-input consumer. It checks insufficient
+admission, every intermediate escrow and asset projection, Pending and Closed,
+exact final charges/refunds, resource usage, duplicate compensation, duplicate
+source/consumer execution, and late-source conservation. It is a rules test,
+not a consensus test or an exhaustive permutation suite.
+Existing TestCompensationBeforeAdaptation runs the decision through the public
+application and checks duplicate decisions before/after repayment have no new
+effects or fee outputs. Existing batch and member-following tests separately
+cover public multi-slot commands and cumulative local restoration; these are
+identified as separate test layers rather than attributed to the new rules test.
+
+3. Service guarantee
+Receipt authenticates an output/issuer and supports a request for a successor.
+It is conditional on successor admission and public execution; it does not
+itself create a redeemable public compensation obligation. Successful public
+consumption of a missing certified input creates consumption, coverage,
+obligation/gap, and child outputs atomically. Source execution or a valid
+post-deadline decision closes that obligation without repeating child principal.
+The no-obligation guard in TestCompensationBeforeAdaptation rejects a decision
+and returns neither state changes nor effects. This is a targeted negative test,
+not a claim that this one case proves every possible command path.
+Intent-conflict and wallet/member tests remain part of the package regression.
+
+4. Capital: measured observations versus proof
+audit_capital.py reads the existing P final-resources.json files, fingerprints
+each source, and emits capital-audit.json. All three runs have eight members,
+zero recorded resource Limited counters, and zero final CAL/work reservations.
+FUEL charges remain retained; the audit does not pretend fees are restored.
+The P runs use fixed abundant grants (CAL grant 10^12) and no automatic top-up.
+All 21,048 payments close. These observations establish finite workload closure
+with the stated configuration, not minimum-capital efficiency or indefinite
+adversarial admission. The coverage theorem also counts hidden certificates;
+its universal prefix statement is analytical, not inferred from sampled logs.
+The driver's 256 outstanding limit is not used as a global bound on all partial,
+abandoned, or unreconciled approvals. Known capacity-retention boundary tests
+remain relevant even when the public reserve has money.
+
+Verification artifacts
+regression-final.log: all eight relevant application packages passed.
+new-assertions.log: new 12 fee cases and three ABCI authorization cases passed.
+comet-regression.log: pinned-fork consensus/store/state targeted tests passed.
+vet.log: go vet for rules and committee passed (no output).
+version-check.json: baseline source comparison and normalized equality of 11
+tracked fork files with materialized copies. The generated state.go patch is
+represented by overlay.py and its real entry-point regression tests.
+regression.log retains an initial command error from the nonexistent package
+internal/finality; regression-final.log uses the correct finality package.
+
+Follow-up audit: added Propose-step polka-before-parts, two distinct-parent fulfillment-before-compensation cases, and direct local/public escrow equality after compensation/source arrival in 13 member scenarios. All passed; see consensus-order-final.log, fee-order-final.log, member-fee-final.log. An earlier test additionally expected immediate parts-first progression while still at Propose; the normal timeout governs that case, so the final new assertion targets the requested polka-before-parts transition. No production transition was changed.

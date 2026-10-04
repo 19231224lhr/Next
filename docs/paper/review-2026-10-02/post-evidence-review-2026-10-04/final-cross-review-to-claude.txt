@@ -1,0 +1,153 @@
+GPT已完成补充材料核验，并将总体建议调整为小修。现把其最终答复原文给你，供交叉核对，不要求统一等级。请简短回答：与你最后意见相比，是否还有实质不同的接收条件？还是主要是大修/小修分级差异？若保留分歧，请明确一条具体主张及必要修订；不新增范围。额外说明：其提到的两处期限生产接线已找到，Engine.BeginBlock直接调用rules.AnchorDirectDeadlines(v,*e.direct,b.Height,b.Time.Unix())，cmd/committee/main.go生产配置Direct非空时NewTimedApp(...engine.ExecuteAt,engine.BeginBlock)，已给GPT原文。论文尚未按本轮意见改动。
+
+GPT最终答复：
+
+
+建议调整为小修（Minor Revision）。 补充材料消除了原先大部分实现证据缺口。按现稿已经明确限定的主张，我不再把有限资本压测、多机部署、同步钱包对照或 M／无 CH 对照列为接收前提。本次结论来自源码及记录核查，没有由我重新运行完整工程。
+
+一、已关闭与尚需补齐的具体项
+
+三项事实澄清确认成立。 capital-audit.source_sha256 确实来自 final-resources.json；309 项实验清单与当前 production/test 清单不能混用。核对清单、runner 和构建记录后，P/R 与 chain 的二进制哈希相同，所附源文件及展开 Comet 比对记录也报告无差异。不能再据这些字段提出“实验代码版本不一致”的疑虑。
+clarification-source
+ 
+experiment-source-manifest
+ 
+clarification-verification
+
+核查项	最终分级
+成员批准、回收、重提与偿还账户	关闭原疑虑。 签名位于批准事务成功返回之后；回收受成功冲突消费及原批准状态约束；重提使用保留材料；recoverOutput 检查发行者与 CAL 账户一致，限制 Recovered≤Paid，不增加授信。
+clarification-source
+ 
+clarification-source
+ 
+clarification-source
+
+跟随认证	关闭入口缺口。 VerifyBlock 核对固定交易投影、执行结果根及后继签名头；Run 验证后才调用 Commit，后者将连续高度检查、业务更新和游标原子提交。它不是任意修订正文的完整授权验证器，但论文 S1 已明确这种分工，不应要求它承担 C3 的全部验证职责。
+follower-and-history-evidence
+ 
+follower-and-history-evidence
+ 
+supplement
+
+ProposalBatch WAL	关闭原疑虑。 批量消息先持久化再处理；新增证据使用真实文件 WAL、FilePV 和重放路径，并允许写入失败留下有效持久前缀，而非假设失败等于原子回滚。所附八包及 ProposalBatch 非缓存执行日志均通过；这支持指定边界，不是穷尽验证。
+clarification-source
+ 
+clarification-verification
+ 
+clarification-verification
+
+期限机制疑虑可以关闭，但“生产接线已逐行核验”还差很窄的一段材料。
+
+已经确认：义务先处于未锚定状态，锚定函数只对当前仍为 Open、Deadline=0 的义务设置期限并清除 anchor；长空闲测试检查了未锚定不赔付、10029 不到期、10030 到期。通用 FinalizeBlock 也确实在交易前执行 beginBlock。
+clarification-source
+ 
+follower-and-history-evidence
+ 
+follower-and-history-evidence
+
+但附件中仍未找到 Engine.BeginBlock 调用 AnchorDirectDeadlines 的函数体，以及生产节点将该方法传入 NewTimedApp 的调用语句；目前看到的是通用钩子和测试接线。只需补这两处短源码，并在规范中写明正常连续执行时的期限为“创建高度 
+𝐻
+H 的下一块时间加超时”，无需新增实验。这是材料对应问题，不是已经发现期限错误。
+clarification-source
+ 
+follower-and-history-evidence
+ 
+implementation-evidence
+
+二、哪些新增实验是必要的？
+
+你列出的项目，目前没有一项是现稿主张的必需新增实验。 我上一轮没有充分区分“值得进一步研究”与“支持现有主张的最低证据”，这里收回其强制性。
+
+上轮建议	当前判断	扩大到什么主张才需要
+有限资本持续压测	现有证明与有限容量边界台账足以支持覆盖、碎片化及停签边界	最低资本、资本效率、开放竞争下的持续准入
+独立主机部署	单机注入延迟实验可以保留其限定结论	实际跨机／广域部署性能、独立故障域表现
+同步钱包对照	不必为明确使用 NoSync 的链指标增加该对照；P 的场景钱包本已同步	将收款延迟宣称为包含钱包落盘的持久收款延迟
+M 计时、无 CH 对照	不影响现有功能比较及指定实现的成本测量	宣称优于普通物化视图，或量化 CH 的增量开销与性能因果
+
+这些限制并非事后替作者缩小范围：正文已经排除最低资本、可持续吞吐和计时实验中的重启恢复主张，也明确区分 NoSync 普通钱包与同步场景钱包；C3 则已限定为本地记录服务。
+manuscript
+ 
+manuscript
+ 
+manuscript
+
+同理，13.70 倍可以作为含重试及证据观察的端到端模式比较保留；未分类重试限制因果归因，但不要求为了保留这个描述性结果重做实验。R 仍只能称为源材料扣留恢复，不升级为客户端崩溃恢复。
+supplement
+ 
+supplement
+
+三、风险解释是否足够，是否必须修改协议？
+
+足以保留当前范围，不强制增加协议缓解。 现稿并未保证任意恶意竞争下持续签发；安全地保留责任并停止准入，不构成其覆盖定理的反例。已有分阶段服务合同也不必重写，只需与最强边界实例连接得更直接。
+manuscript
+
+需要准确保留三层区别：
+
+普遍上界与可达实例不同。 
+𝑆
+𝑔
+≤
+𝑄
+𝑔
+≤
+𝐵
+𝑔
+S
+g
+	​
+
+≤Q
+g
+	​
+
+≤B
+g
+	​
+
+ 是上界；
+𝐵
+=
+300
+B=300 的轮换签名者轨迹展示可以损失全部 300，而固定签名者两轮停止不是普遍保护余量。
+manuscript
+ 
+supplement
+发行者损失与攻击者成本不同。 从台账推导，在控制相关收款且后继保持可用路由的条件下，后继价值可以等额替代被锁源本金，使攻击者的可用 CAL 不减少；这不是“无成本攻击”，更不是已测利润。实际 FUEL 支出、完整费用输入锁定及其他受限资产必须另计。
+manuscript
+ 
+supplement
+保护已执行后继，不等于保证第三方继续获得服务。 储备支持缺口闭合，确实与收款保护有关；但同一受限消费路由上的第三方可能无法获得新 QC，终端证书也没有无条件兑付。后半句不否定前半句。
+manuscript
+
+Theorem 3 无需改成仅诚实执行。 满足其交易集合和成功执行前提的恶意调度仍在定理范围内；永久 Intent 失败轨迹不满足前提，并不推翻该结论。
+manuscript
+
+四、C3 的最终判断
+
+功能与安全：支持，关闭原先的具体授权疑虑。 批量正文从 canonical 状态逐槽构造，逐项受决定约束，再检查完整 BlockID；安装器核对已提交 Task 的精确正文及摘要，而不是把任意兼容碰撞当作授权。
+follower-and-history-evidence
+ 
+follower-and-history-evidence
+ 
+clarification-source
+
+贡献权重：可以保留为第三项互补系统贡献，但权重低于 C2。 原完整 BlockID 兼容性是明确的技术目标；它不自动证明优于索引/M，也不证明存在外部强制采用需求。
+
+是否阻断接受：不单独阻断。 本地消费者已经存在，论文也承认相同经济答案可由索引获得。因此，不应把“必须找到真实外部强制原 BlockID 的客户”设为接收条件；保持当前可选记录层定位即可。
+manuscript
+
+最终仅保留两项决定性小修
+补全实现对应说明。 给出上述期限生产接线；将已有完整身份／POL 说明与 ProposalBatch WAL、Finalize 响应批量持久化、autofile 同步省略的保持条件集中对应。后两类确有语义修改，不能只归为计时探针；无需另起协议或要求机械证明。
+implementation-evidence
+收束最坏情形风险表述。 将普遍损失上界、轮换签名者可达实例、条件性的可用 CAL 本金中性，以及第三方路由停服后果连起来；不混淆 FUEL、锁定成本与 CAL 损失。
+
+这两项完成后，我支持按当前限定范围接收，不再要求新增系统实验。
+
+Is this conversation helpful so far?
+ChatGPT can make mistakes. Check important info.
+Latest response
+
+
+
+
+Pro

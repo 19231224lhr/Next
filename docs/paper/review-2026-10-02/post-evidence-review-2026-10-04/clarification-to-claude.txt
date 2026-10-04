@@ -1,0 +1,15 @@
+谢谢。按你提出的具体材料补充，请复核事实后区分：模型内反例、论文主张/用途不足、超出现有主张的扩展要求。不是要求改变总体等级。
+
+1. 附件补齐 ApproveDirectBytes、partial_reclaim、recoverOutput、recoverExposedSources、CompensationTarget、NewEngine、direct_deadline、proposal_batch 及其测试、ClockTick 调度与实验脚本。WAL批处理只收集已就绪本地提案分片，先写完并 FlushAndSync，成功后才逐个handleMsg；投票单独WriteSync；边界消息在批次产生newStep之后写。overlay.py的autofile仅在该句柄自上次成功Sync无写入时跳过，写入/重新打开均清标记。新复跑 ProposalBatch 测试含写失败、Sync失败与落盘后重放，日志在附件；不将这些测试当作完整BFT模型证明。
+
+2. 你问的309项是实验目录 source-manifest.json，本次补齐；首次给你的final-source-manifest.json是另一个“当前生产/新增测试”清单。P/R构建文件把共同构建放在base字段，actual_binary_hashes记录真实运行二进制。附件逐键比较与chain构建：305项source、664项comet_go、5项运行文件指纹一致；member是wrapper并执行member-real。capital-audit.json的source_sha256是每轮final-resources.json的哈希，不是源码，audit_capital.py可直接验证。
+
+3. 为消除原日志缺命令的疑问，刚从仓库根目录新执行go test -tags comet_v3 -count=1（rules/committee/redaction/member/wallet/finality/blockfollow/protocol八包），全部通过；附完整命令、Go/环境、退出码，未用-race。WAL测试从根module依赖路径执行亦通过。没有重跑网络实验。14.15与13.70确实对应旧/新数据，补充材料的旧段落归属标识值得修正，不把旧数当成当前结果。
+
+4. M1的跨组织Intent损失/容量滞留，现稿III-E、V-F、S3的两轮台账和S4-B(b)的轮换签名者测试已经明确允许；没有Subject CAL门槛或开放服务长期抗耗尽承诺。你的“保持可用本金同时消耗储备”的经济解释值得进一步强调。请区分它是反驳哪个已陈述定理，还是你认为即使如此限定，开放服务的研究价值仍不足、需要协议缓解。若需缓解，请指出最小必要目标，不将费用等同保险。我们不把“已写限制”当作风险已经消失。
+
+5. C3本来不把等BlockID当授权，IV-H及安全分析Reader scope要求本地已执行前缀中的精确Revision/Task。不同合法部分可混合通过CH关系是承诺可适配性的后果，但未通过精确Task不能安装为授权修订。请核对是否存在能通过这些实际守卫的混合体反例；若只是BlockID独立不证明授权，这已是接口定义。C3当前宣称的是原身份下修订正文的本地例外复核/重导出，不是索引无法回答经济问题，也不主张只凭等哈希即可审计。
+
+6. 固定配置、静态腐化、保留原始历史的诚实副本是当前范围，不宣称裁剪后state-sync副本可直接执行补偿，也不宣称已测完全无CH构建。无适配依赖与无历史存储依赖确实不是同一性质。进程内内存实验每次从创世开始，不把崩溃丢状态后重用旧密钥当支持的恢复。
+
+请据此更新需要保留/撤回的具体问题，并给出对当前明确范围最关键的剩余项。若仍大修，请列最重要的3项以及验收条件；无需为了凑更广系统而要求实现所有扩展。

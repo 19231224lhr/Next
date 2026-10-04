@@ -1,4 +1,4 @@
-\section{Background and Related Work}
+\section{Related Work}
 \label{sec:related}
 
 Next combines certified payments that a recipient can reuse before public
@@ -46,10 +46,14 @@ bilateral channel nor a prefunded route between them.
 Snappy protects merchants who accept fast on-chain payments through
 collateralized approvals, and reusable payment guarantees combine privacy with
 customer collateral that can be reused across defined time
-windows~\cite{snappy,reusable}. Next keeps the user's payment principal
-separate from additional organizational backing, and its compensation closes
-the missing source of an already executed child without a second principal
-credit to that child's recipient. HyperService adjudicates cross-chain
+windows~\cite{snappy,reusable}. The service trigger differs: FastPay backs primary-ledger redemption
+with prepaid funds, and Snappy gives an accepting merchant a collateral claim
+under its approval rules. In Next, signing reserves issuer backing, but the
+public obligation arises when an executed successor consumes a missing
+certified output. Compensation closes that source obligation without a second
+principal credit to the child recipient. A terminal holder whose source never
+executes and who has no executing successor has no certificate-only redemption
+path (Section~\ref{sec:model-contract}). HyperService adjudicates cross-chain
 execution violations through a public Network Status Blockchain and an
 Insurance Smart Contract that financially reverses the effects of committed
 transactions~\cite{web3}. Next draws the responsibility boundary within one
@@ -71,7 +75,12 @@ from a committed compensation decision and public payment-state checks, not
 from the primitive.
 
 Reparo provides a publicly verifiable repair layer and can re-execute affected
-transactions while repairing state~\cite{reparo}. Next fixes payment
+transactions while repairing state~\cite{reparo}. Its Ethereum implementation also maps an old transaction hash to
+repaired transaction data, supporting access through an existing record
+identifier. IA-CCF audits immutable ledger records against saved execution
+receipts~\cite{ia-ccf}. These systems motivate review through established
+record references; Next specializes the revision authority to a committed
+compensation decision. Next fixes payment
 authorizations and outputs in advance: a public decision accounts for the
 compensation once, and representation commands replace only the permitted
 funding representation, without re-executing successors. The original

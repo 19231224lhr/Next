@@ -1,0 +1,29 @@
+\section{Introduction}
+\label{sec:introduction}
+
+In a UTXO ledger, each payment spends outputs of earlier transactions, so if recipients wait for public execution, every hop of a payment chain adds a confirmation delay. Suppose Alice pays Bob 100 CAL and Bob forwards it to Carol before Alice's payment executes. If Bob's payment executes first, the ledger consumes an output that does not yet exist, and the missing 100 CAL needs an identified, funded source, whether Alice's transaction arrives later or never.
+
+Waiting for public execution at every hop is the direct alternative, and our evaluation uses it as a control. Certificate-based systems separate recipient usability from public processing: FastPay and Zef support low-latency certified payments, and Sui Lutris combines broadcast and consensus paths for different kinds of state access~\cite{fastpay,zef,lutris}. Payment channels obtain rapid transfers from channel liquidity~\cite{blitz,donner}. Next asks how a native ledger can fund a certified payment whose source has not executed, with registered organizations rather than channels standing behind it.
+
+Three difficulties are coupled. Certificates circulate before public registration, so accounting from public gaps misses existing commitments. A late source must not pay both the guarantor that advanced the value and the recipient who already spent it. A client may hold a source and never submit it.
+
+Our insight is that the party answerable for a missing source is already named by the certificate that travels with the output. Next charges the gap to that direct issuer instead of tracing ancestors, bounds every signed certificate's liability by reserve-backed signing capacity, and closes an unresolved obligation by a public decision without changing stored history.
+
+Economic closure leaves a separate record question: a compensated input still cites its missing output in the original block. Ledger auditing already uses saved execution evidence to revisit historical records~\cite{ia-ccf}; Reparo also returns repaired transaction data through the old transaction hash~\cite{reparo}. We develop this workflow for compensation: an archival replica can export a revised funding reference at the original payment coordinates. An index supplies the same economic answer. The additional task is to authorize a replacement body while retaining the complete identity referenced by existing commits and successor headers~\cite{comet-blockid}, without executing the payment again.
+
+The design has three complementary contributions.
+
+\noindent\textbf{C1: A layered architecture for one-round continuation.} Certification and public execution carry different duties: a certificate fixes outputs and assigns liability to its issuer, whereas public execution decides which payment the ledger accepts. Members of the consuming organization lock inputs and reserve capacity atomically before signing, and one parallel round yields a TXCer. The recipient verifies and records the output and can request a successor at once, carrying only certificates of its direct inputs, while replication and public submission run in the background. Successor approval remains subject to input, fee, and capacity checks; the stage-specific service contract is given in Section~\ref{sec:model-contract}.
+
+\noindent\textbf{C2: Direct responsibility with source decoupling.} Public execution atomically consumes a missing certified input and records an obligation against its issuer. The successor's block publishes the source's certificate, so the original signers can resubmit the source from stored approvals; after the deadline, a public decision debits the issuer's reserve without threshold adaptation, and a late source repays it. Each approval reserves the full CAL output, change included, while it remains potentially certifiable, and an authenticated conflicting public spend may release the unused local reservation of a non-certified approval. For four-member organizations and a four-validator committee with at most one static Byzantine member each, we prove unique consumption and that signing capacity covers the outstanding CAL liability of every certificate, published or not. For a finite, acyclic, conflict-free payment set that contains the sources of its certified inputs and executes each payment once, all orders of arrival and compensation end with the same CAL holdings and reserve balances. The accounting extends overlapping per-member budgets~\cite{stingray} to hidden certificate liability, dynamic compensation and repayment, and source closure.
+
+\noindent\textbf{C3: Decision-authorized funding-reference repair.} A committed compensation decision closes an obligation economically; C3 reflects that decision in stored history. Restricted chameleon-hash commands write its reserve-debit reference into the designated input. Exact revisions and tasks authorize the replacement while owner authorizations, output and successor references, and the complete BlockID remain unchanged. Original commands are retained for replay, and representation writes no accounting state. This supports local exception review and re-export of a revised block under its existing identity, without making economic closure wait for historical repair.
+
+On one M4 Max host with synchronous member commits and NoSync wallet
+stores, a 100-hop chain reaches its last certified receipt in a median
+4.707\,s, versus 64.479\,s when waiting for public execution between
+hops. On the same current build, three fourteen-service P runs complete
+21,048 payments; compensation and repayment finish before paused
+adaptation services resume. Separate experiments characterize behavior
+under injected network delays and single faults, and the local reading,
+storage, and maintenance costs of optional historical representation.

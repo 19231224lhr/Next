@@ -1,0 +1,69 @@
+\section{Introduction}
+\label{sec:introduction}
+
+In a UTXO ledger, each payment spends outputs of earlier transactions, so if recipients wait for public execution, every hop of a payment chain adds a confirmation delay. Suppose Alice pays Bob 100 CAL and Bob forwards it to Carol before Alice's payment executes. If Bob's payment executes first, the ledger consumes an output that does not yet exist, and the missing 100 CAL needs an identified, funded source, whether Alice's transaction arrives later or never.
+
+Waiting for public execution at every hop is the direct alternative, and our evaluation uses it as a control. Certificate-based systems separate recipient usability from public processing: FastPay and Zef support low-latency certified payments, and Sui Lutris combines broadcast and consensus paths for different kinds of state access~\cite{fastpay,zef,lutris}. Payment channels obtain rapid transfers from channel liquidity~\cite{blitz,donner}. Next asks how a native ledger can fund a certified payment whose source has not executed, with registered organizations rather than channels standing behind it.
+
+Three difficulties are coupled. Certificates circulate before public registration, so accounting from public gaps misses existing commitments. A late source must not pay both the guarantor that advanced the value and the recipient who already spent it. A client may hold a source and never submit it.
+
+Our insight is that the party answerable for a missing source is already named by the certificate that travels with the output. Next charges the gap to that direct issuer instead of tracing ancestors, bounds every signed certificate's liability by reserve-backed signing capacity, and closes an unresolved obligation by a public decision without changing stored history.
+
+Economic closure leaves a separate record question. After compensation, the
+consuming input in the original block still cites the source output that
+the reserve replaced. Local exception review and historical re-export work
+from stored blocks: an archival replica revisits the input, reports the
+reserve advance with its authorizing decision and repayment status, and
+exports the block. Authorized historical repair lets the exported body
+itself name the reserve debit at the input's original coordinates. A
+decision index gives the same economic answer from the original body; the
+additional interface is a revised body that verifies against the original
+commit, with authorization drawn from the replica's executed prefix. Ledger
+auditing revisits records through saved execution evidence~\cite{ia-ccf},
+and Reparo returns repaired data through an old transaction
+hash~\cite{reparo}; Next authorizes a replacement body that keeps the
+complete identity referenced by existing commits and successor
+headers~\cite{comet-blockid}, without executing the payment again.
+
+The design has three complementary contributions.
+
+\noindent\textbf{C1: A layered architecture for one-round continuation.} A certificate
+fixes a payment's outputs and names its issuer; public execution decides
+which payment the ledger accepts. Before signing, each member of the
+consuming organization locks the inputs and reserves capacity for all CAL
+outputs, change included, in one atomic step, and one parallel round yields
+a TXCer. The recipient verifies and records the output and can request a
+successor at once, carrying only the certificates of its direct inputs,
+while replication and public submission continue in the background.
+Table~\ref{tab:model-contract} states the guarantee of each stage.
+
+\noindent\textbf{C2: Direct responsibility with source decoupling.} When a successor
+consumes a certified output whose source has not executed, public execution
+records the consumption and an obligation against the direct issuer in one
+atomic step. The successor's block exposes the source certificate, so the
+original signers can resubmit the source from their stored approvals. After
+the deadline, an included valid decision compensates the gap from the issuer's
+reserve, and a late source repays it. We prove that signing capacity covers
+the outstanding CAL liability of every certificate, published or not,
+extending overlapping per-member budgets~\cite{stingray} to compensation
+and repayment.
+
+\noindent\textbf{C3: Authorized historical repair.} After compensation, the original
+block still cites the missing source output, although the reserve funded
+it. Restricted chameleon-hash commands write the reserve-debit reference
+into that input. A committed compensation decision and an exact revision
+task authorize each replacement; owner authorizations, output and successor
+references, and the complete BlockID remain unchanged, and the commands
+write representation state alone. The original commands remain the replay
+history. An archival replica can then review the exception and re-export
+the revised body under its existing identity, while economic closure
+proceeds without waiting for the repair.
+
+On one M4 Max host with synchronous member commits and NoSync wallet
+stores, a 100-hop chain reaches its last certified receipt in a median
+4.707\,s, versus 64.479\,s when waiting for public execution between
+hops. On the same current build, three fourteen-service P runs complete
+21,048 payments; compensation and repayment finish before paused
+adaptation services resume. Separate experiments characterize behavior
+under injected network delays and single faults, and the local reading,
+storage, and maintenance costs of optional historical representation.

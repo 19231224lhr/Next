@@ -1,0 +1,57 @@
+三项评审意见收尾报告（2026-10-04）
+
+结论
+已依次完成共识与费用证据、服务保证表述、有限资本结论三项工作。
+本轮新增或加强四个测试文件，没有修改节点生产流程、协议或共识参数。
+Claude 已阅读代码、断言、修订章节及资本审计，并认可这些窄项可归档为已解决。
+这不是新的全篇小修/录用结论；他未亲自重跑测试，测试由本地执行。
+
+一、共识与费用闭合证据
+1. 对照 pinned CometBFT v0.38.26、overlay.py 与物化 fork：八处候选身份比较使用完整 BlockID；保留的 Finalize 哈希判断前有 PartSetHeader 检查，vote-extension 调用方受完整身份守卫保护。
+2. TestStableHashIdentity 通过真实共识状态入口验证九个子场景。特别增加 Propose 步、polka 先到分片后到：精确候选只产生一次 precommit，之后不补发 prevote，也不再发第二票。带 -v 的完整日志保存于 consensus-order-final.log。
+3. 原始开口限制在消息 ValidateBasic/MsgFromProto 边界执行；PartSet.AddPart 的包含性校验本身不是该限制。中英文证明与补充材料已说明这一区别。
+4. public submission 三个负向场景经过 CheckTx、ProcessProposal、FinalizeBlock。伪 QC 用例先断言所有者授权、准入准备、摘要绑定通过，再确认 QC 的 ErrAuth；不把较早守卫拒绝混称 QC 检查有效。
+5. 费用上界明确为 M >= 注册费 + 结算费 + 关闭费 + k * 修复费，并结合阶段幂等和 Held + Rewards + Burned + Refunded = M 说明合法准入不会因已预算费用不足而卡住关闭。
+6. 14 个规则层用例覆盖用户/组织付费、零/一/二义务赔付、紧/富余预算，以及两个独立父来源中先履约后赔付的关闭顺序；检查逐步守恒、精确退款、重复执行无效、迟到来源不重开子交易。
+7. 13 个成员跟块场景新增本地 Fee 与公共 Fee 的 DeepEqual，补偿后及来源到达后均检查。成员层场景为单认证输入，不扩大为多义务成员组合覆盖。
+
+证据：new-assertions.log、fee-order-final.log、member-fee-final.log、consensus-order-final.log、comet-regression.log、regression-final.log、vet.log。
+测试源码：
+internal/committee/submission_boundary_test.go
+internal/rules/fee_closure_evidence_test.go
+internal/member/blocks_test.go
+third_party/cometbft/consensus/block_identity_test.go
+
+二、服务保证
+正文模型和相关工作明确了三个阶段：
+- TXCer 到账：认证输出、发行组织及其责任，支持发起后继付款请求；后继批准仍受输入、费用、额度和准入规则约束。
+- 公共义务触发：后继在公共执行中成功消费尚未落实的认证输入，同时登记有资金支持的直接义务。
+- 终端持有人：单纯持有 TXCer 并不自动获得证书单独兑付接口；来源执行或已形成的公共义务按协议闭合，赔付不重复增加后继本金。
+同时与 FastPay 的预付资金赎回、Snappy 的商户抵押索赔进行具体比较，不把它们混称同一种保障。
+已有无义务赔付拒绝测试作为代码入口证据；未更改 Intent 规则。
+
+三、有限资本
+重新读取三轮 P 原始资源结果，三轮共 21,048 笔付款完成；每轮八个成员，共 24 条终点记录，资源不足 Limited 计数均为零，CAL 与工作资源预留均归零，费用消耗保留而不假装恢复。
+各组织 CAL grant = 10^12，无自动补资。每轮费用 659,544 FUEL，其中奖励 589,384、销毁 70,160。
+run_mixed.py 每轮只启动一次实验；runLab 没有自动重启循环，子进程退出即终止实验。三轮 lab.log 各一次启动记录，没有成员退出记录。正文注明拒绝计数是进程内计数且这些运行无成员重启。
+资金覆盖的逐前缀结论来自证明（包括隐藏证书），有限工作负载的终点记录来自实测，二者分别陈述。
+256 笔未完成上限属于压测器，不能当成全系统所有局部批准的上限。不声称本轮证据证明最低资本或无限期持续接单。
+证据：audit_capital.py、capital-audit.json、final-source-manifest.json。
+
+四、验证与版本
+八个相关应用包回归全部通过，规则/委员会/成员的 go vet 通过；pinned fork 共识、存储、状态的定向测试通过。
+当前 checkout 863952d605b9410338a242145f959df7ad506940。与网络实验 f856c7b3d6265f7275a15767bdced52d40dafada 对比，节点与 fork 生产代码不变，仅原有两处 payctl 计时源码不同。本轮测试文件与生产文件摘要分别列于 final-source-manifest.json。
+早先命令路径写错及过强测试预期的日志保留，最终有效结果以 *final.log 为准；未掩盖或改写原实验数据。
+四份 PDF 已编译：英文正文 19 页、中文正文 21 页、中英文补充材料各 28 页。引用、公式、表格对应检查通过，未有越界文本或 overfull。Overleaf 十份章节已同步，线上英文 19 页 PDF 已下载并验证包含本轮的新共识/费用/资本表述。
+
+五、Claude 复核范围
+详细回复认为三个窄项充分解决，没有需要改动协议或补实验的真实遗漏；提出的日志、消息边界措辞、无重启前提与工件分组已处理。
+最后确认：“这三个窄项我认为可以归档为已解决。”
+最后的小修细节按我们给出的核验说明确认，他未独立逐一核对最后新日志与清单，亦未独立运行测试。原始页面摘录见 claude-review-transcript.json。
+整体评审等级未重评。普通路径 CH 编码常驻成本、条件性 Intent/部分批准风险及单机评估范围，不因这三项完成而被一并宣布消失。
+
+交付
+pdf/main.pdf；pdf/main-zh.pdf；pdf/supplement-main.pdf；pdf/supplement-main-zh.pdf
+Next-interface-service-capital-LaTeX.zip（59 个源文件/图件）
+SHA256.json；pdf-checks.json；overleaf-check.json；overleaf-synced.jpg
+所有代码/文稿修改保留在当前工作分支，未声称已推送远端。

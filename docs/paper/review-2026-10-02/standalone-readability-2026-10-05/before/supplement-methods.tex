@@ -1,0 +1,496 @@
+\section{Experimental Methods for Archived Builds}
+\label{sec:supp-methods}
+
+\noindent\textbf{Build lineage and deployment.}
+Results retain their original build identifiers (Table~\ref{tab:supp-builds}). The
+\emph{continuation and accounting baseline}, committed as \texttt{d99ec92},
+implements the layered continuation and the accounting transitions; its
+compensation commits together with its representation. The artifact records
+per-binary SHA-256 fingerprints and the configuration of each run. The
+nine-service continuation, compensation and repayment, storage, and
+short-throughput series use this build. The initial fourteen-service paired
+runs use the same single-obligation rule before the batch-result tag was
+separated from the direct-result tag, and the cross-type codec regressions
+cover that separation. Members in the baseline storage, in-memory
+continuation, and short-throughput controls run with GOGC=200 and
+GOMAXPROCS=16; this override is not applied to committee, gateway, or wallet
+processes.
+
+The \emph{decision-first build} (accounting domain
+\texttt{DIRECT\_ACCOUNTING\_V5\_DECISION\_FIRST}) implements resubmission from
+public certificates, the compensation decision, and the separate
+representation commands. It derives from the branch base \texttt{0e7bae5}, a
+documentation-only descendant of \texttt{d99ec92}. The nine functional runs
+use the initial implementation snapshot, whose source-package SHA-256 begins
+\texttt{2c91b0251024322c}. The later snapshot of this series, whose package SHA-256 begins
+\texttt{449b4d4072c99588}, rejects a decision whose position does not match
+committed state before reading any historical block and raises the bounded
+due-decision scan from 8 to 32 entries per round; the ordinary payment path is
+unchanged. The six ordinary-path runs, the full test suite, and the race tests
+use the later snapshot of this series. The audited commit \texttt{f185f73} additionally
+requires the certificates attached to a payment to correspond one-to-one to
+its certificate inputs, and it does not change the payments accepted in the
+measured workloads. Numbers from the baseline and decision-first builds are
+reported separately.
+
+\begin{table}[t]
+  \caption{Builds and the series they support.}
+  \label{tab:supp-builds}
+  \centering
+  \small
+  \begin{tabular}{@{}p{0.2\columnwidth}p{0.3\columnwidth}p{0.4\columnwidth}@{}}
+    \toprule
+    Build & Identifier & Series \\
+    \midrule
+    Continuation and accounting baseline
+      & \texttt{d99ec92}
+      & 100-hop chains, synchronous-member and storage controls,
+        compensation and repayment matrix, paired interference runs,
+        short throughput. \\
+    Decision-first
+      & Base \texttt{0e7bae5}; functional package \texttt{2c91b0251024322c};
+        later series snapshot \texttt{449b4d4072c99588}; audited \texttt{f185f73}
+      & Nine functional runs, six ordinary-path runs, regression and race
+        tests. \\
+    Archived evaluation
+      & \texttt{721800c}
+      & 100-hop chains, the complete N/R/C/P matrix, and historical-reading controls (Section~S2). \\
+    Partial-approval reclamation
+      & \texttt{bf71c4d}
+      & Conflict and restart regressions; 1,000-payment smoke and 100-hop continuation. \\
+    Archived
+      & \texttt{e3870e1}/\texttt{a083ff6}, \texttt{f0c0a274},
+        \texttt{8e1fb40}/\texttt{5807546}, \texttt{bb65af69}/\texttt{13be856},
+        \texttt{f82f8cd}, \texttt{c1ebf2d}
+      & Operating range, original continuation, capital, organization
+        paths, batch integration, source-failure checkpoint. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The archived operating-range runs record base \texttt{e3870e1} and
+implementation \texttt{a083ff6}. Original continuation records
+\texttt{f0c0a274}, capital records base \texttt{8e1fb40} and implementation
+\texttt{5807546}, and organization paths record base \texttt{bb65af69} and
+verified source \texttt{13be856}. The archived batch integration uses
+\texttt{f82f8cd}, and the structural repair counts were repeated on the
+baseline code. The source-failure checkpoint \texttt{c1ebf2d} uses the
+superseded late-source rule and does not support the current claims.
+
+Mac trials share one M4 Max host with 16 CPU cores and 64\,GiB RAM, and the
+structural microbenchmarks run on Windows amd64. Baseline memory chains and
+short throughput trials use in-memory service state and NoSync wallets.
+Compensation and repayment trials use disk-backed committee application state
+and BlockStore with in-memory members and gateway. Storage controls change
+only member commits between bbolt NoSync and synchronous transactions. Each
+run starts from fresh genesis. Six additional fourteen-service disk-backed
+chain runs use the baseline accounting rule and user-paid FUEL. Their three
+fast 100-hop runs take 668.960--688.080\,ms, and the inter-hop confirmation
+runs take 114.496--118.742\,s. They form a separate storage and deployment
+configuration from the nine-service results in the main paper.
+
+\noindent\textbf{Decision-first functional runs.}
+The nine runs use the fourteen-service configuration with 450 initial
+outputs, a disk-backed committee, members in their default NoSync mode, flush
+and gossip settings of 10\,ms, and explicitly authorized organization-funded FUEL; signatures and all amount
+and consumption checks remain enabled. Ordinary-payment stress wallets use the
+NoSync wallet option, and the two-hop fault demonstrations use the default
+wallet mode. In each run, an injected fault prevents the original publisher
+from submitting the parent payment or running INSTALL for it after its full QC exists, so
+the original signers hold their approvals but not the QC. The child spends the
+parent's TXCer. In the resubmission treatment the driver never submits the
+original payment. The control treatment disables the automatic resubmission
+step with an experiment switch. Ordinary backup submission by members
+holding installed complete material remains enabled; INSTALL itself
+replicates that material within the organization. The
+paused treatment also disables resubmission and, while a marker file exists,
+makes the input and part adaptation HTTP endpoints of all four committee
+members return a paused status; consensus, decisions, and payment processing
+are not paused.
+
+Times start at the first HTTP send of the child payment. The fast receipt ends
+when the wallet has verified the certificate and recorded the output. Public
+events are observed by polling the followers' status endpoints, so they
+include polling delay, and the difference between two public observations is
+not a protocol delay measured from the exact commit. The compensation time
+includes the configured 30-s obligation period, the advance of public time by
+committee ticks, and background scheduling. In the paused treatment the script
+submits the late source after the compensation and waits until the status
+endpoints of all four committee members show the obligation repaid and the
+representation neither committed nor materialized. It stores these four
+observations, removes the marker, and then waits for the representation to be
+committed and materialized at all four members. The status endpoint's
+stability flag compares the header hash, data hash, and transaction identity.
+The materialization step and the real-consensus integration tests check the
+complete block identity and part-set header, so the flag alone is not offered
+as the complete identity proof. The repayment and the resumption of adaptation
+have no timestamps of their own. The measurements contain no comparison with
+periodic scanning, vote collection, or the earlier coupled build under paused
+adaptation.
+
+Each treatment has three rounds, and every functional run passes four checks:
+equal state hashes at the four committee members, a zero gap, closed
+payments, and drained outboxes. The resubmission and control treatments each
+carry three additional runs of 300 ordinary payments. Per-run values are in
+Table~\ref{tab:supp-functional}.
+
+\noindent\textbf{Decision-first ordinary-path runs.}
+Six runs compare the build at the branch base with the final decision-first
+snapshot in the order AB, BA, AB. Each sends 300 payments at 100 payments/s
+with 64 concurrent fast requests and at most 256 outstanding, using NoSync
+stress wallets. The elapsed time includes the public confirmation of all 300
+payments and member following; it is neither a single-payment time nor a
+maximum throughput. The send span is about 2.990\,s in every run. Summary
+values in the main text are medians of the per-run statistics, not quantiles
+pooled over payments. Ordinary final outputs carry no input certificates, so
+these runs do not measure the storage retained for payments whose inputs are
+not final. Per-run values are in Table~\ref{tab:supp-cost}.
+
+\begin{table*}[t]
+  \caption{Per-run records of the nine decision-first functional runs.
+    Times are client observations from the child payment's wallet send;
+    ``Parent fast'' is the original payment's own receipt. Public columns
+    include polling. A dash marks a column that does not apply or whose
+    time was not recorded. ``Auto.\ source'' does not apply in the control
+    and paused rows because automatic resubmission is disabled there; the
+    driver later submits the source, which executes and repays the issuer
+    (verified by the repayment audit), but that instant was not
+    timestamped. In the resubmission rows no compensation or
+    materialization occurs.}
+  \label{tab:supp-functional}
+  \centering
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}llrrrrrr@{}}
+    \toprule
+    Treatment & Run & \shortstack{Child fast\\(ms)} & \shortstack{Parent fast\\(ms)}
+      & \shortstack{Child public\\(s)} & \shortstack{Auto. source\\(s)} & \shortstack{Compensation\\(s)}
+      & \shortstack{Materialized\\(s)} \\
+    \midrule
+    Resubmission & 1 & 13.94 & 9.02 & 1.414 & 2.014 & -- & -- \\
+     & 2 & 13.94 & 8.94 & 1.990 & 2.565 & -- & -- \\
+     & 3 & 13.91 & 9.02 & 1.440 & 2.039 & -- & -- \\
+    \addlinespace
+    Control & 1 & 11.96 & 8.97 & 1.364 & -- & 35.839 & 36.994 \\
+     & 2 & 12.94 & 8.97 & 1.413 & -- & 35.888 & 37.021 \\
+     & 3 & 12.01 & 9.00 & 1.388 & -- & 35.864 & 37.019 \\
+    \addlinespace
+    Paused & 1 & 12.00 & 7.98 & 1.362 & -- & 35.837 & 42.748 \\
+     & 2 & 13.92 & 9.04 & 1.341 & -- & 35.814 & 42.736 \\
+     & 3 & 13.92 & 9.03 & 1.841 & -- & 35.891 & 42.798 \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\begin{table*}[t]
+  \caption{Per-run records of the six ordinary-path runs. Run orders are
+    AB, BA, AB (A $=$ branch base, B $=$ decision-first).
+    Quantiles are over the 300 payments of one run.}
+  \label{tab:supp-cost}
+  \centering
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}llrrrrrr@{}}
+    \toprule
+    Build & Run & \shortstack{Elapsed\\(s)} & \shortstack{Fast P50\\(ms)} & \shortstack{Fast P95\\(ms)}
+      & \shortstack{Block P50\\(ms)} & \shortstack{Dispatch P95\\(ms)} & \shortstack{Send span\\(s)} \\
+    \midrule
+    Branch base & 1 & 3.871 & 1.112 & 27.441 & 1151.0 & 0.338 & 2.990 \\
+     & 2 & 3.815 & 1.096 & 17.951 & 1101.1 & 0.295 & 2.990 \\
+     & 3 & 3.805 & 1.052 & 39.945 & 1076.0 & 0.437 & 2.990 \\
+    \addlinespace
+    Decision-first & 1 & 4.000 & 1.071 & 30.530 & 1127.9 & 0.430 & 2.990 \\
+     & 2 & 3.845 & 1.073 & 22.084 & 1103.9 & 0.355 & 2.990 \\
+     & 3 & 3.791 & 1.045 & 33.744 & 1052.3 & 0.383 & 2.990 \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\noindent\textbf{Regression coverage.}
+Compensation decisions are rejected when they are not yet due, when the
+network, slot, or amount does not match, when the reserve is insufficient, or
+when they conflict with the recorded decision. A repeated decision has no
+economic effect, including after repayment, where it returns no changes,
+effects, or fee outputs, and both orders, source first and decision first, are
+covered. Resubmission is tested for cross-organization and multi-level
+sources, repeated exposure, and payments already observed or already queued,
+which are not rebuilt. Ordinary verification rejects mismatched material, and
+the original approval, the payment bytes, and the CAL quota are unchanged
+before and after resubmission. Representation requires a successful decision,
+remains possible after the source's repayment, and does not restore member
+progress or Worker slices a second time. For identity and replay, real
+threshold adaptation preserves the complete consensus identity, the successor
+body, and pre-signed successor references. Replay of the original history
+reproduces the application state at every height, and item-wise and
+differently grouped representation of one decided set give the same final
+body and part openings, with 1, 2, 4, and 8 inputs spanning two real parts.
+The full test suite and static checks pass at the later snapshot of this series on Windows
+and macOS, the race detector passes on the member, representation, and
+committee-runtime packages on macOS, and the full suite and static checks pass
+again at the audited commit.
+
+\noindent\textbf{Timing and aggregation.}
+Certified-receipt latency generally runs from the first wallet HTTP send
+through recipient verification and local atomic recording. Capital and
+source-failure drivers include a small amount of pre-send construction, so
+their comparisons stay within the same driver family. A local NoSync
+transaction completion is not a synchronous durability receipt. Public and
+member completion timestamps record observation of authenticated execution,
+not the committee's internal commit. The sender's single monotonic clock
+measures cross-site ACK latency, including the return path, and a recipient
+can start its successor before the preceding sender receives that ACK.
+Offered targets, actual send rates, and completion rates including drain are
+retained separately. Captions distinguish transaction quantiles from
+statistics across runs, and within-run sample variability is not an estimate
+of cross-run uncertainty.
+
+\noindent\textbf{Delivery-gate runs.}
+On the archived delivery-gate build, the gated variant waits for three
+members to INSTALL complete material or for authenticated public success,
+whichever occurs first, and collects no second signature quorum. At 200
+payments/s for 30\,s, three paired runs per mode each send and complete 6,000
+payments. The median of run-level receipt P50s is 1.300\,ms with immediate
+delivery and 2.167\,ms with the gate. Separate 100-hop trials reduce median
+chain time from 287.983 to 200.356\,ms (Fig.~\ref{fig:delivery-gate}).
+
+\begin{figure*}[!t]
+  \centering
+  \includegraphics[width=\textwidth]{delivery-gate.pdf}
+  \caption{Delivery-gate effect (ms). Left: run-level receipt P50 at
+    200 payments/s, 6,000 payments/run, three paired repetitions.
+    Right: whole-chain time for three 100-hop chains per mode. Columns
+    show the median of the three run values; dots show individual runs.}
+  \label{fig:delivery-gate}
+\end{figure*}
+
+\noindent\textbf{Baseline-build controls.}
+The reserve trajectories of the three 5\% runs of the compensation and
+repayment matrix (Fig.~\ref{fig:reserve-recovery}) are sampled at the
+driver's release schedule, so the lowest sampled reserve is not a
+reserve-sizing result.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{recovery-reserve.pdf}
+  \caption{Sampled reserve trajectories for the three 5\% runs (60
+    compensated sources each). Repayment restores the initial 60,000 CAL.
+    The vertical axis is restricted to 59,600--60,000 CAL to show temporary
+    use. Samples reflect the driver's release schedule.}
+  \label{fig:reserve-recovery}
+\end{figure}
+
+Three pairs of fourteen-service runs, ordered normal/withheld,
+withheld/normal, and normal/withheld, use the initial baseline build, before
+the batch-result tag separation, with committee and member databases on disk
+and member and wallet NoSync. Each sends 4,000 payments at 100 payments/s for
+40\,s. Alongside them, four additional two-hop demonstrations have sources
+that are delivered normally (normal run) or withheld, compensated after
+30\,s, and later repaid (withheld run). All 4,000 payments complete in all six
+runs. The final CAL held by each owner role (30,000 and 830,000) and both
+reserve balances ($10^{12}$) coincide across the six runs, and the withheld
+runs record 400\,CAL paid and 400\,CAL repaid, so the final allocation is
+consistent with delay neutrality. Receipt P50s for normal and withheld runs
+are 1.070/1.127, 1.089/1.108, and 1.083/1.097\,ms, and P95s are
+26.84/59.23, 29.49/58.44, and 27.41/55.15\,ms; completion rates are
+97.2--97.8 payments/s in all runs. Receipt P50 is 1.3--5.3\% higher and P95 is
+1.98--2.21 times the paired normal values. Concurrent compensation therefore
+affects the receipt tail in this configuration, and these pairs do not
+isolate the responsible stage.
+
+Six runs of 1,000 payments at 100 payments/s on the nine-service
+configuration (committee on disk, wallets NoSync) differ only in the member
+store. With NoSync members, receipt P50 is 1.002--1.035\,ms and P95
+33.97--40.62\,ms, with 93.11--93.93 payments/s completed including drain.
+With synchronous member commits, P50 is 43.19--51.85\,ms and P95
+80.98--96.56\,ms, with 90.99--92.72 payments/s. All payments complete. Because
+wallets remain NoSync, this isolates the cost of synchronous member commits.
+
+\noindent\textbf{Representation microbenchmarks and batch integration.}
+These structural measurements use the earlier coupled representation command,
+which also carried the economic step. Microbenchmarks on Windows amd64 with
+Go~1.27.1 place $k\in\{1,2,4,8\}$ missing inputs in one historical block and
+part. Across five repeats, single commands require $k$ commands and $k$ part
+adaptations, whereas a batch uses one of each, and input adaptations remain
+$k$. At $k=8$, total encoded command bytes fall from 127,336 to 2,752
+(Fig.~\ref{fig:repair-cost}). The dispersed control separates batching from
+compact encoding: eight independent target blocks still require eight
+commands and eight part adaptations, while bytes fall from 30,008 to 5,440. At
+$k=1$, both formats perform one part adaptation and encode 3,751 versus 680
+bytes. Compact fields therefore explain part of the byte reduction, and
+shared block representation explains the reduced adaptation count. These are
+encoded command sizes, not total network traffic or total cryptographic work.
+They also exclude the 88-byte decision command that each decided output
+carries in the decision-first build.
+
+\begin{figure*}[!t]
+  \centering
+  \includegraphics[width=\textwidth]{repair-cost.pdf}
+  \caption{Same-block, same-part representation costs of the earlier
+    coupled command versus obligation count $k$. Panels show
+    command/part-adaptation counts and total encoded command payloads in
+    KiB (log scale). Five repeats per configuration give identical
+    structural measurements. Input adaptations remain $k$.}
+  \label{fig:repair-cost}
+\end{figure*}
+
+An archived fourteen-service, disk-backed batch-integration run
+(\texttt{f82f8cd}) combines four actual missing sources into a single
+1,568-byte batch whose BatchID agrees across all committee replicas. After
+late-parent handling, all 1,000 subsequent payments offered at 100 payments/s
+complete. Receipt P50/P95 are 1.048/26.531\,ms, and total completion time is
+11.120\,s, including observation and shutdown. Gaps and outboxes drain, and
+committee state hashes agree. This batch carried economic steps and predates
+the separation of decisions from representation.
+
+\noindent\textbf{Externally funded authorization controller.}
+The capital experiments sample member availability every 200\,ms. Let $\rho$
+be the declared CAL authorization demand per second, counting both parent and
+child requests in each workload unit, and let $u$ count unique requests whose
+certification remains unfinished. The controller sets
+\begin{align*}
+ b &= 200+100u,\\
+ H_{\mathrm{low}} &= \rho\,(0.8\,\mathrm{s})+b,\\
+ H_{\mathrm{target}} &= 1.25H_{\mathrm{low}}.
+\end{align*}
+Here the watermarks and burst allowance are in CAL. When the minimum observed
+member availability $A_{\min}$ falls below $H_{\mathrm{low}}$, the proposed
+grant increment is
+\[
+ \Delta B=100\left\lceil
+ \frac{1.5(H_{\mathrm{target}}-A_{\min})}{100}
+ \right\rceil,
+\]
+subject to the configured authorization cap and available external funding. At
+most one increment is in flight. Its public command debits the external source
+and credits the reserve and grant atomically, and following members add the
+resulting share difference without clearing existing approvals. The experiment
+supplies $\rho$ in advance rather than estimating unknown production demand.
+Controller decisions are requests for actual funded transfers, not a mechanism
+for creating backing capital.
+
+\noindent\textbf{Capital workload accounting.}
+Each condition has one 300-s run with one Worker per member and sufficient
+user FUEL. Starting from 3,600 CAL, the constant, rate-step, and
+delayed-parent conditions end at 14,400, 21,600, and 23,300 CAL after external
+transfers of 10,800, 18,000, and 19,700 CAL
+(Table~\ref{tab:eval-capital}). Each completes 6,000 two-hop units, or 12,000
+payments, spending 1,128,000 user FUEL. Corresponding fixed-high controls
+complete, while the fixed-low condition closes 46 of 6,000 units, leaves 5,826
+unstarted, and records 64 partially approved payments. These categories have
+different units and are not summed as one payment count. The per-run tables
+preserve the full seven-condition comparison without implying three
+repetitions per condition. The series ran on an earlier build in which no
+compensation occurred.
+
+\begin{table}[t]
+  \caption{Actual capital additions. Each condition has one 300-s run,
+    starts with 3,600 CAL, and completes 12,000 payments. Both columns
+    are CAL; every addition debits an external funded account.}
+  \label{tab:eval-capital}
+  \centering
+  \small
+  \begin{tabular}{@{}lrr@{}}
+    \toprule
+    Workload & Final reserve & Added capital \\
+    \midrule
+    Constant: 20 units/s & 14,400 & 10,800 \\
+    Step: 10 to 30 units/s & 21,600 & 18,000 \\
+    Parent delayed by 3\,s & 23,300 & 19,700 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\noindent\textbf{Identities, resource use, and retained history.}
+The multi-identity configurations use shared clients, so 2,048 wallet
+identities do not represent 2,048 separate operating system processes.
+Comparing independent inputs with ten-hop payments, the three-run medians are
+12.67 versus 15.24 core-ms per payment and 59.32 versus 71.83\,KiB of HTTP
+payload per payment. Memory reporting separates total node RSS and retained
+history from active obligations, pending work, and outboxes, so an increasing
+historical footprint is not reported as an increasing payment backlog.
+Per-run resource summaries and their archived source locations are included in
+the artifact index.
+
+\noindent\textbf{Endpoint-specific Lightning reference.}
+The archived deployment uses LND v0.21.3-beta and Bitcoin Core 31.1 in
+regtest, with synchronous LND persistence and its 50-ms channel-commit
+setting. Each of three fresh deployments has two nodes and a direct channel.
+After 20 warm-up transfers, each run issues 100 serial, alternating
+10,000-satoshi payments using prepared invoices, with receiver
+\texttt{SETTLED} as the completion event; the reported P50/P95 are
+282.12/320.17\,ms. A separate Next run sends 300 payments at 100 payments/s
+for 3\,s using in-memory service state and NoSync wallet storage.
+Recipient-certified receipt has P50/P95 of 0.9625/1.2075\,ms. Workload
+concurrency, durability, and completion semantics differ, so these records are
+deployment references rather than a normalized acceleration ratio.
+
+\begin{table}[t]
+  \caption{Compensation decision record and representation commands (C3).
+    Both are public commands committed once; they differ in what the
+    stored history shows.}
+  \label{tab:c3-compare}
+  \centering
+  \small
+  \begin{tabular}{@{}p{0.2\columnwidth}p{0.37\columnwidth}p{0.37\columnwidth}@{}}
+    \toprule
+    & Decision record & Decision plus representation (C3) \\
+    \midrule
+    Economic closure
+      & Reserve debit, obligation state, and fee effects commit in one
+        public decision, independent of adaptation; successors unchanged.
+      & The same decision; representation commands add no economic
+        effect. \\
+    Stored historical body
+      & Original body unchanged; the funding source of a consumed input is
+        read from the decision index.
+      & Stored body names the reserve debit; transaction identity, owner
+        authorization, and complete block identity $(H_b,P_b)$ are
+        unchanged and verified. \\
+    Inspecting a designated historical input
+      & Consult the decision index together with the block.
+      & Read the represented source under the original commitments and consult the permanent decision and current obligation state in the same $V_H$. \\
+    Readers
+      & An honest local replica that has verified and executed prefix $H$.
+      & The same local replica, reading a committed logical revision in $V_H$; remote untrusted readers need separate authorization evidence. \\
+    Storage and replay
+      & Original blocks plus decision records; replay runs the original
+        commands, including decisions.
+      & Additionally revised bodies, revisions, and tasks; replay runs the
+        same original commands and the representation commands;
+        same-block commands share part adaptation and installation
+        advances to the latest committed revision. \\
+    Progress dependency
+      & Public execution of the decision.
+      & Three adaptation contributions and a current revision; economic
+        closure does not depend on them. \\
+    Status
+      & Implemented as the economic path; measured in the decision-first
+        runs.
+      & Implemented; functional runs and regressions above. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Archived Operating-Range Series}
+The archived operating-range series complements the continuation results. One
+active organization uses sponsored fees, reused addresses, and independent
+final inputs. Five runs of 150,000 payments each all finish
+(Fig.~\ref{fig:operating}). At a target of 2,000 payments/s, two runs achieve
+completion rates of 1,948.66--1,950.45 payments/s, including drain, with
+receipt P50s of 2.521--2.566\,ms. Raising the target to 2,200 yields
+2,103.63--2,106.29 completed payments/s. At 2,400, the achieved rate is
+2,174.68, P50/P95 rise to 7.174/89.38\,ms, and the 4,096-entry pending
+admission limit records 1,635 hits. The operating curve pairs achieved
+completion rates with their corresponding queue pressure.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.62\columnwidth]{operating-point.pdf}
+  \caption{Operating points versus target offered load. Top: completion
+    throughput (payments/s), including drain. Bottom: receipt latency (ms).
+    Each point is one 150,000-payment run:
+    two at target 2,000, two at 2,200, and one at 2,400.
+    P50/P95 summarize transactions within each run, not cross-run
+    uncertainty. All services share one host.}
+  \label{fig:operating}
+\end{figure}

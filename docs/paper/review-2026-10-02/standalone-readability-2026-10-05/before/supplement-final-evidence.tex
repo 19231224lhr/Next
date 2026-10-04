@@ -1,0 +1,379 @@
+\section{Current-Build Evidence and Implementation Correspondence}
+\label{supp:final-evidence}
+The production baseline is \texttt{f856c7b}. Six chain runs and three representative P runs share node binaries and Comet sources. Additional \texttt{payctl} following checkpoints are enabled in every chain run. The \texttt{final-\allowbreak evidence-\allowbreak 2026-10-04} artifact retains source and binary fingerprints, payment records, audits, analysis scripts, and regression logs. Tables below are generated from their CSV/JSON records.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Six chain runs. Times start at the first actual send, in seconds. Public denotes observation of payment 100; closure denotes all-payment member observation.}
+\label{tab:final-evidence-chain}
+\begin{tabular}{lrrrrr}\toprule
+Run & Receipt chain & Public & Closure & Attempts & Gaps \\\midrule
+r1-fast & 4.726 & 5.451 & 5.495 & 100 & 2 \\
+r1-wait & 64.479 & 65.054 & 65.115 & 140 & 0 \\
+r2-fast & 4.700 & 5.480 & 5.535 & 100 & 4 \\
+r2-wait & 64.670 & 65.280 & 65.300 & 138 & 0 \\
+r3-fast & 4.707 & 5.477 & 5.526 & 100 & 1 \\
+r3-wait & 64.387 & 64.983 & 65.030 & 136 & 0 \\
+\bottomrule\end{tabular}
+\end{table}
+
+\noindent\textbf{Stage definitions.} Ordinary intervals use 100 payments per run and inter-hop intervals use 99 transitions. We calculate P50/P95 within each run, then take the median of the corresponding three quantiles. Shared wallet/height checkpoints are expanded by payment, not treated as independent height samples. Intervals use same-host Unix-nanosecond timestamps; whole-chain duration uses a monotonic clock. The verification checkpoint follows successful VerifyBlock at PrepareBlock entry. The post-transaction callback follows Update return, not a synchronous flush. Negative differences retain execution overlap. Successful-fetch time is contained in commit-to-complete-fetch; neither overlapping intervals nor quantiles are added, and a successful return does not identify the earliest evidence availability.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Client stages: medians of three within-run quantiles, in milliseconds.}
+\label{tab:final-evidence-stages}
+\begin{tabular}{lrrrr}\toprule
+Interval & Fast P50 & Fast P95 & Wait P50 & Wait P95 \\\midrule
+Send to application commit & 573.703 & 814.807 & 363.470 & 381.553 \\
+Commit to complete fetch & 395.096 & 440.920 & 285.884 & 314.509 \\
+Fetch to verification checkpoint & 0.114 & 0.399 & 0.084 & 0.236 \\
+Checkpoint to post-transaction callback & 0.940 & 27.496 & 0.128 & 1.343 \\
+Callback to driver observation & 2.669 & 4.649 & 3.099 & 4.713 \\
+Successful fetch call (overlapping) & 9.228 & 26.355 & 0.557 & 7.593 \\
+Receipt to next send & 0.269 & 15.228 & 585.442 & 625.777 \\
+Observation to next build & -905.118 & -630.176 & 0.002 & 0.006 \\
+Next build to send & 0.265 & 15.224 & 0.237 & 11.539 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+\begin{table}[htbp]
+\centering\small
+\caption{P driver backpressure. Limit hits count driver events, not rejected payments. All payments close.}
+\label{tab:final-evidence-pressure}
+\begin{tabular}{lrrrr}\toprule
+Run & \shortstack{Peak\\outstanding} & \shortstack{Total-limit\\hits} & \shortstack{Fast-limit\\hits} & \shortstack{Scheduled receipt\\P95 (ms)} \\\midrule
+r1-P & 256 & 7 & 0 & 189.591 \\
+r2-P & 256 & 29 & 0 & 326.828 \\
+r3-P & 256 & 143 & 917 & 851.742 \\
+\bottomrule\end{tabular}
+\end{table}
+
+\clearpage
+\begingroup
+\small
+\setlength{\tabcolsep}{3pt}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\setlength{\LTcapwidth}{\textwidth}
+\renewcommand{\arraystretch}{1.10}
+
+\begin{longtable}{@{}
+    >{\raggedright\arraybackslash}p{0.22\textwidth}
+    >{\raggedright\arraybackslash}p{\dimexpr0.48\textwidth-2\tabcolsep\relax}
+    >{\raggedright\arraybackslash}p{\dimexpr0.30\textwidth-2\tabcolsep\relax}
+    @{}}
+\caption{Selected proof--implementation correspondences for production baseline \texttt{f856c7b}. The artifact index retains complete paths and test assertions.}
+\label{tab:proof-implementation}\\
+\toprule
+Claims (main-text names) &
+Production entry and proof obligation &
+Representative regression evidence \\
+\midrule
+\endfirsthead
+
+\multicolumn{3}{@{}l}{Table~\thetable\ (continued)}\\
+\toprule
+Claims (main-text names) &
+Production entry and proof obligation &
+Representative regression evidence \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{3}{r@{}}{Continued on next page}\\
+\endfoot
+
+\bottomrule
+\endlastfoot
+
+Original-execution agreement &
+The Comet overlay and \texttt{matchesBlockID} compare both identity
+components. Original-part validation and candidate transfers preserve
+body--parts pairing and execution context through consensus and replay. &
+Stable-hash identity cases, rejected relabelled openings and uncertified
+revisions, and retained-original replay; Comet-specific evidence keeps
+its recorded build. \\
+
+Authenticated, unique consumption;
+public authorization &
+\texttt{ApproveDirectBytes} commits locks, Intent, approval, and debits
+before signing. \texttt{CheckTx}, \texttt{ProcessProposal}, and
+\texttt{FinalizeBlock} reach \texttt{Engine.Check} and submission
+verification. Full-byte caching does not replace current-ledger checks
+in \texttt{EvaluateDirectPaymentAt}. The fixed wire4 cases in
+\texttt{Check}/\texttt{ExecuteAt} are \texttt{ReserveIncrease},
+\texttt{ClockTick}, \texttt{RepairInput}, \texttt{RepairBatch},
+\texttt{CompensationDecision}, and \texttt{DirectSubmission};
+\texttt{Execute} rejects legacy in direct mode. &
+\texttt{TestPublicAuthorization\allowbreak AtABCIEntry};
+\texttt{TestDirectModeRejects\allowbreak AlternatePayment\allowbreak Envelopes}; distinct-voter, identical-byte-cache, current-ledger, durable-approval,
+and replay tests. \\
+
+Superseded partial approval
+and~Residual capacity &
+Authenticated successful, applied results reach
+\texttt{reclaimPartial} and \texttt{finishLocal}.
+Normal CAL restoration requires observed source settlement;
+invalidation separately requires the guarded same-configuration input
+conflict. Both restore only original residual debits, with cumulative
+progress and the follower cursor committed atomically. &
+Partial-conflict, multiple-input, failed-result, contradiction,
+late-effect, original-debit, and cumulative-restart tests. \\
+
+Resubmission preserves authorization
+and~Certificates bound liability, not execution &
+\texttt{recoverExposedSources} reconstructs retained approved material
+with the public QC and verifies it before queuing; it creates no
+approval or debit. \texttt{EvaluateDirectPaymentAt} preserves the global
+Intent binding established by successful execution. &
+Cross-organization and multi-depth source reconstruction, duplicate
+exposure, Subject separation, and the two-round Intent-compensation
+ledger. \\
+
+Potential liabilities are funded &
+\texttt{PrepareDirectVector}, submission verification, and approval
+bind issuer, configuration, grant, and Worker availability.
+\texttt{GrantShare}, \texttt{EvaluateReserveIncrease}, and
+\texttt{ApplyReserveIncrease} use external unprotected funding and
+cumulative share differences without erasing existing debits. \texttt{Engine.NewEngine} aggregates
+CAL/FUEL grants by \texttt{AccountKey} and checks their total against
+its balance. Protected CAL includes all organization and CAL-grant accounts. &
+Capacity fragmentation, funded completion, persistent 2/2 input split,
+protected-source rejection, shared external funding, and cumulative
+rounding tests. \\
+
+Compensation takes effect at most once
+and~Source repayment &
+\texttt{ExecuteDecision} checks the recorded decision, Open status,
+public deadline, position, and amount before atomic compensation.
+\texttt{recoverOutput} repays the original issuer within successful
+source execution, bounds recovery by payment, and creates no second user output. Only an undecided target reaches
+\texttt{targetSlot}, which requires \texttt{OriginalFunding} matching
+its original \texttt{OutputID}, amount, and fixed consumer fields. &
+Repeated and conflicting decisions, late-source repayment, partial-output
+repair, four-hop orders, and split--merge orders. \\
+
+CAL conservation
+and~CAL delay neutrality &
+Payment, compensation, repayment, and reserve-increase transitions
+apply through overlays and public commit. Failed transitions contribute
+no business changes. Terminal CAL comparison retains the theorem's
+initial-state, conflict-free source-closed payment-set, and successful payment/top-up conditions;
+it does not compare FUEL. &
+Monetary projections across interleavings and replay; current-build
+audits of 600 chain payments and 21,048 representative P payments. \\
+
+Decision-gated representation authority
+and~Representation is economically inert &
+\texttt{InputTarget}, \texttt{batchBody}, and \texttt{ExecuteBatch}
+derive decided slots, preserve non-target bytes, and check openings,
+version digests, and the original complete BlockID.
+Representation-only writes and unchanged subsequent economic reads
+are separate obligations; \texttt{DecodePublicExecution} adds no
+representation-induced principal effect. Both \texttt{RepairInput} and
+\texttt{RepairBatch} use decided-target guards.
+\texttt{EvaluateDirectPaymentAt} does not read historical \texttt{Canonical}.
+Existing decisions return before historical access; other revised slots
+leave an undecided target and its fixed fields unchanged. &
+Atomic two-input and cross-part batches, compensation before adaptation,
+and payment--repair monetary replay. \\
+
+Identity preservation and installation independence;
+local reader contract &
+\texttt{Canonical} selects the logical revision in $V_H$.
+\texttt{PrepareMaterialization} supplies exact Task material;
+physical revision guards prevent rollback, and replay uses originals.
+Saved-commit compatibility does not itself authorize a revision. &
+Revision-order and interleaved-queue tests, original-history replay,
+reader equivalence, and \texttt{same\_consumer\_views} across real
+repayment at $H=4,5$. \\
+
+Protected continuation;
+Economic closure does not wait for adaptation &
+Shared authorization guards compose with
+\texttt{finality.VerifyBlock}, \texttt{PrepareBlock}, and
+\texttt{blockfollow.Commit}.
+\texttt{FreshRecv} remains a history premise.
+Economic closure uses \texttt{ExecuteDecision} without adaptation
+access; business updates and follower progress commit together.
+\texttt{wallet.ReceiveDirect} checks registered configuration, network,
+owner, and \texttt{c.VerifyOutput}, and atomically records
+\texttt{DirectCoin}, rejecting inconsistent bodies for one OutputID.
+\texttt{member.\allowbreak InstallDirectClassified} verifies the full payment,
+rejects Invalidated in its transaction, treats Observed as a no-op,
+and records all input/fee consumption, install material, and outbox
+without another reservation. Receipt checks alone do not establish FreshRecv. &
+Durable approval/background installation, 297 early successors in six
+chains, and 96 replica--target P checks showing repayment before
+representation commitment or materialization. \\
+\end{longtable}
+\endgroup
+
+\noindent\textbf{Premises and evidence levels.}
+The proofs cover finite traces under the stated model; production
+guards identify implementation responsibilities, and regressions
+exercise particular acceptance and rejection traces.
+Fixed four-member organizations and a four-validator committee,
+three-vote quorums, at most one static Byzantine participant per group,
+consistent configuration, and non-rollback of honest signing state remain
+model or deployment premises. Aggregate genesis backing and protected-CAL
+restrictions map to \texttt{Engine.NewEngine}, the fixed dispatcher,
+and the account guards above.
+Signature unforgeability, binding original commitments, and correctly
+generated dealer-based threshold RSA parameters are not established by
+functional tests; fixed-target opening convergence additionally requires
+unique valid openings.
+Historical reads trust one verified, executed prefix $V_H$ with retained
+history, while progress retains its capacity, resource, and fair-delivery
+conditions.
+The new \texttt{TestPublicAuthorization\allowbreak AtABCIEntry} sends already encoded,
+tampered authorization bytes directly through the three ABCI interfaces
+and checks rejection without business-state changes.
+Sender-side encoding failures are separate; receiver-side decoding,
+binding, and signature-verification rejections are distinct outcomes.
+This test does not identify the deepest rejection stage for each case;
+encoding or decoding rejection is not evidence that signature verification executed.
+Existing cache regressions distinguish byte-identical reuse from
+current-ledger validation.
+The current eight-package regression passes, with client and test
+additions fingerprinted separately from the production baseline.
+Comet-interface, persistent-restart, network-evidence, and threshold
+tests retain their recorded versions and scope; they are not new
+remote-download experiments, exhaustive Byzantine-scheduling tests,
+or mechanized proofs.
+
+% BEGIN FINAL REVIEW ADDITIONS
+\subsection{Approval and Execution Conditions}
+\begingroup\small
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.15\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}@{}}
+\caption{Member approval versus public execution. D: deterministic functions of the
+submitted bytes and static configuration. S: checks against two different states.
+L: delivery and scheduling assumptions. Theorem~3 compares only histories in which every
+payment and increase succeeds; the table does not claim that a QC-bearing payment
+always executes.}
+\label{tab:sup-checks}\\
+\hline
+Check & Member approval (\texttt{Approve\allowbreak DirectBytes}) & Public execution (\texttt{VerifyDirect\allowbreak Submission}, \texttt{EvaluateDirect\allowbreak PaymentAt}) & Relation and claim \\
+\hline
+\multicolumn{4}{@{}l}{\textit{D. Deterministic}} \\
+D1 Encoding, owner authorization, initial funding openings, rule IDs, network, configuration, epoch
+ & \texttt{PrepareDirect\allowbreak Vector}; identity equals own organization
+ & Same \texttt{PrepareDirect\allowbreak Vector}, plus the current payment QC; organization looked up by configuration
+ & Shared fixed-content checks. A member signs after local commit; public execution additionally verifies the assembled QC. \\
+D2 Admission vector and caps (CAL cap includes change; escrow floor includes one compensation charge per certificate input)
+ & \texttt{PrepareDirect\allowbreak Vector}
+ & \texttt{PrepareDirect\allowbreak Vector}
+ & Identical caps on both sides. \\
+D3 Direct input certificates; value conservation
+ & Issuer configuration, rules and output checked; one certificate--index entry per certified input; duplicate OutputIDs and unused entries rejected; $\sum$in $=\sum$out
+ & The same bindings; $\sum$in $=\sum$out at evaluation
+ & Equivalent checks; the member also lies in a validated single-network configuration. \\
+\hline
+\multicolumn{4}{@{}l}{\textit{S. State}} \\
+S1 Input instances
+ & Candidate/consumed locks; authenticated creation records for final principal and user-fee inputs, matching certificates for certified inputs. Locks are written before signing
+ & Consumed flag; final creation record, or a direct certificate for a missing output
+ & Quorum intersection: no two conflicting QCs. A QC excludes public consumption by a different fact. Local lag may cause rejection or permit a partial conflicting approval by a member outside the executed payment's signer set; intersection still prevents a conflicting QC. \\
+S2 Intent
+ & Organization-local Intent $\to$ TxID
+ & Global Intent $\to$ TxID, written on successful execution
+ & Independent states; conflict is possible with valid QCs (the global Intent counterexample). \\
+S3 Grants, capacity, fees
+ & Worker-slice \texttt{Available} $\ge$ cap for every resource; fee inputs and grants checked in member state
+ & CAL: registration within the grant (\texttt{Reserved}+\texttt{Spent} $\le B_g$); non-CAL: \texttt{updateUsage}; FUEL account or fee-input UTXOs
+ & CAL coverage excludes grant-capacity failure at first registration and reserve-principal shortfall when compensating an Open obligation. Other resource and fee checks remain separate execution conditions. \\
+\hline
+\multicolumn{4}{@{}l}{\textit{L. Liveness}} \\
+L1 Inclusion, delivery, resubmission
+ & Original signer keeps the approval and follows the chain
+ & Honest inclusion and fair delivery; no global Intent conflict for the source
+ & No completion bound and no timeout unlocking; adaptation is not required for closure. \\
+\hline
+\end{longtable}
+\endgroup
+
+
+\subsection{Recovery and Boundary Evidence}
+\paragraph{Automatic source resubmission (R).}
+On the frozen build, one run schedules 2,000 ordinary payments (100/s for 20\,s)
+plus three cross-organization parent--child pairs, 2,006 payments in total, with
+automatic resubmission enabled and adaptation not paused. For each pair, the driver
+obtains the parent's three signatures through a collector that neither persists,
+installs nor submits it, and the driver never submits the parent itself; the client
+stays alive and observes, so this is withholding, not process-crash injection. The
+child spends the parent's TXCer. After the child's public execution exposes that
+certificate, the parent's original signers rebuild and submit the parent. All three
+obligations end Fulfilled and none is compensated; all 2,006 payments close,
+committee state hashes agree, outboxes are empty, and member CAL, execution and
+byte-budget reservations return to zero. The three pairs are three recovery targets,
+not repetitions. Times are client observations; outbox creation times were not
+recorded.
+
+\begin{table}[htbp]
+\caption{Pair-level observations in R (ms). Receipt times start at each payment's own
+first send; the last two columns start at the child's first send and are client
+observations, not internal recovery times.}
+\label{tab:sup-r}
+\centering\small
+\begin{tabular}{@{}rrrrr@{}}
+\hline
+Pair & Parent & Child & Child & Source \\
+ & receipt & receipt & public & Fulfilled \\
+\hline
+0 & 100.146 & 116.559 & 1391.849 & 2767.211 \\
+1 &  82.988 &  61.749 & 1806.036 & 2958.003 \\
+2 &  75.033 & 135.119 & 1286.147 & 2442.890 \\
+\hline
+\end{tabular}
+\end{table}
+
+\paragraph{Rotating-signer bound.}
+A deterministic regression uses production approvals, public execution and
+compensation. One Byzantine member signs without applying its local limit; the three
+honest members co-sign in the pairs $(0,1)$, $(0,2)$, $(1,2)$. Each round certifies a
+100-CAL source that loses on global Intent; a valid child then consumes its output and
+the issuer reserve is debited. With $B_g=300$ the reserve falls $300\to200\to100\to0$,
+honest reservations are $(100,100,0)$, $(200,100,100)$, $(200,200,200)$, and the fourth
+request is refused by all three honest members. A repeated decision changes nothing and
+CAL/FUEL are conserved. The run attains $Q_g=B_g$, so the two-round stop in
+Table~\ref{tab:s3-ledger} is specific to a fixed signer set. It measures neither attacker profit nor
+cost: the source inputs stay locked and FUEL is spent.
+
+\paragraph{Version bridge.}
+Between 721800c and 9879f64, five member production files changed
+(\texttt{blocks.go}, \texttt{direct.go}, \texttt{outcome.go}, \texttt{partial\_reclaim.go},
+\texttt{source\_recovery.go}); the 721800c N/R/C/P and capital results therefore keep their
+original build and are not inherited. Between 9879f64 and f856c7b, the checked member,
+committee, rules, redaction, transport, wallet, protocol, finality, node entry points, dependencies and Comet production
+files are unchanged; only client and test files differ. The three redaction core files and
+the listed Comet overlay files have identical SHA-256 digests in all three builds. No
+older number is relabelled.
+
+\paragraph{Retries in wait mode.}
+Wait mode uses 414 attempts for 300 payments (140, 138 and 136 per run). The client
+sleeps 50\,ms after every failed attempt, whatever the cause (transport, HTTP status or
+read error), and the original logs do not classify failures. The 114 extra attempts
+therefore include 5.7\,s of fixed sleep over the three runs, plus unmeasured
+service time. We report the $13.70\times$ ratio with retries included and derive no
+retry-free figure.
+
+\paragraph{Manifest scope.}
+The manifest has 309 entries: 305 build-source files, two experiment runners,
+and \texttt{go.mod} and \texttt{go.sum}.
+Chain, P, and R node binaries, the client, and expanded Comet sources match exactly.
+The \texttt{member} wrapper executes \texttt{member-real}.
+It sets \texttt{GOMAXPROCS} to 16 and \texttt{GOGC} to 200.
+
+\paragraph{Dispatch-slot interpretation.}
+The driver acquires a fast slot before serialized pacing and releases it after
+certified receipt. In P run 3, 63.31\% of aggregate slot time precedes HTTP send;
+its P95 is 589.422\,ms, compared with 589.418\,ms of recorded pacing wait.
+At the 917 fast-limit checks, timestamp reconstruction gives medians of 59
+acquired-but-unsent tasks and five sent tasks awaiting receipt.
+The reconstruction uses the receipt timestamp immediately before slot release.
+Thus a fast-limit hit does not identify a slow member request. Total unfinished-task
+backpressure remains in the results; no runtime trace was collected to attribute
+its underlying service delay to CPU scheduling, storage, or block following.

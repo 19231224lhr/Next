@@ -1,0 +1,73 @@
+Claude responded: 失败条件分类
+Determining which checks still require supporting evidence.
+
+Determining which checks still require supporting evidence.
+失败条件分类
+
+下表按附件中的原代码，对一笔持有 QC 的来源交易在 EvaluateDirectPaymentAt 中可能遇到的每个失败分支做分类。
+
+检查（位置）	返回	性质	对持有 QC 的来源是否可能发生
+fact 为零值、Rules 不匹配、时间与 timeout 检查	ErrRule	静态	只有规则升级时才会永久失败，属于模型外情形
+全局 Intent 已绑定到其他 TxID	ErrConflict	永久	会发生（Lemma 5）
+grant()：记录缺失，或 ID、Config、Key 不匹配	ErrAuth	静态	固定配置下不会发生；重配置或 grant 替换属于模型外情形
+CAL 条目 a.Cap > g.Amount	ErrLimited	静态	成员已做同样检查，且授权只增不减，因此不会发生
+Policy Subject 不匹配	ErrAuth	静态	成员已检查，不会发生
+ValidateDirectFee（用户自付模式）	ErrMissing / ErrAuth / ErrLimited	静态（最终创建记录不会消失）	不会发生
+费用输入或本金输入已被消费，义务或 promise 冲突	ErrConflict	—	被输入锁与法定人数交集排除
+缺失父输入的 register 中 CAL 的 updateUsage	ErrLimited	—	被 Theorem 1 / 式 (7) 排除
+register 中没有 CAL 条目	ErrRule	静态	成员绑定唯一 CAL 条目，不会发生
+非 CAL updateUsage，work 类	ErrLimited	暂时占用	可能发生，详见下文
+非 CAL updateUsage，FUEL / Policy 类	ErrLimited	实际支出，单调累积	未定，详见下文
+组织代付模式 changeAmount(FUEL 账户, Maximum)	余额不足	取决于账户余额	未定，详见下文
+NewEscrow、feeStage、ErrAccounting	—	静态	成员已做托管下限与守恒检查，不会发生
+work 类资源：暂时占用
+
+closeFee 对 work 类资源调用 updateUsage(..., spent=0, register=false)，只释放 Reserved，不计入 Spent。因此 ErrLimited 是暂时的：一旦占用额度的其他支付关闭，额度就会恢复。
+
+但 closeFee 要求 Pending == 0。所以一个带有 Open 义务的消费者，会一直占用其组织 grant 下的 work 额度，直到来源到达或补偿决定执行。
+
+FUEL / Policy 类资源：实际支出
+
+这两类资源在关闭时执行 Spent += Rewards + Burned，Spent 永久累积。在授权额度不增加的情况下，后续支付可能遇到永久性的 ErrLimited。
+
+对于已认证但尚未执行的来源，是否存在类似 CAL 的覆盖不等式，取决于两项成员侧规则，附件中没有：
+
+FUEL / Policy 的份额如何划分；
+§IV-C 中"已支出的 FUEL 不恢复"的本地簿记规则。
+
+这一项仍需证据。
+
+组织代付的 FUEL 账户
+
+扣押额是 Maximum。代码依赖 genesis 时"Σ grants ≤ 余额"的聚合检查，但这个检查能否推出"已认证事实的扣押不会因余额不足而失败"，取决于 FUEL 的 cap 与 Maximum 之间的对应关系，以及 FUEL 账户有哪些入账路径，附件中没有。这一项也需证据。
+
+closeFee 自身
+
+closeFee 在 Reserved 下溢，或某个 FUEL / Policy 条目出现 paid > cap 时会失败。由于补偿决定在 Pending 归零时也会执行费用关闭，这里需要作者确认 paid ≤ cap 是一个被保证的不变式。否则补偿决定可能被这一步阻塞。
+
+CAL 定理的适用范围
+
+Theorem 1 与式 (7) 只保证两件事：
+
+首次登记时，CAL 授权容量不会不足；
+补偿一个 Open 义务时，储备本金充足。
+
+以下情形都不在其覆盖范围内：Intent、非 CAL 资源用量、FUEL 账户余额、grant 记录的身份、规则版本。Theorem 3 以"全部支付成功"为前提，同样不覆盖这些失败。
+
+据此修正上一轮的说法：在模型内已确认的永久性失败只有 Intent；FUEL / Policy 授权耗尽是否会造成永久失败，仍待成员侧证据；work 类资源与代付账户余额属于暂时性或依赖条件的失败。
+
+对上一轮表述的纠正
+守恒式。 Theorem 2 的 U + A − D = C0 在每个前缀上都成立。单笔补偿只令 ΔA = ΔD = −a，消掉的是它自身对应的缺口。只有当全部 Open 义务都关闭、D = 0 时，才有 U + A = C0。上一轮写成"补偿恢复 U + A = C0"，这是错的。
+闭合时间。 协议不提供无条件的固定墙钟上界。Lemma 12 给出的是：在截止期已到、决定被公平纳入、原始历史可用、储备与托管充足的前提下，义务最终会闭合，而延迟仍受共享资源与排序影响。上一轮"有界时间的会计终局"应改为**"在上述假设下的最终闭合"**。补偿的另一个具体公开效果是：通过 closeFee 释放消费者所属组织 grant 下的 work 预留，并结清 FUEL / Policy 用量。
+"攻击者不能获利"。 这一结论仅限于 TestRevisionIntentTwoRoundCompensation 这一个夹具，且以赢家付给攻击者自控地址为前提。而 boundary-summary.json 只记录了组织账户，攻击者一侧的持有是我依据测试结构推得的，并没有被账本直接记录。它不构成一般性的经济安全证明。上一轮的 8B/9 同样只是计数推导，没有经过实验验证。
+
+以上技术结论确认完毕，等另一位评审的意见到后再交换总体意见。
+
+
+Create a Word document
+
+
+
+
+
+just now

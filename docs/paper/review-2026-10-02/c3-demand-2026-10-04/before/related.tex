@@ -1,0 +1,89 @@
+\section{Background and Related Work}
+\label{sec:related}
+
+Next combines certified payments that a recipient can reuse before public
+execution, reserve-backed responsibility for a source that has not executed,
+and authorized editing of stored history. We compare prior work along two
+questions: who answers for a missing source, and which payment and block
+identities survive once that answer is recorded.
+
+\noindent\textbf{Certificate-based payments and execution.}
+FastPay uses Byzantine consistent broadcast for low-latency payments and, in
+its primary-ledger deployment, backs redemption with prepaid
+funds~\cite{fastpay}. Its redeemability argument lets a valid certificate be
+confirmed before all incoming transfers are locally confirmed, provided the
+sender's missing earlier outgoing certificates are supplied; redemption then
+reaches the primary funding pool. Zef combines disposable accounts with
+private, transferable coins, and ordinary spending uses current coin
+certificates and consumption evidence in place of the full ancestor
+history~\cite{zef}. Sui Lutris pairs broadcast execution for owned objects
+with consensus for shared-object interactions~\cite{lutris}.
+
+Stingray supports concurrent transactions through Byzantine bounded counters
+and FastUnlock~\cite{stingray}. Its overlapping per-replica budgets
+(Sec.~4.2) and its treatment of budget exhaustion when no quorum certificate
+forms (Sec.~5.3) are the counting precedent for Next's signing-capacity
+accounting, and we do not present them as new. Its commutative workloads
+differ from a payment chain in which each transaction consumes its
+predecessor's output. For that chain, Next publicly executes a certified
+consumption before the source executes and registers a funded obligation
+against the direct issuer. It adds responsibility for certificates that were
+never published, dynamic conservation of the Paid, Recovered, and Remaining
+quantities of each certificate, and closure of the source obligation by a
+public decision. The successor's execution also publishes the source's
+certificate, so the issuing organization's own members can resubmit the
+source from the approvals they stored.
+
+\noindent\textbf{Channels and collateralized guarantees.}
+Blitz replaces two-phase commitment in channel payments with
+pay-or-revoke~\cite{blitz}, Donner develops virtual channels that address the
+Domino attack~\cite{donner}, and CryptoMaze provides atomic multipath channel
+payments with unlinkable partial payments~\cite{cryptomaze}. All three operate
+through channel arrangements. Next runs on a native ledger with registered
+consumption routes and organization reserves, so counterparties need neither a
+bilateral channel nor a prefunded route between them.
+
+Snappy protects merchants who accept fast on-chain payments through
+collateralized approvals, and reusable payment guarantees combine privacy with
+customer collateral that can be reused across defined time
+windows~\cite{snappy,reusable}. Next keeps the user's payment principal
+separate from additional organizational backing, and its compensation closes
+the missing source of an already executed child without a second principal
+credit to that child's recipient. HyperService adjudicates cross-chain
+execution violations through a public Network Status Blockchain and an
+Insurance Smart Contract that financially reverses the effects of committed
+transactions~\cite{web3}. Next draws the responsibility boundary within one
+native UTXO ledger: compensation settles a direct issuer obligation and leaves
+the principal effects of executed successors in place.
+
+\noindent\textbf{Controlled editing and historical consistency.}
+Chameleon hashes permit authorized alternative messages under the same digest
+and underpin editable-blockchain designs~\cite{redactable}. SDR studies
+decentralized attribute-based edit authority and dynamic
+delegation~\cite{sdr}, Escaping moves committee selection and voting outside
+the consensus layer to shorten redaction waiting~\cite{escaping}, and
+Reconstructing Chameleon Hash develops stronger definitions of
+indistinguishability and collision resistance~\cite{reconstructCH}. Next uses
+an established adaptation primitive, with the trapdoor held as threshold
+shares of an RSA exponent following Shoup's practical threshold-signature
+approach~\cite{shoup}. The authority to apply a compatible replacement comes
+from a committed compensation decision and public payment-state checks, not
+from the primitive.
+
+Reparo provides a publicly verifiable repair layer and can re-execute affected
+transactions while repairing state~\cite{reparo}. Next fixes payment
+authorizations and outputs in advance: a public decision accounts for the
+compensation once, and representation commands replace only the permitted
+funding representation, without re-executing successors. The original
+commands, including the decisions, remain the economic replay history.
+RedactChain coordinates concurrent edits to the same block and their
+preprocessing~\cite{redactchain}, and CDEdit uses reusable privilege tokens to
+cut repeated token and key generation and verification across multiple
+edits~\cite{cdedit}. In Next, a batch shares the final block representation
+across the decided slots of one block, and each slot's reserve debit was
+already committed by its own decision, so the edit has no economic effect. The
+complete block identity combines the stable header hash with the original
+part-set header, and publicly committed logical revisions authorize exact
+replacement bodies. Physical installation can therefore advance directly to a
+later authorized revision without changing successor references or replay of
+the public command history.

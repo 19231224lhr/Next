@@ -50,3 +50,103 @@ invalidation rule: its QC-backed responsibility, input locks, and
 signing reservation remain.  The current relay may continue retrying
 such a source; terminating those retries is a separate engineering
 follow-up and cannot release the certified liability.
+
+\subsection{Executable Interface and Fee Evidence}
+\label{supp:interface-fee-evidence}
+The artifact's 2026-10-04 interface audit records source fingerprints,
+commands, and assertion logs. It adds tests to checkout \texttt{863952d};
+node production logic is unchanged from the measured \texttt{f856c7b}
+baseline. Local regressions use Go 1.27.1 on Windows amd64 and supply
+correctness evidence, not replacement performance measurements.
+
+\noindent\textbf{Identity-sensitive transitions.}
+The pinned CometBFT overlay replaces eight body-hash comparisons by
+\texttt{matches\allowbreak BlockID}, which checks the body's hash and its paired part-set
+header. The remaining Finalize hash check follows a part-header check;
+the vote-extension caller is already gated by the full-identity match.
+\texttt{Test\allowbreak Stable\allowbreak Hash\allowbreak Identity} exercises actual consensus state methods for
+commit-target replacement, stale parts, exact finalization, Locked/Valid
+pairing, POL rounds, and a quorum preceding or following the available body.
+The polka-before-parts case also starts at Propose: completion causes one
+precommit for the exact identity, and subsequent attempts cause neither a
+late prevote nor another precommit. The separate nil-precommit case checks
+that late parts cannot produce a second vote. This tests the added
+current-round-polka transition as well as the comparison guards.
+
+\noindent\textbf{Consensus overlay: preserved conditions.}
+Table~\ref{tab:supp-consensus-map} separates semantic changes from their regression evidence. The overlay retains the upstream lock/POL argument under the paper's full-identity premise: a body and its part-set header form one identity, a current-round polka supports that identity, and the round/step guard permits at most one precommit. Storage changes preserve the order in which durable evidence becomes visible to execution.
+
+\begin{longtable}{@{}p{0.22\textwidth}p{0.43\textwidth}p{0.29\textwidth}@{}}
+\caption{Consensus and persistence changes mapped to preserved conditions.}\label{tab:supp-consensus-map}\\
+\toprule
+Change & Preserved condition & Existing regression evidence \\
+\midrule\endfirsthead
+\toprule Change & Preserved condition & Existing regression evidence \\
+\midrule\endhead
+Full BlockID and current-round polka &
+Locked/Valid bodies remain paired with their part roots. A body available after a matching current-round polka can enter precommit, including from Propose, subject to the round/step guard; a late body cannot produce a second vote. &
+\texttt{TestStableHashIdentity}: stale parts, commit target, POL, lock pairing, polka-before-body, and nil-precommit/late-body cases. \\
+Proposal WAL batching &
+Only already-ready local proposal material is grouped, up to 16 messages and 512\,KiB. All writes and \texttt{FlushAndSync} finish before the first \texttt{handleMsg}; any failure stops processing. Votes retain individual \texttt{WriteSync}. A crash can leave a replayable prefix, not an all-or-nothing WAL batch. &
+\texttt{TestProposalBatch}: boundaries, pre-sync nonapplication, write/sync failures, real-file durable-prefix replay and signature reuse. \\
+Finalize response batching &
+Historical responses and the last-response recovery record are staged in one database batch and committed by \texttt{WriteSync}. The caller receives storage errors; an uncertain error after a durable write does not imply rollback. &
+\texttt{results\_batch\_test.go}: pre-write failure publishes no partial record; uncertain sync returns an error; disk restart checks paired recovery data. \\
+Autofile clean-sync elision &
+Sync is skipped only after a successful sync of the same handle with no intervening write. Writes and reopen reset the flag, failed sync leaves it unset, and buffered flush precedes the decision. &
+\texttt{sync\_test.go}: first sync, repeated clean sync, writes, failed sync, reopen, rotation and concurrent group writes. \\
+Original execution and historical installation &
+Original openings are validated at admission. Replay and catch-up retain original bodies and parts; revisions need exact committed Tasks and cannot become fresh payment execution. &
+Relabelled-opening rejection, actual BlockStore rewrite/replay, and original-part catch-up tests. \\
+\bottomrule
+\end{longtable}
+
+The bounds and batching policy change scheduling and storage work, not vote thresholds or payment authorization. The assertion logs retained with the artifact exercise these entry points; the safety argument remains the invariant argument, rather than a claim that tests exhaust all executions.
+
+\noindent\textbf{Deadline wiring.}
+Production \texttt{Engine.BeginBlock} calls \texttt{AnchorDirectDeadlines} with the current height and block time, and the committee entry point passes it to \texttt{NewTimedApp}. An Open obligation created at height $h$ is anchored at $h+1$; source closure before anchoring makes that entry inactive. Deadline checks use committed block time. The current chain, mixed-load, and recovery genesis templates all set \texttt{TimeoutSeconds=30}.
+
+\noindent\textbf{Original material and application authentication.}
+\texttt{Test\allowbreak Consensus\allowbreak Rejects\allowbreak Relabelled\allowbreak Opening} passes a compatible adaptation
+relabelled as revision zero through the consensus message's
+\texttt{Validate\allowbreak Basic} and \texttt{Msg\allowbreak From\allowbreak Proto}: original admission rejects
+the nonoriginal opening. Part-set inclusion verification alone accepts
+the relabelled part under the signed root; original-opening rejection
+occurs at the consensus message boundary. The real BlockStore rewrite/replay and catch-up
+tests retain and serve original bodies and parts after revision.
+\texttt{Test\allowbreak Public\allowbreak Authorization\allowbreak At\allowbreak ABCIEntry} checks rejection by
+\texttt{CheckTx}, \texttt{ProcessProposal}, and \texttt{FinalizeBlock}, with
+no business-state change, after warming a valid verification cache. In its
+forged-QC case, decoding, owner authorization, admission preparation, and
+summary binding pass before QC authentication returns \texttt{ErrAuth}; the
+unrelated-QC and forged-owner cases reject at earlier guards. Separate cache
+tests require identical bytes for reuse and recheck current ledger validity.
+
+\noindent\textbf{Escrow and closure.}
+\texttt{PrepareDirectVector} checks the base fees plus one compensation fee per
+certified input with checked arithmetic. \texttt{feeStage} applies cumulative
+escrow deltas, \texttt{endObligation} permits one compensation charge on leaving
+Open, and \texttt{closeFee} accounts for actual paid fees within the admitted
+cap. \texttt{Test\allowbreak Fee\allowbreak Closure\allowbreak Multiple\allowbreak Obligations} has twelve rule-level cases:
+two fee modes, zero to two compensated inputs, and minimum or surplus escrow.
+They assert escrow and asset conservation after each transition, exact final
+charges and refunds, closure at zero Pending, and idempotent duplicates.
+Two further cases in \texttt{Test\allowbreak Fee\allowbreak Closure\allowbreak Fulfillment\allowbreak Before\allowbreak Compensation}
+use distinct parents: one arrives normally before compensation of the other
+closes the consumer, and the late second source leaves its closed escrow
+unchanged. Public-decision and multi-slot tests separately cover the
+application boundary. The member-following suite compares local escrow with
+the public payment state after compensation and source arrival, in addition
+to checking cumulative restoration and non-recycling of spent FUEL.
+
+\noindent\textbf{What the observations establish.}
+These tests connect the proof's transition assumptions to implementation
+entry points; they do not replace the locking or accounting arguments.
+The no-obligation decision guard rejects without changes or effects, matching
+the service contract's absence of certificate-only redemption. The final
+mixed-load capital audit reads the recorded counters and resource endpoints
+of eight members per run: all three runs have zero resource-insufficiency
+counters and zero final CAL/work reservations, while actual FUEL charges
+remain retained. This endpoint audit is separate from the analytic coverage
+of unpublished certificates and from the workload conditions for ongoing
+admission.

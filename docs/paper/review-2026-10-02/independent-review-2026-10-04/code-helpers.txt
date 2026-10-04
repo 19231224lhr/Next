@@ -1,0 +1,128 @@
+C:/Users/Bocchi/Desktop/Next/.e8-worktree/internal/rules/direct_fee.go:11
+func ValidateDirectFee(v state.ReadView, tx protocol.FastTx) (uint64, error) {
+	if tx.Body.Fee.Source != protocol.OwnerFinalUTXO {
+		return 0, nil
+	}
+	var total uint64
+	for _, in := range tx.Body.Fee.Inputs {
+		c, ok, err := state.Load[state.Creation](v, DirectCreationKey(in.Output, 0))
+		if err != nil {
+			return 0, err
+		}
+		if !ok || !c.Final || in.Kind != protocol.FinalInput || c.Fact != in.Evidence {
+			return 0, ErrMissing
+		}
+		out := c.Output
+		if out.Asset != protocol.AssetFUEL || out.Amount == 0 || out.Recipient.Route.Kind != protocol.OrgRoute || out.Recipient.Route.Org != tx.Body.Certifier {
+			return 0, protocol.ErrAuth
+		}
+		signed := false
+		for _, a := range tx.Auth {
+			if a.Owner == out.Recipient.Owner {
+				signed = true
+				break
+			}
+		}
+		if !signed {
+			return 0, protocol.ErrAuth
+		}
+		total, err = protocol.Add(total, out.Amount)
+		if err != nil {
+			return 0, err
+		}
+	}
+	if total < tx.Body.Fee.Maximum {
+		return 0, ErrLimited
+	}
+	return total, nil
+}
+
+
+C:/Users/Bocchi/Desktop/Next/.e8-worktree/internal/rules/direct.go:349
+func (e *directEval) grant(s protocol.OutputSummary, index int) (state.Grant, error) {
+	a := s.Admission[index]
+	g, ok, err := state.Load[state.Grant](e.o, state.Key(state.KeyGrant, a.Key.Encode()))
+	if err != nil {
+		return g, err
+	}
+	if !ok || g.ID != s.Grants[index] || g.Organization != s.Config || g.Key != a.Key {
+		return g, protocol.ErrAuth
+	}
+	return g, nil
+}
+
+
+C:/Users/Bocchi/Desktop/Next/.e8-worktree/internal/rules/direct.go:360
+func (e *directEval) register(c protocol.OutputCertificate) error {
+	s := c.Summary
+	fact := c.QC.Fact
+	key := state.Key(keyDirectCoverage, fact[:])
+	if _, found, err := state.Load[directCoverage](e.o, key); err != nil {
+		return err
+	} else if found {
+		return nil
+	}
+	var receipt CoverageBalance
+	for i, a := range s.Admission {
+		if a.Key.Kind == protocol.ResourceCAL {
+			g, err := e.grant(s, i)
+			if err != nil {
+				return err
+			}
+			if err = updateUsage(e.o, a.Key, a.Cap, 0, g.Amount, true); err != nil {
+				return err
+			}
+			receipt = CoverageBalance{Original: a.Cap, Remaining: a.Cap}
+		}
+	}
+	if receipt.Original == 0 {
+		return protocol.ErrRule
+	}
+	for i := range s.Outputs {
+		id := s.OutputID(uint32(i))
+		key := state.Key(keyDirectPromise, id[:])
+		old, found, err := state.Load[directPromise](e.o, key)
+		if err != nil {
+			return err
+		}
+		if found && (old.Certificate != fact || old.Index != uint32(i)) {
+			return ErrConflict
+		}
+		if !found {
+			if err = state.Put(e.o, key, directPromise{Certificate: fact, Index: uint32(i)}); err != nil {
+				return err
+			}
+		}
+	}
+	return state.Put(e.o, key, directCoverage{Summary: s, Credit: receipt})
+}
+
+
+C:/Users/Bocchi/Desktop/Next/.e8-worktree/internal/rules/settle.go:59
+func updateUsage(o *state.Overlay, key protocol.ResourceKey, cap, spent uint64, grant uint64, register bool) error {
+	k := state.Key(state.KeyUsage, key.Encode())
+	usage, _, e := state.Load[PublicUsage](o, k)
+	if e != nil {
+		return e
+	}
+	if register {
+		usage.Reserved, e = protocol.Add(usage.Reserved, cap)
+	} else {
+		usage.Reserved, e = protocol.Sub(usage.Reserved, cap)
+		if e == nil {
+			usage.Spent, e = protocol.Add(usage.Spent, spent)
+		}
+	}
+	if e != nil {
+		return e
+	}
+	total, e := protocol.Add(usage.Reserved, usage.Spent)
+	if e != nil {
+		return e
+	}
+	if total > grant {
+		return ErrLimited
+	}
+	return state.Put(o, k, usage)
+}
+

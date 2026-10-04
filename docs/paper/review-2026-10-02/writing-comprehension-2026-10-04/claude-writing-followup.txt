@@ -1,0 +1,65 @@
+Claude responded: 事实纠正：接受
+Checking the reorganization plan against each identified weakness.
+
+Checking the reorganization plan against each identified weakness.
+事实纠正：接受
+Lemma 5 之后关于 Intent 失败者的那一段，位于 \end{IEEEproof} 之后，属于证明后的讨论。我把它说成"写在证明里"是错的。准确的说法是：内容已经写出，但位置靠后，且接在一个以"执行唯一性"为结论的引理后面，读者不容易把它当作签发方风险的主要陈述。
+"三类原因比例大致相当"没有逐条统计，撤回。
+样本论文中的文字瑕疵未经版面核验，不纳入本轮判断。
+作者方案是否足以解决本轮所见的阅读障碍
+
+结构层面基本足够。 把 §III-D 的例子和 §III-E 的服务契约前置到模型概览、四维状态表随首次使用给出、压缩引言中的 C2 贡献清单、§VI 先提出实验问题再给版本与口径表，这几项对应了 W3 的位置问题、W4 的出现时机问题和 W6。不把五条形式性质和完整的最坏情形命题都塞到前面，我也同意：Table II 已经承担了"分阶段保证"的作用，再加一层反而会造成新的过载。
+
+方案中有三处需要收紧：
+
+摘要也要一起压缩（W1）。 方案只提到引言的贡献清单，但我当初遇到的主要障碍出在摘要：C3 的机制细节与 C2 的条件挤在一起。
+C3 只用一个词。 "repair/representation"中的斜线如果出现在正文里，两套叫法就会并存。建议选定一个，例如 authorized historical representation，并在术语表中写一次 Repaired ↔ Compensated 的代码映射。f_repair 也需要改名，或在符号表中注明它是补偿费用。
+C3 的引言动机段与 §IV-H 的 Use 段要合并或互相指引（W5）。 方案里没有提到这一点；不处理的话，动机段仍然是先让步、后给用途。
+必须补写、无法靠移动解决的内容
+
+以下各项每项一到两句：
+
+签发方风险的刻画（W3）， 放在 §V-F 或 Lemma 5 之后的讨论中即可，§III-E 用一句话指向那里：
+攻击者的可用 CAL 本金可以不减少。这一点有条件：攻击者控制相关的收款方，且后继输出仍有可用路由；FUEL 支出和费用输入锁定另计。
+S4-B(b) 能达到上界的条件是 B = 300、a = 100，且有一名拜占庭成员不受本地上限约束。
+容量停止签发后，路由到该组织的输出（包括最终输出）无法获得新的认证。
+Table II 第二行补一个从句： 说明登记是经过容量检查的步骤，并指向 §V-C 的式 (7) 及其前提。
+术语改名： 两种 Reserved 需要区分；储备账户换一个符号，不再与输出共用 x。
+C3 的必要性需求句， 或明确写明它是可选的记录层服务。
+截止期： 写明"创建高度下一块的时间 + timeout"，并给出 timeout 取值。
+补充材料： 补一节说明共识层中除身份比较以外的语义修改。
+S3-A： 改正构建标注。这是一处事实错误，不是表述问题。
+英文示例的两处修正
+
+原句： "Registration cannot fail for lack of CAL authorization (Thm. 1)."
+
+改为：
+
+Under the fault and state model of Section III-A (at most one Byzantine member per organization; honest signing state is never rolled back), first registration of a valid source certificate cannot fail for lack of CAL authorization (Section V-C); other admission and fee checks still apply.
+
+原句： "…which can stop all new certification on that route until a top-up."
+
+改为：
+
+…and its signers keep that capacity reserved, so new certification on that route can stop. A funded top-up adds capacity but clears neither the existing reservations nor the locked inputs; the paper gives no guarantee that service resumes.
+
+自足性与"新评审不会有疑问"的区别
+
+这些编辑能做到的： 本轮审稿中出现的每个疑问，都能在论文或补充材料中找到明确的回答位置，读者不再需要作者在审稿往来中额外解释。作者可以自行验证：把本轮各项疑问列成清单，逐条标注它在修订稿中的回答位置。
+
+这些编辑做不到的： 保证新评审不再提出任何问题。原因有三：
+
+一部分疑问来自评审自身的阅读，例如我对 Theorem 3 和 Reader scope 的误读。改写可以降低这类误读的概率，但无法消除。
+一部分是价值判断，而不是理解问题，例如开放部署的服务价值、C3 的贡献分量、是否需要更多实验。文字只能把这些问题的边界写清楚，不能替评审作出判断。
+背景不同的评审会提出本轮没有出现过的新问题。
+
+因此，修订目标应定为"对已知问题自足、限定清楚"，而不是"无疑问"。作者也不应为了预先回答所有可能的疑问而层层添加防御性解释，那正是需要避免的另一种过载。
+
+
+Create a Word document
+
+
+
+
+
+just now

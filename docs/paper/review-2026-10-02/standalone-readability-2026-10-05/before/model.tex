@@ -1,0 +1,206 @@
+\section{System Model and Overview}
+\label{sec:model}
+\input{architecture}
+
+Next lets a recipient spend a newly certified output before the transaction that creates it executes publicly. Four objects carry the design: authenticated payment rights, their public consumption, the responsibility for unresolved sources, and the later representation of that responsibility in stored history. Table~\ref{tab:model-notation} lists the notation.
+
+\begin{table}[!b]
+\caption{Principal notation.}
+\label{tab:model-notation}
+\centering
+\begin{tabular}{@{}p{0.23\columnwidth}p{0.69\columnwidth}@{}}
+\toprule
+Symbol & Meaning \\
+\midrule
+$G,\mathcal C$ & Guarantor organization and public committee \\
+$T,c_T$ & Payment and its certified summary fact \\
+$(x,i)$ & Output identifier and spend instance \\
+$g,B_g$ & Grant and cumulative authorization \\
+$a_T,p_T,\mathsf{Rec}_T$ & Total CAL outputs, gross compensation, and recovered compensation \\
+$\mathcal O_x,\mathcal D_x$ & Direct obligation for a missing output and its immutable compensation decision \\
+$(H_b,P_b)$ & Stable block hash and original part-set header \\
+$\rho_\ell,\rho_p$ & Committed logical and installed physical revisions \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Participants, Assets, and Assumptions}
+\label{sec:model-participants}
+Next operates a native UTXO ledger. CAL carries payment value and FUEL pays processing fees. Users spend their own outputs, and organizations hold additional CAL in public reserve accounts. The fast path requires an output with a supported organization route; payment principal stays with its owner, and no bilateral channel is opened. Fees default to the user's final FUEL outputs; an authorized organization-funded mode also exists.
+
+Each organization has four fixed members and a replaceable collector. Members validate requests independently and authorize payments, while the collector distributes requests, assembles certificates, and coordinates propagation without spending authority. A separate committee $\mathcal C$ of four equally weighted validators, with three votes required, orders public commands and maintains accounts, outputs, obligations, and compensation decisions.
+
+\noindent\textbf{Faults and cryptography.}
+The adversary corrupts statically at most one member per organization and one committee validator throughout an execution; users and collectors behave arbitrarily. Honest participants share the network configuration, genesis, rules, and organization registry, and each route names one active configuration and one consumption-lock domain. Signatures are unforgeable, canonical digests and original block commitments are binding, and messages may be delayed arbitrarily.
+
+\noindent\textbf{State.}
+Honest signing state is atomic and never forgotten or rolled back. Before a member signs, its approval records the payment, the admission vector, and the direct input certificates of the request; the quorum certificate is not part of it. Public execution is deterministic and atomically committed, and followers apply authenticated consecutive blocks, updating state and cursor together. Compensation and representation read original blocks and their metadata, so correct committee replicas retain both at every height that holds an open obligation or a decided slot awaiting representation.
+
+\noindent\textbf{Adaptation and progress.}
+Representation uses threshold adaptation with material generated and distributed by a trusted offline dealer, and a committed command must authorize any adaptation output. Progress needs responsive honest participants, available evidence, sufficient fees and resources, and fair delivery and scheduling. The experimental in-memory configuration keeps state atomic only while the process runs, and each run starts from fresh genesis.
+
+Historical reads concern an honest replica that has verified and executed public prefix $H$, using one read transaction on its state $V_H$. Section~\ref{sec:protocol-reader} specifies the interface semantics.
+
+\subsection{A Continuous-Payment Example}
+\label{sec:model-example}
+Alice pays Bob 100~CAL through organization $G_A$, creating output $x$
+routed to $G_B$. The payment passes through three stages, whose guarantees
+Table~\ref{tab:model-contract} lists.
+
+\emph{Certified receipt.} Members of $G_A$ lock Alice's inputs, reserve
+signing capacity for every CAL output of her payment, change included, and
+sign; three matching signatures form the TXCer. Bob verifies it and records
+$x$. He can then ask $G_B$ to certify a payment to Carol, which $G_B$
+admits under its own input, fee, and capacity checks. At this stage Bob
+holds an authenticated right to request continuation, before any public compensation obligation is created.
+
+\emph{Public consumption.} If Bob's payment executes before Alice's, the
+committee consumes $(x,0)$, records a 100-CAL obligation against $G_A$, and
+creates the outputs of Bob's payment as final, all in one transition. Carol
+spends her output under the ordinary final-input rules. The same block
+carries the certificate of Alice's payment, so members of $G_A$ that
+approved it can resubmit it when Alice's wallet does not.
+
+\emph{Economic closure.} If Alice's payment executes while the obligation is
+Open, it fulfills the obligation. Once the deadline set by public block time
+has passed, a public decision can instead debit $G_A$'s reserve by 100~CAL
+and mark the obligation Compensated (the implementation's \texttt{Repaired}
+status). Carol receives no second credit, and Bob's payment executes only
+once. If Alice's payment executes afterwards, it repays $G_A$ instead of
+creating $x$; if it never executes, $G_A$ bears the 100~CAL.
+
+\emph{Authorized historical repair.} Independently of these stages, a later
+command may replace the funding reference of Bob's stored input with the
+reserve debit. Such commands change the \emph{representation} state
+(defined in Section~\ref{sec:security-decision}) and leave balances,
+obligations, and closure as they are.
+\subsection{Service Contract}
+\label{sec:model-contract}
+Receipt, consumption, and closure establish different guarantees
+(Table~\ref{tab:model-contract}). Receipt authenticates a right to request
+continuation; successful public consumption establishes the funded obligation
+that protects the executed successor. Closing an obligation resolves its gap and updates fee accounting; the
+consumer's escrow closes only after all its input obligations are resolved,
+without another principal credit.
+
+\begin{table}[!t]
+\caption{Service contract by stage.}
+\label{tab:model-contract}
+\centering\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.24\columnwidth}>{\raggedright\arraybackslash}p{0.69\columnwidth}@{}}
+\toprule
+Trigger & Established state \\
+\midrule
+Verified receipt &
+The issuer's QC binds the output and its owner. The recipient may
+request a successor, subject to its own admission checks. Receipt
+alone creates no public compensation obligation. \\
+Public consumption of a missing certified output &
+Successful execution atomically consumes the input, registers its
+direct issuer's obligation, and creates the child outputs.
+Authorization, fees, consumption state, Intent, and coverage must pass the
+public checks. Under the stated fault and state model, valid certificates have sufficient CAL authorization (Theorem~\ref{thm:security-coverage}). \\
+Liability closure &
+Source execution fulfills the obligation; otherwise an included,
+valid post-deadline decision debits the issuer's CAL reserve.
+A later source repays it without a second credit to the recipient.
+The deadline alone does not guarantee completion. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Terminal holders.}
+A verified TXCer alone creates no redeemable public obligation. If its source
+does not execute and the holder cannot obtain a valid successor that executes
+publicly, the protocol offers no certificate-only redemption or unconditional exit;
+waiting does not create one.
+
+\noindent\textbf{Admission and stoppage.}
+Any client may collect approvals, without acquiring spending or
+fee-sponsorship authority. Before a new approval, each member checks
+the Intent, input locks, fees, grants, and available capacity in every
+applicable Worker slice in one transaction, including $a_T$ CAL for all outputs and change. Insufficient capacity
+rejects that approval without committing its changes or returning a
+signature. A retry of an existing, non-invalidated approval adds no
+reservation. The wallet records certified receipt only after verifying
+three matching signatures and the network, configuration, ownership,
+and output commitment. If no quorum approves, the request yields no
+new TXCer; earlier partial approvals remain reserved. Thus new
+certification can stop while the public reserve still has funds.
+Stoppage does not cancel existing certificates or unlock inputs.
+
+\noindent\textbf{Deployment and risk bearer.}
+The implementation has neither Subject-level CAL admission nor a
+cross-collector unfinished-request bound. Fee-sponsorship policies and
+gateway concurrency limits do not supply these guarantees. Sustained
+progress depends on the workload conditions of
+Section~\ref{sec:security-composition}, rather than an enforced global
+admission limit. In open deployment, the direct issuer bears the
+principal of a publicly consumed certified output whose source never
+executes, including an Intent loser. FUEL sponsorship does not transfer
+this CAL liability to the fee payer.
+
+Section~\ref{sec:security-composition} quantifies this exposure and the conditions for continued admission.
+
+
+\noindent\textbf{Four state dimensions.}
+These dimensions describe different objects and advance separately. Representation is the authorized historical record layer; its logical revision is separate from physical installation.
+
+\begin{table}[!t]
+\caption{Independent state dimensions.}
+\label{tab:model-states}
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}p{0.24\columnwidth}p{0.70\columnwidth}@{}}
+\toprule
+Dimension & Meaning \\
+\midrule
+Public payment &
+\texttt{Settled} records successful execution. Newly created outputs are final even when \texttt{Pending} is nonzero; outputs with Compensated obligations repay the reserve rather than being recreated. \\
+
+Direct obligation &
+Open$\to$Fulfilled, or Open$\to$Compensated$\to$Recovered.
+Compensated denotes compensation; Recovered denotes subsequent repayment.
+The compensation decision persists. \\
+
+Logical representation &
+The revision in $V_H$ determines the slot.
+\texttt{OriginalFunding} does not imply absence of compensation.
+\texttt{ReserveFunding} records a historical advance and remains
+after repayment. \\
+
+Physical installation &
+$\rho_p$ records the installed block-store version.
+Installation progress does not determine the logical answer at $H$
+or change economic state. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Outputs, Routes, and Certificates}
+\label{sec:model-certificates}
+An output carries an asset, an amount, an owner, and a consumption route. Its identifier $x$ derives from the network, the creating transaction, and the output position, and spending is indexed by $(x,i)$ with $i=0$ for ordinary outputs. All inputs of a fast payment share one consumption organization, and the owner authorizes the transaction. New outputs may select another registered organization, so cross-organization continuation changes the route of the new output while the previous issuer's responsibility stays in place.
+
+A TXCer pairs a summary with a quorum certificate (QC): three distinct member signatures over one fact $c_T$. The summary binds the network, transaction identity, issuer, configuration, epoch, rules, output commitments and amounts, and admission grants. Output bodies may be delivered separately, and the recipient checks commitment, position, and ownership before saving an output. The certificate authenticates the issuer's guarantee; Section~\ref{sec:model-contract} defines the corresponding service.
+
+Each payment carries
+\[\begin{aligned}
+\mathsf{IntentID}=\operatorname{Digest}(&\texttt{INTENT},\mathit{Network},\\
+&\mathit{Subject},\mathit{Nonce}),
+\end{aligned}\]
+which names an operation of one payer on one network; it is not a nonce space shared among users. Members keep local intent records per organization, whereas public execution binds an intent to one TxID in the same atomic transition that executes the payment successfully. Two organizations can therefore certify, from independent inputs, two payments with the same subject and nonce and both obtain QCs, but at most one TxID executes publicly. This deduplicates transaction execution, not economic receipts from separately executed successors of conflicting QCs.
+
+Throughout, the \emph{source} of an output (also its parent) is the payment that creates it, and its \emph{consumer} (also its successor or child) is the payment that spends it. Child outputs are the outputs that the consumer creates. Source arrival means successful public execution of the source transaction, which the implementation's \texttt{Settled} flag marks and which may coexist with nonzero \texttt{Pending}.
+
+\subsection{Three-Layer Design}
+\label{sec:model-layers}
+\noindent\textbf{Certification and continuation.}
+A member reserves the input instances and applicable resources atomically before it signs. A CAL grant $g$ authorizes $B_g$, and each member holds $\lfloor2B_g/3\rfloor$ signing capacity, partitioned among its local execution Workers. A payment reserves $a_T$, the sum of all its CAL outputs including change; these overlapping capacities constrain commitments but do not increase the backing funds. The collector returns a TXCer after three matching approvals in one parallel request--response round. Recipient verification and atomic local recording complete the fast path, while relay-material storage, \texttt{INSTALL} (replication of complete material within the organization), and public submission run in the background. Input locks outlive budget release.
+
+\noindent\textbf{Source-decoupled public execution.}
+A public command carries the transaction, admission vector, organization authorization, and direct input certificates. The committee reconstructs the certified summary, verifies the authorization, and checks the current consumption state. For a certified input that is not yet publicly created, it atomically records the consumption, registers certificate-wide coverage against the issuer, creates $\mathcal O_x$ and its gap, and creates the child outputs; only a missing output that is actually consumed opens an obligation. Each public payment check uses direct certificates rather than fetching ancestor transaction bodies. Members restore signing capacity from authenticated blocks against their own recorded debits (Section~\ref{sec:protocol-closure}). Genesis checks aggregate grants against each backing account, and top-ups debit unprotected accounts and raise balance and grant atomically; authorizations never decrease.
+
+\noindent\textbf{Resubmission, compensation, and representation.}
+An obligation closes by source arrival or, after a deadline fixed by public block time, by compensation from the issuer's reserve. The block that executes the consumer publishes the certificate of its source, and members of the issuing organization that hold the approval rebuild the payment from retained material and resubmit it without new signatures. Once the deadline has passed, a public compensation decision can close an obligation that remains Open. It debits the reserve, closes the gap, and records an immutable decision without adaptation data; a source that arrives afterwards repays the compensating issuer within its own execution, and the decision stays recorded.
+
+Representation commands then replace the funding reference of a decided input with the reserve reference. Restricted chameleon-hash adaptation preserves the fixed authorization, the output references, and the complete block identity $(H_b,P_b)$; \texttt{RepairBatch} groups the decided slots of one historical block, and the commands write representation state only. Original commands, committed revisions $\rho_\ell$, and installed revisions $\rho_p$ stay separate, installation can advance directly to a later authorized version, and replay runs the original commands, which include the decisions. Successors need neither new signatures nor re-execution.

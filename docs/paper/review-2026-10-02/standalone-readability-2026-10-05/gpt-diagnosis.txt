@@ -1,0 +1,595 @@
+Share
+You said:
+补齐你最后指出的两处生产接线，以下为当前源码原文（本轮未修改）：
+
+internal/committee/direct.go:97–102
+func (e *Engine) BeginBlock(v state.ReadView, b BlockContext) (state.Transition, error) {
+ if e.direct == nil { return state.Transition{}, nil }
+ return rules.AnchorDirectDeadlines(v, *e.direct, b.Height, b.Time.Unix())
+}
+
+cmd/committee/main.go:92–101
+if e = configureDirect(network, engine); e != nil { return e }
+var app *committee.App
+if network.Direct != nil {
+ app, e = committee.NewTimedApp(network.ChainID, db, engine.Check, engine.ExecuteAt, engine.BeginBlock)
+} else {
+ app, e = committee.NewApp(network.ChainID, db, engine.Check, engine.Execute, engine.Drain)
+}
+
+请简短确认这一特定材料缺口是否关闭即可。论文中仍应补的集中说明与风险表述继续保留，不把提交源码等同于已改好论文。
+…
+Show more
+Worked for 48s
+ChatGPT said:
+
+确认，这一特定材料缺口已关闭。 两段源码补全了生产接线：NewTimedApp 注册 engine.BeginBlock，后者将 BlockContext 的高度和时间传给 AnchorDirectDeadlines；结合此前已核查的 FinalizeBlock 交易前调用，调用链证据完整。
+follower-and-history-evidence
+
+论文中仍需补充的集中说明与风险表述继续保留为小修项，不因提交源码而视为论文修改已完成。
+
+You said:
+main(1).pdf
+PDF
+supplement-main(1).pdf
+PDF
+我们已实际完成你最后两项小修的集中书面说明，同时与Claude重整写作。请核读这两个最新PDF：补充材料共识语义映射表和期限接线、正文最坏风险集中段是否准确补齐；同时看模型示例/服务契约/状态表前置后，读者是否可从稿件本身理解条件性续付、义务触发、赔付与历史修复独立。请只给最多3个尚需修正的具体句子或必要问题，不新增实验、不要求改变Intent，不以给出小修为目标。Claude已起草本轮摘要/引言等，实际PDF复核发送连续失败，现请你完成此轮核验。若看到重复可给简短删减建议。
+Worked for 6m 34s
+ChatGPT said:
+
+此前两项书面要求已补齐，可以关闭。 补充材料表 S1 已集中区分共识身份、WAL、响应批量落盘和同步省略的保持条件，期限接线也与此前源码一致。正文 §V-F 已准确区分普遍损失上界、轮换签名者可达实例、可用 CAL 本金与 FUEL／锁定成本，以及额度耗尽后的停服后果。
+supplement-main
+ 
+main(1)
+
+前置的模型示例、服务契约及表 II／III，已经能让读者从稿件本身理解：收证书后只能有条件地申请续付；成功公开消费缺失输出才触发义务；赔付不等待历史修复，逻辑修订也不等于物理安装。 未见新的技术阻断项。
+main
+ 
+main
+ 
+main
+
+仅建议以下两处措辞精确化，另有一处可选删减：
+
+摘要，第 1 页：“without re-executing payments or delaying closure”。
+“不延迟”容易被理解为没有性能干扰，而 §V-F 明确保留共享资源对延迟的影响。建议改为：
+
+without re-executing payments or making economic closure wait for historical repair.
+这里只澄清依赖关系，不改变现有结论。
+main
+ 
+main(1)
+
+§III-C，第 4 页：“Closure settles the issuer’s liability and the consumer’s fee escrow…”
+多输入付款中，关闭一个义务不一定结清整个费用托管；§IV-E 已正确限定为没有剩余输入义务时才结清。建议改为：
+
+Closing an obligation resolves its gap and updates fee accounting; the consumer’s escrow closes only after all its input obligations are resolved, without another principal credit.
+
+main
+ 
+main
+
+可选删减：§IV 标题后的导语整段。
+它重复了紧邻的 §III-E 中“公开消费—重提—赔付—历史修复”流程，可以删除，直接进入 §IV-A；前置示例和两张表应保留。
+main
+
+You said:
+main(2).pdf
+PDF
+supplement-main(2).pdf
+PDF
+本次只收尾你已经核读的两项小修：补充材料 S1-A 的共识不变量/入口/测试集中对应及期限接线，正文 V-F 的净损失上界、轮换签名可达实例及 CAL/FUEL/锁定成本与第三方停签风险。附件是最终实际 PDF。你上一轮提出的摘要措辞已改为“making economic closure wait for historical repair”；III-C 已明确全部输入义务解决后才关闭 escrow；IV 开头重复导语已删除。请核对这些位置，如仍有漏项请具体指出；若没有请说明上述两项是否可结项。只核验约定修改是否落实，不再做新一轮整篇独立评审，也不要求与其他评审统一观点。
+Worked for 1m 46s
+ChatGPT said:
+
+已核对最终两个 PDF，没有发现约定修改的漏项，这两项可以结项。
+
+补充材料 S1-A：已落实。 表 S1 已集中对应 Full BlockID/current-round polka、Proposal WAL batching、Finalize response batching、Autofile clean-sync、原始执行/历史安装的保持不变量与测试证据；其后也明确写出生产 Engine.BeginBlock → AnchorDirectDeadlines、NewTimedApp 接线，以及 
+ℎ
++
+1
+h+1 锚定和 committed block time。
+supplement-main
+正文 V-F 风险段：已落实。 已明确 
+𝑆
+𝑔
+≤
+𝑄
+𝑔
+≤
+𝐵
+𝑔
+S
+g
+	​
+
+≤Q
+g
+	​
+
+≤B
+g
+	​
+
+ 是净未偿赔付上界而非 lifetime gross Paid；随后给出 
+𝐵
+𝑔
+=
+300
+B
+g
+	​
+
+=300 的轮换签名可达实例，并分别说明“usable CAL may not decrease”的条件、FUEL 实际消耗、源输入/用户付费输入继续锁定，以及额度耗尽后该 grant 路由上的第三方新认证也停止。固定签名者两轮停止也明确不是更小的普遍损失界。
+main
+
+同时，上轮三个文字点也确已改到最终 PDF：摘要使用 “making economic closure wait for historical repair”；III-C 明确 escrow 在全部输入义务解决后才关闭；IV 已直接从标题进入 §IV-A，不再有重复导语。
+main
+ 
+main
+ 
+main
+
+就本轮约定的两项小修而言：可正式关闭。
+
+You said:
+我们开始一轮独立于已关闭两项小修的写作重构。用户的核心要求是：专业读者只读正文就能准确理解系统，不靠补充材料、源码或聊天解释。请重新阅读刚上传的最终 main(2).pdf，只据正文判断（这不是一次盲评，因为你已有历史，务必标明这一限制）。不要给接收等级，也不要限制只能提三条。先用自己的话复述：每笔交易由谁认证，证书发行组织和后继消费组织的关系；收证书究竟得到什么；何时形成公共责任；正常来源、迟到来源与永不执行来源分别怎样处理；经济闭合与历史修复分别服务谁；额度覆盖为何不等于持续接单。逐项指出哪些能从正文直接得出、哪些依赖了之前聊天。然后诊断具体阅读障碍：角色/术语引入顺序、概览与规范重复、实现术语过早、证明缺少路线、实验缺乏因果解释等，必须按实际文本判断，不必同意这些猜测。请提出完整但克制的正文重构方案，保留全部实质性假设、风险、公式及证据，不以删除条件换通顺。我们正在重读原先精选的支付/系统顶会及TDSC论文，稍后将提供样本原文共同分析。请先给出可直接使用的英文摘要草案和系统概览结构。普通、精确、有逻辑的学术英文；不要营销词、答辩口吻或不断重复免责。当前阶段不改协议、不跑新实验。
+Show less
+Worked for 9m 28s
+ChatGPT said:
+
+本轮不是盲评。 我已重新阅读 main(2).pdf 的正文和相关图表，但此前的阅读经历仍可能影响我的理解速度与关注点。下面区分的是：结论是否能由当前正文支持，以及首次阅读者是否容易从正文建立正确理解，不把此前源码核查当作正文证据。
+
+我的总体判断是：核心信息大体齐全，主要问题是读者需要自行组织分散的信息。 重构应优先解决交易之间的角色转换、几个记账层次的关系和章节分工，而不是继续增加限制声明。
+
+一、仅依据正文，我如何理解系统
+1. 谁认证交易，发行组织与后继消费组织是什么关系？
+
+对于本文的快速付款，付款所有者授权交易，交易输入的共同消费路由指定认证组织，该组织的成员独立检查并提供三份匹配签名；公开委员会负责后续排序和执行。 Collector 负责收集与传播，不拥有付款授权。
+main(2)
+ 
+main(2)
+ 
+main(2)
+
+用正文的例子说：Alice 的交易由 
+𝐺
+𝐴
+G
+A
+	​
+
+ 认证，产生交给 Bob、路由到 
+𝐺
+𝐵
+G
+B
+	​
+
+ 的输出 
+𝑥
+x。所以，
+𝑥
+x 的证书发行者是 
+𝐺
+𝐴
+G
+A
+	​
+
+，而认证 Bob 下一笔付款的是 
+𝐺
+𝐵
+G
+B
+	​
+
+。Bob 消费尚未公开生成的 
+𝑥
+x 时，责任仍指向 
+𝐺
+𝐴
+G
+A
+	​
+
+，不是转给 
+𝐺
+𝐵
+G
+B
+	​
+
+。同一个组织可以在不同交易中承担不同角色。
+main(2)
+ 
+main(2)
+
+依据类型：正文合读可得。 例子很明确，但一般规则需要将 §III-B、§III-D 与 §IV-A 联起来；并非依赖聊天才能知道。
+
+2. 收到证书究竟得到什么？
+
+收款人得到的是绑定输出、所有者和发行者的认证凭据，可以据此申请下一笔付款。后继仍需通过自己的输入、费用、额度等检查；收证书本身既不保证后继一定获批，也不产生可直接兑付的公共赔付义务。正文还区分了“验证收到证书”和“此前未授权消费该实例”的历史条件。
+main(2)
+ 
+main(2)
+
+依据类型：正文直接说明。 这一点当前已不需要聊天补充。
+
+3. 何时形成公共责任？
+
+应区分三个时点：
+
+成员批准时，占用本地签名额度，为可能流通的输出承担潜在责任；首次公开消费某证书的缺失输出时，登记该证书全部输出金额的覆盖；对实际被消费的缺失输出，建立具体义务和 gap。正文的 40/60 例子很有效：覆盖登记为 100 CAL，但只消费缺失的 40 CAL 输出，就只形成 40 CAL 的义务。登记覆盖本身尚不扣储备金。
+main(2)
+ 
+main(2)
+
+依据类型：正文直接说明，但集中在 §IV-B。 概览只读到“funded obligation”时，尚不容易知道它与此前的签名额度是什么关系。
+
+4. 正常、迟到和永不执行的来源分别怎样处理？
+来源执行的时点	正文规定的处理
+先于后继公开执行	后继按普通最终输入规则消费，不需要缺失来源义务。
+后继已执行，但义务仍为 Open	来源执行履行义务、关闭对应 gap；已经消费的实例不会重新成为可花费余额。
+已经赔付之后	来源按正常规则消费自身输入，并将对应金额偿还给实际垫付的发行者；不再创建那个已由赔付替代的输出。
+始终不执行	已发生的赔付成为发行者净损失；没有成功公开消费该输出的后继，则证书本身不会自动变成公共兑付请求。
+
+这些分支可由 §III-B/C、§IV-B/C/E 直接重建。特别是，“迟到”的关键分界是是否已经赔付，而不是是否刚过期限：期限已过但义务仍 Open，来源执行仍可履行它。
+main(2)
+ 
+main(2)
+ 
+main(2)
+ 
+main(2)
+
+依据类型：正文合读可得。 这里需要重新组织时间分支，不需要补入历史聊天事实。
+
+5. 经济闭合与历史修复分别服务谁？
+
+经济闭合服务于公开账本中的付款责任及费用结算：解决已经执行的后继所留下的来源缺口，保持后继既有本金效果；它不是再给收款人一笔本金。
+
+历史修复服务于已经验证并执行相应公共前缀的本地归档副本：在原历史位置报告垫付来源、授权决定与偿还状态，并导出仍满足原完整 BlockID 的修订正文。普通索引也能回答相同经济问题，C3 额外提供的是正文表示兼容性。
+main(2)
+ 
+main(2)
+
+这里的“独立”应理解为单向依赖：历史修复需要此前的赔付决定，但赔付和来源偿还不需要等待历史修复；并非两个服务完全互不依赖。
+main(2)
+ 
+main(2)
+
+依据类型：正文直接说明，使用者与完整用途主要到 §IV-H 才充分展开。
+
+6. 为什么额度覆盖不等于持续接单？
+
+覆盖结论回答的是：已经形成的证书责任是否有足够授权和储备支持。 持续接单还要求响应法定人数在相关资源分片上具有足够可用容量，输入锁和 Intent 相容，费用与其他资源充足，并满足交付和调度条件。
+
+未形成 QC 的零散批准也可能占满容量；已经赔付但来源仍不执行的证书，仍占用原签名者的额度。因此，可以出现储备仍有资金但无法形成新 QC，也可以达到储备损失上界并停止新认证。
+main(2)
+ 
+main(2)
+
+依据类型：正文直接说明。
+
+上述六项没有哪一项必须靠此前聊天才能补全。 但“正文有依据”不等于“顺着读一遍就能建立模型”。另一方面，完整生产入口、WAL 实际写序、逐项原始实验台账的核查，不能仅凭正文中的概述完成；我不会把此前对此的了解算作本轮正文的自足性。
+
+二、实际阅读障碍
+1. 角色定义晚于角色使用，而且“消费组织”是交易相对角色
+
+摘要和引言已使用 consuming organization、issuer、successor，但“一笔付款的输入共同指定认证组织、新输出的路由指定下一次消费组织”的一般规则直到 §III-D 才集中出现。例子虽已前置，读者仍可能将 
+𝐺
+𝐴
+/
+𝐺
+𝐵
+G
+A
+	​
+
+/G
+B
+	​
+
+ 理解成固定的“发行层/消费层”，而非相邻交易中的角色。
+main(2)
+ 
+main(2)
+
+**改法：**在第一个例子前，用两句话固定关系：
+
+A fast payment spends inputs routed to one registered organization. That organization certifies the payment, while the routes of its new outputs determine the organizations that certify subsequent payments.
+
+随后再定义“某输出的证书发行者”。全文保持 owner authorizes、members approve/sign、organization certifies、committee executes 的动词分工。
+
+图 1 也需要相同处理：上排展示当前付款认证，下排却直接写 “Execute child payment”，而公开提交箭头来自上排认证组织。缺少交易标识，容易让读者对不上是哪笔付款。 建议在原图中标出 
+𝑇
+0
+,
+𝑇
+1
+,
+𝑥
+,
+𝐺
+𝐴
+,
+𝐺
+𝐵
+T
+0
+	​
+
+,T
+1
+	​
+
+,x,G
+A
+	​
+
+,G
+B
+	​
+
+，明确由 
+𝑇
+1
+T
+1
+	​
+
+ 的公开消费暴露 
+𝑇
+0
+T
+0
+	​
+
+ 的证书，而不是再增加一张相似总图。
+main(2)
+
+2. 重复仍然存在，但不是“概览与规范不能重复”
+
+当前流程经过引言 C1–C3、§III-B 例子、§III-C 契约、§III-E 三层设计，再到 §IV 规范，多次完整经过“认证—消费—补交—赔付—修复”。其中：
+
+例子与契约表值得保留：前者说明事情怎样发生，后者说明每个阶段保证什么。真正可以合并的是 §III-E 再次完整讲流程的部分，以及相关工作里重复解释本系统细节的段落。
+main(2)
+ 
+main(2)
+ 
+main(2)
+
+**改法：**概览只完成一次完整示例，并解释三个设计选择；规范负责定义记录、前置条件、原子更新与重复执行行为。不是删掉重复出现的关键结论，而是让每次出现承担不同任务。
+
+3. 过早出现的主要是实现词，而不只是符号
+
+§III-C 的 Subject、Worker slice、aT，表 III 的 Settled、Pending、VH 和物理版本，要求读者在尚未读到执行规则时理解实现状态。Pending 的输入义务含义主要在 §IV-B 展开，Workers 也缺少一个足够早的简短解释。
+main(2)
+ 
+main(2)
+ 
+main(2)
+
+**改法：**保留状态表，但先写语义，再在同一格末尾对应字段。例如：
+
+The payment has executed publicly, although some of its input obligations may remain unresolved (Settled, Pending).
+
+Workers 首次出现时说明是成员内部执行工作单元及其容量分片，不是另一组共识成员。精确字段和配置细节继续留在正文的规范或实现小节，不移交给补充材料兜底。
+
+4. 三种“额度/资金”虽已区分，但没有成为概览的中心解释
+
+§IV-B 已准确区分本地 Reserved、公共覆盖 Reserved 和真实储备账户；问题不是缺定义，而是读者在前面看到“reserve capacity”“funded obligation”时，尚不知道三者不在同一本账里。
+main(2)
+
+**改法：**把现有 40/60 例子提升为概览中的一个短说明，按“成员签名容量—证书公共覆盖—实际输出义务”讲清。保留 §IV-B 的式（2）作为规范定义。这样读者再遇到 Theorem 1，才能知道为什么不能只统计公共 gap。
+
+5. C3 的用途解释充分，但出现在机制之后
+
+当前顺序是 §IV-F 批量命令、§IV-G 安装与重放，最后 §IV-H 才完整解释本地归档服务需要什么。读者先处理 Base、Task、part openings 和四种身份，随后才知道为什么需要这些机制。
+main(2)
+ 
+main(2)
+
+**改法：**先给使用者、输入与输出，再讲权限及兼容性，最后讲批量构造和安装。
+
+另外，应保留 §IV-H 那个很重要的解释：原输入正确记录了执行时接受的对象，修订字段记录后来的储备垫付。 这能避免把 “repair” 误读成“原付款无效，需要改写后才能成立”。不需要更换 C3 名称。
+main(2)
+
+6. 证明不是没有逻辑，而是缺少显式依赖路线
+
+现有证明已经依次讨论原始执行、唯一消费、责任覆盖、守恒、表示授权和组合保证，不能说是一堆无关联公式。但 §V 开头主要罗列验证条件，随后立即进入 polka；读者尚不知道这些结果怎样共同支持付款服务。Theorem 3 又前向使用 Lemma 10，进一步增加阅读跳转。
+main(2)
+ 
+main(2)
+ 
+main(2)
+
+**改法：**增加一段证明路线，而不是增加定理：
+
+身份、输入锁和原始执行一致性，确定“谁授权了什么、什么被消费”。
+残余签名容量与证书责任的联系，推出覆盖。
+原子赔付与来源偿还，推出守恒及有条件的终态等价。
+表示授权和经济惰性，使历史修复不能破坏前述结果。
+最后组合成条件性续付保证，并单列进展与风险。
+
+Theorem 3 的完成前提、表示惰性依赖和不比较 FUEL，应在这段路线里提前交代，不改变定理范围。
+
+7. 实验并非缺乏因果解释，而是解释与数字的组织还可改善
+
+三处已经有有效解释：
+
+链实验区分了提前发送和真正的 child-before-source 执行；P 实验明确暂停适配、保留赔付路径；历史读取实验用访问与分配数据说明布局/重建收益，而非密码计算减少。不能把这些都诊断为“只堆数字”。
+main(2)
+ 
+main(2)
+ 
+main(2)
+
+需要改善的是每节都按同一逻辑展开：
+
+问题 → 改变什么 → 保持什么 → 观察什么 → 能解释到哪里。
+
+例如，P 开头应先说明关闭自动重提是为了让扣留来源保持未解决，从而实际触发赔付路径，再列运行参数。链实验先把“去掉 99 个跳间等待”与“端到端指标仍含重试及证据观察”放在一起，再给结果。不得把未知部分重新归因给轮询、磁盘或共识。
+
+还有一个很小但真实的组织问题：§VI 的 Q3 是故障、Q4 是历史读取，但正文先讲历史读取再讲故障。直接对齐即可。
+main(2)
+ 
+main(2)
+
+三、正文重构方案
+
+建议采用下面这套单一结构。主要是移动与分工，不增加协议内容。
+
+新章节	内容与现有材料来源
+I. Introduction	保留连续付款问题、核心责任安排、C1–C3 与主要结果。用简短的相关工作定位替代展开比较。
+II. System Model and Overview	重组现 §III：角色与输出关系、全部模型假设、一个完整例子、阶段契约、容量直觉、历史记录用途。合并原 §III-E 的重复流程。
+III. Payment Protocol	现 §IV-A–E。按身份与批准、公开消费、来源恢复、赔付/偿还、成员核销与补资组织。让公共责任生命周期连贯，再讲本地核销细节。
+IV. Authorized Historical Repair	现 §IV-F–H。改为“本地读取与导出契约 → 决定授权 → 命令与批量构造 → 完整身份 → 安装和原件重放 → 密码实例”。
+V. Security and Progress	保留现有全部论证，增加依赖路线；覆盖、守恒、终态等价、表示授权与进展条件明确分工。最坏风险段保持集中。
+VI. Implementation and Evaluation	先统一构建、持久性与计时口径，再按连续认证、经济闭合、故障、历史读取、边界回归展开。保留全部数据及构建归属。
+VII. Related Work	移入现 §II，保留实质比较及引用；本系统机制只作必要对照，不再完整复述一遍。
+VIII. Conclusion	总结得到的服务与取舍，不再压缩复述整条实现流程。
+保留条件的方法
+
+模型假设集中保留在新 §II：固定成员与委员会、静态腐化界、任意用户/collector 行为、固定路由和配置、密码假设、诚实签名状态不回滚、公共原子执行、认证跟随、历史保留、可信 dealer，以及各类进展条件。历史读取的本地可信前缀假设，也在首次介绍该服务时出现。
+main(2)
+
+公式不删除：式（1）留在身份规范；式（2）和式（3）留在覆盖与核销规范；式（4）—（7）、式（8）及 FUEL 两个关系保留在安全分析；式（9）—（10）保留在表示论证；容量充分条件和净损失界留在进展/风险部分。
+
+**重构时尤其不能把以下区别压成一句话：**证书潜在责任与公共义务、本地额度与储备余额、单义务闭合与全部 escrow 闭合、唯一消费与 Intent 冲突、终态等价与成功执行保证、完整 BlockID 兼容性与修订授权。这些都是正文已经具备的实质内容，不是可删的“解释负担”。
+main(2)
+ 
+main(2)
+ 
+main(2)
+ 
+main(2)
+
+对于重复的范围说明，采用“在定义处完整说明，在使用处只提醒相关条件”：例如本地读取的信任范围完整写一次；实验再说明计时是否包含验证，不重复整段远程证明排除说明。这样保留条件，也减少答辩式语气。
+
+四、英文摘要草案
+
+以下草案依据正文现有机制、保证范围与实验，不加入新的部署或性能主张。
+main(2)
+ 
+main(2)
+ 
+main(2)
+
+**Abstract—**Next is a native UTXO ledger that allows recipients to request successor payments before source transactions execute publicly. The organization designated by a payment’s input routes certifies its outputs. Before signing, members lock the inputs and reserve capacity for the full CAL output value, including change. A verified certificate supports continuation subject to admission checks and available capacity; receipt alone creates no public compensation obligation. Successful public consumption of a missing certified output records an obligation against that output’s certificate issuer. The exposed certificate enables the original signers to resubmit the source. Source execution fulfills an open obligation; otherwise, an included valid post-deadline decision closes its gap from the issuer’s reserve. Later source execution repays the reserve without recreating the consumed output, while permanent nonexecution leaves the compensated amount as the issuer’s loss. An optional historical-repair service lets a local archival replica record the reserve debit in an authorized revised body under the original complete block identity. Economic closure does not wait for this service. Under the stated cryptographic and state assumptions, with four fixed members per organization and four committee validators and at most one static Byzantine participant in each group, we prove unique consumption, reserve coverage, and CAL conservation. For finite, acyclic, source-closed, conflict-free payment sets whose payments each succeed exactly once, we prove equal terminal CAL holdings across execution orders. On one host with synchronous member commits and NoSync wallets, 100-hop chains reach their last certified receipt in a median 4.707 s, versus 64.479 s with per-hop waiting, including retries. Three mixed-load runs complete 21,048 payments, with compensation and repayment preceding the resumption of historical adaptation.
+
+五、可直接用于写作的系统概览结构
+
+建议新 §II 使用以下六个小节。英文句子可直接作为各节起笔；其后的中文说明限定该节任务，避免又写成一轮完整协议复述。
+
+A. Actors, Outputs, and Certification
+
+A fast payment spends inputs routed to one registered organization. That organization certifies the payment and is named as the issuer in its output certificate. Each new output also specifies a consumption route, which determines the organization asked to certify a later payment spending it.
+
+接着定义 CAL/FUEL、owner、成员、collector 和公共委员会。明确组织对付款的认证与委员会的公共执行是不同动作。此处只需核心对象，不列全部编码字段。
+
+B. Fault and State Assumptions
+
+Each organization has four fixed members, and a separate four-validator committee orders public commands. Certification and committee decisions each require three participants, with at most one static Byzantine participant in each group. Users and collectors may behave arbitrarily.
+
+随后完整保留配置、路由、签名状态、公共原子执行、历史保留、密码与 dealer 假设。将安全依赖的状态条件和进展依赖的响应、资源及调度条件分成两段；不要把实验内存配置插在两类假设之间。
+
+C. Certified Continuation
+
+Alice submits a payment certified by 
+𝐺
+𝐴
+G
+A
+	​
+
+, creating an output 
+𝑥
+x for Bob with consumption route 
+𝐺
+𝐵
+G
+B
+	​
+
+. After verifying the certificate, Bob can ask 
+𝐺
+𝐵
+G
+B
+	​
+
+ to certify a payment to Carol. 
+𝐺
+𝐵
+G
+B
+	​
+
+ checks Bob’s payment independently; it does not take over 
+𝐺
+𝐴
+G
+A
+	​
+
+’s responsibility for 
+𝑥
+x.
+
+继续说明输入锁、全输出金额预留、三签名收款，以及后台传播。将图 1 放在这里，并标出两笔不同交易。收证书不是公共最终执行，这个区别在例子中直接体现，不另加一段泛泛警告。
+
+D. Public Consumption and Source Resolution
+
+If Bob’s payment executes before Alice’s, the committee records the consumption of 
+𝑥
+x and a 100-CAL obligation against 
+𝐺
+𝐴
+G
+A
+	​
+
+ in the same transition. The block exposes Alice’s certificate, allowing her original signers to reconstruct and resubmit the retained payment.
+
+接着按“来源先到—义务 Open 时到—赔付后到—始终不到”列出分支。说明赔付关闭既有 gap、不重复给本金；全部输入义务解决后才关闭付款 escrow。期限只在这里给语义，精确 
+ℎ
++
+1
+h+1 锚定规则留到协议规范。
+
+E. Signing Capacity and Service Guarantees
+
+Signing capacity limits the liabilities that an organization can certify before their public resolution. This limit protects outstanding commitments; it does not ensure that a quorum has capacity to approve every new request.
+
+这里放阶段契约表，以及现有 40/60 例子。解释成员容量、公共覆盖与真实储备账户的区别，并给出 
+⌊
+2
+𝐵
+𝑔
+/
+3
+⌋
+⌊2B
+g
+	​
+
+/3⌋ 的计数直觉。以一个紧凑段落收束终端无条件兑付缺失、部分批准占额、Intent 失败和第三方停签风险；精确充分条件与可达损失界仍在 §V。
+
+F. Economic Closure and Historical Records
+
+Compensation resolves a public funding obligation. Historical repair records that resolution in the consuming input for local archival review and re-export. A repair requires a committed compensation decision, but compensation and repayment do not require the repair to finish.
+
+接着放四维状态表，但以语义为主、实现字段为辅。用一个状态组合说明独立性：义务已 Compensated，历史输入仍为 OriginalFunding，物理修订尚未安装，这并不矛盾。最后说明本地归档者读取决定和当前义务状态，修订正文保留原完整 BlockID；完整记录格式、Task 和 opening 验证留到历史修复规范。
+main(2)
+ 
+main(2)
+
+ChatGPT can make mistakes. Check important info.
+Latest response
+
+
+
+
+Pro

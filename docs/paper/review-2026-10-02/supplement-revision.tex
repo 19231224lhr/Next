@@ -1,4 +1,4 @@
-\section{Boundary and Network Validation: Build 9879f64}
+\section{Boundary, Timing, and Network Evidence}
 \label{supp:major-revision}
 Production snapshot \texttt{9879f64} retains the local reclamation patch
 \texttt{bf71c4d}. The new fixtures and network driver additions are
@@ -118,7 +118,9 @@ requests after restart, roll back cursor and state together on failed
 follower application, and apply restoration once across restart. These
 checks retain committed state rather than simulate its loss.
 
-\subsection{Waiting-Mode Timestamp Audit}
+\subsection{Archived Waiting-Mode Timestamp Audit: Build 721800c}
+The following audit and 14.15-fold ratio belong to build \texttt{721800c}; current-build chain totals appear in Section~\ref{supp:final-evidence}.
+
 \noindent\textbf{Inter-hop observation cost.}
 The driver polls every 5\,ms and the block follower every 25\,ms;
 250\,ms is the commit setting, not either polling interval.
@@ -155,7 +157,7 @@ commit check rejects the complete BlockID. Thus matching the header
 alone is insufficient for this consumer.
 
 After repayment, authorized bytes, cached rows, and the permanent decision
-remain unchanged; current status changes from Repaired to Recovered.
+remain unchanged; current status changes from Compensated to Recovered.
 This local functional comparison does not time the cached view or establish
 external adoption. The main paper's read timings compare the original
 index and C3 layouts, not this third view. Authorization in every case

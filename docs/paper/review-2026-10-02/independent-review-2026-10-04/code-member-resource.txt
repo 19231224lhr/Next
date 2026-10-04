@@ -1,0 +1,464 @@
+Current code evidence; read-only extraction, no new test or formal proof.
+
+C:/Users/Bocchi/Desktop/Next/.e8-worktree/internal/member/direct.go:28
+func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.DirectApproval, error) {
+	if m.direct == nil {
+		return protocol.DirectApproval{}, protocol.ErrUnsupported
+	}
+	req, err := protocol.DecodeDirectRequest(raw)
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	requesttrace.Mark(ctx, "request_decoded")
+	tx := req.Tx
+	t := tx.Body
+	cfg := m.cfg.Organization
+	if t.Network != cfg.Network || t.Certifier != cfg.Org || t.Config != cfg.Hash() || t.Epoch != cfg.Epoch {
+		return protocol.DirectApproval{}, protocol.ErrAuth
+	}
+	vector, err := rules.PrepareDirectVector(tx, *m.direct)
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	summary := protocol.SummaryFor(tx, vector)
+	fact := summary.Fact()
+	parents := map[protocol.OutputID]protocol.InputCertificate{}
+	for _, parent := range req.InputCertificates {
+		c := parent.Certificate
+		org, ok := m.peers[c.Summary.Config]
+		if !ok || c.Verify(org) != nil || c.Summary.Rules != m.direct.Rules() || int(parent.Index) >= len(c.Summary.Outputs) {
+			return protocol.DirectApproval{}, protocol.ErrAuth
+		}
+		id := c.Summary.OutputID(parent.Index)
+		if _, exists := parents[id]; exists {
+			return protocol.DirectApproval{}, protocol.ErrRule
+		}
+		parents[id] = parent
+	}
+	var totalIn, totalOut uint64
+	used := map[protocol.OutputID]bool{}
+	for i, in := range t.Inputs {
+		claim := tx.Claims[i]
+		if in.Kind == protocol.CertificateInput {
+			p, ok := parents[in.Output]
+			if !ok || in.Evidence != protocol.Hash(p.Certificate.QC.Fact) || p.Certificate.VerifyOutput(m.peers[p.Certificate.Summary.Config], p.Index, claim.Output) != nil {
+				return protocol.DirectApproval{}, protocol.ErrAuth
+			}
+			used[in.Output] = true
+		}
+		totalIn, err = protocol.Add(totalIn, claim.Output.Amount)
+		if err != nil {
+			return protocol.DirectApproval{}, err
+		}
+	}
+	for _, out := range t.Outputs {
+		totalOut, err = protocol.Add(totalOut, out.Amount)
+		if err != nil {
+			return protocol.DirectApproval{}, err
+		}
+	}
+	if totalIn != totalOut || len(used) != len(parents) {
+		return protocol.DirectApproval{}, protocol.ErrRule
+	}
+	requesttrace.Mark(ctx, "validation_complete")
+	id := tx.ID()
+	worker := uint32(id[0]) % m.cfg.Workers
+	requesttrace.Mark(ctx, "commit_requested")
+	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		requesttrace.Mark(ctx, "update_started")
+		o := state.NewOverlay(v)
+		key := state.Key(state.KeyApproval, fact[:])
+		if _, found, err := state.Load[state.Approval](o, key); err != nil {
+			return nil, err
+		} else if found {
+			p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+			if err != nil {
+				return nil, err
+			}
+			if p.Invalidated {
+				return nil, rules.ErrConflict
+			}
+			return nil, nil
+		}
+		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
+			return nil, err
+		} else if found {
+			return nil, rules.ErrConflict
+		}
+		if old, found, err := state.Load[protocol.TxID](o, state.Key(state.KeyIntent, t.Intent[:])); err != nil {
+			return nil, err
+		} else if found && old != id {
+			return nil, rules.ErrConflict
+		}
+		for i, in := range t.Inputs {
+			claim := tx.Claims[i]
+			key := rules.DirectSpendKey(in.Output, claim.Instance)
+			spend, _, err := state.Load[state.Spend](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if spend.Consumed != (protocol.SpendFactID{}) || (spend.Candidate != (protocol.SpendFactID{}) && spend.Candidate != fact) {
+				return nil, rules.ErrConflict
+			}
+			if in.Kind == protocol.FinalInput {
+				created, found, err := state.Load[state.Creation](o, rules.DirectCreationKey(in.Output, claim.Instance))
+				if err != nil {
+					return nil, err
+				}
+				if !found || !created.Final || created.Fact != in.Evidence || created.Output != claim.Output {
+					return nil, rules.ErrMissing
+				}
+			}
+			spend.Candidate = fact
+			if err = state.Put(o, key, spend); err != nil {
+				return nil, err
+			}
+		}
+
+		if _, err := rules.ValidateDirectFee(o, tx); err != nil {
+			return nil, err
+		}
+		for _, in := range t.Fee.Inputs {
+			key := rules.DirectSpendKey(in.Output, 0)
+			spent, _, err := state.Load[state.Spend](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if spent.Consumed != (protocol.SpendFactID{}) || (spent.Candidate != (protocol.SpendFactID{}) && spent.Candidate != fact) {
+				return nil, rules.ErrConflict
+			}
+			spent.Candidate = fact
+			if err = state.Put(o, key, spent); err != nil {
+				return nil, err
+			}
+		}
+		a := state.Approval{Fact: fact, Direct: &tx, Admission: vector, DirectParents: req.InputCertificates}
+		for i, allocation := range vector {
+			ref := t.Admission[i]
+			g, found, err := state.Load[state.Grant](o, state.Key(state.KeyGrant, allocation.Key.Encode()))
+			if err != nil {
+				return nil, err
+			}
+			if !found || g.ID != ref.Grant || g.Organization != cfg.Hash() || (g.Key.Kind == protocol.ResourcePolicy && g.Subject != t.Subject) {
+				return nil, protocol.ErrAuth
+			}
+			key := state.SliceKey(allocation.Key, worker)
+			slice, found, err := state.Load[state.Slice](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if !found || slice.Available < allocation.Cap {
+				m.budgetLimited[allocation.Key.Kind].Add(1)
+				return nil, rules.ErrLimited
+			}
+			slice.Available -= allocation.Cap
+			slice.Reserved, err = protocol.Add(slice.Reserved, allocation.Cap)
+			if err != nil {
+				return nil, err
+			}
+			if err = state.Put(o, key, slice); err != nil {
+				return nil, err
+			}
+			a.Debits = append(a.Debits, state.Debit{Key: allocation.Key, Cap: allocation.Cap, Worker: worker})
+		}
+		if err := state.Put(o, key, a); err != nil {
+			return nil, err
+		}
+		if err := state.Put(o, state.Key(state.KeyIntent, t.Intent[:]), id); err != nil {
+			return nil, err
+		}
+		requesttrace.Mark(ctx, "update_evaluated")
+		return o.Changes(), nil
+	})
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	requesttrace.Mark(ctx, "commit_returned")
+	vote := protocol.SignSpend(fact, m.cfg.Index, m.cfg.Key)
+	requesttrace.Mark(ctx, "vote_signed")
+	return protocol.DirectApproval{Summary: summary, Vote: vote}, nil
+}
+
+
+C:/Users/Bocchi/Desktop/Next/.e8-worktree/internal/member/member.go:82
+func (m *Member) bootstrap(gen state.Genesis) error {
+	return m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		key := state.Key(state.KeyGenesis)
+		genHash := gen.Hash()
+		orgHash := m.cfg.Organization.Hash()
+		ids := m.cfg.Schedule.IDs()
+		if m.direct != nil {
+			ids = m.direct.Rules()
+		}
+		layout := new(protocol.Encoder)
+		layout.U16(m.cfg.Index)
+		layout.U32(m.cfg.Workers)
+		var committeeHash []byte
+		if m.cfg.Committee.Validators != nil {
+			committeeHash = m.cfg.Committee.Validators.Hash()
+		}
+		hash := protocol.Digest("MEMBER_INITIAL_STATE", genHash[:], orgHash[:], ids.Fee[:], ids.Work[:], ids.Accounting[:], layout.Data(), committeeHash, []byte(m.cfg.Committee.ChainID))
+		if m.direct != nil {
+			key := m.direct.Key.KeyID()
+			hash = protocol.Digest("MEMBER_INITIAL_STATE_V3", hash[:], key[:])
+		}
+		if old, found, e := state.Load[protocol.Hash](v, key); e != nil {
+			return nil, e
+		} else if found {
+			if old != hash {
+				return nil, store.ErrIdentity
+			}
+			return nil, nil
+		}
+		o := state.NewOverlay(v)
+		seen := make(map[protocol.OutputID]bool)
+		for _, g := range gen.Outputs {
+			if seen[g.ID] || g.ID == (protocol.OutputID{}) || g.Fact == (protocol.Hash{}) || g.Output.Amount == 0 || g.Output.Recipient.Verify(gen.Network) != nil {
+				return nil, protocol.ErrRule
+			}
+			seen[g.ID] = true
+			creationKey := state.Key(state.KeyCreation, g.ID[:])
+			if m.direct != nil {
+				creationKey = rules.DirectCreationKey(g.ID, 0)
+			}
+			if e := state.Put(o, creationKey, state.Creation{Output: g.Output, Fact: g.Fact, Final: true}); e != nil {
+				return nil, e
+			}
+		}
+		for _, g := range gen.Grants {
+			if g.Organization != m.cfg.Organization.Hash() {
+				continue
+			}
+			minimum := protocol.ResourceFUEL
+			if m.direct != nil {
+				minimum = protocol.ResourceCAL
+			}
+			if g.ID == (protocol.Hash{}) || g.Key.Kind < minimum || g.Key.Kind > protocol.ResourcePolicy || g.Key.Version == 0 {
+				return nil, protocol.ErrRule
+			}
+			if _, found, e := state.Load[state.Grant](o, state.Key(state.KeyGrant, g.Key.Encode())); e != nil {
+				return nil, e
+			} else if found {
+				return nil, protocol.ErrRule
+			}
+			if e := state.Put(o, state.Key(state.KeyGrant, g.Key.Encode()), g); e != nil {
+				return nil, e
+			}
+			share, e := protocol.GrantShare(g.Amount)
+			if e != nil {
+				return nil, e
+			}
+			for w := uint32(0); w < m.cfg.Workers; w++ {
+				amount := share / uint64(m.cfg.Workers)
+				if uint64(w) < share%uint64(m.cfg.Workers) {
+					amount++
+				}
+				if e = state.Put(o, state.SliceKey(g.Key, w), state.Slice{Available: amount, Generation: 1}); e != nil {
+					return nil, e
+				}
+			}
+		}
+		if e := state.Put(o, key, hash); e != nil {
+			return nil, e
+		}
+		return o.Changes(), nil
+	})
+}
+
+
+C:/Users/Bocchi/Desktop/Next/.e8-worktree/internal/member/blocks.go:67
+func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgress) error {
+	if p.Invalidated {
+		return rules.ErrAccounting
+	}
+	var err error
+	p.Applied, err = localApplied(*a, *p)
+	if err != nil {
+		return err
+	}
+	if p.Settled && p.Pending == 0 && !p.Fee.Closed {
+		next, err := p.Fee.Complete(rules.FeeClose)
+		if err != nil {
+			return err
+		}
+		p.Fee = next
+	}
+	for i := range a.Debits {
+		d := &a.Debits[i]
+		target := uint64(0)
+		if d.Key.Kind == protocol.ResourceCAL && p.Settled {
+			net, err := protocol.Sub(p.Paid, p.Recovered)
+			if err != nil {
+				return err
+			}
+			target, err = protocol.Sub(d.Cap, net)
+			if err != nil {
+				return err
+			}
+		}
+		if d.Key.Kind != protocol.ResourceCAL && p.Fee.Closed {
+			target = d.Cap
+			if d.Key.Kind == protocol.ResourceFUEL || d.Key.Kind == protocol.ResourcePolicy {
+				paid, err := protocol.Add(p.Fee.Rewards, p.Fee.Burned)
+				if err != nil {
+					return err
+				}
+				target, err = protocol.Sub(target, paid)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if target < p.Applied[i] || target > d.Cap {
+			return rules.ErrAccounting
+		}
+		delta := target - p.Applied[i]
+		if delta == 0 {
+			continue
+		}
+		key := state.SliceKey(d.Key, d.Worker)
+		slice, found, err := state.Load[state.Slice](o, key)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return rules.ErrMissing
+		}
+		slice.Reserved, err = protocol.Sub(slice.Reserved, delta)
+		if err != nil {
+			return err
+		}
+		slice.Available, err = protocol.Add(slice.Available, delta)
+		if err != nil {
+			return err
+		}
+		p.Applied[i] = target
+		if err = state.Put(o, key, slice); err != nil {
+			return err
+		}
+	}
+	return state.Put(o, ProgressKey(a.Fact), *p)
+}
+
+
+C:/Users/Bocchi/Desktop/Next/.e8-worktree/internal/rules/direct.go:113
+func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.AdmissionVector, error) {
+	t := tx.Body
+	if p.Key == nil || p.TimeoutSeconds <= 0 || p.RepairCost == 0 || p.Base.Validate() != nil || t.Rules != p.Rules() || t.Kind != protocol.FastTransfer || (t.Fee.Source != protocol.OrgReserve && t.Fee.Source != protocol.OwnerFinalUTXO) {
+		return nil, protocol.ErrRule
+	}
+	if err := tx.VerifyInitial(p.Key); err != nil {
+		return nil, err
+	}
+	if t.Work.Depth != 1 || t.Work.Ancestors != 1 {
+		return nil, protocol.ErrRule
+	}
+	var cal uint64
+	for _, out := range t.Outputs {
+		var err error
+		cal, err = protocol.Add(cal, out.Amount)
+		if err != nil {
+			return nil, err
+		}
+	}
+	escrow, err := NewEscrow(t.Fee.Maximum, p.Base.Fee)
+	if err != nil {
+		return nil, err
+	}
+	var certified uint64
+	for _, in := range t.Inputs {
+		if in.Kind == protocol.CertificateInput {
+			certified++
+		}
+	}
+	reserve, err := protocol.MulDiv(certified, p.RepairCost, 1)
+	if err != nil {
+		return nil, err
+	}
+	minimum, err := protocol.Add(p.Base.Fee.Register, p.Base.Fee.Settle)
+	if err != nil {
+		return nil, err
+	}
+	minimum, err = protocol.Add(minimum, p.Base.Fee.Close)
+	if err != nil {
+		return nil, err
+	}
+	minimum, err = protocol.Add(minimum, reserve)
+	if err != nil || minimum > escrow.Maximum {
+		return nil, ErrLimited
+	}
+	inputCost, err := protocol.MulDiv(uint64(len(t.Inputs)+len(t.Fee.Inputs)), p.Base.InputExecution, 1)
+	if err != nil {
+		return nil, err
+	}
+	outputCount := len(t.Outputs)
+	if t.Fee.Source == protocol.OwnerFinalUTXO {
+		outputCount += 2
+	}
+	outputCost, err := protocol.MulDiv(uint64(outputCount), p.Base.OutputExecution, 1)
+	if err != nil {
+		return nil, err
+	}
+	exec, err := protocol.Add(p.Base.BaseExecution, inputCost)
+	if err != nil {
+		return nil, err
+	}
+	exec, err = protocol.Add(exec, outputCost)
+	if err != nil {
+		return nil, err
+	}
+	// Reserve one bounded repair action for each certificate input.
+	repairExec, err := protocol.MulDiv(certified, p.Base.BaseExecution, 1)
+	if err != nil {
+		return nil, err
+	}
+	exec, err = protocol.Add(exec, repairExec)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := tx.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	retained, err := protocol.Add(p.Base.BaseBytes, uint64(len(raw))+uint64(len(t.Inputs))*protocol.MaxCertificateBytes)
+	if err != nil {
+		return nil, err
+	}
+	if t.Fee.Source == protocol.OwnerFinalUTXO {
+		retained, err = protocol.Add(retained, 4+2*protocol.FeeOutputBytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if exec > uint64(t.Work.Execution) || retained > uint64(t.Work.Bytes) {
+		return nil, ErrLimited
+	}
+	amounts := map[protocol.ResourceKind]uint64{protocol.ResourceCAL: cal, protocol.ResourceFUEL: t.Fee.Maximum, protocol.ResourceExecution: exec, protocol.ResourceBytes: retained, protocol.ResourcePolicy: t.Fee.Maximum}
+	if t.Fee.Source == protocol.OwnerFinalUTXO {
+		delete(amounts, protocol.ResourceFUEL)
+		delete(amounts, protocol.ResourcePolicy)
+	}
+	if len(t.Admission) != len(amounts) {
+		return nil, protocol.ErrRule
+	}
+	var vector protocol.AdmissionVector
+	seen := map[protocol.ResourceKind]bool{}
+	for _, ref := range t.Admission {
+		cap, ok := amounts[ref.Key.Kind]
+		account := t.Certifier
+		if ref.Key.Kind == protocol.ResourceFUEL {
+			account = t.Fee.Account
+		}
+		if ref.Key.Kind == protocol.ResourcePolicy {
+			account = t.Fee.Policy
+		}
+		if !ok || seen[ref.Key.Kind] || ref.Key.Account != account || (t.Fee.Source == protocol.OrgReserve && ref.Key.Version != t.Fee.Version) {
+			return nil, protocol.ErrRule
+		}
+		seen[ref.Key.Kind] = true
+		vector = append(vector, protocol.Allocation{Key: ref.Key, Cap: cap})
+	}
+	return vector, vector.Validate()
+}
+
+

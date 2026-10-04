@@ -1,0 +1,37 @@
+% Chinese reading edition of the supplementary material. Compile with XeLaTeX.
+\RequirePackage[OT1]{fontenc}
+\documentclass[letterpaper,11pt,onecolumn,journal]{IEEEtran}
+\usepackage[UTF8,fontset=none,heading=false]{ctex}
+\setCJKmainfont{FandolSong-Regular.otf}[BoldFont=FandolSong-Bold.otf,ItalicFont=FandolKai-Regular.otf,BoldItalicFont=FandolSong-Bold.otf,SmallCapsFont=FandolSong-Regular.otf]
+\setCJKsansfont{FandolHei-Regular.otf}[BoldFont=FandolHei-Bold.otf]
+\setCJKmonofont{FandolFang-Regular.otf}
+\setmainfont{texgyretermes-regular.otf}[BoldFont=texgyretermes-bold.otf,ItalicFont=texgyretermes-italic.otf,BoldItalicFont=texgyretermes-bolditalic.otf]
+\setsansfont{texgyreheros-regular.otf}[BoldFont=texgyreheros-bold.otf,ItalicFont=texgyreheros-italic.otf,BoldItalicFont=texgyreheros-bolditalic.otf]
+\usepackage{amsmath,amssymb,booktabs,array,longtable,graphicx,algorithmic}
+\graphicspath{{figures/}{./}}
+\usepackage[unicode,hidelinks]{hyperref}
+\hypersetup{pdftitle={Next：以直接担保实现连续 UTXO 支付——补充材料},pdfauthor={Lu Hengrun}}
+\renewcommand{\thesection}{S\arabic{section}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\theequation}{S\arabic{equation}}
+\renewcommand{\tablename}{表}
+\title{Next：以直接担保实现连续 UTXO 支付\\补充材料（中文阅读版）}
+\author{Lu Hengrun}
+\begin{document}
+\maketitle
+\noindent\textbf{阅读指南。} 当前构建实验记录及证明到实际入口的对应见第~\ref{supp:final-evidence}~节，共识与费用对应见第~\ref{supp:interface-fee-evidence}~节。其他章节保留明确标注的旧构建及其测量结果。 本补充材料中的 Compensated 表示实现里名为 \texttt{Repaired} 的经济义务状态。
+
+
+\input{zh-supplement-security}
+\input{zh-supplement-current}
+\input{zh-supplement-revision}
+\input{zh-supplement-final-evidence}
+\input{zh-supplement-methods}
+\input{zh-supplement-archived}
+\clearpage
+\section{逐轮实验记录}
+\input{zh-supplement-tables}
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+\end{document}

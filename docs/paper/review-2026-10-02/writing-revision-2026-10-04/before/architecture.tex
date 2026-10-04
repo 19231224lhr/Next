@@ -1,0 +1,28 @@
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,font=\footnotesize,
+box/.style={draw=black!55,rounded corners=2pt,align=center,minimum height=1.05cm,text width=2.65cm,fill=white},
+flow/.style={-{Stealth[length=2mm]},thick,draw=blue!60!black},
+bgflow/.style={-{Stealth[length=2mm]},draw=black!65,dashed},
+lab/.style={font=\scriptsize,align=center,fill=white,inner sep=2pt}]
+\node[box] (sender) at (0,0) {Sender wallet\\\textbf{Authorize payment}};
+\node[box,fill=blue!4] (org) at (4.1,0) {Consumption organization\\4 independent members\\\textbf{3 matching signatures}};
+\node[box,fill=blue!4] (wallet) at (8.2,0) {Recipient wallet\\Verify and record TXCer\\\textbf{Ready to continue}};
+\node[box] (next) at (12.3,0) {Next payment\\Same or another\\registered organization};
+\draw[flow] (sender) -- node[lab,above]{Transaction} (org);
+\draw[flow] (org) -- node[lab,above]{Output + TXCer} (wallet);
+\draw[flow] (wallet) -- node[lab,above]{Direct evidence} (next);
+\node[box,fill=green!4] (recover) at (0,-2.5) {Original signers\\Resubmit retained payment\\\textbf{Same authorization}};
+\node[box,fill=green!4] (comm) at (4.1,-2.5) {Public committee\\Execute child payment\\\textbf{Record direct gap}};
+\node[box,fill=orange!6] (decision) at (8.2,-2.5) {Public decision\\Debit issuer reserve\\\textbf{Close economic gap}};
+\node[box,fill=orange!6] (repair) at (12.3,-2.5) {Authorized representation\\Adapt restricted slots\\\textbf{Install committed revision}};
+\draw[bgflow] (org) -- node[lab,right]{Public submission} (comm);
+\draw[bgflow] (comm) -- node[lab,above]{Consumed\\input QC} (recover);
+\draw[bgflow] (recover.south) -- ++(0,-.7) -| node[lab,pos=.25,below]{Original submission} (comm.south);
+\draw[bgflow] (comm) -- node[lab,above]{Still missing\\after deadline} (decision);
+\draw[bgflow] (decision) -- node[lab,above]{Immutable\\decision} (repair);
+\node[lab] at (10.25,-1.2) {Economic closure does not wait for adaptation};
+\end{tikzpicture}
+\caption{One-round continuation and evidence-driven source resolution. Solid arrows form the recipient path; dashed arrows denote background work. Public successor evidence enables the original signers to resubmit retained authorized material. If the source remains unresolved after its deadline, the committee closes the gap independently of adaptation. A subsequent authorized representation preserves the payment and complete block identities.}
+\label{fig:architecture}
+\end{figure*}

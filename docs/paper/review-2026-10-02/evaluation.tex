@@ -1,18 +1,32 @@
 \section{Implementation and Evaluation}
 \label{sec:evaluation}
 
-\noindent\textbf{Builds and measurement.}
-The current-build series is based on \texttt{f856c7b}: three
-100-hop runs per continuation mode and three runs of the
-representative paused-adaptation treatment P. All nine runs
-share the same node build. Additional timing probes are confined
-to \texttt{payctl} and are enabled in all six chain runs, without
-changes to production node paths. The complete N/R/C/P matrix
-on \texttt{721800c} remains archived; historical-reader measurements
-retain \texttt{721800c}, and the injected-latency study retains
-\texttt{9879f64}. Chain summaries use medians and ranges of three
-run totals; mixed-load summaries use medians of three run-level
-statistics.
+This section asks four questions. (Q1) How much earlier does a 100-hop
+chain reach its last certified receipt when each hop continues after
+certification instead of after public execution? (Q2) Do compensation and
+repayment complete under ordinary traffic while adaptation for historical
+repair is paused? (Q3) What does authorized historical repair cost in local
+reading, storage, and maintenance? (Q4) How do injected delay and a single
+suspended member or validator affect receipt and public completion? All
+series run on one host; Table~\ref{tab:eval-builds} lists each series' build and measured outcome.
+
+\begin{table}[!t]
+\caption{Evidence groups and measured outcomes. Persistence and endpoints are specified with each experiment.}
+\label{tab:eval-builds}
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}p{0.27\columnwidth}p{0.18\columnwidth}p{0.46\columnwidth}@{}}
+\toprule
+Evidence & Node build & Outcome \\
+\midrule
+Current continuation and P & \texttt{f856c7b} & Six chain totals; three mixed-load runs \\
+Injected delay and faults & \texttt{9879f64} & Receipt and public completion \\
+Historical reader and full N/R/C/P & \texttt{721800c} & Read, storage, maintenance costs; archived treatment matrix \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All nine current runs share the same node binaries. Additional timing probes are confined to \texttt{payctl} and enabled in all six chain runs. Chain results report medians and ranges of three run totals; mixed-load results use medians of three run-level statistics. Supplement~S4 supplies the current evidence and version bridge; older results retain their original build.
 
 \noindent\textbf{Setup and measurement.}
 Experiments use one Mac Studio M4 Max with 16 CPU cores, 64\,GiB RAM,
@@ -93,7 +107,11 @@ indicate overlap.
 \label{sec:eval-liabilities}
 \label{sec:eval-repair}
 
-The fourteen-service P treatment schedules 7,000 ordinary payments
+The P treatment keeps selected sources absent until compensation to test
+whether economic closure proceeds while historical adaptation is unavailable.
+Automatic source resubmission is disabled so that retained source material
+cannot resolve these obligations before the compensation path is exercised.
+The fourteen-service treatment schedules 7,000 ordinary payments
 at 100 payments/s over 70\,s, alongside eight independent
 cross-organization parent--child pairs, using authorized
 organization-funded FUEL. Four committee nodes and two organizations with four members and one gateway each give fourteen services. Ordinary wallets use NoSync; scenario wallets commit synchronously. The driver limits fast requests to 64 and outstanding payments to 256. Pairs start ten seconds after driver launch, one second apart, and scenario wallets follow blocks for at least 55\,s. Parent publication and \texttt{INSTALL}
@@ -114,6 +132,20 @@ resumption in the measured executions. Within each run,
 committee state hashes agree at a common height, and CAL/FUEL,
 input, fee, reservation, and outbox audits pass. Per-run fees are
 659,544~FUEL: 589,384 in rewards and 70,160 burned.
+
+\noindent\textbf{Capital and admission.}
+Each P run uses a fixed CAL grant of $10^{12}$ per organization and no
+automatic top-up. The final resource records of all eight members in each run
+report zero resource-insufficiency counters and zero remaining CAL and work
+reservations; spent FUEL remains charged. The insufficiency counters are
+process-local, and no member restarts during these runs. These runs establish closure with
+fixed, sufficient funding. The coverage theorem concerns all execution
+prefixes, including unpublished certificates, whereas these records measure
+the finite workload and its endpoint. The 256-outstanding driver limit is
+not a bound on all competing or abandoned approvals. The boundary ledgers
+below identify when retained capacity stops certification, and
+Section~\ref{sec:security-composition} states the separate conditions for
+continued admission.
 
 Table~\ref{tab:current-p} reports ordinary receipt latency together
 with pre-send backpressure and drain. Median run-level receipt
@@ -171,6 +203,12 @@ Median & 54.538 & 147.549 & 245.315 & 326.828 & 70.235 & 1.090 \\
 \subsection{Historical Reading: Equivalent Answers and Explicit Costs}
 \label{sec:eval-reader}
 
+We evaluate the exception-review workflow in
+Section~\ref{sec:protocol-reader}: whether revised records preserve economic
+answers and the original complete block identity, and what local reading,
+storage, and maintenance they cost. The paused-adaptation runs above
+separately test that economic closure proceeds before representation.
+
 The timed historical-reader series retains build \texttt{721800c}; the same-consumer functional extension uses the current build. The reader is an honest local replica that has verified and executed
 prefix $H$, querying original coordinates $(h,j,k)$ within one
 application read transaction $V_H$. A loads original history and uses
@@ -201,7 +239,8 @@ test-only cached view, not a third timed backend.
   \centering
   \caption{Functional comparison for local archival review. A: original
     body plus decision index; M: ordinary cached funding rows; B: C3.
-    All use the same executed prefix and authorization records.}
+    All use the same executed prefix and authorization records.
+    The revised-body row is C3's representation contract.}
   \label{tab:c3-function}
   \small
   \begin{tabular}{@{}p{0.65\columnwidth}ccc@{}}
@@ -279,6 +318,9 @@ included. Local sequential adaptation, assembly, Finalize, synchronous
 application Commit, and materialization total 43--214\,ms.
 It excludes network/consensus waits, public-block saving, and
 commit-signature construction. Common compensation costs are reported separately.
+These figures characterize incremental repair on a CH-enabled build;
+they do not isolate the steady-state cost of CH encoding against a
+non-CH build.
 
 
 

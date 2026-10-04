@@ -1,26 +1,7 @@
 \begin{abstract}
-Next is a native UTXO ledger enabling a recipient to verify a
-quorum-signed output certificate (TXCer) after one certification round
-and request a successor before public source execution, subject to
-successor admission and available capacity. If the successor executes
-first, the committee records a funded obligation against the direct
-issuer. Original signers can resubmit sources from publicly exposed
-certificates. A deadline-triggered decision debits the issuer's reserve;
-late sources repay it, but permanently unexecuted sources leave the
-issuer bearing the CAL of publicly consumed outputs. Optional authorized
-history commands support local block review by embedding reserve
-references at original coordinates while preserving owner authorizations,
-successor references, and the complete BlockID. For four-member
-organizations and a four-validator committee, each requiring three votes
-with at most one static Byzantine member, we prove unique consumption,
-coverage of outstanding certificate liability, and delay-neutral terminal
-CAL holdings for finite, acyclic, source-closed, conflict-free payment
-sets whose payments each succeed exactly once. On one host with
-synchronous member commits, median time to the last certified receipt
-in a 100-hop chain is 4.707\,s versus 64.479\,s with per-hop waiting.
-Targeted boundary and restart tests check capacity, economic closure,
-and historical reads.
+Next is a native UTXO ledger that lets recipients request successor payments using verified output certificates before source transactions execute publicly. Input routes identify each payment's certifying organization. Members lock inputs and reserve capacity for all CAL outputs, including change. Continuation remains subject to admission checks and capacity; receipt alone creates no public compensation obligation. When a successor executes and consumes a missing certified output, the committee records an obligation against that output's certificate issuer. Exposed certificates enable original signers to resubmit sources. Source execution fulfills an open obligation; an included valid post-deadline decision can instead close it by debiting the issuer's reserve. Later source execution repays the reserve without recreating the consumed output. A local archival service records the debit in an authorized revised body preserving the original complete block identity. Economic closure does not wait for this repair. Under the stated assumptions, we prove unique consumption, reserve coverage, and CAL conservation for fixed four-member organizations and a four-validator committee, each with at most one static Byzantine participant. On one host with synchronous member commits and NoSync wallets, a 100-hop chain reaches its last certified receipt in a median 4.707\,s, versus 64.479\,s with per-hop waiting, including retries.
 \end{abstract}
+
 \begin{IEEEkeywords}
 Blockchain, certified payments, collateral, Byzantine fault tolerance,
 chameleon hash.

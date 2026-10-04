@@ -1,0 +1,86 @@
+{
+  "builds": {
+    "results-mixed": {
+      "commit": "f856c7b-plus-client-timing",
+      "actual_binary_hashes": {
+        "bin-final/committee": "cba6a04f0b269cdac7ba443510fb6f89f60b7271d80bf20ca0832ec710e2e042",
+        "bin-final/payctl": "d0b30f820873cb31259c9d473a1f0e636c93005f117196504c17f9a87b398f39",
+        "bin-final/member": "5334100fba5a9750d18aae5f69347d71298fb934ccfa649b37b204f79fcdaf7c",
+        "bin-final/member-real": "127ca692771664cb9c92ad67bab6517792dcf97d41b64a1ef66741424343ec3c",
+        "bin-final/gateway": "cdc4db54e5863a0f43e7277726e24d2968f7c3a674282ef1f29c5b6c0fa95a50"
+      },
+      "client_sha256": "d0b30f820873cb31259c9d473a1f0e636c93005f117196504c17f9a87b398f39",
+      "changed_client_files": [],
+      "env": {
+        "UTXO_EXPERIMENT_COMMIT": "250ms",
+        "UTXO_EXPERIMENT_FLUSH": "10ms",
+        "UTXO_EXPERIMENT_GOSSIP": "10ms",
+        "UTXO_EXPERIMENT_BUDGET": "1",
+        "UTXO_EXPERIMENT_MEMBER_SYNC": "1",
+        "UTXO_SETTLEMENT_TRACE": "1",
+        "UTXO_EXPERIMENT_COMMITTEE_MEMORY": "0",
+        "UTXO_EXPERIMENT_MEMBER_MEMORY": "0",
+        "UTXO_EXPERIMENT_GATEWAY_MEMORY": "0",
+        "UTXO_EXPERIMENT_MEM_BLOCKSTORE": "0"
+      }
+    },
+    "results": {
+      "commit": "f856c7b-plus-client-timing",
+      "binaries": {
+        "bin-final/committee": "cba6a04f0b269cdac7ba443510fb6f89f60b7271d80bf20ca0832ec710e2e042",
+        "bin-final/gateway": "cdc4db54e5863a0f43e7277726e24d2968f7c3a674282ef1f29c5b6c0fa95a50",
+        "bin-final/member": "5334100fba5a9750d18aae5f69347d71298fb934ccfa649b37b204f79fcdaf7c",
+        "bin-final/member-real": "127ca692771664cb9c92ad67bab6517792dcf97d41b64a1ef66741424343ec3c",
+        "bin-final/payctl": "d0b30f820873cb31259c9d473a1f0e636c93005f117196504c17f9a87b398f39"
+      },
+      "source_count": 305,
+      "expanded_comet_count": 664,
+      "go": "go version go1.27.1 darwin/arm64",
+      "env": {
+        "UTXO_EXPERIMENT_COMMIT": "250ms",
+        "UTXO_EXPERIMENT_FLUSH": "10ms",
+        "UTXO_EXPERIMENT_GOSSIP": "10ms",
+        "UTXO_EXPERIMENT_BUDGET": "1",
+        "UTXO_EXPERIMENT_MEMBER_SYNC": "1",
+        "UTXO_SETTLEMENT_TRACE": "1",
+        "UTXO_EXPERIMENT_COMMITTEE_MEMORY": "0",
+        "UTXO_EXPERIMENT_MEMBER_MEMORY": "0",
+        "UTXO_EXPERIMENT_GATEWAY_MEMORY": "0",
+        "UTXO_EXPERIMENT_MEM_BLOCKSTORE": "0"
+      }
+    },
+    "results-recovery": {
+      "commit": "f856c7b-plus-client-timing",
+      "actual_binary_hashes": {
+        "bin-final/committee": "cba6a04f0b269cdac7ba443510fb6f89f60b7271d80bf20ca0832ec710e2e042",
+        "bin-final/payctl": "d0b30f820873cb31259c9d473a1f0e636c93005f117196504c17f9a87b398f39",
+        "bin-final/member": "5334100fba5a9750d18aae5f69347d71298fb934ccfa649b37b204f79fcdaf7c",
+        "bin-final/member-real": "127ca692771664cb9c92ad67bab6517792dcf97d41b64a1ef66741424343ec3c",
+        "bin-final/gateway": "cdc4db54e5863a0f43e7277726e24d2968f7c3a674282ef1f29c5b6c0fa95a50"
+      },
+      "client_sha256": "d0b30f820873cb31259c9d473a1f0e636c93005f117196504c17f9a87b398f39",
+      "changed_client_files": [],
+      "env": {
+        "UTXO_EXPERIMENT_COMMIT": "250ms",
+        "UTXO_EXPERIMENT_FLUSH": "10ms",
+        "UTXO_EXPERIMENT_GOSSIP": "10ms",
+        "UTXO_EXPERIMENT_BUDGET": "1",
+        "UTXO_EXPERIMENT_MEMBER_SYNC": "1",
+        "UTXO_SETTLEMENT_TRACE": "1",
+        "UTXO_EXPERIMENT_COMMITTEE_MEMORY": "0",
+        "UTXO_EXPERIMENT_MEMBER_MEMORY": "0",
+        "UTXO_EXPERIMENT_GATEWAY_MEMORY": "0",
+        "UTXO_EXPERIMENT_MEM_BLOCKSTORE": "0"
+      }
+    }
+  },
+  "differences_from_chain_build": {
+    "results-mixed/comet_go": [],
+    "results-recovery/comet_go": [],
+    "results-recovery/source": [],
+    "results-mixed/source": [],
+    "results-recovery/binaries": [],
+    "results-mixed/binaries": []
+  },
+  "note": "Compared source and comet_go in nested base of P/R build.json, and actual_binary_hashes against chain binaries. Capital source_sha256 hashes final-resources.json, not code."
+}

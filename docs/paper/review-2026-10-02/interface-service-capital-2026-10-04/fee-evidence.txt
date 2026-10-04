@@ -1,0 +1,1507 @@
+
+FILE internal/rules/accounting.go
+SHA256 afb268093495543bc8354dbf50bb90784de966dfd5f7e3fc766cf61c3ae0af45
+
+package rules
+
+import (
+	"errors"
+	"utxo/protocol"
+)
+
+var ErrAccounting = errors.New("inconsistent cumulative accounting")
+
+type CreditState struct{ Original, Paid, Discharged, Returned, Remaining, Revision uint64 }
+
+func (c CreditState) Validate() error {
+	sum, e := protocol.Add(c.Paid, c.Discharged)
+	if e != nil {
+		return e
+	}
+	sum, e = protocol.Add(sum, c.Remaining)
+	if e != nil {
+		return e
+	}
+	if sum != c.Original || c.Returned > c.Paid {
+		return ErrAccounting
+	}
+	return nil
+}
+func (c CreditState) Residual() (uint64, error) {
+	if e := c.Validate(); e != nil {
+		return 0, e
+	}
+	credit, e := protocol.Add(c.Discharged, c.Returned)
+	if e != nil {
+		return 0, e
+	}
+	return protocol.Sub(c.Original, credit)
+}
+
+// ApplyCredit consumes an already authenticated fact. Callers bind its resource,
+// original approval and authorization before changing the corresponding slice.
+func ApplyCredit(old, next CreditState) (CreditState, uint64, error) {
+	if e := old.Validate(); e != nil {
+		return old, 0, e
+	}
+	if e := next.Validate(); e != nil {
+		return old, 0, e
+	}
+	if old.Original != next.Original {
+		return old, 0, ErrAccounting
+	}
+	if next.Revision < old.Revision {
+		return old, 0, nil
+	}
+	if next.Revision == old.Revision {
+		if next != old {
+			return old, 0, ErrAccounting
+		}
+		return old, 0, nil
+	}
+	if next.Paid < old.Paid || next.Discharged < old.Discharged || next.Returned < old.Returned || next.Remaining > old.Remaining {
+		return old, 0, ErrAccounting
+	}
+	a, _ := old.Residual()
+	b, _ := next.Residual()
+	delta, e := protocol.Sub(a, b)
+	if e != nil {
+		return old, 0, e
+	}
+	return next, delta, nil
+}
+
+type FeeAction uint8
+
+const (
+	FeeRegister FeeAction = 1
+	FeeSettle   FeeAction = 2
+	FeeClose    FeeAction = 3
+)
+
+type FeePlan struct{ Register, Settle, Close, Burn uint64 }
+type Escrow struct {
+	Maximum, Held, Rewards, Burned, Refunded uint64
+	Plan                                     FeePlan
+	Completed                                uint8
+	Closed                                   bool
+}
+
+func NewEscrow(maximum uint64, plan FeePlan) (Escrow, error) {
+	total, e := protocol.Add(plan.Register, plan.Settle)
+	if e != nil {
+		return Escrow{}, e
+	}
+	total, e = protocol.Add(total, plan.Close)
+	if e != nil {
+		return Escrow{}, e
+	}
+	if total > maximum || plan.Burn > plan.Close {
+		return Escrow{}, ErrAccounting
+	}
+	return Escrow{Maximum: maximum, Held: maximum, Plan: plan}, nil
+}
+func (f Escrow) Validate() error {
+	total, e := protocol.Add(f.Held, f.Rewards)
+	if e != nil {
+		return e
+	}
+	total, e = protocol.Add(total, f.Burned)
+	if e != nil {
+		return e
+	}
+	total, e = protocol.Add(total, f.Refunded)
+	if e != nil {
+		return e
+	}
+	if total != f.Maximum {
+		return ErrAccounting
+	}
+	return nil
+}
+func (f Escrow) Complete(action FeeAction) (Escrow, error) {
+	if e := f.Validate(); e != nil {
+		return f, e
+	}
+	if action < FeeRegister || action > FeeClose {
+		return f, protocol.ErrUnsupported
+	}
+	bit := uint8(1) << action
+	if f.Completed&bit != 0 {
+		return f, nil
+	}
+	if f.Closed {
+		return f, ErrAccounting
+	}
+	original := f
+	cost := f.Plan.Register
+	if action == FeeSettle {
+		if f.Completed&(1<<FeeRegister) == 0 {
+			return f, ErrAccounting
+		}
+		cost = f.Plan.Settle
+	}
+	if action == FeeClose {
+		if f.Completed&(1<<FeeSettle) == 0 {
+			return f, ErrAccounting
+		}
+		cost = f.Plan.Close
+	}
+	var e error
+	f.Held, e = protocol.Sub(f.Held, cost)
+	if e != nil {
+		return original, e
+	}
+	reward := cost
+	if action == FeeClose {
+		reward, e = protocol.Sub(cost, f.Plan.Burn)
+		if e != nil {
+			return original, e
+		}
+		f.Burned, e = protocol.Add(f.Burned, f.Plan.Burn)
+		if e != nil {
+			return original, e
+		}
+		f.Refunded = f.Held
+		f.Held = 0
+		f.Closed = true
+	}
+	f.Rewards, e = protocol.Add(f.Rewards, reward)
+	if e != nil {
+		return original, e
+	}
+	f.Completed |= bit
+	if e = f.Validate(); e != nil {
+		return original, e
+	}
+	return f, nil
+}
+
+
+FILE internal/rules/direct.go
+SHA256 d353de0d3e4732b6f712d55aed7d9ebf25cc8cfb2790407eb3e660e1292801a4
+
+package rules
+
+import (
+	"bytes"
+	"math"
+	"sort"
+
+	"utxo/crypto/chameleon"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// DirectPolicy belongs to a fixed genesis. Timeouts use committed block time.
+type DirectPolicy struct {
+	Base           Schedule
+	TimeoutSeconds int64
+	RepairCost     uint64
+	Key            *chameleon.Public
+	Organizations  map[protocol.Hash]protocol.OrgConfig
+}
+
+func (p DirectPolicy) Rules() protocol.RuleIDs {
+	r := p.Base.IDs()
+	e := new(protocol.Encoder)
+	e.Fixed(r.Accounting[:])
+	e.U64(uint64(p.TimeoutSeconds))
+	e.U64(p.RepairCost)
+	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V5_DECISION_FIRST", e.Data())
+	return r
+}
+
+type InputCertificate = protocol.InputCertificate
+type DirectPayment = protocol.DirectPayment
+type VerifiedDirectPayment struct {
+	payment protocol.DirectSubmission
+	parents map[protocol.OutputID]InputCertificate
+}
+
+// TxID exposes identity without exposing the cached, immutable payment material.
+func (v VerifiedDirectPayment) TxID() protocol.TxID { return v.payment.Tx.ID() }
+
+const (
+	keyDirectCoverage   uint8 = 100
+	keyDirectPromise    uint8 = 101
+	keyDirectObligation uint8 = 102
+	keyDirectPayment    uint8 = 103
+	keyDirectRepair     uint8 = 105
+	keyDirectGap        uint8 = 106
+)
+const (
+	DirectOpen uint8 = iota
+	DirectFulfilled
+	DirectRepaired
+	DirectRecovered
+)
+
+func DirectCreationKey(id protocol.OutputID, instance uint8) []byte {
+	return state.Key(state.KeyCreation, id[:], []byte{instance})
+}
+func DirectSpendKey(id protocol.OutputID, instance uint8) []byte {
+	return state.Key(state.KeySpend, id[:], []byte{instance})
+}
+func DirectObligationKey(id protocol.OutputID) []byte { return state.Key(keyDirectObligation, id[:]) }
+func DirectRepairKey(id protocol.OutputID) []byte     { return state.Key(keyDirectRepair, id[:]) }
+func DirectGapKey() []byte                            { return state.Key(keyDirectGap) }
+
+func DirectDueKey(deadline int64, id protocol.OutputID) []byte {
+	e := new(protocol.Encoder)
+	e.U64(uint64(deadline))
+	e.Fixed(id[:])
+	return state.Key(112, e.Data())
+}
+
+type DirectObligation struct {
+	AnchorHeight          int64
+	Output                protocol.OutputID
+	Issuer, Config        protocol.Hash
+	Certificate, Consumer protocol.SpendFactID
+	Transaction           protocol.TxID
+	Input                 uint32
+	Amount                uint64
+	Deadline              int64
+	Status                uint8
+}
+type DirectRepairTodo struct {
+	ID, Debit      protocol.Hash
+	Obligation     DirectObligation
+	Decision       protocol.CompensationDecision
+	DecisionHeight int64
+}
+type directPromise struct {
+	Certificate protocol.SpendFactID
+	Index       uint32
+	Status      uint8
+}
+type CoverageBalance struct{ Original, Paid, Recovered, Discharged, Remaining, Revision uint64 }
+
+type directCoverage struct {
+	Summary protocol.OutputSummary
+	Credit  CoverageBalance
+}
+type directPayment struct {
+	Summary    protocol.OutputSummary
+	FeeAccount protocol.Hash
+	FeeSource  protocol.FeeSource
+	FeeRefund  protocol.ReceiveDescriptor
+	Fee        Escrow
+	Pending    uint32
+	Settled    bool
+}
+type DirectPaymentState = directPayment
+
+func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.AdmissionVector, error) {
+	t := tx.Body
+	if p.Key == nil || p.TimeoutSeconds <= 0 || p.RepairCost == 0 || p.Base.Validate() != nil || t.Rules != p.Rules() || t.Kind != protocol.FastTransfer || (t.Fee.Source != protocol.OrgReserve && t.Fee.Source != protocol.OwnerFinalUTXO) {
+		return nil, protocol.ErrRule
+	}
+	if err := tx.VerifyInitial(p.Key); err != nil {
+		return nil, err
+	}
+	if t.Work.Depth != 1 || t.Work.Ancestors != 1 {
+		return nil, protocol.ErrRule
+	}
+	var cal uint64
+	for _, out := range t.Outputs {
+		var err error
+		cal, err = protocol.Add(cal, out.Amount)
+		if err != nil {
+			return nil, err
+		}
+	}
+	escrow, err := NewEscrow(t.Fee.Maximum, p.Base.Fee)
+	if err != nil {
+		return nil, err
+	}
+	var certified uint64
+	for _, in := range t.Inputs {
+		if in.Kind == protocol.CertificateInput {
+			certified++
+		}
+	}
+	reserve, err := protocol.MulDiv(certified, p.RepairCost, 1)
+	if err != nil {
+		return nil, err
+	}
+	minimum, err := protocol.Add(p.Base.Fee.Register, p.Base.Fee.Settle)
+	if err != nil {
+		return nil, err
+	}
+	minimum, err = protocol.Add(minimum, p.Base.Fee.Close)
+	if err != nil {
+		return nil, err
+	}
+	minimum, err = protocol.Add(minimum, reserve)
+	if err != nil || minimum > escrow.Maximum {
+		return nil, ErrLimited
+	}
+	inputCost, err := protocol.MulDiv(uint64(len(t.Inputs)+len(t.Fee.Inputs)), p.Base.InputExecution, 1)
+	if err != nil {
+		return nil, err
+	}
+	outputCount := len(t.Outputs)
+	if t.Fee.Source == protocol.OwnerFinalUTXO {
+		outputCount += 2
+	}
+	outputCost, err := protocol.MulDiv(uint64(outputCount), p.Base.OutputExecution, 1)
+	if err != nil {
+		return nil, err
+	}
+	exec, err := protocol.Add(p.Base.BaseExecution, inputCost)
+	if err != nil {
+		return nil, err
+	}
+	exec, err = protocol.Add(exec, outputCost)
+	if err != nil {
+		return nil, err
+	}
+	// Reserve one bounded repair action for each certificate input.
+	repairExec, err := protocol.MulDiv(certified, p.Base.BaseExecution, 1)
+	if err != nil {
+		return nil, err
+	}
+	exec, err = protocol.Add(exec, repairExec)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := tx.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	retained, err := protocol.Add(p.Base.BaseBytes, uint64(len(raw))+uint64(len(t.Inputs))*protocol.MaxCertificateBytes)
+	if err != nil {
+		return nil, err
+	}
+	if t.Fee.Source == protocol.OwnerFinalUTXO {
+		retained, err = protocol.Add(retained, 4+2*protocol.FeeOutputBytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if exec > uint64(t.Work.Execution) || retained > uint64(t.Work.Bytes) {
+		return nil, ErrLimited
+	}
+	amounts := map[protocol.ResourceKind]uint64{protocol.ResourceCAL: cal, protocol.ResourceFUEL: t.Fee.Maximum, protocol.ResourceExecution: exec, protocol.ResourceBytes: retained, protocol.ResourcePolicy: t.Fee.Maximum}
+	if t.Fee.Source == protocol.OwnerFinalUTXO {
+		delete(amounts, protocol.ResourceFUEL)
+		delete(amounts, protocol.ResourcePolicy)
+	}
+	if len(t.Admission) != len(amounts) {
+		return nil, protocol.ErrRule
+	}
+	var vector protocol.AdmissionVector
+	seen := map[protocol.ResourceKind]bool{}
+	for _, ref := range t.Admission {
+		cap, ok := amounts[ref.Key.Kind]
+		account := t.Certifier
+		if ref.Key.Kind == protocol.ResourceFUEL {
+			account = t.Fee.Account
+		}
+		if ref.Key.Kind == protocol.ResourcePolicy {
+			account = t.Fee.Policy
+		}
+		if !ok || seen[ref.Key.Kind] || ref.Key.Account != account || (t.Fee.Source == protocol.OrgReserve && ref.Key.Version != t.Fee.Version) {
+			return nil, protocol.ErrRule
+		}
+		seen[ref.Key.Kind] = true
+		vector = append(vector, protocol.Allocation{Key: ref.Key, Cap: cap})
+	}
+	return vector, vector.Validate()
+}
+
+func VerifyDirectPayment(payment DirectPayment, p DirectPolicy) (VerifiedDirectPayment, error) {
+	if payment.Certificate.Summary.Fact() != payment.Submission().Summary().Fact() {
+		return VerifiedDirectPayment{}, protocol.ErrAuth
+	}
+	return VerifyDirectSubmission(payment.Submission(), p)
+}
+
+// cloneDirectTx owns every slice; descriptors, claims and signatures otherwise
+// contain only value fields. This is a copy, never a verification shortcut.
+func cloneDirectTx(tx protocol.FastTx) protocol.FastTx {
+	tx.Body.Inputs = append([]protocol.Input(nil), tx.Body.Inputs...)
+	tx.Body.Outputs = append([]protocol.Output(nil), tx.Body.Outputs...)
+	tx.Body.Admission = append([]protocol.AdmissionRef(nil), tx.Body.Admission...)
+	tx.Body.Fee.Inputs = append([]protocol.Input(nil), tx.Body.Fee.Inputs...)
+	tx.Claims = append([]protocol.InputClaim(nil), tx.Claims...)
+	tx.Commitments = append([]chameleon.Commitment(nil), tx.Commitments...)
+	tx.Funding = append([]protocol.Funding(nil), tx.Funding...)
+	tx.Auth = append([]protocol.OwnerAuth(nil), tx.Auth...)
+	return tx
+}
+
+func VerifyDirectSubmission(payment protocol.DirectSubmission, p DirectPolicy) (VerifiedDirectPayment, error) {
+	// Freeze mutable slices without serializing and re-verifying the same
+	// signatures twice. PrepareDirectVector below still validates the complete
+	// transaction, its initial funding openings and its encoded size.
+	source := payment.Tx
+	if len(source.Body.Inputs) > protocol.MaxInputs || len(source.Body.Outputs) > protocol.MaxOutputs ||
+		len(source.Body.Fee.Inputs) > protocol.MaxInputs || len(source.Body.Admission) > protocol.MaxAdmission ||
+		len(source.Claims) > protocol.MaxInputs || len(source.Commitments) > protocol.MaxInputs ||
+		len(source.Funding) > protocol.MaxInputs || len(source.Auth) > protocol.MaxInputs {
+		return VerifiedDirectPayment{}, protocol.ErrRule
+	}
+	tx := cloneDirectTx(source)
+	payment.Tx = tx
+	freeze := func(c protocol.OutputCertificate) (protocol.OutputCertificate, error) {
+		b, err := c.MarshalBinary()
+		if err != nil {
+			return c, err
+		}
+		return protocol.DecodeOutputCertificate(b)
+	}
+	payment.Admission = append(protocol.AdmissionVector(nil), payment.Admission...)
+	payment.Authorization.Votes = append([]protocol.SpendVote(nil), payment.Authorization.Votes...)
+	vector, err := PrepareDirectVector(tx, p)
+	if err != nil {
+		return VerifiedDirectPayment{}, err
+	}
+	cfg, ok := p.Organizations[tx.Body.Config]
+	summary := payment.Summary()
+	if !ok || summary.Validate() != nil || summary.Network != cfg.Network || summary.Issuer != cfg.Org || summary.Epoch != cfg.Epoch || summary.Config != cfg.Hash() || payment.Authorization.Fact != summary.Fact() || summary.Fact() != protocol.SummaryFor(tx, vector).Fact() || protocol.VerifyQC(payment.Authorization, cfg) != nil {
+		return VerifiedDirectPayment{}, protocol.ErrAuth
+	}
+	if len(payment.InputCertificates) > protocol.MaxInputs {
+		return VerifiedDirectPayment{}, protocol.ErrRule
+	}
+	parents := make(map[protocol.OutputID]InputCertificate, len(payment.InputCertificates))
+	frozen := make([]InputCertificate, 0, len(payment.InputCertificates))
+	for _, parent := range payment.InputCertificates {
+		parent.Certificate, err = freeze(parent.Certificate)
+		if err != nil {
+			return VerifiedDirectPayment{}, err
+		}
+		c := parent.Certificate
+		cfg, ok := p.Organizations[c.Summary.Config]
+		if !ok || c.Verify(cfg) != nil || c.Summary.Network != tx.Body.Network || c.Summary.Rules != p.Rules() || int(parent.Index) >= len(c.Summary.Outputs) {
+			return VerifiedDirectPayment{}, protocol.ErrAuth
+		}
+		id := c.Summary.OutputID(parent.Index)
+		if _, duplicate := parents[id]; duplicate {
+			return VerifiedDirectPayment{}, protocol.ErrRule
+		}
+		parents[id] = parent
+		frozen = append(frozen, parent)
+	}
+	payment.InputCertificates = frozen
+	used := 0
+	for i, in := range tx.Body.Inputs {
+		if in.Kind != protocol.CertificateInput {
+			continue
+		}
+		parent, ok := parents[in.Output]
+		if !ok || in.Evidence != protocol.Hash(parent.Certificate.QC.Fact) || parent.Certificate.VerifyOutput(p.Organizations[parent.Certificate.Summary.Config], parent.Index, tx.Claims[i].Output) != nil {
+			return VerifiedDirectPayment{}, protocol.ErrAuth
+		}
+		used++
+	}
+	// Inputs are unique after PrepareDirectVector. Match the member approval
+	// rule: unrelated certificates must not trigger source-recovery work.
+	if used != len(parents) {
+		return VerifiedDirectPayment{}, protocol.ErrRule
+	}
+	return VerifiedDirectPayment{payment: payment, parents: parents}, nil
+}
+
+type directEval struct {
+	o          *state.Overlay
+	policy     DirectPolicy
+	network    protocol.Hash
+	resultData protocol.ExecutionResult
+}
+
+func newDirectEval(v state.ReadView, p DirectPolicy, network protocol.Hash) *directEval {
+	return &directEval{o: state.NewOverlay(v), policy: p, network: network}
+}
+func (e *directEval) result() (state.Transition, error) {
+	sort.Slice(e.resultData.FeeOutputs, func(i, j int) bool {
+		a, b := e.resultData.FeeOutputs[i], e.resultData.FeeOutputs[j]
+		c := bytes.Compare(a.Transaction[:], b.Transaction[:])
+		return c < 0 || (c == 0 && a.Index < b.Index)
+	})
+	raw, err := e.resultData.MarshalBinary()
+	if err != nil {
+		return state.Transition{}, err
+	}
+	return state.Transition{Changes: e.o.Changes(), Data: raw}, nil
+}
+
+func (e *directEval) grant(s protocol.OutputSummary, index int) (state.Grant, error) {
+	a := s.Admission[index]
+	g, ok, err := state.Load[state.Grant](e.o, state.Key(state.KeyGrant, a.Key.Encode()))
+	if err != nil {
+		return g, err
+	}
+	if !ok || g.ID != s.Grants[index] || g.Organization != s.Config || g.Key != a.Key {
+		return g, protocol.ErrAuth
+	}
+	return g, nil
+}
+func (e *directEval) register(c protocol.OutputCertificate) error {
+	s := c.Summary
+	fact := c.QC.Fact
+	key := state.Key(keyDirectCoverage, fact[:])
+	if _, found, err := state.Load[directCoverage](e.o, key); err != nil {
+		return err
+	} else if found {
+		return nil
+	}
+	var receipt CoverageBalance
+	for i, a := range s.Admission {
+		if a.Key.Kind == protocol.ResourceCAL {
+			g, err := e.grant(s, i)
+			if err != nil {
+				return err
+			}
+			if err = updateUsage(e.o, a.Key, a.Cap, 0, g.Amount, true); err != nil {
+				return err
+			}
+			receipt = CoverageBalance{Original: a.Cap, Remaining: a.Cap}
+		}
+	}
+	if receipt.Original == 0 {
+		return protocol.ErrRule
+	}
+	for i := range s.Outputs {
+		id := s.OutputID(uint32(i))
+		key := state.Key(keyDirectPromise, id[:])
+		old, found, err := state.Load[directPromise](e.o, key)
+		if err != nil {
+			return err
+		}
+		if found && (old.Certificate != fact || old.Index != uint32(i)) {
+			return ErrConflict
+		}
+		if !found {
+			if err = state.Put(e.o, key, directPromise{Certificate: fact, Index: uint32(i)}); err != nil {
+				return err
+			}
+		}
+	}
+	return state.Put(e.o, key, directCoverage{Summary: s, Credit: receipt})
+}
+
+func (e *directEval) completeOutput(id protocol.OutputID, paid bool) error {
+	key := state.Key(keyDirectPromise, id[:])
+	promise, ok, err := state.Load[directPromise](e.o, key)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrMissing
+	}
+	if promise.Status != DirectOpen {
+		return nil
+	}
+	coverageKey := state.Key(keyDirectCoverage, promise.Certificate[:])
+	coverage, ok, err := state.Load[directCoverage](e.o, coverageKey)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrMissing
+	}
+	amount := coverage.Summary.Outputs[promise.Index].Amount
+	r := &coverage.Credit
+	r.Remaining, err = protocol.Sub(r.Remaining, amount)
+	if err != nil {
+		return err
+	}
+	spent := uint64(0)
+	promise.Status = DirectFulfilled
+	if paid {
+		r.Paid, err = protocol.Add(r.Paid, amount)
+		spent = amount
+		promise.Status = DirectRepaired
+	} else {
+		r.Discharged, err = protocol.Add(r.Discharged, amount)
+	}
+	if err != nil {
+		return err
+	}
+	r.Revision++
+	for i, a := range coverage.Summary.Admission {
+		if a.Key.Kind == protocol.ResourceCAL {
+			g, err := e.grant(coverage.Summary, i)
+			if err != nil {
+				return err
+			}
+			if err = updateUsage(e.o, a.Key, amount, spent, g.Amount, false); err != nil {
+				return err
+			}
+		}
+	}
+	if err = state.Put(e.o, key, promise); err != nil {
+		return err
+	}
+	if err = state.Put(e.o, coverageKey, coverage); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e *directEval) feeStage(p *directPayment, action FeeAction) error {
+	old := p.Fee
+	next, err := old.Complete(action)
+	if err != nil {
+		return err
+	}
+	beneficiary := p.Summary.Issuer
+	if action == FeeSettle {
+		beneficiary = protocol.Digest("COMMITTEE_REWARDS", e.network[:])
+	}
+	if err = changeAmount(e.o, state.Key(state.KeyReward, beneficiary[:]), next.Rewards-old.Rewards, false); err != nil {
+		return err
+	}
+	if err = changeAmount(e.o, state.Key(state.KeyBurned), next.Burned-old.Burned, false); err != nil {
+		return err
+	}
+	if p.FeeSource == protocol.OwnerFinalUTXO {
+		err = e.feeOutput(p, protocol.FeeRefundIndex, next.Refunded-old.Refunded)
+	} else {
+		err = changeAmount(e.o, AccountKey(p.FeeAccount, protocol.AssetFUEL), next.Refunded-old.Refunded, false)
+	}
+	if err != nil {
+		return err
+	}
+	p.Fee = next
+	return nil
+}
+
+func (e *directEval) closeFee(p *directPayment) error {
+	if p.Pending != 0 || p.Fee.Closed {
+		return nil
+	}
+	if err := e.feeStage(p, FeeClose); err != nil {
+		return err
+	}
+	paid, err := protocol.Add(p.Fee.Rewards, p.Fee.Burned)
+	if err != nil {
+		return err
+	}
+	for i, a := range p.Summary.Admission {
+		if a.Key.Kind == protocol.ResourceCAL {
+			continue
+		}
+		spent := uint64(0)
+		if a.Key.Kind == protocol.ResourceFUEL || a.Key.Kind == protocol.ResourcePolicy {
+			spent = paid
+		}
+		g, err := e.grant(p.Summary, i)
+		if err != nil {
+			return err
+		}
+		if err = updateUsage(e.o, a.Key, a.Cap, spent, g.Amount, false); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (e *directEval) endObligation(ob *DirectObligation, paid bool) error {
+	if ob.Status != DirectOpen {
+		return nil
+	}
+	if err := e.completeOutput(ob.Output, paid); err != nil {
+		return err
+	}
+	ob.Status = DirectFulfilled
+	if paid {
+		ob.Status = DirectRepaired
+	}
+	if err := state.Put(e.o, DirectObligationKey(ob.Output), *ob); err != nil {
+		return err
+	}
+	e.o.Apply([]state.Change{{Key: DirectDueKey(ob.Deadline, ob.Output), Delete: true}})
+	if err := changeAmount(e.o, DirectGapKey(), ob.Amount, true); err != nil {
+		return err
+	}
+	key := state.Key(keyDirectPayment, ob.Consumer[:])
+	p, ok, err := state.Load[directPayment](e.o, key)
+	if err != nil {
+		return err
+	}
+	if !ok || p.Pending == 0 {
+		return ErrAccounting
+	}
+	p.Pending--
+	if paid {
+		p.Fee.Held, err = protocol.Sub(p.Fee.Held, e.policy.RepairCost)
+		if err != nil {
+			return err
+		}
+		p.Fee.Rewards, err = protocol.Add(p.Fee.Rewards, e.policy.RepairCost)
+		if err != nil {
+			return err
+		}
+		beneficiary := protocol.Digest("COMMITTEE_REWARDS", e.network[:])
+		if err = changeAmount(e.o, state.Key(state.KeyReward, beneficiary[:]), e.policy.RepairCost, false); err != nil {
+			return err
+		}
+	}
+	if err = e.closeFee(&p); err != nil {
+		return err
+	}
+	return state.Put(e.o, key, p)
+}
+
+func EvaluateDirectPayment(v state.ReadView, verified VerifiedDirectPayment, policy DirectPolicy, now int64) (state.Transition, error) {
+	return EvaluateDirectPaymentAt(v, verified, policy, now, 0)
+}
+
+func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, policy DirectPolicy, now, height int64) (state.Transition, error) {
+	pay := verified.payment
+	tx := pay.Tx
+	t := tx.Body
+	summary := pay.Summary()
+	fact := pay.Authorization.Fact
+	if fact == (protocol.SpendFactID{}) || t.Rules != policy.Rules() || now <= 0 || policy.TimeoutSeconds <= 0 || now > math.MaxInt64-policy.TimeoutSeconds {
+		return state.Transition{}, protocol.ErrRule
+	}
+	e := newDirectEval(v, policy, t.Network)
+	key := state.Key(keyDirectPayment, fact[:])
+	old, found, err := state.Load[directPayment](e.o, key)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if found && old.Settled {
+		return state.Transition{}, nil
+	}
+	if prior, found, err := state.Load[protocol.TxID](e.o, state.Key(state.KeyIntent, t.Intent[:])); err != nil {
+		return state.Transition{}, err
+	} else if found && prior != tx.ID() {
+		return state.Transition{}, ErrConflict
+	}
+	p := directPayment{Summary: summary, FeeAccount: t.Fee.Account, FeeSource: t.Fee.Source, FeeRefund: t.Fee.Refund}
+	e.resultData.Applied = true
+	for i, a := range summary.Admission {
+		g, err := e.grant(summary, i)
+		if err != nil {
+			return state.Transition{}, err
+		}
+		if a.Key.Kind == protocol.ResourceCAL {
+			if a.Cap > g.Amount {
+				return state.Transition{}, ErrLimited
+			}
+			continue // New final outputs need no temporary coverage registration.
+		}
+		if a.Key.Kind == protocol.ResourcePolicy && g.Subject != t.Subject {
+			return state.Transition{}, protocol.ErrAuth
+		}
+		if err = updateUsage(e.o, a.Key, a.Cap, 0, g.Amount, true); err != nil {
+			return state.Transition{}, err
+		}
+	}
+	if t.Fee.Source == protocol.OwnerFinalUTXO {
+		total, err := ValidateDirectFee(e.o, tx)
+		if err != nil {
+			return state.Transition{}, err
+		}
+		for _, in := range t.Fee.Inputs {
+			key := DirectSpendKey(in.Output, 0)
+			spent, _, err := state.Load[state.Spend](e.o, key)
+			if err != nil {
+				return state.Transition{}, err
+			}
+			if spent.Consumed != (protocol.SpendFactID{}) {
+				return state.Transition{}, ErrConflict
+			}
+			if err = state.Put(e.o, key, state.Spend{Consumed: fact}); err != nil {
+				return state.Transition{}, err
+			}
+		}
+		if err = e.feeOutput(&p, protocol.FeeChangeIndex, total-t.Fee.Maximum); err != nil {
+			return state.Transition{}, err
+		}
+	} else if err = changeAmount(e.o, AccountKey(t.Fee.Account, protocol.AssetFUEL), t.Fee.Maximum, true); err != nil {
+		return state.Transition{}, err
+	}
+	p.Fee, err = NewEscrow(t.Fee.Maximum, policy.Base.Fee)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if err = e.feeStage(&p, FeeRegister); err != nil {
+		return state.Transition{}, err
+	}
+	var incoming, outgoing uint64
+	for i, in := range t.Inputs {
+		claim := tx.Claims[i]
+		spent, _, err := state.Load[state.Spend](e.o, DirectSpendKey(in.Output, claim.Instance))
+		if err != nil {
+			return state.Transition{}, err
+		}
+		if spent.Consumed != (protocol.SpendFactID{}) {
+			return state.Transition{}, ErrConflict
+		}
+		creation, exists, err := state.Load[state.Creation](e.o, DirectCreationKey(in.Output, claim.Instance))
+		if err != nil {
+			return state.Transition{}, err
+		}
+		if exists && creation.Final {
+			if creation.Output != claim.Output || (in.Kind == protocol.FinalInput && in.Evidence != creation.Fact) || (in.Kind == protocol.CertificateInput && in.Evidence != creation.Source) {
+				return state.Transition{}, protocol.ErrAuth
+			}
+		} else {
+			parent, ok := verified.parents[in.Output]
+			if !ok || claim.Instance != 0 || in.Kind != protocol.CertificateInput {
+				return state.Transition{}, ErrMissing
+			}
+			if err = e.register(parent.Certificate); err != nil {
+				return state.Transition{}, err
+			}
+			if _, exists, err := state.Load[DirectObligation](e.o, DirectObligationKey(in.Output)); err != nil {
+				return state.Transition{}, err
+			} else if exists {
+				return state.Transition{}, ErrConflict
+			}
+			ob := DirectObligation{Output: in.Output, Issuer: parent.Certificate.Summary.Issuer, Config: parent.Certificate.Summary.Config, Certificate: parent.Certificate.QC.Fact, Consumer: fact, Transaction: tx.ID(), Input: uint32(i), Amount: claim.Output.Amount, Deadline: now + policy.TimeoutSeconds}
+			if height > 0 {
+				ob.Deadline = 0
+				ob.AnchorHeight = height + 1
+			}
+			if err = state.Put(e.o, DirectObligationKey(in.Output), ob); err != nil {
+				return state.Transition{}, err
+			}
+			deadlineKey := DirectDueKey(ob.Deadline, ob.Output)
+			if height > 0 {
+				deadlineKey = DirectAnchorKey(height+1, ob.Output)
+			}
+			if err = state.Put(e.o, deadlineKey, ob); err != nil {
+				return state.Transition{}, err
+			}
+			if err = changeAmount(e.o, DirectGapKey(), ob.Amount, false); err != nil {
+				return state.Transition{}, err
+			}
+			p.Pending++
+			e.resultData.MissingInputs = append(e.resultData.MissingInputs, uint32(i))
+		}
+		incoming, err = protocol.Add(incoming, claim.Output.Amount)
+		if err != nil {
+			return state.Transition{}, err
+		}
+		if err = state.Put(e.o, DirectSpendKey(in.Output, claim.Instance), state.Spend{Consumed: fact}); err != nil {
+			return state.Transition{}, err
+		}
+	}
+	for _, out := range t.Outputs {
+		outgoing, err = protocol.Add(outgoing, out.Amount)
+		if err != nil {
+			return state.Transition{}, err
+		}
+	}
+	if incoming != outgoing {
+		return state.Transition{}, ErrAccounting
+	}
+	p.Settled = true
+	if err = e.feeStage(&p, FeeSettle); err != nil {
+		return state.Transition{}, err
+	}
+	if err = e.closeFee(&p); err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(e.o, key, p); err != nil {
+		return state.Transition{}, err
+	}
+	for i, out := range t.Outputs {
+		id := summary.OutputID(uint32(i))
+		ob, exists, err := state.Load[DirectObligation](e.o, DirectObligationKey(id))
+		if err != nil {
+			return state.Transition{}, err
+		}
+		if exists {
+			if ob.Certificate != fact || ob.Amount != out.Amount || ob.Issuer != summary.Issuer {
+				return state.Transition{}, protocol.ErrAuth
+			}
+			if ob.Status == DirectRepaired {
+				if err = e.recoverOutput(&ob); err != nil {
+					return state.Transition{}, err
+				}
+				e.resultData.RecoveredOutputs = append(e.resultData.RecoveredOutputs, uint32(i))
+				continue // The payer is subrogated; no second user-owned output.
+			} else if ob.Status == DirectOpen {
+				if err = e.endObligation(&ob, false); err != nil {
+					return state.Transition{}, err
+				}
+			}
+		}
+		// A child may already have registered this promise before its source
+		// arrived. Resolve that record; do not create one just to close it.
+		if _, found, err := state.Load[directPromise](e.o, state.Key(keyDirectPromise, id[:])); err != nil {
+			return state.Transition{}, err
+		} else if found {
+			if err = e.completeOutput(id, false); err != nil {
+				return state.Transition{}, err
+			}
+		}
+		created := protocol.CreationIdentity(t.Network, tx.ID(), uint32(i), 0)
+		if err = state.Put(e.o, DirectCreationKey(id, 0), state.Creation{Output: out, Fact: created, Source: protocol.Hash(fact), Final: true}); err != nil {
+			return state.Transition{}, err
+		}
+
+	}
+	if err = state.Put(e.o, state.Key(state.KeyIntent, t.Intent[:]), tx.ID()); err != nil {
+		return state.Transition{}, err
+	}
+	return e.result()
+}
+
+// EvaluateDirectCompensation is the accounting substep of a validated
+// CompensationDecision. ExecuteDecision commits these changes together with
+// the immutable decision; later representation commands have no economic effect.
+// This function is not an RPC command.
+func EvaluateDirectCompensation(v state.ReadView, id protocol.OutputID, policy DirectPolicy, now int64) (state.Transition, error) {
+	ob, found, err := state.Load[DirectObligation](v, DirectObligationKey(id))
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if !found {
+		return state.Transition{}, ErrMissing
+	}
+	if ob.Status != DirectOpen {
+		return state.Transition{}, nil
+	}
+	if ob.Deadline == 0 || now < ob.Deadline {
+		return state.Transition{}, ErrLimited
+	}
+	cfg, ok := policy.Organizations[ob.Config]
+	if !ok || cfg.Org != ob.Issuer {
+		return state.Transition{}, protocol.ErrAuth
+	}
+	e := newDirectEval(v, policy, cfg.Network)
+	e.resultData.Applied = true
+	if err = changeAmount(e.o, AccountKey(ob.Issuer, protocol.AssetCAL), ob.Amount, true); err != nil {
+		return state.Transition{}, err
+	}
+	if err = e.endObligation(&ob, true); err != nil {
+		return state.Transition{}, err
+	}
+	idHash := protocol.RepairIdentity(cfg.Network, id)
+	todo := DirectRepairTodo{ID: idHash, Debit: protocol.ReserveDebitIdentity(cfg.Network, id), Obligation: ob}
+	if err = state.Put(e.o, DirectRepairKey(id), todo); err != nil {
+		return state.Transition{}, err
+	}
+	return e.result()
+}
+
+
+FILE internal/rules/fee_closure_evidence_test.go
+SHA256 974e81ff125dfd6270d19fea9f9992fc3a170fbba67a3a2378fdfa7c688c7f3a
+
+package rules
+
+import (
+	"bytes"
+	"fmt"
+	"reflect"
+	"sort"
+	"testing"
+
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// Two certified inputs exercise both the per-input compensation budget and
+// the single per-payment close. These are rules tests, not consensus tests.
+func TestFeeClosureMultipleObligations(t *testing.T) {
+	for _, ownerFee := range []bool{false, true} {
+		for compensated := 0; compensated <= 2; compensated++ {
+			for _, surplus := range []uint64{0, 17} {
+				t.Run(fmt.Sprintf("owner=%v/paid=%d/surplus=%d", ownerFee, compensated, surplus), func(t *testing.T) {
+					f := newDirectFixture(t)
+					base := f.payment(t, f.genesis, nil, 1)
+					body := base.Tx.Body
+					half := f.output
+					half.Amount = 50
+					body.Outputs = []protocol.Output{half, half}
+					makeTx := func(b protocol.TxBody, claims []protocol.InputClaim) protocol.FastTx {
+						t.Helper()
+						b.Intent = b.IntentID()
+						tx, err := protocol.NewFastTx(b, claims, f.policy.Key)
+						if err != nil {
+							t.Fatal(err)
+						}
+						tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.owner)}
+						return tx
+					}
+					parent := f.certify(t, makeTx(body, base.Tx.Claims), nil)
+					body = base.Tx.Body
+					body.Nonce[0] = 2
+					body.Inputs = nil
+					var certs []InputCertificate
+					for i := uint32(0); i < 2; i++ {
+						body.Inputs = append(body.Inputs, protocol.Input{Kind: protocol.CertificateInput, Output: parent.Certificate.Summary.OutputID(i), Evidence: protocol.Hash(parent.Certificate.QC.Fact)})
+						certs = append(certs, InputCertificate{Certificate: parent.Certificate, Index: i})
+					}
+					plan := f.policy.Base.Fee
+					baseCost := plan.Register + plan.Settle + plan.Close
+					minimum := baseCost + 2*f.policy.RepairCost
+					body.Fee.Maximum = minimum + surplus
+					if ownerFee {
+						fee := seedOwnerFee(t, f, "two-obligations", 1500)
+						body.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: minimum + surplus, Inputs: []protocol.Input{fee}, Refund: f.output.Recipient}
+						body.Admission = nil
+						for _, g := range f.grants {
+							if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+								body.Admission = append(body.Admission, g)
+							}
+						}
+					}
+					claims := []protocol.InputClaim{{Output: half}, {Output: half}}
+					sort.Slice(body.Inputs, func(i, j int) bool { return bytes.Compare(body.Inputs[i].Output[:], body.Inputs[j].Output[:]) < 0 })
+					under := body
+					under.Fee.Maximum = minimum - 1
+					if _, err := PrepareDirectVector(makeTx(under, claims), f.policy); err != ErrLimited {
+						t.Fatalf("underfunded admission: %v", err)
+					}
+					child := f.certify(t, makeTx(body, claims), certs)
+					baseline := projectMoney(t, f.db)
+					f.settle(t, child, 100)
+					paymentKey := state.Key(keyDirectPayment, child.Certificate.QC.Fact[:])
+					check := func(pending uint32, paidCount int) {
+						t.Helper()
+						p := loadDirect[directPayment](t, f.db, paymentKey)
+						if p.Pending != pending || p.Fee.Closed != (pending == 0) || p.Fee.Validate() != nil {
+							t.Fatalf("bad fee state: %+v", p)
+						}
+						if got := projectMoney(t, f.db); got != baseline {
+							t.Fatalf("asset projection: %+v != %+v", got, baseline)
+						}
+						if pending == 0 {
+							paid := baseCost + uint64(paidCount)*f.policy.RepairCost
+							if p.Fee.Held != 0 || p.Fee.Rewards+p.Fee.Burned != paid || p.Fee.Refunded != body.Fee.Maximum-paid {
+								t.Fatalf("wrong final fee: %+v", p.Fee)
+							}
+							for _, a := range child.Certificate.Summary.Admission {
+								if a.Key.Kind == protocol.ResourceCAL {
+									continue
+								}
+								u := loadDirect[PublicUsage](t, f.db, state.Key(state.KeyUsage, a.Key.Encode()))
+								want := uint64(0)
+								if a.Key.Kind == protocol.ResourceFUEL || a.Key.Kind == protocol.ResourcePolicy {
+									want = paid
+								}
+								if u.Reserved != 0 || u.Spent != want {
+									t.Fatalf("wrong closed usage: %+v", u)
+								}
+							}
+						}
+					}
+					check(2, 0)
+					for i := 0; i < compensated; i++ {
+						id := parent.Certificate.Summary.OutputID(uint32(i))
+						for repeat := 0; repeat < 2; repeat++ {
+							err := f.db.Update(func(v state.ReadView) ([]state.Change, error) {
+								tr, err := EvaluateDirectCompensation(v, id, f.policy, 130)
+								if repeat == 1 && len(tr.Changes) != 0 {
+									t.Fatal("duplicate compensation wrote state")
+								}
+								return tr.Changes, err
+							})
+							if err != nil {
+								t.Fatal(err)
+							}
+						}
+						check(uint32(1-i), i+1)
+					}
+					f.settle(t, parent, 131)
+					p := loadDirect[directPayment](t, f.db, paymentKey)
+					if p.Pending != 0 || !p.Fee.Closed || p.Fee.Held != 0 || p.Fee.Rewards+p.Fee.Burned != baseCost+uint64(compensated)*f.policy.RepairCost || p.Fee.Refunded != body.Fee.Maximum-baseCost-uint64(compensated)*f.policy.RepairCost || p.Fee.Validate() != nil {
+						t.Fatalf("source closure: %+v", p)
+					}
+					// Parent fees legitimately add to shared Usage; the child itself
+					// must remain byte-for-byte unchanged after duplicate execution.
+					if len(f.settle(t, child, 132).Changes) != 0 || len(f.settle(t, parent, 132).Changes) != 0 {
+						t.Fatal("duplicate payment charged again")
+					}
+					if got := loadDirect[directPayment](t, f.db, paymentKey); !reflect.DeepEqual(got, p) {
+						t.Fatal("duplicate changed child fee state")
+					}
+					if got := projectMoney(t, f.db); got != baseline {
+						t.Fatal("late source changed total assets")
+					}
+				})
+			}
+		}
+	}
+}
+
+
+FILE internal/redaction/decision.go
+SHA256 beadde84ffdfb9bd5b35b111ebf283d931a382d3d07ad419d62cb9db47b01725
+
+//go:build comet_v3
+
+package redaction
+
+import (
+	cmtstore "github.com/cometbft/cometbft/store"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// Pending entries may be removed after a representation command commits;
+// the separate immutable index remains available for canonical reconstruction.
+func decisionIndexKey(kind uint8, height int64, out protocol.OutputID) []byte {
+	e := new(protocol.Encoder)
+	e.U64(uint64(height))
+	e.Fixed(out[:])
+	return state.Key(kind, e.Data())
+}
+func DecisionPendingKey(height int64, out protocol.OutputID) []byte {
+	return decisionIndexKey(116, height, out)
+}
+func DecisionIndexKey(height int64, out protocol.OutputID) []byte {
+	return decisionIndexKey(117, height, out)
+}
+
+func ExecuteDecision(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.CompensationDecision, height, now int64) (state.Transition, error) {
+	if c.ID() == (protocol.Hash{}) || c.Height >= height {
+		return state.Transition{}, protocol.ErrRule
+	}
+	if todo, found, err := state.Load[rules.DirectRepairTodo](v, rules.DirectRepairKey(c.Output)); err != nil {
+		return state.Transition{}, err
+	} else if found {
+		if todo.Decision != c || todo.DecisionHeight <= 0 {
+			return state.Transition{}, protocol.ErrAuth
+		}
+		raw, err := (protocol.CompensationResult{Decision: c.ID()}).MarshalBinary()
+		return state.Transition{Data: raw}, err
+	}
+	// Reject mismatched public requests before loading/decoding a historical
+	// block. The decision is permissionless, but its target is not caller-chosen.
+	ob, found, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(c.Output))
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if !found || ob.Status != rules.DirectOpen {
+		return state.Transition{}, rules.ErrMissing
+	}
+	location, found, err := state.Load[Location](v, LocationKey(ob.Transaction))
+	if err != nil {
+		return state.Transition{}, err
+	}
+	cfg, known := p.Organizations[ob.Config]
+	if !found || !known || cfg.Network != c.Network || location.Height != c.Height || location.Index != c.Transaction || ob.Input != c.Input {
+		return state.Transition{}, protocol.ErrAuth
+	}
+	target, pay, err := CompensationTarget(v, bs, p, c.Output, now)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if c.Network != target.Network || c.Height != target.Height || c.Transaction != target.Transaction || c.Input != target.Input {
+		return state.Transition{}, protocol.ErrAuth
+	}
+	// Replacement is fixed width. Check representability without computing a
+	// collision or contacting an adapter before authorizing the debit.
+	original, err := pay.MarshalBinary()
+	if err != nil {
+		return state.Transition{}, err
+	}
+	pay.Tx.Funding[c.Input].Kind = protocol.ReserveFunding
+	pay.Tx.Funding[c.Input].Ref = protocol.ReserveDebitIdentity(c.Network, c.Output)
+	replaced, err := pay.MarshalBinary()
+	if err != nil || len(original) != len(replaced) {
+		return state.Transition{}, protocol.ErrRule
+	}
+	tr, err := rules.EvaluateDirectCompensation(v, c.Output, p, now)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	effect, err := protocol.DecodeExecution(tr.Data)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if !effect.Applied {
+		return state.Transition{}, rules.ErrConflict
+	}
+	o := state.NewOverlay(v)
+	o.Apply(tr.Changes)
+	todo, found, err := state.Load[rules.DirectRepairTodo](o, rules.DirectRepairKey(c.Output))
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if !found {
+		return state.Transition{}, rules.ErrMissing
+	}
+	todo.Decision, todo.DecisionHeight = c, height
+	if err = state.Put(o, rules.DirectRepairKey(c.Output), todo); err != nil {
+		return state.Transition{}, err
+	}
+	for _, key := range [][]byte{DecisionPendingKey(c.Height, c.Output), DecisionIndexKey(c.Height, c.Output)} {
+		if err = state.Put(o, key, todo.Obligation); err != nil {
+			return state.Transition{}, err
+		}
+	}
+	ob = todo.Obligation
+	raw, err := (protocol.CompensationResult{Decision: c.ID(), Applied: true, Effects: []protocol.RepairEffect{{Output: c.Output, ParentFact: ob.Certificate, ConsumerFact: ob.Consumer, ConsumerTx: ob.Transaction, Input: ob.Input, Amount: ob.Amount, Debit: todo.Debit}}, FeeOutputs: effect.FeeOutputs}).MarshalBinary()
+	if err != nil {
+		return state.Transition{}, err
+	}
+	return state.Transition{Changes: o.Changes(), Data: raw}, nil
+}
+
+
+FILE internal/redaction/decision_test.go
+SHA256 f1badea5a0e6255f22d35daf469ac64acb5d623d5b46b174df7ef11af0855458
+
+//go:build comet_v3
+
+package redaction_test
+
+import (
+	"bytes"
+	"context"
+	"crypto/x509"
+	"encoding/pem"
+	"os"
+	"testing"
+	"time"
+	"utxo/internal/redaction"
+
+	dbm "github.com/cometbft/cometbft-db"
+	abci "github.com/cometbft/cometbft/abci/types"
+	cmtstore "github.com/cometbft/cometbft/store"
+	"github.com/cometbft/cometbft/types"
+	apppkg "utxo/internal/committee"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/internal/store"
+	"utxo/internal/testkit"
+	"utxo/protocol"
+)
+
+// This test deliberately withholds every adaptation share. Economic closure
+// must still be a publicly executable command, not a local helper invocation.
+func TestCompensationBeforeAdaptation(t *testing.T) {
+	_, _, vals, keys := committee(t)
+	f := testkit.NewFixture(chain, "decision", 1)
+	f.EnableDirect()
+	keyBytes, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemBlock, _ := pem.Decode(keyBytes)
+	key, err := x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := rules.DirectSettings{Modulus: key.N.Bytes(), TimeoutSeconds: 30, RepairCost: 5}
+	p, err := settings.Policy(f.Schedule, []protocol.OrgConfig{f.Org})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := store.NewMemory()
+	defer db.Close()
+	bs := cmtstore.NewBlockStore(dbm.NewMemDB())
+	e, err := apppkg.NewEngine(apppkg.EngineConfig{Network: f.Org.Network, Organizations: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Genesis: f.Genesis, Direct: &settings, Accounts: []apppkg.GenesisAccount{{Owner: f.Org.Org, Asset: protocol.AssetCAL, Balance: 1_000_000_000}, {Owner: f.Org.Org, Asset: protocol.AssetFUEL, Balance: 1_000_000_000}}}, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = e.EnableRepair(bs); err != nil {
+		t.Fatal(err)
+	}
+	app, err := apppkg.NewTimedApp(chain, db, e.Check, e.ExecuteAt, e.BeginBlock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := f.FastTransaction(0, 1, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pc, err := f.DirectCertificate(parent, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := parent.Body
+	body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(0), Evidence: protocol.Hash(pc.QC.Fact)}}
+	body.Nonce[0] = 42
+	body.Intent = body.IntentID()
+	child, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: parent.Body.Outputs[0]}}, p.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	child.Auth = []protocol.OwnerAuth{protocol.SignOwner(child.ID(), f.Owner)}
+	cc, err := f.DirectCertificate(child, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	childRaw, err := (protocol.DirectPayment{Tx: child, Certificate: cc, InputCertificates: []protocol.InputCertificate{{Certificate: pc}}}).Submission().MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := &types.Commit{}
+	appendBlock := func(height, stamp int64, raw []byte) []byte {
+		t.Helper()
+		b := block(t, height, raw, last, vals)
+		b.Time = time.Unix(stamp, 0).UTC()
+		parts, err := b.MakePartSet(types.BlockPartSizeBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		last = commit(t, height, types.BlockID{Hash: b.Hash(), PartSetHeader: parts.Header()}, vals, keys)
+		bs.SaveBlock(b, parts, last)
+		r, err := app.FinalizeBlock(context.Background(), &abci.RequestFinalizeBlock{Height: height, Hash: b.Hash(), Time: b.Time, Txs: [][]byte{raw}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.TxResults[0].Code != 0 {
+			t.Fatalf("public execution failed: %+v", r.TxResults[0])
+		}
+		if _, err = app.Commit(context.Background(), &abci.RequestCommit{}); err != nil {
+			t.Fatal(err)
+		}
+		return r.TxResults[0].Data
+	}
+	appendBlock(1, 1700000001, childRaw)
+	appendBlock(2, 1700000002, protocol.ClockTick(f.Org.Network, 2))
+	originalID := bs.LoadBlockMeta(1).BlockID
+	// Canonical decision wire: no input or block adaptation witness.
+	out := pc.Summary.OutputID(0)
+	wire := new(protocol.Encoder)
+	wire.Fixed([]byte("CMPDEC05"))
+	wire.Fixed(f.Org.Network[:])
+	wire.Fixed(out[:])
+	wire.U64(1)
+	wire.U32(0)
+	wire.U32(0)
+	if err := e.Check(wire.Data()); err != nil {
+		t.Fatalf("independent compensation command rejected: %v", err)
+	}
+	decision, err := protocol.DecodeCompensationDecision(wire.Data())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.View(func(v state.ReadView) error {
+		for _, name := range []string{"early", "network", "height", "transaction", "input", "amount", "balance", "no-obligation", "source-first"} {
+			t.Run("guard_"+name, func(t *testing.T) {
+				o := state.NewOverlay(v)
+				c, now := decision, int64(1700000032)
+				switch name {
+				case "early":
+					now = 1700000030
+				case "network":
+					c.Network[0] ^= 1
+				case "height":
+					c.Height++
+				case "transaction":
+					c.Transaction++
+				case "input":
+					c.Input++
+				case "amount":
+					ob, _, err := state.Load[rules.DirectObligation](o, rules.DirectObligationKey(out))
+					if err != nil {
+						t.Fatal(err)
+					}
+					ob.Amount++
+					if err := state.Put(o, rules.DirectObligationKey(out), ob); err != nil {
+						t.Fatal(err)
+					}
+				case "balance":
+					if err := state.Put(o, rules.AccountKey(f.Org.Org, protocol.AssetCAL), uint64(99)); err != nil {
+						t.Fatal(err)
+					}
+				case "no-obligation":
+					o.Delete(rules.DirectObligationKey(out))
+				case "source-first":
+					verified, err := rules.VerifyDirectPayment(protocol.DirectPayment{Tx: parent, Certificate: pc}, p)
+					if err != nil {
+						t.Fatal(err)
+					}
+					tr, err := rules.EvaluateDirectPayment(o, verified, p, now)
+					if err != nil {
+						t.Fatal(err)
+					}
+					o.Apply(tr.Changes)
+				}
+				tr, err := redaction.ExecuteDecision(o, bs, p, c, 3, now)
+				if err == nil || len(tr.Changes) != 0 || len(tr.Data) != 0 {
+					t.Fatal("invalid decision produced effects", err)
+				}
+			})
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	data := appendBlock(3, 1700000032, wire.Data())
+	result, effects, err := protocol.DecodePublicExecution(f.Org.Network, wire.Data(), data)
+	if err != nil || !result.Applied || len(effects) != 1 || effects[0].Amount != 100 {
+		t.Fatalf("missing public compensation effect: %+v %+v %v", result, effects, err)
+	}
+	if err := db.View(func(v state.ReadView) error {
+		balance, _, err := state.Load[uint64](v, rules.AccountKey(f.Org.Org, protocol.AssetCAL))
+		if balance != 999999900 {
+			t.Fatalf("balance=%d", balance)
+		}
+		ob, _, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(out))
+		if ob.Status != rules.DirectRepaired {
+			t.Fatal("gap not closed")
+		}
+		canonical, revision, err := redaction.Canonical(v, bs, 1)
+		if err != nil || revision.Number != 0 || !bytes.Equal(canonical.Data.Txs[0], childRaw) {
+			t.Fatal("compensation must not imply an installed or logical representation", err)
+		}
+		todo, found, err := state.Load[rules.DirectRepairTodo](v, rules.DirectRepairKey(out))
+		if err != nil || !found || todo.Decision != decision || todo.DecisionHeight != 3 {
+			t.Fatal("unchanged representation lost its independent debit authority", err)
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(bs.LoadBlock(1).Data.Txs[0], childRaw) || !bs.LoadBlockMeta(1).BlockID.Equals(originalID) {
+		t.Fatal("decision changed historical representation")
+	}
+	data = appendBlock(4, 1700000033, wire.Data())
+	result, effects, err = protocol.DecodePublicExecution(f.Org.Network, wire.Data(), data)
+	if err != nil || result.Applied || len(effects) != 0 {
+		t.Fatal("duplicate compensation has effects", err)
+	}
+	parentRaw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).Submission().MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendBlock(5, 1700000034, parentRaw)
+	if err := db.View(func(v state.ReadView) error {
+		// Recovery returns real funds but never reopens the debit decision.
+		tr, err := redaction.ExecuteDecision(v, bs, p, decision, 6, 1700000035)
+		if err != nil || len(tr.Changes) != 0 {
+			t.Fatal("decision replay after recovery changed state", err)
+		}
+		result, effects, err := protocol.DecodePublicExecution(f.Org.Network, wire.Data(), tr.Data)
+		if err != nil || result.Applied || len(effects) != 0 || len(result.FeeOutputs) != 0 {
+			t.Fatal("decision replay after recovery repeated economic effects", err)
+		}
+		conflict := decision
+		conflict.Transaction++
+		tr, err = redaction.ExecuteDecision(v, bs, p, conflict, 6, 1700000035)
+		if err == nil || len(tr.Changes) != 0 || len(tr.Data) != 0 {
+			t.Fatal("conflicting location reused an existing decision", err)
+		}
+		balance, _, err := state.Load[uint64](v, rules.AccountKey(f.Org.Org, protocol.AssetCAL))
+		if balance != 1_000_000_000 {
+			t.Fatalf("late source did not repay: %d", balance)
+		}
+		ob, found, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(out))
+		if err != nil || !found || ob.Status != rules.DirectRecovered {
+			t.Fatal("current obligation does not expose repayment", err)
+		}
+		todo, found, err := state.Load[rules.DirectRepairTodo](v, rules.DirectRepairKey(out))
+		if err != nil || !found || todo.Decision != decision || todo.DecisionHeight != 3 {
+			t.Fatal("repayment rewrote historical debit authority", err)
+		}
+		canonical, revision, err := redaction.Canonical(v, bs, 1)
+		if err != nil || revision.Number != 0 || !bytes.Equal(canonical.Data.Txs[0], childRaw) {
+			t.Fatal("repayment silently revised historical bytes", err)
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+}

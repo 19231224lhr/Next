@@ -1,0 +1,45 @@
+ChatGPT said:
+
+此前两项书面要求已补齐，可以关闭。 补充材料表 S1 已集中区分共识身份、WAL、响应批量落盘和同步省略的保持条件，期限接线也与此前源码一致。正文 §V-F 已准确区分普遍损失上界、轮换签名者可达实例、可用 CAL 本金与 FUEL／锁定成本，以及额度耗尽后的停服后果。
+supplement-main
+ 
+main(1)
+
+前置的模型示例、服务契约及表 II／III，已经能让读者从稿件本身理解：收证书后只能有条件地申请续付；成功公开消费缺失输出才触发义务；赔付不等待历史修复，逻辑修订也不等于物理安装。 未见新的技术阻断项。
+main
+ 
+main
+ 
+main
+
+仅建议以下两处措辞精确化，另有一处可选删减：
+
+摘要，第 1 页：“without re-executing payments or delaying closure”。
+“不延迟”容易被理解为没有性能干扰，而 §V-F 明确保留共享资源对延迟的影响。建议改为：
+
+without re-executing payments or making economic closure wait for historical repair.
+这里只澄清依赖关系，不改变现有结论。
+main
+ 
+main(1)
+
+§III-C，第 4 页：“Closure settles the issuer’s liability and the consumer’s fee escrow…”
+多输入付款中，关闭一个义务不一定结清整个费用托管；§IV-E 已正确限定为没有剩余输入义务时才结清。建议改为：
+
+Closing an obligation resolves its gap and updates fee accounting; the consumer’s escrow closes only after all its input obligations are resolved, without another principal credit.
+
+main
+ 
+main
+
+可选删减：§IV 标题后的导语整段。
+它重复了紧邻的 §III-E 中“公开消费—重提—赔付—历史修复”流程，可以删除，直接进入 §IV-A；前置示例和两张表应保留。
+main
+
+ChatGPT can make mistakes. Check important info.
+Latest response
+
+
+
+
+Pro

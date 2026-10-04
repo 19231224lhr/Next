@@ -1,0 +1,28 @@
+\begin{abstract}
+Next is a native UTXO ledger enabling a recipient to verify a
+quorum-signed output certificate (TXCer) after one certification round
+and request a successor before public source execution, subject to
+successor admission and available capacity. If the successor executes
+first, the committee records a funded obligation against the direct
+issuer. Original signers can resubmit sources from publicly exposed
+certificates. A deadline-triggered decision debits the issuer's reserve;
+late sources repay it, but permanently unexecuted sources leave the
+issuer bearing the CAL of publicly consumed outputs. Decision-authorized
+funding-reference repair then records historical reserve debits in designated
+inputs, supporting local exception review under the original block identity.
+It preserves owner authorizations and successor references without
+re-executing payments or delaying economic closure. For four-member
+organizations and a four-validator committee, each requiring three votes
+with at most one static Byzantine member, we prove unique consumption,
+coverage of outstanding certificate liability, and delay-neutral terminal
+CAL holdings for finite, acyclic, source-closed, conflict-free payment
+sets whose payments each succeed exactly once. On one host with
+synchronous member commits, median time to the last certified receipt
+in a 100-hop chain is 4.707\,s versus 64.479\,s with per-hop waiting.
+Targeted boundary and restart tests check capacity, economic closure,
+and historical reads.
+\end{abstract}
+\begin{IEEEkeywords}
+Blockchain, certified payments, collateral, Byzantine fault tolerance,
+chameleon hash.
+\end{IEEEkeywords}

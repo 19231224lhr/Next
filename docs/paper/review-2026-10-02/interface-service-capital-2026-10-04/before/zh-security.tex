@@ -1,0 +1,434 @@
+\section{安全性分析}
+\label{sec:security}
+
+我们在第~\ref{sec:model-participants}~节的模型下，分析第~\ref{sec:protocol}~节协议的有限执行。论证围绕转移函数的守卫条件展开；除故障与状态假设外，还使用第~\ref{sec:protocol-certification}~节的验证规则：输入证书绑定网络、组织、事实和声明的输出，并与证书型输入一一对应；每个准入向量均包含一个绑定至签发者的 CAL 条目。表示只能通过已提交的命令生效，该命令的守卫要求已有补偿决定，据此导出槽位和储备引用，并验证每个非目标字节及完整区块身份。因此，适配输出只是候选材料，其可用性仅影响表示的进展。共识论证将 Tendermint 锁定接口~\cite{tendermint} 特化到完整区块身份。
+
+\subsection{原始执行与认证消费}
+\label{sec:security-identity}
+
+一个 \emph{polka} 是同一轮次中针对某个完整区块身份或 nil 的、达到法定人数的预投票集合。
+
+\begin{lemma}[原始执行的一致性]
+\label{lem:security-original}
+在共识接口的锁定与有效性规则下，每个已提交高度仅接纳一个原始区块体，
+包括其应用上下文。
+\end{lemma}
+\begin{IEEEproof}
+当原始开口为~1~时，部件叶节点对其绑定上下文的消息代表元求哈希，因此绑定性和 Merkle 证明在原始部件集头下固定了该部件的字节。候选区块体从部件重建，或在本地与部件配对；Locked 和 Valid 的转移保持这种配对，提案、锁定证明（POL）、锁定和提交的比较均使用 $(H_b,P_b)$；下载目标变化时清除旧区块体，轮次与步骤守卫则确保每轮只发出一次预提交。
+
+同轮次的冲突提交需要诚实成员发出双重预提交。取值 $v$ 在轮次 $r$ 的一次提交及其两名诚实签署者，并在随后出现冲突 polka 的轮次中选取最小轮次 $s$，以及该轮最早形成证书的事件；这里也计入允许解锁的 nil polka。该法定人数集合与这两名签署者的集合相交，而交集中的签署者要发出该投票，就需要更早的解锁依据，这与 $s$ 或证书形成事件的选取矛盾。对锁定值的投票可沿更早的锁定轮次追溯至提案验证，Finalize 则在与完整区块身份匹配的提交之后执行。同步与重放保持区块体、高度和时间不变，补充材料进一步展开了这一论证。
+\end{IEEEproof}
+
+\begin{lemma}[经过认证的唯一消费]
+\label{lem:security-consumption}
+TXCer 固定其输出和签发者。不存在两张有效证书
+授权对同一 $(x,i)$ 的冲突消费，且公开执行
+至多消费该实例一次。
+\end{lemma}
+\begin{IEEEproof}
+绑定性固定认证摘要和所有者授权的交易，固定路由将竞争请求送至同一组织。两个三成员法定人数集合至少交于两名成员，因此交集中存在诚实成员。该成员在签名前原子地锁定输入，所以两个冲突请求中只会批准一个，且预算释放不会清除该锁。最终输入和证书型输入的执行查询同一个消费键。重放一个事实既不增加消费，也不增加费用扣收。已偿还输出没有最终创建记录，其实例~0~保持已消费状态，因此之后针对 $(x,i)$ 的声明会失败。
+\end{IEEEproof}
+
+\begin{lemma}[被取代的部分批准]
+\label{lem:security-superseded}
+固定一个四成员组织，要求三份签名，且至多
+有一名拜占庭成员。设某诚实成员已批准事实
+$c$，并锁定了本金输入（最终或认证输入）或用户付费输入实例 $\xi$。
+如果同一组织配置下一笔成功应用的公开付款
+携带针对另一事实 $c'$ 的有效 QC，具有不同的
+交易身份，并消费了 $\xi$，那么不可能曾经存在针对 $c$ 的
+三份相匹配的有效成员签名。因此，该诚实成员可以
+恢复 $c$ 的剩余本地扣减额，同时永久拒绝
+签署或安装 $c$。这一结论不适用于
+输入互不相交、仅因全局 Intent 而冲突的两个
+持有 QC 的事实。
+\end{lemma}
+
+\begin{IEEEproof}
+$c'$ 的公开执行已通过当前组织的
+授权检查，因此携带有效的三成员 QC。
+反设 $c$ 也具有有效的三成员 QC。
+两个签署者集合至少交于两名成员。由于至多
+一名成员是拜占庭成员，交集中必有一名诚实成员。
+这意味着该成员签署了两个消费
+同一实例 $\xi$ 的不同事实，然而诚实成员在签名前会原子地
+锁定本金输入和用户付费输入实例，并拒绝
+针对已锁定实例的另一候选请求。这与批准规则矛盾。
+
+因此，不可能曾经存在针对 $c$ 的三份相匹配的签名。使用
+第~\ref{sec:security-coverage}~节引入的记号，有 $c\notin C_g$。
+恢复某成员对 $c$ 的剩余扣减额，不会移除
+$Q_g$ 中任何一项的容量见证。对 $\xi$ 的成功公开
+消费、不可变的批准记录以及标记为失效的
+进度记录，会继续拒绝之后对 $c$ 的使用；恢复的仅是其尚未使用的
+本地资源预留。
+\end{IEEEproof}
+
+\subsection{源交易重提交与补偿决定}
+\label{sec:security-decision}
+
+对于输出 $x$，$\mathcal O_x$ 表示其直接义务，状态为 Open、Fulfilled、Repaired 或 Recovered，$\mathcal D_x$ 表示其不可变的补偿决定。Repaired 表示已经完成经济补偿，与存储字节的状态无关。决定在 Open 向 Repaired 的转移中写入，且永不删除，因此 $\mathcal D_x$ 存在，当且仅当 $\mathcal O_x$ 处于 Repaired 或 Recovered。集合 $\mathcal R$ 保存表示状态，包括已提交修订版本、头命令、任务、批次引用、队列和待表示索引；投影 $\pi_{\mathrm{econ}}$ 保留公开资产、消费、覆盖、义务、授权项用量和费用状态，而省略 $\mathcal D$ 和 $\mathcal R$。
+
+\begin{lemma}[重提交保持授权不变]
+\label{lem:security-resubmission}
+设一个诚实成员为事实 $c$ 创建重提交任务。该任务提交成员在签署 $c$ 之前存储的付款、准入向量和直接输入证书，并附上 $c$ 的公开 QC；公开验证与执行将其视为该付款的普通提交。它不需要新的所有者或成员签名，不创建批准，不改变输入锁，也不预留签名容量。每个成员对每个事实至多保有一个任务，付款执行后移除该任务。一旦 $c$ 的某个输出上的直接义务已经公开，$c$ 的至少两名诚实签署者就保有这些存储材料。
+\end{lemma}
+\begin{IEEEproof}
+成员使用公开 QC 中的事实索引其批准记录，存储的付款和准入向量必须重现该事实。它将这些材料、存储的直接输入证书与已公开的 QC 组合，并在创建 outbox 条目之前执行普通付款验证。事实绑定与法定人数验证排除了其他付款核心，法定人数签名则固定了公开方选择携带的证书内容。该转移只写入 outbox，因此批准、输入锁和授权项预留保持原样；已有 outbox 和已观察执行标记抑制重复。未通过这些检查的存储记录不属于故障模型允许的状态。
+
+义务只能由消费认证缺失输入的已执行付款产生，而公开验证要求提供该输入的证书，因此该证书必然已经公开。其三名不同签署者中至少有两名诚实成员，每名诚实成员都在返回签名之前存储了批准材料。批准记录本身不包含法定人数证书，后者随区块到达，因此客户端扣留证书不会破坏重提交所需的材料。执行还需要持续工作的诚实跟随者、公平的消息交付，以及满足普通执行规则的源付款，其中包括全局 Intent 检查。
+\end{IEEEproof}
+
+\begin{lemma}[证书限定责任，而非保证执行]
+\label{lem:security-intent}
+设 $T_1\ne T_2$ 是具有相同 Network、Subject 和 Nonce 的两笔付款，分别消费路由至组织 $G_1$ 和 $G_2$ 的互不相交输入，且各自满足所属组织的批准规则。两笔付款都可以获得 QC，但在任何公开顺序中至多有一笔执行。恶意用户可以造成这种情形，重提交其中任意一笔都不会消除冲突。不同 Subject 的付款不会仅因使用相同 nonce 而冲突。
+\end{lemma}
+\begin{IEEEproof}
+各组织维护各自的本地 Intent 记录，且批准涉及互不相交的输入，因此两个组织都不会观察到冲突，而所有者授权涵盖每笔付款。在公开执行时，如果 Intent 已绑定至不同的 TxID，求值过程就返回冲突。该绑定在成功执行付款的同一转移中写入，且不存在删除或重新绑定它的生产路径，因此无论怎样重提交，另一笔付款都保持未执行状态。不同 Subject 产生不同的 Intent。
+\end{IEEEproof}
+
+如果 $T_2$ 无法执行，但消费其认证输出的付款已经执行，
+该消费方就登记了一项针对 $G_2$ 的义务。补偿
+扣减该签发者的资金，但不会使 $T_2$ 变得可执行。其批准
+成员保持 $r_{m,c}=a_c$，责任也保持为 $w_c=a_c$。
+原输入继续锁定，但控制消费方
+输出的用户可以在后续请求中使用这份新价值。重复这一过程需要
+新的成对 Intent、可用路由、认证容量和费用；
+最终后代输出也必须保有可用路由。这里复用的是
+后代输出的价值，而不是解锁被拒绝源交易的输入。
+在用户付费模式下，被拒绝源交易的完整
+FUEL 输入仍保持锁定，而不只是其签名授权的托管上限。
+定理~\ref{thm:security-neutrality} 排除了这一情形，因为并非
+每笔付款都成功。终止对冲突源交易的
+重复提交，并不会授权释放其由证书承载的
+责任。
+
+\begin{lemma}[补偿至多生效一次]
+\label{lem:security-decision}
+每项直接义务至多发生一次储备扣减及其
+相关经济效果。如果 $x$ 已有记录
+$\mathcal D_x$，与该记录相同的决定不产生效果，
+偿还之后也如此；不同的决定则被拒绝。如果尚无记录，
+一旦 $\mathcal O_x$ 不再是 Open，决定就被拒绝。
+\end{lemma}
+\begin{IEEEproof}
+状态只沿 Open$\to$Fulfilled、Open$\to$Repaired（仅由决定触发）和 Repaired$\to$Recovered（发生在源交易成功执行之内）变化。决定首先检查 $\mathcal D_x$：完全匹配时返回未应用结果和空变更集，不匹配时拒绝。没有记录时，转移要求义务处于 Open、区块时间已达到截止期，并且历史位置、金额和资金承诺相匹配；这些内容都从已提交状态重新导出。随后，它在一个原子步骤中扣减签发者储备、关闭缺口、更新费用与覆盖，并记录 $\mathcal D_x$。状态机无环，因此只会离开 Open 一次，至多有一个决定生效。
+
+如果源交易先执行，义务就离开 Open，不会再有针对它的决定提交。如果补偿先发生，源交易执行时通过唯一的 Repaired$\to$Recovered 转移将资金返还签发者，保留 $\mathcal D_x$，且不创建用户输出。对公开命令顺序归纳，即得到补偿和偿还均至多发生一次。
+\end{IEEEproof}
+
+\subsection{公开与隐藏承诺的覆盖}
+\label{sec:security-coverage}
+
+每个认证事实都携带一个绑定至签发者的 CAL 条目，因为至少两名诚实签署者在签名前按照准入规则计算了向量，且事实绑定该摘要。对于完整的 CAL 授权项 $g$，累计授权额 $B_g$ 为每名成员提供 $s(B_g)=\lfloor2B_g/3\rfloor$ 的容量。令 $C_g$ 包含截至当前前缀曾经存在三份签名的所有不同事实，包括对应尚未组装或隐藏证书的事实，以及已结算事实。唯一的 CAL 分配项将每个事实绑定至一个配置、ResourceKey 和 Grant ID。事实 $c$ 的输出上限为 $a_c$，即其所有 CAL 输出之和。对于 $c\in C_g$，令 $p_c$ 为针对这些输出累计支付的补偿额，$\mathsf{Rec}_c$ 为源交易执行时偿还的部分，$z_c$ 表示 $c$ 对应的付款是否已成功执行。\emph{净补偿额}为 $\bar p_c=p_c-\mathsf{Rec}_c$。定义
+\begin{equation}
+  w_c=\begin{cases}a_c,&z_c=0,\\\bar p_c,&z_c=1,\end{cases}
+  \qquad Q_g=\sum_{c\in C_g}w_c.
+  \label{eq:security-risk}
+\end{equation}
+
+\begin{lemma}[源交易偿还]
+\label{lem:security-recovery}
+已补偿输出仅在其源交易成功执行之内
+离开 Repaired 状态，且该过程与设置 $z_c=1$ 发生在同一转移中，
+偿还资金记入原先被扣款的账户。因此
+$0\le\mathsf{Rec}_c\le p_c\le a_c$；当 $z_c=0$ 时，$\mathsf{Rec}_c=0$；
+一旦 $z_c=1$，就有 $\mathsf{Rec}_c=p_c$。特别地，源交易
+尚未执行时 $\bar p_c=p_c$，执行之后 $\bar p_c=0$，
+因此源交易执行后不再留下净补偿额。
+\end{lemma}
+\begin{IEEEproof}
+每项已登记承诺至多离开 Open 一次；根据引理~\ref{lem:security-decision}，每个输出的补偿至多生效一次，且仅在其义务处于 Open 时生效，因此 $p_c\le a_c$。唯一离开 Repaired 的转移，是某笔付款的输出处理步骤，该付款的事实和签发者必须等于义务所记录的证书事实和签发者。该步骤在将付款记录为已结算的同一覆盖层中执行，因此 $z_c$ 与偿还同步变化。它处理源交易中每个具有义务的输出，将 Open 转为 Fulfilled，将 Repaired 转为 Recovered；之后 $c$ 的每项承诺均已关闭，因此不会产生新的补偿，重复提交也为空操作。补偿扣款和偿还入账均使用义务中存储的签发者账户，即 $c$ 的单一 CAL 分配项所绑定的账户，且偿还不改变 $\mathcal D_x$。
+\end{IEEEproof}
+
+对于任意本地批准，令 $r_{m,c}=a_c-\mathsf{Applied}_{m,c}$，其中 Applied 是其累计 CAL 恢复额。
+
+\begin{lemma}[残留容量]
+\label{lem:security-witness}
+对于每个事实 $c\in C_g$，以及批准了 $c$ 的每名诚实成员 $m$，
+在每个前缀都有
+$r_{m,c}\ge w_c$。
+\end{lemma}
+\begin{IEEEproof}
+对于 $c\in C_g$，引理~\ref{lem:security-superseded} 排除了诚实签署者将其置为失效的可能性：触发失效的冲突会蕴含 $c\notin C_g$。
+在 $m$ 观察到 $c$ 对应付款成功执行之前，其对 $c$ 的 CAL 恢复额为零，因此无论补偿状态如何，都有 $r_{m,c}=a_c\ge w_c$。观察到执行之后，$m$ 检查报告的偿还额是否覆盖自身记录的补偿额，并将记录的偿还额设为该补偿额。恢复目标为 $a_c$ 减去记录中为零的净补偿额，因此 $r_{m,c}=0$；由引理~\ref{lem:security-recovery}，有 $w_c=\bar p_c=0$。在跟随补偿事件之后才批准的成员没有记录该补偿，只恢复自身的扣减额。
+\end{IEEEproof}
+
+\begin{theorem}[潜在责任具有资金覆盖]
+\label{thm:security-coverage}
+对于每个 CAL 授权项，都有 $Q_g\le B_g$。对于每个储备账户 $x$，
+其未闭缺口总额 $\mathsf{Gap}_x$ 不超过账户余额 $A_x$。
+\end{theorem}
+\begin{IEEEproof}
+令 $\mathcal A_{m,g}$ 包含 $g$ 下的全部成功批准，包括没有 QC 的批准（失效批准的残留贡献为零），并令 $L_{m,g}=\sum_{c\in\mathcal A_{m,g}}r_{m,c}$，该求和涵盖各 Worker。批准、普通恢复和被取代后的失效处理在 Available 与 Reserved 之间移动容量，补资则增加成员份额的差值，因此对于本地观察到的授权额 $B_{m,g}$，有 $L_{m,g}\le s(B_{m,g})\le s(B_g)$；授权额只增不减。固定该组织中任意三名诚实成员组成集合 $H_g$。QC 有三名不同签署者，而 $H_g$ 之外至多只有一名成员，因此 $H_g$ 中签署了 $c$ 的成员集合 $\mathsf{Sig}_c$ 至少含有两名成员。诚实成员仅在批准之后签名，所以由引理~\ref{lem:security-witness}，对 $m\in\mathsf{Sig}_c$ 有 $r_{m,c}\ge w_c$，并且
+\begin{equation}
+\begin{aligned}
+  2Q_g
+  &\le\sum_{m\in H_g}\sum_{\substack{c\in C_g\\m\in\mathsf{Sig}_c}}r_{m,c}\\
+  &\le\sum_{m\in H_g}L_{m,g}
+  \le3\lfloor2B_g/3\rfloor\le2B_g.
+\end{aligned}
+\label{eq:security-counting}
+\end{equation}
+
+令 $R_c$ 和 $d_c$ 分别为已登记的剩余覆盖额和已解除覆盖额，登记前有 $p_c=d_c=R_c=0$。已登记记录满足 $a_c=p_c+d_c+R_c$，且 $z_c=1$ 蕴含 $R_c=0$。因此 $R_c\le w_c-\bar p_c$：当 $z_c=0$ 时，$\mathsf{Rec}_c=0$，所以 $R_c\le a_c-p_c=w_c-\bar p_c$；一旦 $z_c=1$，两边都为零。定义 $S_g=\sum\bar p_c$、$V_g=\sum R_c$ 和 $E_g=Q_g-S_g$，各求和均遍历 $C_g$。登记、补偿、偿还和覆盖解除共同维持公开状态中的 Usage.Spent$=S_g$ 和 Usage.Reserved$=V_g$。
+
+令 $\mathcal G_x$ 包含全部由 $x$ 提供资金支撑的授权项；其认证的 CAL 账户就是被扣款的签发者账户。创世状态建立 $\sum_{g\in\mathcal G_x}(B_g-S_g)\le A_x$。来自外部非受保护账户的补资使两边等量增加。补偿使 $S_g$ 增加，并使 $A_x$ 减少相同金额；偿还使 $S_g$ 减少，并使 $A_x$ 增加相同金额（引理~\ref{lem:security-recovery}）；不存在其他提取 CAL 储备的协议操作。每项 Open 义务对应一项不同的剩余承诺，因此
+\begin{equation}
+\begin{aligned}
+\mathsf{Gap}_x&\le\sum_{g\in\mathcal G_x}V_g
+    \le\sum_{g\in\mathcal G_x}E_g\\
+   &\le\sum_{g\in\mathcal G_x}(B_g-S_g)\le A_x.
+\end{aligned}
+\label{eq:security-backing}
+\end{equation}
+累计补偿总额 Paid 及其偿还均只计入一次，$E_g$ 是风险上界，而不是成员的可用容量。
+\end{IEEEproof}
+
+部分批准持续占用额度，直到其自身付款
+执行，或经过认证的公开历史证明其锁定的某个
+实例已被同一配置下另一个成功获授权的
+事实消费。时间本身绝不释放该预留。
+一笔输入互不相交、在全局 Intent 冲突中失败的付款，仍可能
+具有有效 QC 和签发者责任，因此保留其输入
+锁和签名预留。
+
+\noindent\textbf{CAL 准入推论。}
+在执行前状态中，包括同一区块内更早成功命令产生的状态，令 $N_g$ 为 $g$ 下相匹配且尚未消费的缺失输入所需的、不同且有效而尚未登记的父事实集合。它们满足 $w_c=a_c$ 和 $p_c=R_c=0$。每个已登记事实满足 $R_c+\bar p_c\le w_c$，且这些事实互不重叠，因此
+\begin{equation}
+ V_g+S_g+\sum_{c\in N_g}a_c\le Q_g\le B_g.
+ \label{eq:security-admission}
+\end{equation}
+同一证书的重复使用只计一次，顺序登记能够看到此前的预留，因此每个部分和都满足该上界。故首次登记不可能因 CAL 授权容量不足而失败，即使它先于同一转移中的偿还执行也是如此，因为偿还只会降低 $S_g$。同样，金额为 $a\le\mathsf{Gap}_x\le A_x$ 的 Open 义务具有足够的储备本金。其他资源和费用检查仍是独立要求。
+
+\subsection{资产守恒与延迟中立性}
+\label{sec:security-conservation}
+
+\begin{theorem}[CAL 守恒]
+\label{thm:security-conservation}
+令 $U$ 为最终且未消费的 CAL 实例的总价值，$A$ 为
+CAL 账户余额总和，$D$ 为 Open 缺口的总价值。每个
+执行前缀均满足
+\begin{equation}
+ U+A-D=C_0,
+ \label{eq:security-conservation}
+\end{equation}
+其中 $C_0$ 包括创世输出和所有账户，
+也包括补资来源账户。
+\end{theorem}
+\begin{IEEEproof}
+一笔付款消费最终价值 $F$ 和缺失价值 $M$，并产生 $F+M$。令 $J$ 和 $R$ 分别为其到达输出中、义务原先处于 Open 和已补偿状态的总价值。前一类输出已经被消费，因此它们关闭缺口而不增加未消费价值；后一类输出不生成创建记录。于是 $\Delta U=M-J-R$、$\Delta D=M-J$，偿还使 $\Delta A=R$，从而 $\Delta(U+A-D)=0$。金额为 $a$ 的补偿决定使 $\Delta A=\Delta D=-a$，且 $\Delta U=0$。重提交不改变公开状态；由引理~\ref{lem:security-representation}，表示命令和安装保持 $U$、$A$ 和 $D$ 不变。补资在已计入的账户之间转账，其他转移也保持该投影。
+\end{IEEEproof}
+
+FUEL 单独记账：每笔托管上限等于 Held 加上累计 Rewards、Burned 和 Refunded；全局守恒总量计入未消费 FUEL、普通账户、当前 Held、奖励余额和累计销毁额。唯一的阶段身份和义务身份使价值仅转移一次，对用户付费和组织付费均如此。
+
+守恒确定总量，而下面的结果确定最终持有者。
+
+\begin{theorem}[CAL 延迟中立性]
+\label{thm:security-neutrality}
+令 $\mathcal T$ 为有限付款集合，满足：(i) 任意两笔付款不消费
+同一实例或费用输入；(ii) ``消费由另一付款创建的输出''
+这一关系无环；(iii) $\mathcal T$ 中付款的每个证书型
+输入均认证 $\mathcal T$ 中某笔付款的输出。令
+$\mathcal U$ 为有限的已授权储备增加集合。从干净的
+创世状态开始，其中不存在覆盖、承诺或义务记录，
+CAL Reserved 和 Spent 均为零。令 $\rho_0$ 按照
+符合条件 (ii) 的顺序执行 $\mathcal T$，并应用 $\mathcal U$；
+令 $\rho$ 为任意执行，由 $\mathcal T$ 中的付款、
+$\mathcal U$ 中的增加以及到期 Open 义务的补偿决定
+以任意顺序组成，并可穿插符合规则的表示命令。
+假设每笔付款和每次增加在两个执行中
+都恰好成功一次。则在 $\rho$ 和 $\rho_0$ 结束时：
+\begin{enumerate}
+\item 最终且未消费的 CAL 实例相同，所有者和
+金额也相同；
+\item 每个储备账户具有相同的 CAL 余额；
+\item 每个 CAL 授权项具有相同的授权额，且
+Reserved$=$Spent$=0$；每项义务均为 Fulfilled 或 Recovered，
+并且每张证书都满足 $\mathsf{Paid}_c=\mathsf{Rec}_c$。
+\end{enumerate}
+不比较费用和 FUEL。
+\end{theorem}
+此处成功包含全部适用的授权、输入、Intent、资源与费用检查。
+CAL 覆盖上界并不推出每个带 QC 的付款均满足这些独立的执行条件。
+\begin{IEEEproof}
+\emph{持有者。} 由条件 (i)，两个执行消费相同的实例。在 $\rho$ 中，一个在源交易执行之前被消费的输出会获得一项义务；源交易执行时，该输出要么转为 Fulfilled，具有对应实例已经被消费的创建记录；要么转为 Recovered，没有创建记录；两种情况下它都已被消费。未被 $\mathcal T$ 中任何付款消费的输出，在两个执行中都被创建为最终且未消费的输出。因此，未消费实例就是创世输出和 $\mathcal T$ 的输出中未被 $\mathcal T$ 消费的那些实例。
+
+\emph{储备。} 对于储备账户 $x$，令 $\hat A_x$ 为其余额加上由 $x$ 签发的 Repaired 义务金额之和。补偿降低 $A_x$，并使 Repaired 总额增加相同金额；偿还在同一账户上执行相反变化（引理~\ref{lem:security-recovery}）；创建或履行义务则不改变这两项。与定理~\ref{thm:security-coverage} 相同，只有补资、补偿和偿还改变储备余额，因此每个前缀都有 $\hat A_x=A_x(0)+\tau_x$，其中 $\tau_x$ 是截至该前缀记入 $x$ 的增加总额。义务仅针对在源交易执行之前被消费的输出存在，而根据条件 (iii)，该源交易会在 $\rho$ 中执行，使义务变为 Fulfilled 或 Recovered。结束时不存在 Open 或 Repaired 义务，因此 $A_x=A_x(0)+\tau_x$，这也等于 $\rho_0$ 中的值。
+
+\emph{用量。} 每张已登记证书都被某个缺失输入使用，因此由条件 (iii)，其源交易会在 $\rho$ 中执行。该执行关闭其全部承诺，所以 Remaining$=0$，而引理~\ref{lem:security-recovery} 给出 $\mathsf{Paid}_c=\mathsf{Rec}_c$。因此 Reserved$=\sum$Remaining$=0$ 且 Spent$=\sum(\mathsf{Paid}_c-\mathsf{Rec}_c)=0$，授权额仅通过 $\mathcal U$ 改变。
+
+\emph{表示。} 根据引理~\ref{lem:security-representation}，穿插的表示命令不会改变任何被比较的量，也不会改变随后在相同高度和时间执行的付款或决定的结果。
+\end{IEEEproof}
+
+中间状态有所不同：在源交易执行之前，已补偿源交易的签发者持有的资金更少，定理~\ref{thm:security-coverage} 覆盖这种情形；比较所用的投影省略了仅存在于 $\rho$ 中的决定记录和表示状态。永不执行的源交易会使其补偿金额成为签发者的净损失，激励问题不在该定理范围内。
+
+\subsection{授权表示及其独立性}
+\label{sec:security-repair}
+
+\begin{lemma}[由决定约束的表示权限]
+\label{lem:security-repair}
+每个生效的表示项均引用一个已有补偿
+决定，包括其义务后来已获偿还的决定，并引用一个
+仍保存 \texttt{OriginalFunding} 的规范槽位。成功的
+表示不会改变获授权资金槽位之外的任何交易字节，
+即使适配输出由对手控制也是如此。
+\end{lemma}
+\begin{IEEEproof}
+令 $N$ 为 RSA 模数，$e$ 为公钥指数，$r$ 为 $\mathbb Z_N^*$ 中的开口。经过域分离的代表元 $\mathsf{FDH}(ctx,m)$ 绑定消息及其修复上下文。关系式
+\begin{equation}
+ C=\mathsf{FDH}(ctx,m)r^e=\mathsf{FDH}(ctx,m')r'^e\pmod N
+\end{equation}
+仅给出兼容性，不携带新的批准；已公开的开口比值可以在相同消息关系下复用。公开守卫读取保存义务快照和储备扣款身份的决定记录，并从中导出槽位与替换引用。它们检查当前基版本和区块体摘要，并验证全部非目标字节及完整区块承诺。读取快照使已决定的槽位在偿还之后仍可进行表示。无效候选不留下任何变更，对已成功命令的完全相同重放为空操作，而重新封装的命令会遇到不再保存 \texttt{OriginalFunding} 的槽位或已有任务。经济效果已由决定提交，因此表示命令不提供金额、签发者或账户变更，适配器也不写入账本状态；该论证仅依赖经过验证的输出。
+\end{IEEEproof}
+
+\begin{lemma}[表示不产生经济影响]
+\label{lem:security-representation}
+对于每个成功的单项或批量表示命令 $r$ 以及
+状态 $S$，有 $\pi_{\mathrm{econ}}(r(S))=\pi_{\mathrm{econ}}(S)$。
+在相同高度和时间执行的付款或决定，在 $r(S)$
+和 $S$ 中产生相同结果，且两个后继状态的投影
+相同。
+\end{lemma}
+\begin{IEEEproof}
+表示命令检查决定、规范目标、基修订版本、前序摘要和获准的替换。其写集包含修订版本、头命令、任务和批次引用记录、队列以及待处理索引项的删除；它跳过记账转移，不写入任何账户、义务、覆盖、用量、消费或费用记录。跟随者将其结果映射为空经济效果。因此，单步不改变投影；通过归纳，任意此类步骤序列也不改变投影。
+
+针对输出 $y$ 的决定只通过交易身份、授权事实、输入、声明和金额、编码长度以及 $y$ 的槽位读取规范区块体。如果 $\mathcal D_y$ 存在，该决定就是不读取历史的空操作。否则，$y$ 的槽位仍保存 \texttt{OriginalFunding}，因为替换要求已有 $\mathcal D_y$；替换其他固定宽度槽位不会改变其余字段。付款执行从不读取规范区块体。
+\end{IEEEproof}
+
+\begin{lemma}[身份保持与安装独立性]
+\label{lem:security-installation}
+生效的表示保持所有者授权、
+交易和输出身份、声明、后继引用以及
+完整的原始 BlockID $(H_b,P_b)$ 不变。对于同一公开历史，
+合法的物理安装调度具有相同的经济投影。
+此外，如果变色龙关系对于每个
+固定消息和承诺都具有唯一有效开口，那么对于固定的原始区块体
+及固定的已决定槽位集合，最终区块体和部件开口
+不依赖表示命令的分组或顺序。
+修订号、命令历史和应用哈希则可能不同。
+\end{lemma}
+\begin{IEEEproof}
+执行器仅改变声明的资金槽位及其开口，以构建规范区块体。式~\eqref{eq:protocol-identities} 的身份编码保持交易身份、声明和输入承诺不变，替换也保持编码宽度不变。执行器验证新开口，重新计算修订区块体的区块哈希和部件集头，并且仅在它们与原始 BlockID 相等时接受。Base 和 Previous 将竞争的规范修订串行化，已提交 Task 则绑定允许的字节。后继引用交易和输出身份，因此既不需要重新签名，也不需要重新执行。
+
+Canonical 读取已提交的逻辑修订版本 $\rho_\ell$，精确的 Task 授权修订版本 $r\le\rho_\ell$ 下的区块体和部件。若 $\rho_p<r$，安装向前推进；若 $\rho_p=r$，检查完全相等；若 $\rho_p>r$，则视为已覆盖，不进行回滚。安装不写入经济状态，仅读取已提交的修订和任务记录，队列进度也只越过已完成条目。对于同一公开前缀上的合法调度 $\mu_1,\mu_2$，有
+\begin{equation}
+ \pi_{\mathrm{econ}}(S_{\mu_1})=\pi_{\mathrm{econ}}(S_{\mu_2}).
+ \label{eq:security-installation}
+\end{equation}
+收敛结论来自每个槽位和部件开口的唯一性，以及部件上下文不依赖修订计数器。补充材料给出了这一论证，以及对跟随者更新和历史的比较。
+\end{IEEEproof}
+
+\noindent\textbf{读取方范围。}
+这些引理适用于在自身状态上执行过守卫检查的副本，因此第~\ref{sec:protocol-reader}~节的读取方信任执行了这些检查的本地状态。一个区块即使携带 \texttt{RepairBatch}，如果该命令未成功执行，也不赋予任何表示权限。单凭包含证明、相等的 BlockID 或变色龙关系，都不能证明某个表示截至 $H$ 已获授权。若要服务于不可信的远程读取方，就需要与认证状态根或原始执行证明绑定的授权证据；本文未定义此类证据。
+
+\subsection{受保护的连续支付与进展}
+\label{sec:security-composition}
+
+令 $\mathsf{FreshRecv}(w,o,c)$ 表示诚实所有者经过认证的接收，且该所有者此前未授权消费该实例。新鲜性是关于历史的谓词，不能仅由成功接收推出。
+
+\begin{theorem}[受保护的连续支付]
+\label{thm:security-continuation}
+在 FreshRecv 之后，未经所有者授权，认证输出不能被重新解释或
+消费。已获认证并公开执行的
+后继要么消费最终源输出，要么原子地建立一项具有资金覆盖的
+直接义务。源交易闭合、补偿和表示
+保持其已经成立的本金效果，无需后继重新签名
+或重新执行。
+\end{theorem}
+\begin{IEEEproof}
+引理~\ref{lem:security-consumption} 固定所有权并排除冲突消费，原子执行则将每次缺失消费与其义务和输出绑定在一起。定理~\ref{thm:security-coverage} 提供资金覆盖，定理~\ref{thm:security-conservation} 核算闭合与迟到源交易，引理~\ref{lem:security-original} 确定已执行历史，引理~\ref{lem:security-resubmission} 约束重提交，引理~\ref{lem:security-decision} 约束补偿，而引理~\ref{lem:security-repair}--\ref{lem:security-installation} 限制后续变更。对本地与公开转移组成的联合序列归纳，可组合这些性质。\texttt{INSTALL} 保留本地消费效果，不改变公开资产。补偿决定可以改变 Pending、费用和储备余额，但不会重复产生后继本金；表示和物理安装则不改变这些量。
+\end{IEEEproof}
+
+\noindent\textbf{本地保留情形。}
+以下情形区分资源恢复与输入
+解锁。仅凭时间流逝，二者均不获授权。
+
+\par\smallskip
+{\small
+\setlength{\tabcolsep}{3pt}
+\noindent
+\begin{tabular}{@{}p{0.27\columnwidth}p{0.67\columnwidth}@{}}
+\toprule
+批准状态 & 现有规则下的结果 \\
+\midrule
+没有 QC 的独立部分批准 &
+容量可能发生碎片化，而不产生公开责任。具有实际资金支持的增加
+可以使付款完成，但不会清除已有锁。 \\
+
+全诚实成员下的同输入 2/2 分裂 &
+两个候选都无法获得第三份签名。增加容量
+不能消除冲突的输入锁。 \\
+
+被取代的未认证批准 &
+同一配置下成功执行的冲突 QC 所对应付款，
+证明旧批准不可能曾经形成 QC。满足守卫条件的
+失效处理只恢复其剩余本地扣减额。 \\
+
+持有 QC 的 Intent 失败方 &
+输入互不相交时，因 Intent 被拒绝不允许触发失效处理。
+未执行的源交易即使已经
+补偿，仍保留其签名预留。 \\
+\bottomrule
+\end{tabular}
+\par}
+
+\noindent\textbf{条件性进展。}
+固定一个 CAL 授权项。对于成员 $m$ 和 Worker $w$，令 $C_{m,w}$ 为
+本地观察到的切片总容量，即 Available 与 Reserved 之和。
+令 $L_{m,w}$ 为指定请求集合之外的残留预留上界，
+令 $N_{m,w}\ge1$ 为该集合中可能同时
+取得或保留预留的不同请求数量上界，其中包括候选请求。
+如果每个请求至多预留 $a_{\max}$ CAL，且计入找零，那么
+\[
+  C_{m,w}\ge L_{m,w}+N_{m,w}a_{\max}
+\]
+可排除该候选请求因 CAL 容量不足而被拒绝的情形：其他预留
+至多占用 $L_{m,w}+(N_{m,w}-1)a_{\max}$。所有竞争预留
+都必须恰好计入一次，包括部分批准或被放弃的批准、
+已认证但尚未释放预留的付款，以及等待本地
+对账的付款。
+
+该条件必须在一个能够响应的诚实法定人数集合所涉及的
+相关扣减步骤和切片上成立。它是工作负载条件，
+而不是在多个收集者之间强制执行的上界。
+输入与 Intent 的兼容性、充足的费用及其他资源、
+可用证据、公平的消息交付与入块，仍是独立要求。
+源交易执行、经济闭合和表示各自具有不同的进展条件；
+任何一项都不蕴含普遍适用的完成期限或基于超时的解锁。
+
+\begin{lemma}[经济闭合不等待适配]
+\label{lem:security-closure}
+当公开截止期已到且决定被纳入区块时，
+尚未闭合的直接义务可以通过其公开补偿决定
+关闭，前提是该位置的原始历史、
+签发者储备和消费方费用托管均可用。该
+转移不需要任何适配贡献。表示的
+完成则另行要求有效适配材料、当前
+规范修订版本，以及公开提交和本地物理
+安装取得进展。
+\end{lemma}
+\begin{IEEEproof}
+决定路径验证义务和历史槽位，并在不使用适配端点的情况下执行记账。由定理~\ref{thm:security-coverage}，储备充足；准入规则则在消费方的费用托管中，为每个认证输入预留一次补偿所需的费用。因此，适配不可用既不会阻止决定，也不会阻止后续偿还。门限服务需要四名固定持有者中的三名提供有效贡献；三名能够响应的诚实持有者已经足够，拜占庭持有者也可能提供有效贡献。共享执行资源和公开排序仍然影响时延，因此该结论区分的是协议依赖关系，而不给出完成时间上界。
+\end{IEEEproof}
+
+\noindent\textbf{可用性与担保方风险。}
+消费方公开来源 QC 后，至少两名诚实来源签署者保有提交材料
+（引理~\ref{lem:security-resubmission}）。公平交付与入块支持
+可执行来源的重提交，但不能消除永久 Intent 冲突；到期义务
+可以不依赖适配而闭合（引理~\ref{lem:security-closure}）。
+在每个前缀，
+\[
+  0\le S_g=\sum_{c\in C_g}
+       \bigl(p_c-\mathsf{Rec}_c\bigr)\le Q_g\le B_g .
+\]
+对不再补资的固定 grant，该式约束净未偿赔付，而非整个生命周期
+的赔付毛额 Paid。未执行的已认证来源在诚实签署者处保持
+$r_{m,c}=a_c$，因此备付尚有余额时，切片也可能停止签发。
+有资金支持的补资增加份额，但不清除预留或输入冲突，且新增授权
+仍面临同样的风险。永久未执行来源不属于
+定理~\ref{thm:security-neutrality} 的范围。
+第~\ref{sec:model-contract}~节的开放服务接受对抗性备付损失
+和容量滞留；FUEL 费用不为二者提供保险，本文不假定
+CAL--FUEL 兑换价值。补充材料~S3 给出两轮账目及固定签署者下的
+容量上界。

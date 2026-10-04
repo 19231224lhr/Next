@@ -1,0 +1,55 @@
+cmd/payctl/lab.go:
+	var repairFiles [4]string
+	if *direct {
+		public, shares, err := chameleon.GenerateDealer()
+		if err != nil {
+			return err
+		}
+		network.Direct = &rules.DirectSettings{Modulus: public.Modulus(), TimeoutSeconds: 30, RepairCost: 5}
+		for i, b := range shares {
+			repairFiles[i] = filepath.Join(root, "keys", fmt.Sprintf("committee%d-repair.key", i))
+			if err = os.WriteFile(repairFiles[i], b, 0600); err != nil {
+				return err
+			}
+		}
+	}
+	keyFile := func(name string) (string, ed25519.PrivateKey, error) {
+		_, key, e := ed25519.GenerateKey(rand.Reader)
+		file := filepath.Join(root, "config", name+".json")
+		var others []string
+		for j, p := range peers {
+			if i != j {
+				others = append(others, p)
+			}
+		}
+		c := map[string]any{"Network": lab.Network, "DataDir": filepath.Join(root, name), "KeyFile": committeeFiles[i], "P2PListen": fmt.Sprintf("tcp://127.0.0.1:%d", *base+200+i), "Peers": strings.Join(others, ","), "Listen": strings.TrimPrefix(network.CommitteeURLs[i], "http://"), "Index": i}
+		if *direct {
+			c["RepairKeyFile"] = repairFiles[i]
+			// This command creates a loopback laboratory, not a WAN deployment.
+			c["P2PSendRate"], c["P2PRecvRate"] = int64(51_200_000), int64(51_200_000)
+		}
+		if e = cfg.Write(file, c); e != nil {
+cmd/committee/repair_runtime.go:
+func startRepairRuntime(parent context.Context, c configuration, n cfg.Network, db store.Store, app *committee.App, node *node.Node, mux *http.ServeMux) (func(), error) {
+	if n.Direct == nil {
+		return func() {}, nil
+	}
+	policy, err := n.Direct.Policy(n.Schedule, n.Organizations)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := os.ReadFile(c.RepairKeyFile)
+	if err != nil {
+		return nil, err
+	}
+	signer, err := chameleon.DecodeSigner(policy.Key, raw)
+	if err != nil {
+		return nil, err
+	}
+	if signer.Index() != uint(c.Index)+1 {
+		return nil, protocol.ErrAuth
+	}
+	localDB, err := store.Open(filepath.Join(c.DataDir, "repair-worker.db"), store.Identity{Network: n.ChainID, Role: "repair-worker", Node: fmt.Sprint(c.Index), Schema: 3})
+	if err != nil {
+		return nil, err
+	}

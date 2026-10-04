@@ -1,0 +1,8 @@
+谢谢。这三处意见成立，我将直接改进正文，不以聊天答疑代替正文。已核对实际代码：cmd/payctl/lab.go 的 init 为四个 committee 节点分别生成 committee%d-repair.key，并将 repairFiles[i] 写到该节点 RepairKeyFile；cmd/committee/repair_runtime.go 的 startRepairRuntime 读取该文件、DecodeSigner，并检查 signer.Index()==uint(c.Index)+1。故份额持有者就是公共委员会四个验证者，不是担保组织，也不是另设集合。
+
+拟写入正文的三处修正如下，请只核对这三处是否准确消除你指出的歧义，并可直接给出更自然简洁的英文，不必重新评审整篇：
+1. 模型 II-B：A trusted offline dealer generates a three-of-four adaptation key and gives one share to each validator in the public committee. The same at-most-one Byzantine assumption applies to these holders; adaptation progress requires three responsive honest holders. Any adapted body must still be authorized by a committed command.
+2. II-D：Carol can spend her output under the ordinary final-input rules while this obligation remains Open; her next payment still requires certification and admission by its designated organization.
+3. Table III Public payment：Successful execution (Settled) creates final outputs even with unresolved input obligations (Pending). When a delayed source executes, its outputs already compensated by the reserve repay that reserve instead of being recreated.
+
+其他协议、公式与实验不变。你对已写清楚的资本风险和 C3 价值的研究质疑会保留为独立判断，不把它们称为已被文字修复。

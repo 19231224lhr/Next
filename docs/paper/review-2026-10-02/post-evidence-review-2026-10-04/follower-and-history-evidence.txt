@@ -1,0 +1,1571 @@
+
+===== FILE: internal/redaction/batch.go =====
+
+//go:build comet_v3
+
+package redaction
+
+import (
+	"bytes"
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cmtstore "github.com/cometbft/cometbft/store"
+	"github.com/cometbft/cometbft/types"
+	"sort"
+	"utxo/crypto/chameleon"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+type BatchTask struct {
+	Command protocol.RepairBatch
+	Body    []byte
+	Height  int64
+}
+type batchReference struct {
+	Batch protocol.Hash
+	Index uint32
+}
+
+func BatchTaskKey(id protocol.Hash) []byte      { return state.Key(114, id[:]) }
+func batchReferenceKey(id protocol.Hash) []byte { return state.Key(115, id[:]) }
+
+// LoadTask projects a batch item for legacy observation APIs without storing
+// the full batch body once per obligation. Batch commands stay immutable.
+func LoadTask(v state.ReadView, id protocol.Hash) (Task, bool, error) {
+	task, found, err := state.Load[Task](v, TaskKey(id))
+	if err != nil || found {
+		return task, found, err
+	}
+	ref, hasRef, err := state.Load[batchReference](v, batchReferenceKey(id))
+	if err != nil {
+		return task, false, err
+	}
+	batchID := id
+	if hasRef {
+		batchID = ref.Batch
+	}
+	batch, found, err := state.Load[BatchTask](v, BatchTaskKey(batchID))
+	if err != nil || !found {
+		return task, found, err
+	}
+	// A batch ID projects item zero only to reuse the single-task installer.
+	// Body, Next and Parts describe the complete batch revision, not one item.
+	index := int(ref.Index)
+	if index >= len(batch.Command.Items) {
+		return task, false, protocol.ErrRule
+	}
+	c := batch.Command
+	x := c.Items[index]
+	block, err := decodeBody(batch.Body)
+	if err != nil {
+		return task, false, err
+	}
+	if int(x.Transaction) >= len(block.Data.Txs) {
+		return task, false, protocol.ErrRule
+	}
+	task = Task{Height: batch.Height, Body: batch.Body, Command: protocol.RepairInput{Network: c.Network, Output: x.Output, Height: c.Height, Transaction: x.Transaction, Input: x.Input, Base: c.Base, Previous: c.Previous, Next: c.Next, Parts: c.Parts, TransactionBytes: bytes.Clone(block.Data.Txs[x.Transaction])}}
+	return task, true, nil
+}
+
+func BuildBatch(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, singles []protocol.RepairInput, now int64) (protocol.RepairBatch, error) {
+	var c protocol.RepairBatch
+	if len(singles) == 0 || len(singles) > protocol.MaxRepairItems {
+		return c, protocol.ErrRule
+	}
+	for i, s := range singles {
+		expected, _, err := InputTarget(v, bs, p, s.Output, now)
+		if err != nil {
+			return c, err
+		}
+		if s.Network != expected.Network || s.Height != expected.Height || s.Transaction != expected.Transaction || s.Input != expected.Input {
+			return c, protocol.ErrAuth
+		}
+		pay, err := protocol.DecodeDirectSubmission(s.TransactionBytes)
+		if err != nil {
+			return c, err
+		}
+		if int(s.Input) >= len(pay.Tx.Funding) {
+			return c, protocol.ErrRule
+		}
+		if i == 0 {
+			c.Network, c.Height, c.Base, c.Previous = expected.Network, expected.Height, expected.Base, expected.Previous
+			c.Parts = []chameleon.Opening{{}}
+		}
+		if expected.Height != c.Height || expected.Base != c.Base || expected.Previous != c.Previous {
+			return c, protocol.ErrRule
+		}
+		c.Items = append(c.Items, protocol.RepairItem{Output: s.Output, Transaction: s.Transaction, Input: s.Input, Opening: pay.Tx.Funding[s.Input].Opening})
+	}
+	sort.Slice(c.Items, func(i, j int) bool {
+		a, b := c.Items[i], c.Items[j]
+		return a.Transaction < b.Transaction || (a.Transaction == b.Transaction && a.Input < b.Input)
+	})
+	_, body, err := batchBody(v, bs, p, c, now)
+	if err != nil {
+		return c, err
+	}
+	c.Next = digest(body)
+	return c, nil
+}
+
+func batchBody(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairBatch, now int64) (*types.Block, []byte, error) {
+	if _, err := c.MarshalBinary(); err != nil {
+		return nil, nil, err
+	}
+	old, revision, err := Canonical(v, bs, c.Height)
+	if err != nil {
+		return nil, nil, err
+	}
+	if revision.Number != c.Base || digest(revision.Body) != c.Previous {
+		return nil, nil, rules.ErrConflict
+	}
+	pb, err := old.ToProto()
+	if err != nil {
+		return nil, nil, err
+	}
+	payments := make(map[uint32]protocol.DirectSubmission)
+	for _, x := range c.Items {
+		expected, pay, err := InputTarget(v, bs, p, x.Output, now)
+		if err != nil {
+			return nil, nil, err
+		}
+		if expected.Network != c.Network || expected.Height != c.Height || expected.Transaction != x.Transaction || expected.Input != x.Input || expected.Base != c.Base || expected.Previous != c.Previous {
+			return nil, nil, protocol.ErrAuth
+		}
+		if previous, ok := payments[x.Transaction]; ok {
+			pay = previous
+		}
+		f := pay.Tx.Funding[x.Input]
+		f.Kind = protocol.ReserveFunding
+		f.Ref = protocol.ReserveDebitIdentity(c.Network, x.Output)
+		f.Opening = x.Opening
+		if !p.Key.Verify(pay.Tx.FundingContext(int(x.Input), p.Key.KeyID()), f.ReferenceBytes(), pay.Tx.Commitments[x.Input], f.Opening) {
+			return nil, nil, protocol.ErrAuth
+		}
+		pay.Tx.Funding[x.Input] = f
+		payments[x.Transaction] = pay
+	}
+	for index, pay := range payments {
+		raw, err := pay.MarshalBinary()
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(raw) != len(pb.Data.Txs[index]) {
+			return nil, nil, protocol.ErrRule
+		}
+		pb.Data.Txs[index] = raw
+	}
+	b, err := types.BlockFromProto(pb)
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err := pb.Marshal()
+	return b, body, err
+}
+
+func BatchPartRequests(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairBatch, now int64) ([]PartRequest, []chameleon.Opening, []byte, error) {
+	_, body, err := batchBody(v, bs, p, c, now)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return partRequestsForBody(v, bs, p, c.Height, body)
+}
+func BatchPartShares(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, signer chameleon.Signer, c protocol.RepairBatch, now int64) ([]chameleon.Contribution, error) {
+	if _, err := c.MarshalBinary(); err != nil {
+		return nil, err
+	}
+	requests, _, _, err := BatchPartRequests(v, bs, p, c, now)
+	if err != nil {
+		return nil, err
+	}
+	shares := make([]chameleon.Contribution, len(requests))
+	for i, r := range requests {
+		shares[i], err = signer.Adapt(r.Context, r.Old, r.Next, r.Commitment, r.Opening)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return shares, nil
+}
+func CompleteBatchParts(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairBatch, now int64, shares [][]chameleon.Contribution) (protocol.RepairBatch, error) {
+	requests, openings, body, err := BatchPartRequests(v, bs, p, c, now)
+	if err != nil {
+		return c, err
+	}
+	openings, err = combinePartOpenings(p, requests, openings, shares)
+	if err != nil {
+		return c, err
+	}
+	c.Parts, c.Next = openings, digest(body)
+	return c, nil
+}
+
+func ExecuteBatch(v state.ReadView, bs *cmtstore.BlockStore, p rules.DirectPolicy, c protocol.RepairBatch, height, now int64) (state.Transition, error) {
+	id := c.ID()
+	if id == (protocol.Hash{}) {
+		return state.Transition{}, protocol.ErrEncoding
+	}
+	if _, found, err := state.Load[BatchTask](v, BatchTaskKey(id)); err != nil {
+		return state.Transition{}, err
+	} else if found {
+		raw, e := (protocol.RepairResult{Command: id}).MarshalBinary()
+		return state.Transition{Data: raw}, e
+	}
+	if c.Height >= height {
+		return state.Transition{}, protocol.ErrRule
+	}
+	b, body, err := batchBody(v, bs, p, c, now)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if digest(body) != c.Next {
+		return state.Transition{}, protocol.ErrAuth
+	}
+	parts, err := types.NewRedactablePartSet(body, types.BlockPartSizeBytes, c.Height, c.Base+1, c.Parts)
+	if err != nil {
+		return state.Transition{}, err
+	}
+	meta := bs.LoadBlockMeta(c.Height)
+	if meta == nil || !bytes.Equal(b.Hash(), meta.BlockID.Hash) || !parts.Header().Equals(meta.BlockID.PartSetHeader) {
+		return state.Transition{}, protocol.ErrAuth
+	}
+	o := state.NewOverlay(v)
+	result := protocol.RepairResult{Command: id, Applied: true}
+	for i, x := range c.Items {
+		o.Apply([]state.Change{{Key: DecisionPendingKey(c.Height, x.Output), Delete: true}})
+		if err = state.Put(o, batchReferenceKey(protocol.RepairIdentity(c.Network, x.Output)), batchReference{Batch: id, Index: uint32(i)}); err != nil {
+			return state.Transition{}, err
+		}
+	}
+	raw, err := result.MarshalBinary()
+	if err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(o, RevisionKey(c.Height), Revision{Number: c.Base + 1, Body: body}); err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(o, state.Key(110, RevisionKey(c.Height)), c); err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(o, BatchTaskKey(id), BatchTask{Command: c, Body: body, Height: height}); err != nil {
+		return state.Transition{}, err
+	}
+	if err = state.Put(o, QueueKey(height, c.Height, c.Base+1, id), id); err != nil {
+		return state.Transition{}, err
+	}
+	return state.Transition{Changes: o.Changes(), Data: raw}, nil
+}
+
+func decodeBody(body []byte) (*types.Block, error) {
+	pb := new(cmtproto.Block)
+	if err := pb.Unmarshal(body); err != nil {
+		return nil, err
+	}
+	return types.BlockFromProto(pb)
+}
+
+
+===== FILE: third_party/cometbft/store/redaction.go =====
+
+package store
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
+	"fmt"
+	"io"
+
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	"github.com/cometbft/cometbft/types"
+)
+
+func revisionKey(height int64) []byte { return []byte(fmt.Sprintf("RV:%d", height)) }
+func originalKey(height int64) []byte { return []byte(fmt.Sprintf("RO:%d", height)) }
+
+// ReviseBlock writes the actual stored Part payloads in a single database batch.
+// authorize must verify an already-finalized RepairInput and its exact byte diff.
+// This method never changes account balances or rewrites historical AppHash.
+func (bs *BlockStore) ReviseBlock(height int64, base uint64, parts *types.PartSet, authorize func(*types.Block, *types.Block) error) error {
+	if base == ^uint64(0) {
+		return types.ErrRedaction
+	}
+	return bs.installRevision(height, base+1, parts, authorize, true)
+}
+
+// InstallCommittedRevision installs an exact, already-authorized snapshot.
+// The callback must use copied committed data, never acquire application locks.
+func (bs *BlockStore) InstallCommittedRevision(height int64, revision uint64, parts *types.PartSet, authorize func(*types.Block, *types.Block) error) error {
+	return bs.installRevision(height, revision, parts, authorize, false)
+}
+
+func (bs *BlockStore) installRevision(height int64, target uint64, parts *types.PartSet, authorize func(*types.Block, *types.Block) error, sequential bool) error {
+	if target == 0 {
+		return types.ErrRedaction
+	}
+
+	if parts == nil || !parts.IsComplete() || authorize == nil {
+		return types.ErrRedaction
+	}
+	bs.revisionMtx.Lock()
+	defer bs.revisionMtx.Unlock()
+	meta := bs.LoadBlockMeta(height)
+	if meta == nil || !parts.Header().Equals(meta.BlockID.PartSetHeader) {
+		return types.ErrRedaction
+	}
+	data, err := io.ReadAll(parts.GetReader())
+	if err != nil {
+		return err
+	}
+	pb := new(cmtproto.Block)
+	if err = pb.Unmarshal(data); err != nil {
+		return err
+	}
+	next, err := types.BlockFromProto(pb)
+	if err != nil {
+		return err
+	}
+	if next.Height != height || !bytes.Equal(next.Hash(), meta.BlockID.Hash) {
+		return types.ErrRedaction
+	}
+	current := bs.loadBlock(height)
+	if err = authorize(current, next); err != nil {
+		return err
+	}
+	state, err := bs.db.Get(revisionKey(height))
+	if err != nil {
+		return err
+	}
+	var rev uint64
+	if len(state) != 0 {
+		if len(state) != 40 {
+			return types.ErrRedaction
+		}
+		rev = binary.BigEndian.Uint64(state[:8])
+	}
+	digest := sha256.Sum256(data)
+	checked := types.NewPartSetFromHeader(meta.BlockID.PartSetHeader)
+	for i := 0; i < int(parts.Total()); i++ {
+		p := parts.GetPart(i)
+		if p.Redaction == nil || p.Redaction.Height != height || p.Redaction.Revision != target {
+			return types.ErrRedaction
+		}
+		if err = p.ValidateBasic(); err != nil {
+			return err
+		}
+		if _, err = checked.AddPart(p); err != nil {
+			return err
+		}
+	}
+
+	if rev == target {
+		if len(state) != 40 || !bytes.Equal(state[8:], digest[:]) {
+			return types.ErrRedaction
+		}
+		for i := 0; i < int(parts.Total()); i++ {
+			old := bs.LoadBlockPart(height, i)
+			if old == nil || old.Redaction == nil || *old.Redaction != *parts.GetPart(i).Redaction || !bytes.Equal(old.Bytes, parts.GetPart(i).Bytes) {
+				return types.ErrRedaction
+			}
+		}
+		return nil
+	}
+	if !sequential && rev > target {
+		return nil
+	}
+	if sequential && rev != target-1 {
+		return types.ErrRedaction
+	}
+	batch := bs.db.NewBatch()
+	defer batch.Close()
+	if rev == 0 {
+		origin, err := current.ToProto()
+		if err != nil {
+			return err
+		}
+		b, err := origin.Marshal()
+		if err != nil {
+			return err
+		}
+		if err = batch.Set(originalKey(height), b); err != nil {
+			return err
+		}
+	}
+	for i := 0; i < int(parts.Total()); i++ {
+		part, err := parts.GetPart(i).ToProto()
+		if err != nil {
+			return err
+		}
+		b, err := part.Marshal()
+		if err != nil {
+			return err
+		}
+		if err = batch.Set(calcBlockPartKey(height, i), b); err != nil {
+			return err
+		}
+	}
+	state = make([]byte, 40)
+	binary.BigEndian.PutUint64(state[:8], target)
+	copy(state[8:], digest[:])
+	if err = batch.Set(revisionKey(height), state); err != nil {
+		return err
+	}
+	return batch.WriteSync()
+}
+
+// LoadOriginalBlock supplies the original execution bytes for deterministic
+// replay. Compensation is applied only when replay reaches RepairInput's height.
+func (bs *BlockStore) LoadOriginalBlock(height int64) (*types.Block, error) {
+	bs.revisionMtx.RLock()
+	defer bs.revisionMtx.RUnlock()
+	b, err := bs.db.Get(originalKey(height))
+	if err != nil {
+		return nil, err
+	}
+	if len(b) == 0 {
+		return bs.loadBlock(height), nil
+	}
+	p := new(cmtproto.Block)
+	if err = p.Unmarshal(b); err != nil {
+		return nil, err
+	}
+	return types.BlockFromProto(p)
+}
+
+// OriginalBlockPart serves consensus catch-up with original execution bytes.
+// Current redacted parts remain available through LoadBlockPart for inspection.
+func (bs *BlockStore) OriginalBlockPart(height int64, index int) (*types.Part, error) {
+	bs.revisionMtx.RLock()
+	defer bs.revisionMtx.RUnlock()
+	raw, err := bs.db.Get(originalKey(height))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		meta := bs.LoadBlockMeta(height)
+		if meta == nil {
+			return nil, nil
+		}
+		if index < 0 || uint64(index) >= uint64(meta.BlockID.PartSetHeader.Total) {
+			return nil, types.ErrRedaction
+		}
+		return bs.LoadBlockPart(height, index), nil
+	}
+	// Rewritten history still serves the immutable original execution bytes.
+	pb := new(cmtproto.Block)
+	if err = pb.Unmarshal(raw); err != nil {
+		return nil, err
+	}
+	block, err := types.BlockFromProto(pb)
+	if err != nil {
+		return nil, err
+	}
+	parts, err := block.MakePartSet(types.BlockPartSizeBytes)
+	if err != nil {
+		return nil, err
+	}
+	if index < 0 || index >= int(parts.Total()) {
+		return nil, types.ErrRedaction
+	}
+	return parts.GetPart(index), nil
+}
+
+
+===== FILE: finality/block.go =====
+
+package finality
+
+import (
+	"bytes"
+	"fmt"
+	abci "github.com/cometbft/cometbft/abci/types"
+	ct "github.com/cometbft/cometbft/types"
+)
+
+// BlockData contains ordinary ledger data, shared by every reader of a height.
+type BlockData struct {
+	Block   *ct.Block
+	Results []*abci.ExecTxResult
+	Next    ct.SignedHeader
+}
+type ExecutedTx struct {
+	Bytes []byte
+	Code  uint32
+	Data  []byte
+}
+type VerifiedBlock struct {
+	height         int64
+	hash, previous []byte
+	txs            []ExecutedTx
+}
+
+func (b VerifiedBlock) Height() int64    { return b.height }
+func (b VerifiedBlock) Hash() []byte     { return bytes.Clone(b.hash) }
+func (b VerifiedBlock) Previous() []byte { return bytes.Clone(b.previous) }
+func (b VerifiedBlock) Transactions() []ExecutedTx {
+	out := make([]ExecutedTx, len(b.txs))
+	for i, t := range b.txs {
+		out[i] = ExecutedTx{bytes.Clone(t.Bytes), t.Code, bytes.Clone(t.Data)}
+	}
+	return out
+}
+func VerifyBlock(t Trust, p BlockData) (VerifiedBlock, error) {
+	fail := VerifiedBlock{}
+	b, h := p.Block, p.Next
+	if t.Validate() != nil || b == nil || h.Header == nil || h.Commit == nil || b.ChainID != t.ChainID || h.Height != b.Height+1 || b.Height < 1 || len(b.Txs) != len(p.Results) {
+		return fail, ErrProof
+	}
+	if err := b.ValidateBasic(); err != nil {
+		return fail, fmt.Errorf("block %d: %w", b.Height, err)
+	}
+	if err := h.ValidateBasic(t.ChainID); err != nil {
+		return fail, fmt.Errorf("next header: %w", err)
+	}
+	if !bytes.Equal(h.ValidatorsHash, t.Validators.Hash()) || !bytes.Equal(h.NextValidatorsHash, t.Validators.Hash()) || !bytes.Equal(h.LastBlockID.Hash, b.Hash()) {
+		return fail, fmt.Errorf("block/header linkage: %w", ErrProof)
+	}
+	// Compute from supplied bytes, not cached fields in the decoded block.
+	data := ct.Data{Txs: b.Txs}
+	if !bytes.Equal(data.Hash(), b.DataHash) {
+		return fail, fmt.Errorf("transaction root: %w", ErrProof)
+	}
+	for _, r := range p.Results {
+		if r == nil {
+			return fail, ErrProof
+		}
+	}
+	if !bytes.Equal(ct.NewResults(p.Results).Hash(), h.LastResultsHash) {
+		return fail, fmt.Errorf("execution root at %d: %w", b.Height, ErrProof)
+	}
+	if err := t.Validators.VerifyCommitLight(t.ChainID, h.Commit.BlockID, h.Height, h.Commit); err != nil {
+		return fail, err
+	}
+	out := VerifiedBlock{height: b.Height, hash: bytes.Clone(b.Hash()), previous: bytes.Clone(b.LastBlockID.Hash)}
+	for i, tx := range b.Txs {
+		r := p.Results[i]
+		out.txs = append(out.txs, ExecutedTx{bytes.Clone(tx), r.Code, bytes.Clone(r.Data)})
+	}
+	return out, nil
+}
+
+
+===== FILE: finality/proof.go =====
+
+package finality
+
+import (
+	"bytes"
+	"errors"
+	"github.com/cometbft/cometbft/crypto/merkle"
+	cryptoproto "github.com/cometbft/cometbft/proto/tendermint/crypto"
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cmttypes "github.com/cometbft/cometbft/types"
+	"utxo/protocol"
+)
+
+var ErrProof = errors.New("invalid final fact proof")
+
+type Commitment struct {
+	Network  protocol.Hash
+	Height   int64
+	Previous []byte
+	WriteSet protocol.Hash
+	FactRoot []byte
+}
+
+func (c Commitment) Hash() (protocol.Hash, error) {
+	if c.Height <= 0 || c.Network == (protocol.Hash{}) || len(c.Previous) != 0 && len(c.Previous) != 32 || len(c.FactRoot) != 32 {
+		return protocol.Hash{}, ErrProof
+	}
+	e := new(protocol.Encoder)
+	e.U64(uint64(c.Height))
+	return protocol.Digest("APP_V2", c.Network[:], e.Data(), c.Previous, c.WriteSet[:], c.FactRoot), nil
+}
+
+type Trust struct {
+	ChainID    string
+	Network    protocol.Hash
+	Validators *cmttypes.ValidatorSet
+}
+
+func (t Trust) Validate() error {
+	if t.ChainID == "" || t.Network == (protocol.Hash{}) || t.Validators == nil || len(t.Validators.Validators) != 4 {
+		return ErrProof
+	}
+	weight := t.Validators.Validators[0].VotingPower
+	if weight <= 0 {
+		return ErrProof
+	}
+	seen := make(map[string]bool)
+	for _, v := range t.Validators.Validators {
+		if v.ValidateBasic() != nil || v.VotingPower != weight || seen[string(v.Address)] {
+			return ErrProof
+		}
+		seen[string(v.Address)] = true
+	}
+	return nil
+}
+
+type FactProof struct {
+	Fact       protocol.FinalFact
+	Commitment Commitment
+	Path       merkle.Proof
+	Header     cmttypes.SignedHeader
+}
+type VerifiedFact struct{ fact protocol.FinalFact }
+
+func (v VerifiedFact) Fact() protocol.FinalFact {
+	f := v.fact
+	f.Payload = bytes.Clone(f.Payload)
+	return f
+}
+func Verify(t Trust, p FactProof) (VerifiedFact, error) {
+	fail := VerifiedFact{}
+	if t.Validate() != nil || p.Fact.Network != t.Network || p.Commitment.Network != t.Network || p.Header.Header == nil || p.Header.Commit == nil {
+		return fail, ErrProof
+	}
+	if p.Header.Height != p.Commitment.Height+1 || p.Header.ChainID != t.ChainID || !bytes.Equal(p.Header.ValidatorsHash, t.Validators.Hash()) || !bytes.Equal(p.Header.NextValidatorsHash, t.Validators.Hash()) {
+		return fail, ErrProof
+	}
+	root, e := p.Commitment.Hash()
+	if e != nil || !bytes.Equal(root[:], p.Header.AppHash) {
+		return fail, ErrProof
+	}
+	if e = p.Header.ValidateBasic(t.ChainID); e != nil {
+		return fail, errors.Join(ErrProof, e)
+	}
+	if e = t.Validators.VerifyCommitLight(t.ChainID, p.Header.Commit.BlockID, p.Header.Height, p.Header.Commit); e != nil {
+		return fail, errors.Join(ErrProof, e)
+	}
+	leaf, e := p.Fact.MarshalBinary()
+	if e != nil {
+		return fail, e
+	}
+	if e = p.Path.Verify(p.Commitment.FactRoot, leaf); e != nil {
+		return fail, errors.Join(ErrProof, e)
+	}
+	f := p.Fact
+	f.Payload = bytes.Clone(f.Payload)
+	return VerifiedFact{fact: f}, nil
+}
+
+const MaxProofBytes = protocol.MaxFactBytes + 128*1024
+
+func (p FactProof) MarshalBinary() ([]byte, error) {
+	fact, e := p.Fact.MarshalBinary()
+	if e != nil {
+		return nil, e
+	}
+	if _, e = p.Commitment.Hash(); e != nil {
+		return nil, e
+	}
+	path, e := p.Path.ToProto().Marshal()
+	if e != nil {
+		return nil, e
+	}
+	if p.Header.Header == nil || p.Header.Commit == nil {
+		return nil, ErrProof
+	}
+	header, e := p.Header.ToProto().Marshal()
+	if e != nil {
+		return nil, e
+	}
+	enc := new(protocol.Encoder)
+	enc.U16(60)
+	enc.U64(protocol.WireVersion)
+	enc.Bytes(fact)
+	enc.Fixed(p.Commitment.Network[:])
+	enc.U64(uint64(p.Commitment.Height))
+	enc.Bytes(p.Commitment.Previous)
+	enc.Fixed(p.Commitment.WriteSet[:])
+	enc.Bytes(p.Commitment.FactRoot)
+	enc.Bytes(path)
+	enc.Bytes(header)
+	if len(enc.Data()) > MaxProofBytes {
+		return nil, ErrProof
+	}
+	return enc.Data(), nil
+}
+func Decode(b []byte) (p FactProof, err error) {
+	if len(b) > MaxProofBytes {
+		return p, protocol.ErrEncoding
+	}
+	d := protocol.NewDecoder(b)
+	if d.U16() != 60 || d.U64() != protocol.WireVersion {
+		return p, protocol.ErrEncoding
+	}
+	p.Fact, err = protocol.DecodeFact(d.Bytes(protocol.MaxFactBytes + 256))
+	if err != nil {
+		return p, err
+	}
+	copy(p.Commitment.Network[:], d.Fixed(32))
+	p.Commitment.Height = int64(d.U64())
+	p.Commitment.Previous = bytes.Clone(d.Bytes(32))
+	copy(p.Commitment.WriteSet[:], d.Fixed(32))
+	p.Commitment.FactRoot = bytes.Clone(d.Bytes(32))
+	path := new(cryptoproto.Proof)
+	if err = path.Unmarshal(d.Bytes(4096)); err != nil {
+		return p, err
+	}
+	mp, e := merkle.ProofFromProto(path)
+	if e != nil {
+		return p, e
+	}
+	p.Path = *mp
+	header := new(cmtproto.SignedHeader)
+	if err = header.Unmarshal(d.Bytes(64 * 1024)); err != nil {
+		return p, err
+	}
+	sh, e := cmttypes.SignedHeaderFromProto(header)
+	if e != nil {
+		return p, e
+	}
+	p.Header = *sh
+	if err = d.Done(); err != nil {
+		return p, err
+	}
+	_, err = p.Commitment.Hash()
+	return
+}
+
+
+===== FILE: internal/blockfollow/follow.go =====
+
+// Package blockfollow reads each committed height once and atomically advances
+// the reader's own state. It never requests payment-specific committee proofs.
+package blockfollow
+
+import (
+	"bytes"
+	"context"
+	"log/slog"
+	"time"
+	"utxo/finality"
+	"utxo/internal/requesttrace"
+	"utxo/internal/state"
+	"utxo/internal/store"
+)
+
+var cursorKey = state.Key(120)
+
+type Cursor struct {
+	Height int64
+	Hash   []byte
+}
+type Apply func(*state.Overlay) error
+
+// Prepare owns decoded block material; only its returned state changes run under
+// the writer. The callback must read current state from the supplied overlay.
+type Prepare func(finality.VerifiedBlock) (Apply, error)
+type Source interface {
+	Block(context.Context, int64) (finality.BlockData, error)
+}
+
+func Height(db store.Store) (height int64, err error) {
+	err = db.View(func(v state.ReadView) error { c, _, e := state.Load[Cursor](v, cursorKey); height = c.Height; return e })
+	return
+}
+func Commit(db store.Store, b finality.VerifiedBlock, prepare Prepare) error {
+	requesttrace.Consensus.Mark("follow_prepare_start", "height", b.Height())
+	apply, err := prepare(b)
+	if err != nil {
+		return err
+	}
+	requesttrace.Consensus.Mark("follow_prepare_done", "height", b.Height())
+	requesttrace.Consensus.Mark("follow_update_requested", "height", b.Height())
+	err = db.Update(func(v state.ReadView) ([]state.Change, error) {
+		requesttrace.Consensus.Mark("follow_update_started", "height", b.Height())
+		c, _, err := state.Load[Cursor](v, cursorKey)
+		if err != nil {
+			return nil, err
+		}
+		if b.Height() == c.Height && bytes.Equal(b.Hash(), c.Hash) {
+			return nil, nil
+		}
+		if b.Height() != c.Height+1 || c.Height > 0 && !bytes.Equal(b.Previous(), c.Hash) {
+			return nil, finality.ErrProof
+		}
+		o := state.NewOverlay(v)
+		requesttrace.Consensus.Mark("follow_apply_start", "height", b.Height())
+		if err = apply(o); err != nil {
+			return nil, err
+		}
+		requesttrace.Consensus.Mark("follow_apply_done", "height", b.Height())
+		if err = state.Put(o, cursorKey, Cursor{b.Height(), b.Hash()}); err != nil {
+			return nil, err
+		}
+		return o.Changes(), nil
+	})
+	if err == nil {
+		requesttrace.Consensus.Mark("follow_committed", "height", b.Height())
+	}
+	return err
+}
+func Run(ctx context.Context, db store.Store, s Source, t finality.Trust, prepare Prepare, committed ...func(int64)) error {
+	if t.Validate() != nil {
+		return finality.ErrProof
+	}
+	ticker := time.NewTicker(25 * time.Millisecond)
+	defer ticker.Stop()
+	var waiting int64
+	for {
+		height, err := Height(db)
+		if err != nil {
+			return err
+		}
+		if waiting != height+1 {
+			waiting = height + 1
+			requesttrace.Consensus.Mark("follow_wait_start", "height", waiting)
+		}
+		p, err := s.Block(ctx, height+1)
+		if err == nil {
+			requesttrace.Consensus.Mark("follow_verify_start", "height", height+1)
+			var b finality.VerifiedBlock
+			b, err = finality.VerifyBlock(t, p)
+			if err != nil {
+				return err
+			}
+			requesttrace.Consensus.Mark("follow_verify_done", "height", height+1)
+			if err = Commit(db, b, prepare); err != nil {
+				return err
+			}
+			// Observers see only successfully committed local state.
+			for _, publish := range committed {
+				publish(b.Height())
+			}
+			continue
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+		}
+	}
+}
+
+// Start joins the follower before its database is closed. An apply error cancels
+// the service context instead of silently leaving quota permanently occupied.
+func Start(ctx context.Context, cancel context.CancelFunc, db store.Store, s Source, t finality.Trust, prepare Prepare, committed ...func(int64)) func() {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if err := Run(ctx, db, s, t, prepare, committed...); err != nil {
+			slog.Error("block follower stopped", "error", err)
+			cancel()
+		}
+	}()
+	return func() { cancel(); <-done }
+}
+
+
+===== FILE: protocol/execution.go =====
+
+package protocol
+
+import "bytes"
+
+// Fee outputs are final public change/refund, never outputs certified by TXCer.
+const FeeChangeIndex uint32 = MaxOutputs
+const FeeRefundIndex uint32 = MaxOutputs + 1
+
+// Transaction, index, asset, amount, and the fixed receive descriptor.
+const FeeOutputBytes uint64 = 32 + 4 + 1 + 8 + 8 + 32 + 32 + 1 + 32 + 64
+
+type FeeOutput struct {
+	Transaction TxID
+	Index       uint32
+	Output      Output
+}
+
+// ExecutionResult records only execution choices not derivable from the signed
+// transaction: missing inputs, recovered outputs, and final fee change/refunds.
+// It contains public ledger effects, not private notifications or credit proofs.
+type ExecutionResult struct {
+	Applied                         bool
+	MissingInputs, RecoveredOutputs []uint32
+	FeeOutputs                      []FeeOutput
+}
+
+func (r ExecutionResult) MarshalBinary() ([]byte, error) {
+	e := new(Encoder)
+	if len(r.FeeOutputs) == 0 {
+		e.U16(412)
+	} else {
+		e.U16(413)
+	}
+	e.Optional(r.Applied)
+	for _, v := range [][]uint32{r.MissingInputs, r.RecoveredOutputs} {
+		if len(v) > MaxInputs+MaxOutputs {
+			return nil, ErrEncoding
+		}
+		e.U32(uint32(len(v)))
+		for i, n := range v {
+			if i > 0 && v[i-1] >= n {
+				return nil, ErrEncoding
+			}
+			e.U32(n)
+		}
+	}
+	if len(r.FeeOutputs) > 0 {
+		if !r.Applied || len(r.FeeOutputs) > MaxOutputs+2 {
+			return nil, ErrEncoding
+		}
+		e.U32(uint32(len(r.FeeOutputs)))
+		for i, f := range r.FeeOutputs {
+			if f.Transaction == (TxID{}) || (f.Index != FeeChangeIndex && f.Index != FeeRefundIndex) || f.Output.Asset != AssetFUEL || f.Output.Amount == 0 {
+				return nil, ErrEncoding
+			}
+			if i > 0 {
+				prev := r.FeeOutputs[i-1]
+				c := bytes.Compare(prev.Transaction[:], f.Transaction[:])
+				if c > 0 || (c == 0 && prev.Index >= f.Index) {
+					return nil, ErrEncoding
+				}
+			}
+			e.Fixed(f.Transaction[:])
+			e.U32(f.Index)
+			encodeOutput(e, f.Output)
+		}
+	}
+	return e.Data(), nil
+}
+func DecodeExecution(b []byte) (r ExecutionResult, err error) {
+	d := NewDecoder(b)
+	tag := d.U16()
+	if tag != 412 && tag != 413 {
+		return r, ErrEncoding
+	}
+	r.Applied = d.Optional()
+	for _, v := range []*[]uint32{&r.MissingInputs, &r.RecoveredOutputs} {
+		*v = make([]uint32, d.Count(MaxInputs+MaxOutputs))
+		for i := range *v {
+			(*v)[i] = d.U32()
+		}
+	}
+	if tag == 413 {
+		r.FeeOutputs = make([]FeeOutput, d.Count(MaxOutputs+2))
+		if len(r.FeeOutputs) == 0 {
+			return r, ErrEncoding
+		}
+		for i := range r.FeeOutputs {
+			f := &r.FeeOutputs[i]
+			copy(f.Transaction[:], d.Fixed(32))
+			f.Index = d.U32()
+			f.Output = decodeOutput(d)
+		}
+	}
+	if err = d.Done(); err != nil {
+		return r, err
+	}
+	_, err = r.MarshalBinary()
+	return
+}
+func CreationIdentity(network Hash, tx TxID, index uint32, instance uint8) Hash {
+	e := new(Encoder)
+	e.U32(index)
+	e.U8(instance)
+	return Digest("CREATION_V4", network[:], tx[:], e.Data())
+}
+
+
+===== FILE: internal/rules/direct_deadline_test.go =====
+
+package rules
+
+import (
+	"testing"
+	"utxo/internal/state"
+)
+
+func TestDirectIdleBlockCannotExpireNewPayment(t *testing.T) {
+	f := newDirectFixture(t)
+	parent := f.payment(t, f.genesis, nil, 11)
+	output := parent.Certificate.Summary.OutputID(0)
+	child := f.payment(t, output, &parent.Certificate, 12)
+	verified, err := VerifyDirectPayment(child, f.policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Block 10 is the first block after a long idle, with old Tendermint time.
+	err = f.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		tr, err := EvaluateDirectPaymentAt(v, verified, f.policy, 100, 10)
+		return tr.Changes, err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		tr, err := EvaluateDirectCompensation(v, output, f.policy, 10000)
+		return tr.Changes, err
+	})
+	if err == nil {
+		t.Fatal("unanchored deadline paid")
+	}
+	err = f.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		tr, err := AnchorDirectDeadlines(v, f.policy, 11, 10000)
+		return tr.Changes, err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ob := loadDirect[DirectObligation](t, f.db, DirectObligationKey(output))
+	if ob.Deadline != 10030 {
+		t.Fatalf("idle shortened deadline: %+v", ob)
+	}
+	err = f.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		tr, err := EvaluateDirectCompensation(v, output, f.policy, 10029)
+		return tr.Changes, err
+	})
+	if err == nil {
+		t.Fatal("early payment")
+	}
+	err = f.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		tr, err := EvaluateDirectCompensation(v, output, f.policy, 10030)
+		return tr.Changes, err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := loadDirect[directCoverage](t, f.db, state.Key(keyDirectCoverage, parent.Certificate.QC.Fact[:])).Credit
+	if r.Paid != 100 {
+		t.Fatal("deadline did not trigger payment")
+	}
+}
+
+
+===== FILE: internal/committee/app.go =====
+
+package committee
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	abci "github.com/cometbft/cometbft/abci/types"
+	"github.com/cometbft/cometbft/crypto/merkle"
+	cmttypes "github.com/cometbft/cometbft/types"
+	"sort"
+	"sync"
+	"time"
+	"utxo/finality"
+	"utxo/internal/requesttrace"
+	"utxo/internal/state"
+	"utxo/internal/store"
+	"utxo/protocol"
+)
+
+var ErrBlock = errors.New("inconsistent block height or identity")
+var metaKey = []byte{0xff, 2, 'c', 'o', 'm', 'm', 'i', 't'}
+
+type MaintenanceFunc func(state.ReadView) (state.Transition, error)
+type CheckFunc func([]byte) error
+type ExecuteFunc func(state.ReadView, []byte) (state.Transition, error)
+type BlockContext struct {
+	Height int64
+	Index  uint32
+	Time   time.Time
+}
+type TimedExecuteFunc func(state.ReadView, []byte, BlockContext) (state.Transition, error)
+type BeginBlockFunc func(state.ReadView, BlockContext) (state.Transition, error)
+type commitRecord struct {
+	Commitment finality.Commitment
+	Leaves     [][]byte
+	Height     int64
+	BlockID    []byte
+	Response   []byte
+}
+
+// App provides ABCI commit isolation. Business execution is supplied by the
+// deterministic payment rules; no standalone node accepts arbitrary key writes.
+type App struct {
+	maintenance MaintenanceFunc
+	abci.BaseApplication
+	mu             sync.Mutex
+	chain          string
+	db             store.Store
+	check          CheckFunc
+	execute        ExecuteFunc
+	executeAt      TimedExecuteFunc
+	beginBlock     BeginBlockFunc
+	committed      commitRecord
+	response       *abci.ResponseFinalizeBlock
+	pending        *commitRecord
+	pendingChanges []state.Change
+	halted         error
+}
+
+var _ abci.Application = (*App)(nil)
+
+// NewTimedApp supplies committed consensus time, never a node's wall clock.
+func NewTimedApp(chain string, db store.Store, check CheckFunc, execute TimedExecuteFunc, begin ...BeginBlockFunc) (*App, error) {
+	if execute == nil || len(begin) > 1 {
+		return nil, protocol.ErrRule
+	}
+	app, err := NewApp(chain, db, check, func(state.ReadView, []byte) (state.Transition, error) { return state.Transition{}, protocol.ErrRule })
+	if err == nil {
+		app.executeAt = execute
+		if len(begin) == 1 {
+			app.beginBlock = begin[0]
+		}
+	}
+	return app, err
+}
+
+func NewApp(chain string, db store.Store, check CheckFunc, execute ExecuteFunc, maintenance ...MaintenanceFunc) (*App, error) {
+	if chain == "" || db == nil || check == nil || execute == nil || len(maintenance) > 1 {
+		return nil, protocol.ErrRule
+	}
+	a := &App{chain: chain, db: db, check: check, execute: execute, response: &abci.ResponseFinalizeBlock{}}
+	if len(maintenance) == 1 {
+		a.maintenance = maintenance[0]
+	}
+	e := db.View(func(v state.ReadView) error {
+		raw, e := v.Get(metaKey)
+		if errors.Is(e, state.ErrNotFound) {
+			genesis, found, err := state.Load[protocol.Hash](v, state.Key(state.KeyGenesis))
+			if err != nil {
+				return err
+			}
+			if found {
+				a.response.AppHash = bytes.Clone(genesis[:])
+			}
+			return nil
+		}
+		if e != nil {
+			return e
+		}
+		if e = json.Unmarshal(raw, &a.committed); e != nil {
+			return e
+		}
+		return a.response.Unmarshal(a.committed.Response)
+	})
+	if e != nil {
+		return nil, e
+	}
+	return a, nil
+}
+func (a *App) Info(context.Context, *abci.RequestInfo) (*abci.ResponseInfo, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	version, name := uint64(2), "utxo-v2"
+	if a.executeAt != nil {
+		version = 4
+		name = "utxo-v4"
+	}
+	return &abci.ResponseInfo{Version: name, AppVersion: version, LastBlockHeight: a.committed.Height, LastBlockAppHash: bytes.Clone(a.response.AppHash)}, nil
+}
+func (a *App) InitChain(_ context.Context, r *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
+	if r.ChainId != a.chain || r.InitialHeight > 1 {
+		return nil, ErrBlock
+	}
+	return &abci.ResponseInitChain{AppHash: bytes.Clone(a.response.AppHash)}, nil
+}
+func (a *App) CheckTx(_ context.Context, r *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
+	requesttrace.Settlement.Command(r.Tx, "mempool_enter", 0)
+	if e := a.check(r.Tx); e != nil {
+		return &abci.ResponseCheckTx{Code: 1, Log: e.Error()}, nil
+	}
+	requesttrace.Settlement.Command(r.Tx, "mempool_checked", 0)
+	return &abci.ResponseCheckTx{}, nil
+}
+func (a *App) PrepareProposal(_ context.Context, r *abci.RequestPrepareProposal) (*abci.ResponsePrepareProposal, error) {
+	requesttrace.Consensus.Mark("prepare_enter", "height", r.Height, "candidates", len(r.Txs))
+	out := &abci.ResponsePrepareProposal{}
+	var size int64
+	for _, tx := range r.Txs {
+		if a.check(tx) != nil {
+			continue
+		}
+		if int64(len(tx)) > r.MaxTxBytes-size {
+			break
+		}
+		size += int64(len(tx))
+		out.Txs = append(out.Txs, bytes.Clone(tx))
+		requesttrace.Settlement.Command(tx, "prepared", r.Height)
+	}
+	requesttrace.Consensus.Mark("prepare_done", "height", r.Height, "selected", len(out.Txs))
+	return out, nil
+}
+func (a *App) ProcessProposal(_ context.Context, r *abci.RequestProcessProposal) (*abci.ResponseProcessProposal, error) {
+	requesttrace.Consensus.Mark("process_enter", "height", r.Height, "transactions", len(r.Txs))
+	for _, tx := range r.Txs {
+		requesttrace.Settlement.Command(tx, "proposal_seen", r.Height)
+		if a.check(tx) != nil {
+			return &abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_REJECT}, nil
+		}
+	}
+	requesttrace.Consensus.Mark("process_done", "height", r.Height)
+	return &abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_ACCEPT}, nil
+}
+func cloneResponse(r *abci.ResponseFinalizeBlock) *abci.ResponseFinalizeBlock {
+	b, _ := r.Marshal()
+	c := new(abci.ResponseFinalizeBlock)
+	_ = c.Unmarshal(b)
+	return c
+}
+func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
+	requesttrace.Consensus.Mark("finalize_enter", "height", r.Height)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	requesttrace.Consensus.Mark("finalize_locked", "height", r.Height)
+	if a.halted != nil {
+		return nil, a.halted
+	}
+	if r.Height == a.committed.Height && bytes.Equal(r.Hash, a.committed.BlockID) {
+		return cloneResponse(a.response), nil
+	}
+	if r.Height != a.committed.Height+1 || len(r.Hash) != 32 {
+		return nil, ErrBlock
+	}
+	if a.pending != nil {
+		if r.Height != a.pending.Height || !bytes.Equal(r.Hash, a.pending.BlockID) {
+			return nil, ErrBlock
+		}
+		out := new(abci.ResponseFinalizeBlock)
+		if e := out.Unmarshal(a.pending.Response); e != nil {
+			return nil, e
+		}
+		return out, nil
+	}
+	response := &abci.ResponseFinalizeBlock{TxResults: make([]*abci.ExecTxResult, len(r.Txs)), AppHash: bytes.Clone(a.response.AppHash)}
+	var changes []state.Change
+	facts := make(map[string]protocol.FinalFact)
+	var commitment finality.Commitment
+	var leaves [][]byte
+	e := a.db.View(func(v state.ReadView) error {
+		overlay := state.NewOverlay(v)
+		apply := func(transition state.Transition) error {
+			for _, c := range transition.Changes {
+				if len(c.Key) == 0 || c.Key[0] == 0xff {
+					return errors.New("executor used reserved state key")
+				}
+			}
+			candidate := state.NewOverlay(overlay)
+			candidate.Apply(transition.Changes)
+			if a.executeAt != nil && len(transition.Facts) != 0 {
+				return protocol.ErrRule
+			}
+			for _, f := range transition.Facts {
+				if f.Network != protocol.Digest("NETWORK", []byte(a.chain)) {
+					return finality.ErrProof
+				}
+				raw, err := f.MarshalBinary()
+				if err != nil {
+					return err
+				}
+				key := f.SortKey()[:34]
+				latest := state.Key(70, key)
+				old, found, err := state.Load[protocol.FinalFact](candidate, latest)
+				if err != nil {
+					return err
+				}
+				if found && old.Revision >= f.Revision {
+					if old.Revision == f.Revision && old.ID() == f.ID() {
+						continue
+					}
+					return finality.ErrProof
+				}
+				if err = state.Put(candidate, latest, f); err != nil {
+					return err
+				}
+				candidate.Set(state.Key(71, f.SortKey()), raw)
+				facts[string(key)] = f
+			}
+			overlay.Apply(candidate.Changes())
+			return nil
+		}
+		if a.beginBlock != nil {
+			tr, err := a.beginBlock(v, BlockContext{Height: r.Height, Time: r.Time})
+			if err != nil {
+				return err
+			}
+			if err = apply(tr); err != nil {
+				return err
+			}
+		}
+		for i, tx := range r.Txs {
+			response.TxResults[i] = &abci.ExecTxResult{}
+			requesttrace.Settlement.Command(tx, "final_check_start", r.Height)
+			if err := a.check(tx); err != nil {
+				response.TxResults[i].Code = 1
+				response.TxResults[i].Log = "invalid command"
+				continue
+			}
+			requesttrace.Settlement.Command(tx, "final_check_done", r.Height)
+			requesttrace.Settlement.Command(tx, "execute_start", r.Height)
+			var transition state.Transition
+			var err error
+			if a.executeAt != nil {
+				transition, err = a.executeAt(overlay, tx, BlockContext{Height: r.Height, Index: uint32(i), Time: r.Time})
+			} else {
+				transition, err = a.execute(overlay, tx)
+			}
+			requesttrace.Settlement.Command(tx, "execute_done", r.Height)
+			if err != nil {
+				response.TxResults[i].Code = 2
+				response.TxResults[i].Log = "business rejected"
+				continue
+			}
+			if err = apply(transition); err != nil {
+				return err
+			}
+			response.TxResults[i].Data = bytes.Clone(transition.Data)
+		}
+		if a.maintenance != nil {
+			transition, err := a.maintenance(overlay)
+			if err != nil {
+				return err
+			}
+			if err = apply(transition); err != nil {
+				return err
+			}
+		}
+		for _, c := range overlay.Changes() {
+			old, err := v.Get(c.Key)
+			if err != nil && !errors.Is(err, state.ErrNotFound) {
+				return err
+			}
+			if c.Delete && errors.Is(err, state.ErrNotFound) {
+				continue
+			}
+			if !c.Delete && err == nil && bytes.Equal(old, c.Value) {
+				continue
+			}
+			changes = append(changes, c)
+		}
+		return nil
+	})
+	if e != nil {
+		return nil, e
+	}
+	ordered := make([]protocol.FinalFact, 0, len(facts))
+	for _, f := range facts {
+		ordered = append(ordered, f)
+	}
+	sort.Slice(ordered, func(i, j int) bool { return bytes.Compare(ordered[i].SortKey(), ordered[j].SortKey()) < 0 })
+	for _, f := range ordered {
+		raw, e := f.MarshalBinary()
+		if e != nil {
+			return nil, e
+		}
+		leaves = append(leaves, raw)
+	}
+	if len(changes) > 0 {
+		enc := new(protocol.Encoder)
+		for _, c := range changes {
+			enc.Bytes(c.Key)
+			enc.Optional(c.Delete)
+			enc.Bytes(c.Value)
+		}
+		if a.executeAt != nil {
+			network := protocol.Digest("NETWORK", []byte(a.chain))
+			root := protocol.Digest("APP_V4", network[:], a.response.AppHash, enc.Data())
+			response.AppHash = bytes.Clone(root[:])
+		} else {
+			commitment = finality.Commitment{Network: protocol.Digest("NETWORK", []byte(a.chain)), Height: r.Height, Previous: bytes.Clone(a.response.AppHash), WriteSet: protocol.Digest("WRITE_SET", enc.Data()), FactRoot: merkle.HashFromByteSlices(leaves)}
+			root, e := commitment.Hash()
+			if e != nil {
+				return nil, e
+			}
+			response.AppHash = bytes.Clone(root[:])
+		}
+	}
+
+	raw, e := response.Marshal()
+	if e != nil {
+		return nil, e
+	}
+	a.pending = &commitRecord{Height: r.Height, BlockID: bytes.Clone(r.Hash), Response: raw, Commitment: commitment, Leaves: leaves}
+	a.pendingChanges = changes
+	requesttrace.Settlement.Block(r.Height, "finalize_done")
+	requesttrace.Consensus.Mark("finalize_done", "height", r.Height)
+	return cloneResponse(response), nil
+}
+func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit, error) {
+	var entered time.Time
+	var lockWait time.Duration
+	if requesttrace.Consensus != nil {
+		entered = time.Now()
+	}
+	a.mu.Lock()
+	if !entered.IsZero() {
+		lockWait = time.Since(entered)
+	}
+	defer a.mu.Unlock()
+	if a.halted != nil {
+		return nil, a.halted
+	}
+	if a.pending == nil {
+		return &abci.ResponseCommit{}, nil
+	}
+	requesttrace.Settlement.Block(a.pending.Height, "commit_start")
+	requesttrace.Consensus.Mark("commit_start", "height", a.pending.Height)
+	if !entered.IsZero() {
+		requesttrace.Consensus.Mark("commit_lock", "height", a.pending.Height, "wait_ns", lockWait.Nanoseconds())
+	}
+	raw, e := json.Marshal(a.pending)
+	if e != nil {
+		return nil, e
+	}
+	cs := append([]state.Change(nil), a.pendingChanges...)
+	cs = append(cs, state.Change{Key: metaKey, Value: raw})
+	if a.executeAt == nil {
+		cs = append(cs, state.Change{Key: blockKey(a.pending.Height), Value: raw})
+	}
+	for i, rawFact := range a.pending.Leaves {
+		f, e := protocol.DecodeFact(rawFact)
+		if e != nil {
+			return nil, e
+		}
+		location, _ := json.Marshal(factLocation{Height: a.pending.Height, Index: i})
+		cs = append(cs, state.Change{Key: proofKey(f.ID()), Value: location})
+	}
+	if requesttrace.Consensus != nil {
+		bytes := 0
+		for _, c := range cs {
+			bytes += len(c.Key) + len(c.Value)
+		}
+		requesttrace.Consensus.Mark("commit_update_start", "height", a.pending.Height, "changes", len(cs), "bytes", bytes)
+	}
+	e = a.db.Update(func(state.ReadView) ([]state.Change, error) {
+		requesttrace.Consensus.Mark("commit_update_callback", "height", a.pending.Height)
+		return cs, nil
+	})
+	requesttrace.Consensus.Mark("commit_update_return", "height", a.pending.Height)
+	if e != nil {
+		a.halted = e
+		return nil, e
+	}
+	a.committed = *a.pending
+	requesttrace.E8Commit(a.pending.Height)
+	a.response = new(abci.ResponseFinalizeBlock)
+	if e = a.response.Unmarshal(a.pending.Response); e != nil {
+		a.halted = e
+		return nil, e
+	}
+	requesttrace.Settlement.Block(a.pending.Height, "commit_done")
+	requesttrace.Consensus.Mark("commit_done", "height", a.pending.Height)
+	a.pending = nil
+	a.pendingChanges = nil
+	return &abci.ResponseCommit{}, nil
+}
+func (a *App) Query(_ context.Context, r *abci.RequestQuery) (*abci.ResponseQuery, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	out := &abci.ResponseQuery{Height: a.committed.Height}
+	if len(r.Data) == 0 || r.Data[0] == 0xff {
+		return &abci.ResponseQuery{Code: 1, Log: "invalid key"}, nil
+	}
+	e := a.db.View(func(v state.ReadView) error {
+		b, e := v.Get(r.Data)
+		if errors.Is(e, state.ErrNotFound) {
+			out.Code = 1
+			return nil
+		}
+		if e != nil {
+			return e
+		}
+		out.Value = b
+		return nil
+	})
+	if e != nil {
+		return nil, fmt.Errorf("query committed state: %w", e)
+	}
+	return out, nil
+}
+func (a *App) OfferSnapshot(context.Context, *abci.RequestOfferSnapshot) (*abci.ResponseOfferSnapshot, error) {
+	return &abci.ResponseOfferSnapshot{Result: abci.ResponseOfferSnapshot_REJECT}, nil
+}
+func (a *App) ApplySnapshotChunk(context.Context, *abci.RequestApplySnapshotChunk) (*abci.ResponseApplySnapshotChunk, error) {
+	return &abci.ResponseApplySnapshotChunk{Result: abci.ResponseApplySnapshotChunk_ABORT}, nil
+}
+
+type factLocation struct {
+	Height int64
+	Index  int
+}
+
+func blockKey(height int64) []byte {
+	e := new(protocol.Encoder)
+	e.U64(uint64(height))
+	return append([]byte{0xff, 'b'}, e.Data()...)
+}
+func proofKey(id protocol.Hash) []byte { return append([]byte{0xff, 'p'}, id[:]...) }
+
+// Proof returns committed material only. Clients still verify the pinned committee.
+func (a *App) Proof(id protocol.Hash, header cmttypes.SignedHeader) (finality.FactProof, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	var result finality.FactProof
+	err := a.db.View(func(v state.ReadView) error {
+		loc, found, e := state.Load[factLocation](v, proofKey(id))
+		if e != nil {
+			return e
+		}
+		if !found {
+			return state.ErrNotFound
+		}
+		record, found, e := state.Load[commitRecord](v, blockKey(loc.Height))
+		if e != nil {
+			return e
+		}
+		if !found || loc.Index < 0 || loc.Index >= len(record.Leaves) {
+			return finality.ErrProof
+		}
+		if header.Header == nil || header.Height != loc.Height+1 {
+			return finality.ErrProof
+		}
+		root, e := record.Commitment.Hash()
+		if e != nil || !bytes.Equal(root[:], header.AppHash) {
+			return finality.ErrProof
+		}
+		_, paths := merkle.ProofsFromByteSlices(record.Leaves)
+		f, e := protocol.DecodeFact(record.Leaves[loc.Index])
+		if e != nil {
+			return e
+		}
+		if f.ID() != id {
+			return finality.ErrProof
+		}
+		result = finality.FactProof{Fact: f, Commitment: record.Commitment, Path: *paths[loc.Index], Header: header}
+		return nil
+	})
+	return result, err
+}
+
+
+===== FILE: internal/committee/timed_test.go =====
+
+package committee
+
+import (
+	"bytes"
+	"context"
+	abci "github.com/cometbft/cometbft/abci/types"
+	"testing"
+	"time"
+	"utxo/internal/state"
+	"utxo/internal/store"
+)
+
+func TestBlockContextUsesConsensusTime(t *testing.T) {
+	db := store.NewMemory()
+	defer db.Close()
+	var seen BlockContext
+	app, err := NewTimedApp("timed", db, func([]byte) error { return nil }, func(_ state.ReadView, _ []byte, b BlockContext) (state.Transition, error) {
+		seen = b
+		return state.Transition{}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stamp := time.Unix(123456, 0).UTC()
+	r, err := app.FinalizeBlock(context.Background(), &abci.RequestFinalizeBlock{Height: 1, Hash: bytes.Repeat([]byte{1}, 32), Time: stamp, Txs: [][]byte{{1}}})
+	if err != nil || r.TxResults[0].Code != 0 || seen.Height != 1 || seen.Index != 0 || !seen.Time.Equal(stamp) {
+		t.Fatalf("wrong block context: %+v %v", seen, err)
+	}
+}
+

@@ -1,0 +1,220 @@
+\section{Results from Earlier Builds}
+\label{sec:archive-results}
+These archived results retain their original builds, storage modes,
+and measurement endpoints. The main paper reports continuous-payment
+and representative P results on \texttt{f856c7b}; historical-reader
+results retain \texttt{721800c}, and the injected-latency study retains
+\texttt{9879f64}. Results from different builds and workloads are not
+combined into a capacity estimate for one configuration.
+
+\subsection{Continuous Spending Without Per-Hop Settlement}
+\label{archive:sec:eval-continuation}
+
+We compare certified continuation with waiting for public execution between
+hops. On the baseline build, a
+100-hop chain reaches its last certified receipt in a median 158.846\,ms,
+compared with 65.204\,s when each hop waits for public confirmation. Three
+wallets transfer 100 CAL in rotation, constructing each payment online from
+its predecessor's output and paying fees from their own final FUEL. Three
+repetitions per mode give six runs and 600 payments on the nine-service
+in-memory configuration. Both modes end at the last certified receipt, and
+the waiting mode adds a public confirmation \emph{between} hops. With
+committee commit, flush, and gossip settings of 250, 10, and 10\,ms, public
+execution and its observation cost about 0.65\,s per hop. Certified
+continuation removes that wait from the recipient's path.
+
+Figure~\ref{archive:fig:continuation} shows the six whole-chain durations. The fast
+runs take 158.492--159.905\,ms. All 297 fast-mode successor requests consume
+the preceding certified output and are sent after its certified receipt but
+before its public completion is observed. A one-input, one-output TXCer is
+779 bytes, and requests are 1,979 bytes at the first hop and 2,766 bytes
+thereafter. For this transaction shape, the direct evidence stays the same
+size across all 100 hops, because each request carries the certificates of its
+direct inputs rather than the ancestor chain.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{continuation-current.pdf}
+  \caption{Time through the last certified receipt of a 100-hop chain on
+    the baseline build. Dots are three independent runs per mode;
+    horizontal bars mark their medians. The logarithmic time axis includes
+    the same endpoint in both modes. Only the waiting baseline requires
+    public confirmation between successive payments.}
+  \label{archive:fig:continuation}
+\end{figure}
+
+To test whether the advantage depends on in-memory member storage, three paired 100-hop trials on a nine-service disk-backed
+configuration with NoSync wallets and user-paid FUEL differ only in member
+storage (NoSync or synchronous; order N/S, S/N, N/S), and each is followed by
+a synchronous waiting chain. Median durations are 681.127\,ms for NoSync
+continuation, 4.471\,s for synchronous continuation, and 65.013\,s for
+synchronous waiting. Certified continuation therefore remains 14.5 times
+faster than waiting when member commits are synchronous. All 900 payments
+complete with agreeing committee states.
+
+On an archived delivery-gate build, a gate after certification waits for three
+members to INSTALL complete material or for authenticated public success.
+The gate collects no second signature quorum, and delivering immediately
+instead shortens continuation. At 200
+payments/s for 30\,s, three paired runs per mode each complete 6,000
+payments, and the median of run-level receipt P50s falls from 2.167\,ms with
+the gate to 1.300\,ms (40.0\%). Separate 100-hop trials fall from 287.983 to
+200.356\,ms (30.43\%). Authorization is unchanged.
+Fig.~\ref{fig:delivery-gate} shows the run-level results;
+Section~\ref{sec:supp-methods} gives the methods.
+
+\subsection{Funded Closure and Repayment}
+\label{archive:sec:eval-liabilities}
+
+This experiment checks that compensation leaves successor payments in place
+and that each compensation is repaid exactly once when its source later
+executes.
+
+\noindent\textbf{Compensation and repayment matrix (baseline build).}
+Nine runs use seeds 23, 37, and 59 at withheld-parent rates of 0\%, 1\%, and
+5\%. Each run offers 20 two-hop units/s for 60\,s (1,200 units, 2,400
+payments) against a fixed 60,000-CAL reserve with user-paid FUEL and no
+top-up. The nine-service deployment uses disk-backed committee application
+state and BlockStore, in-memory members and gateway, and NoSync wallets. The
+driver releases each withheld parent only after its compensation command is committed
+and its historical revision is materialized on all four replicas, so every withheld source is compensated
+after the 30-s public-time deadline and executes afterwards.
+
+All 21,600 payments close. The 216 compensations (12 per 1\% run, 60 per 5\%
+run) are each followed by repayment. At the end of every run no obligation is
+Open or Repaired, the gap is zero, net Spent and Reserved are zero, and the
+reserve is back at 60,000\,CAL (Table~\ref{archive:tab:eval-audit}). The lowest
+sampled reserve is 59,800--59,900\,CAL at 1\% and 59,600\,CAL at 5\%. It
+reflects the driver's release schedule rather than a reserve-sizing result,
+and Fig.~\ref{fig:reserve-recovery} shows the three 5\% trajectories. Run-level receipt P50s
+for normal child payments are 1.185--1.251\,ms. Measured from the deadline, the
+committee commit, which in this build carries the representation, is observed
+at a median of 1.003--1.254\,s, and physical installation of the revised
+body on all four replicas at a median of 1.257--1.761\,s (P95 up to 2.015\,s); both include 250-ms observation
+polling. Each normal payment spends 94 FUEL and each compensation adds 5, and
+rewards, burn, and refunds sum to the fee caps with zero Held.
+
+\begin{table}[t]
+  \caption{Closing audit of the compensation and repayment matrix. Each
+    column is reproduced by all three seeds; each run has 2,400 payments.
+    Reserve values are CAL, fee values are in thousands of FUEL, and fee
+    caps sum the per-payment maxima.}
+  \label{archive:tab:eval-audit}
+  \centering
+  \small
+  \begin{tabular}{@{}lrrr@{}}
+    \toprule
+    Withheld parents & 0\% & 1\% & 5\% \\
+    \midrule
+    Compensations / repayments & 0 & 12 & 60 \\
+    Paid / repaid CAL & 0 & 1,200 & 6,000 \\
+    Final reserve & 60,000 & 60,000 & 60,000 \\
+    Unclosed / net Spent & 0 & 0 & 0 \\
+    Total fee caps & 2,400 & 2,400 & 2,400 \\
+    Rewards & 201.600 & 201.660 & 201.900 \\
+    Burned & 24.000 & 24.000 & 24.000 \\
+    Refunded & 2,174.400 & 2,174.340 & 2,174.100 \\
+    Remaining Held & 0 & 0 & 0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Ledger-level regression covers arrival orders directly: all 24 arrival orders
+of a four-hop chain, with and without due compensation, under three issuer
+sequences give 144 trajectories, and 48 split--merge trajectories vary all
+arrival orders of a 40/60 split, two branches, and their merge under two
+compensation modes. Every step in the 192 trajectories conserves the
+independently computed asset projection. Every trajectory ends with each
+issuer's reserve restored, Spent and Reserved zero, $\mathsf{Paid}=\mathsf{Rec}$,
+and the consumed inputs still consumed.
+
+Two fourteen-service controls separate permanent loss from delayed
+repayment. When the parent never arrives, the grandchild keeps its 100 CAL
+and the responsible issuer's reserve stays 100 CAL lower. When a
+cross-organization chain arrives grandchild first, the intermediate source
+closes its own direct obligation, and the root issuer's compensated 100 CAL
+is repaid when the root later executes. The four committee states agree in
+both cases, and an absent parent's own fee and work reservations can remain
+outstanding.
+
+Three paired
+fourteen-service runs on the initial baseline build, before the batch-result
+tag separation (4,000 payments at 100 payments/s each), end with identical
+owner holdings and reserve balances in normal and withheld-source runs,
+consistent with the CAL delay-neutrality theorem in the main paper. Concurrent compensation
+raises receipt P95 by a factor of 1.98--2.21, and the pairs do not isolate
+the responsible stage.
+
+A storage control with NoSync wallets isolates member
+commits: receipt P50 is 1.0\,ms with NoSync members and 43--52\,ms with
+synchronous commits.
+
+An earlier-build capital series with one run per
+condition and no compensation shows that external additions of
+10,800--19,700\,CAL sustain 300-s runs of 6,000 two-hop units from a
+3,600-CAL start, whereas a fixed 3,600-CAL control closes 46 of 6,000 units.
+
+\subsection{Continuation Across Registered Organizations}
+\label{archive:sec:eval-network}
+
+To measure the effect of communication distance, we use a two-organization
+suite on an archived build recorded in the supplement. Its 24 runs complete
+342,000 payments, with two wallet processes holding 32
+identities each across 64 lanes and each organization supplying 50
+payments/s. The latency comparison uses ten-hop same- and
+cross-organization workloads at 0, 20, and 100\,ms injected HTTP RTT, three
+repetitions per condition. Each proxy direction adds half the RTT, and
+intra-organization certification and committee P2P receive no delay
+injection.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{network.pdf}
+  \caption{ACK latency (ms) versus injected cross-site HTTP RTT (ms).
+    Each point is the median of three run-level P50s for the first
+    120-s cohort; error bars span those P50s' minimum and maximum.
+    Aggregate offered rate is 100 payments/s. Committee P2P is undelayed.}
+  \label{archive:fig:network}
+\end{figure}
+
+For the common first-120-s cohort, the median of three run-level cross-organization
+ACK P50s is 1.632, 21.658, and 101.967\,ms, respectively, and same-organization
+values span 1.615--1.744\,ms (Fig.~\ref{archive:fig:network}). Cross-organization ACK P50
+tracks the injected RTT, with a measured excess of 1.6--2.0\,ms. An ACK includes the
+return path, but a recipient may start its successor on acceptance without
+waiting for the ACK to reach the previous sender. At 100-ms injected RTT in the cross-organization workload,
+three 300-s runs each complete 30,000 payments; pending peaks are 106--110 and
+drain without sustained tail growth. The experiment isolates HTTP path delay
+within one physical host.
+
+\subsection{Operating Capacity and Service Availability}
+\label{archive:sec:eval-operating}
+
+\noindent\textbf{Independent-input throughput (baseline build).}
+Three 30,000-payment runs target 2,000 payments/s on the nine-service
+in-memory configuration with NoSync wallets and authorized organization-paid
+FUEL. Member processes use a 200\% Go GC target and 16 runtime processors. All
+payments complete and the four committee states agree. Completion rates
+including drain are 1,750.27, 1,820.91, and 1,887.31 payments/s over
+15.9--17.1\,s, with receipt P50s of 2.646, 2.842, and 2.824\,ms and P95s of
+47.9, 49.1, and 48.0\,ms. The driver recorded 6,551--7,570 payments that had to
+wait for a fast-receipt admission slot, and the P95 dispatch lag was
+179--229\,ms, so the offered load was not uniform at 2,000 payments/s. These
+are short-run completion measurements on the baseline build. They are not
+remeasured for the decision-first build, whose cost on ordinary payments is
+tested by the six-run comparison above. The supplement identifies the build
+and duration of the 150,000-payment series.
+
+On archived builds, redundant certification and evidence replicated by INSTALL
+sustain service under the specified failures. Nine runs at 200 payments/s complete
+216,000 payments with one member delayed or paused for 30\,s. Gateway-loss
+controls in which one member holds a complete copy replicated by INSTALL
+show backup submission 2.503--2.508\,s after INSTALL.
+Conflict controls produce neither dual conflicting QCs nor repeated
+principal/fee effects, while partial approvals remain a capacity cost.
+
+The multi-identity measurements in Section~\ref{sec:supp-methods} report
+per-payment CPU and HTTP-payload costs; 2,048 identities share clients.
+Historical memory growth is reported separately from backlog. The same
+section gives an LND regtest reference, whose completion event,
+persistence, and workload concurrency differ from the Next measurements.

@@ -1,7 +1,9 @@
 \section{Security Analysis}
 \label{sec:security}
 
-We analyze finite executions of the protocol of Section~\ref{sec:protocol} under the model of Section~\ref{sec:model-participants}. The arguments reason over the guards of the transition functions and use, besides the fault and state assumptions, the verification rules of Section~\ref{sec:protocol-certification}: input certificates bind network, organization, fact, and claimed output and correspond one-to-one with certificate inputs, and each admission vector holds one CAL entry bound to the issuer. A representation takes effect only through a committed command whose guards require an existing compensation decision, derive the slot and reserve reference, and verify every non-target byte and the complete block identity, so adaptation output is a candidate whose availability governs representation progress alone. The consensus argument specializes the Tendermint locking interface~\cite{tendermint} to complete block identities.
+Under the model in Section~\ref{sec:model-assumptions}, we first establish original-execution agreement and unique consumption, so later accounting arguments refer to one authenticated history and at most one consumer per output instance. We then show that source resubmission preserves the original authorization and that each obligation permits at most one compensation debit. The coverage argument links a certificate's outstanding liability to reservations retained by its honest signers, including certificates that have not been published. This link bounds potential commitments and establishes sufficient backing for public gaps. The accounting transitions preserve CAL conservation; the delay-neutrality theorem separately compares terminal CAL holdings under its stated conditions on the payment set and successful execution, without equating FUEL expenditure. Finally, we show that decision-authorized repairs preserve fixed payment fields, complete block identities, and economic effects, while installation leaves the logical result unchanged. We compose these properties into protected continuation for fresh authenticated receipts and analyze progress separately through capacity, fees, evidence, and delivery conditions.
+
+We analyze finite executions of the protocols in Sections~\ref{sec:protocol} and~\ref{sec:history} under the model of Section~\ref{sec:model-assumptions}. The arguments reason over the guards of the transition functions and use, besides the fault and state assumptions, the verification rules of Section~\ref{sec:protocol-certification}: input certificates bind network, organization, fact, and claimed output and correspond one-to-one with certificate inputs, and each admission vector holds one CAL entry bound to the issuer. A representation takes effect only through a committed command whose guards require an existing compensation decision, derive the slot and reserve reference, and verify every non-target byte and the complete block identity, so adaptation output is a candidate whose availability governs representation progress alone. The consensus argument specializes the Tendermint locking interface~\cite{tendermint} to complete block identities.
 
 \subsection{Original Execution and Certified Consumption}
 \label{sec:security-identity}
@@ -14,7 +16,7 @@ Under the locking and validity rules of the consensus interface, one original bl
 committed height, including its application context.
 \end{lemma}
 \begin{IEEEproof}
-With original opening~1, a part leaf hashes its context-bound message representative, so binding and the Merkle proof fix its bytes under the original part-set header. Candidate bodies are rebuilt from parts or paired locally with parts, Locked and Valid transfers preserve the pairing, and proposal, proof-of-lock (POL), lock, and commit comparisons use $(H_b,P_b)$; a change of download target clears the old body, and the round and step guards allow one precommit per round.
+With original opening~1, a part leaf hashes its context-bound message representative, so binding and the Merkle proof fix its bytes under the original part-set header. Candidate bodies are rebuilt from parts or paired locally with parts, Locked and Valid transfers preserve the pairing, and proposal, proof-of-lock (POL), lock, and commit comparisons use $(H_b,P_b)$; a change of download target clears the old body, and the round and step guards allow one precommit per round. A current-round polka may drive precommit for the candidate identified by its full BlockID, with both body and parts available, even without a matching proposal; this transition retains the round and step guards, including when it precedes the local prevote.
 
 Conflicting same-round commits need an honest double precommit. Take a commit of $v$ in round $r$ with its two honest signers, and the smallest later round $s$ with a conflicting polka (nil polkas that authorize unlocking included) at its earliest certificate formation. The quorum meets the two signers, and the vote of that signer needs an earlier unlocking justification, which contradicts the choice of $s$ or of the formation event. Votes for a locked value trace through earlier lock rounds to proposal validation, and Finalize follows a commit that matches the complete block identity. Synchronization and replay preserve body, height, and time, and the supplement expands the argument.
 \end{IEEEproof}
@@ -67,7 +69,7 @@ local resource reservation is restored.
 \subsection{Source Resubmission and Compensation Decisions}
 \label{sec:security-decision}
 
-For an output $x$, $\mathcal O_x$ is its direct obligation, with status Open, Fulfilled, Repaired, or Recovered, and $\mathcal D_x$ is its immutable compensation decision. Repaired means economically compensated, whatever the state of the stored bytes. The decision is written inside the transition from Open to Repaired and is never deleted, so $\mathcal D_x$ exists exactly when $\mathcal O_x$ is Repaired or Recovered. The set $\mathcal R$ holds the representation state (committed revisions, head command, tasks, batch references, queue, pending-representation index), and the projection $\pi_{\mathrm{econ}}$ retains public assets, consumption, coverage, obligations, grant usage, and fee states while omitting $\mathcal D$ and $\mathcal R$.
+For an output $x$, $\mathcal O_x$ is its direct obligation, with status Open, Fulfilled, Compensated, or Recovered, and $\mathcal D_x$ is its immutable compensation decision. Compensated means economically compensated, whatever the state of the stored bytes. The decision is written inside the transition from Open to Compensated and is never deleted, so $\mathcal D_x$ exists exactly when $\mathcal O_x$ is Compensated or Recovered. The set $\mathcal R$ holds the representation state (committed revisions, head command, tasks, batch references, queue, pending-representation index), and the projection $\pi_{\mathrm{econ}}$ retains public assets, consumption, coverage, obligations, grant usage, and fee states while omitting $\mathcal D$ and $\mathcal R$.
 
 \begin{lemma}[Resubmission preserves authorization]
 \label{lem:security-resubmission}
@@ -112,9 +114,9 @@ repayment, and is rejected otherwise. A decision without a record is
 rejected once $\mathcal O_x$ is no longer Open.
 \end{lemma}
 \begin{IEEEproof}
-Status changes only along Open$\to$Fulfilled, Open$\to$Repaired (by a decision alone), and Repaired$\to$Recovered (inside the successful execution of the source). A decision first checks $\mathcal D_x$: an exact match returns an unapplied result with an empty change set, and a mismatch is rejected. Without a record, the transition requires an Open obligation, a deadline reached by block time, and a matching historical position, amount, and funding commitment, all re-derived from committed state. It then debits the issuer reserve, closes the gap, updates fees and coverage, and records $\mathcal D_x$ in one atomic step. The status machine is acyclic, so Open is left once and at most one decision takes effect.
+Status changes only along Open$\to$Fulfilled, Open$\to$Compensated (by a decision alone), and Compensated$\to$Recovered (inside the successful execution of the source). A decision first checks $\mathcal D_x$: an exact match returns an unapplied result with an empty change set, and a mismatch is rejected. Without a record, the transition requires an Open obligation, a deadline reached by block time, and a matching historical position, amount, and funding commitment, all re-derived from committed state. It then debits the issuer reserve, closes the gap, updates fees and coverage, and records $\mathcal D_x$ in one atomic step. The status machine is acyclic, so Open is left once and at most one decision takes effect.
 
-If the source executes first, the obligation leaves Open and no decision for it commits. If compensation comes first, the source's execution returns the funds to the issuer through the single Repaired$\to$Recovered transition, keeping $\mathcal D_x$ and creating no user output. Induction over the public command order gives at-most-once compensation and repayment.
+If the source executes first, the obligation leaves Open and no decision for it commits. If compensation comes first, the source's execution returns the funds to the issuer through the single Compensated$\to$Recovered transition, keeping $\mathcal D_x$ and creating no user output. Induction over the public command order gives at-most-once compensation and repayment.
 \end{IEEEproof}
 
 \subsection{Covering Public and Hidden Commitments}
@@ -129,7 +131,7 @@ Every certified fact carries one CAL entry bound to the issuer, because at least
 
 \begin{lemma}[Source repayment]
 \label{lem:security-recovery}
-A compensated output leaves the Repaired state only inside the successful
+A compensated output leaves the Compensated state only inside the successful
 execution of its source, in the same transition that sets $z_c=1$, and
 the repayment is credited to the account that was debited. Hence
 $0\le\mathsf{Rec}_c\le p_c\le a_c$, $\mathsf{Rec}_c=0$ while $z_c=0$,
@@ -138,7 +140,7 @@ the source is pending and $\bar p_c=0$ afterwards, so no net compensation
 survives the execution of the source.
 \end{lemma}
 \begin{IEEEproof}
-Each registered promise leaves Open at most once, and by Lemma~\ref{lem:security-decision} compensation applies at most once to an output and only while its obligation is Open, so $p_c\le a_c$. The only transition that leaves Repaired is the output-resolution step of a payment whose fact and issuer equal the certificate fact and issuer of the obligation. It runs in the overlay that records the payment as settled, so $z_c$ and the repayment change together. The step resolves every output of the source that has an obligation, turning Open into Fulfilled and Repaired into Recovered, and afterwards every promise of $c$ is closed, so no new compensation arises and a repeated submission is a no-op. Compensation debits and repayment credits use the issuer account stored in the obligation, which is the account of the single CAL allocation of $c$, and the repayment leaves $\mathcal D_x$ untouched.
+Each registered promise leaves Open at most once, and by Lemma~\ref{lem:security-decision} compensation applies at most once to an output and only while its obligation is Open, so $p_c\le a_c$. The only transition that leaves Compensated is the output-resolution step of a payment whose fact and issuer equal the certificate fact and issuer of the obligation. It runs in the overlay that records the payment as settled, so $z_c$ and the repayment change together. The step resolves every output of the source that has an obligation, turning Open into Fulfilled and Compensated into Recovered, and afterwards every promise of $c$ is closed, so no new compensation arises and a repeated submission is a no-op. Compensation debits and repayment credits use the issuer account stored in the obligation, which is the account of the single CAL allocation of $c$, and the repayment leaves $\mathcal D_x$ untouched.
 \end{IEEEproof}
 
 For any local approval, let $r_{m,c}=a_c-\mathsf{Applied}_{m,c}$, where Applied is its cumulative CAL restoration.
@@ -220,7 +222,24 @@ sources.
 A payment consumes final value $F$ and missing value $M$ and produces $F+M$. Let $J$ and $R$ be the total values of its arriving outputs whose obligations were Open and compensated, respectively. The former outputs were already consumed, so they close gaps and add no unspent value; the latter receive no creation record. Hence $\Delta U=M-J-R$, $\Delta D=M-J$, and the repayment gives $\Delta A=R$, so $\Delta(U+A-D)=0$. A compensation decision of amount $a$ gives $\Delta A=\Delta D=-a$ and $\Delta U=0$. Resubmission changes no public state, and by Lemma~\ref{lem:security-representation} representation commands and installation leave $U$, $A$, and $D$ unchanged. Top-ups transfer between included accounts, and other transitions preserve the projection.
 \end{IEEEproof}
 
-FUEL follows separate accounting: each escrow maximum equals Held plus cumulative Rewards, Burned, and Refunded, and the global conserved sum counts unspent FUEL, ordinary accounts, current Held, reward balances, and cumulative burn. Unique stage and obligation identities transfer value once, for user-funded and organization-funded fees alike.
+FUEL follows separate accounting. For escrow maximum $M$, the invariant is
+\[
+ \mathsf{Held}+\mathsf{Rewards}+\mathsf{Burned}+\mathsf{Refunded}=M.
+\]
+For $k$ certified inputs and per-obligation compensation charge $f_{\mathrm{comp}}$, admission requires
+\[
+ M\ge f_{\mathrm{register}}+f_{\mathrm{settle}}+f_{\mathrm{close}}
+       +k f_{\mathrm{comp}}.
+\]
+Stage identities charge each base fee once, and an obligation leaves Open
+once, so at most $k$ compensation charges occur. Closure therefore has enough Held
+for its fee and refunds the remainder. FUEL and Policy caps equal $M$;
+replacing the reserved cap by actual Rewards plus Burned cannot increase
+their total usage. Fee-budget exhaustion thus cannot block closure of a
+validly admitted payment under these rules. The global conserved sum counts
+unspent FUEL, ordinary accounts, Held, reward balances, and cumulative burn,
+for both fee modes. Supplement~S1 maps these guards to public-entry,
+multi-obligation, and member-accounting regressions.
 
 Conservation fixes totals, and the next result fixes the final holders.
 
@@ -255,7 +274,7 @@ every QC-bearing payment meets these independent execution conditions.
 \begin{IEEEproof}
 \emph{Holders.} By (i), both executions consume the same instances. In $\rho$, an output consumed before its source executes receives an obligation, and when the source executes the output is either Fulfilled, with a creation record that is already consumed, or Recovered, with no creation record; in both cases it is consumed. Outputs that no payment of $\mathcal T$ consumes are created as final and unspent in both executions. The unspent instances are therefore the genesis outputs and the outputs of $\mathcal T$ that $\mathcal T$ leaves unconsumed.
 
-\emph{Reserves.} For a reserve account $x$, let $\hat A_x$ be its balance plus the amounts of Repaired obligations issued by $x$. Compensation lowers $A_x$ and raises the Repaired total by the same amount, repayment reverses this on the same account (Lemma~\ref{lem:security-recovery}), and creating or fulfilling an obligation changes neither term. As in Theorem~\ref{thm:security-coverage}, only top-ups, compensation, and repayment change reserve balances, so $\hat A_x=A_x(0)+\tau_x$ at every prefix, where $\tau_x$ is the total of increases credited to $x$ so far. An obligation exists only for an output consumed before its source executes, and by (iii) that source executes in $\rho$ and leaves the obligation Fulfilled or Recovered. At the end no obligation is Open or Repaired, so $A_x=A_x(0)+\tau_x$, which is also the value in $\rho_0$.
+\emph{Reserves.} For a reserve account $x$, let $\hat A_x$ be its balance plus the amounts of Compensated obligations issued by $x$. Compensation lowers $A_x$ and raises the Compensated total by the same amount, repayment reverses this on the same account (Lemma~\ref{lem:security-recovery}), and creating or fulfilling an obligation changes neither term. As in Theorem~\ref{thm:security-coverage}, only top-ups, compensation, and repayment change reserve balances, so $\hat A_x=A_x(0)+\tau_x$ at every prefix, where $\tau_x$ is the total of increases credited to $x$ so far. An obligation exists only for an output consumed before its source executes, and by (iii) that source executes in $\rho$ and leaves the obligation Fulfilled or Recovered. At the end no obligation is Open or Compensated, so $A_x=A_x(0)+\tau_x$, which is also the value in $\rho_0$.
 
 \emph{Usage.} Every registered certificate is used by a missing input, so by (iii) its source executes in $\rho$. That execution closes all of its promises, so Remaining$=0$, and Lemma~\ref{lem:security-recovery} gives $\mathsf{Paid}_c=\mathsf{Rec}_c$. Hence Reserved$=\sum$Remaining$=0$ and Spent$=\sum(\mathsf{Paid}_c-\mathsf{Rec}_c)=0$, and authorizations change only through $\mathcal U$.
 
@@ -424,14 +443,6 @@ adaptation (Lemma~\ref{lem:security-closure}). At every prefix,
   0\le S_g=\sum_{c\in C_g}
        \bigl(p_c-\mathsf{Rec}_c\bigr)\le Q_g\le B_g .
 \]
-For a fixed grant without further funding, this bounds net unrepaid
-compensation, not lifetime gross Paid. An unexecuted certified source
-keeps $r_{m,c}=a_c$ at its honest signers, so a slice can stop issuing
-while reserve principal remains. A funded top-up increases shares
-without clearing reservations or input conflicts and exposes the new
-authorization to the same risk. Permanently unexecuted sources fall
-outside Theorem~\ref{thm:security-neutrality}. The open service in
-Section~\ref{sec:model-contract} accepts adversarial reserve loss and
-retained capacity; FUEL fees do not insure either, and no CAL--FUEL
-exchange value is assumed. Supplement~S3 gives the two-round ledger
-and its fixed-signer capacity bound.
+For a fixed grant without further funding, this bounds net unrepaid compensation, not lifetime gross Paid. The bound is reachable: in the rotating-signer regression of Supplement~S4-B(b), one Byzantine member ignores its local limit and the three honest members co-sign in rotating pairs. With $B_g=300$ and 100-CAL sources that lose a global Intent conflict, three valid successors induce compensation of 300~CAL. Honest reservations reach $(200,200,200)$, and the next request is refused.
+
+If the same adversary controls the recipients and the successor outputs retain usable routes, its usable CAL need not decrease as the issuer loses the compensated amount. Each round still spends FUEL, and the losing sources' inputs, including user-funded fee inputs, remain locked. This distinguishes available payment principal from total tied-up assets and does not assign a CAL--FUEL exchange value. Once honest signing capacity under the grant is exhausted, new certification stops for that grant, including payments spending final outputs routed to the organization. A funded top-up adds the difference between the new and old member shares; it clears neither earlier reservations nor input locks. Sources that never execute lie outside Theorem~\ref{thm:security-neutrality}. Supplement~S3 provides the fixed-signer two-round ledger; the rotating-signer trace shows why its earlier stoppage is not a smaller universal reserve-loss bound.

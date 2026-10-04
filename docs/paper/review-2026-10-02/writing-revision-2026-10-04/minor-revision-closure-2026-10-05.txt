@@ -1,0 +1,41 @@
+两项约定小修的结项核对
+日期：2026-10-05
+
+本轮范围
+仅核对 2026-10-04 双方已收敛的两项文字与论证整理；不新增协议、不重跑系统实验，不把另一次独立评审的其他建议混入此次验收。
+
+时间线
+修改前的 post-evidence-review-2026-10-04/review-summary.txt 写“尚未改入论文”。之后 writing-revision-2026-10-04 已实际加入两项修订，并同步 Overleaf。GPT 于该轮阅读正文和补充 PDF 后确认两项书面要求可关闭，另提出两处措辞修正及一处可选删减；这些也已落实。本次重新核验文件摘要与实际 PDF，避免将旧待办状态误当成当前状态。
+
+第一项：共识不变量及实现对应
+位置：补充材料 S1-A，英文第 3 页表 S1及 Deadline wiring；正文 IV-B，英文第 6 页。
+- 完整 BlockID、正文/part-set 配对、Locked/Valid、当前轮 polka、round/step 防重复投票。
+- ProposalBatch 的先写入/FlushAndSync 后 handleMsg；票单独 WriteSync；故障允许持久前缀，不假定原子回滚。
+- Finalize 两类恢复记录同一 batch WriteSync；不确定持久错误不等于回滚。
+- Autofile 跳过同步的前提：同一句柄已成功同步、无新写入；重开/写入/失败规则明确。
+- 原始开口准入、原件重放及追赶、精确 Task 授权历史安装的分工。
+- 各行列出已有回归；正文与上下段列出实际入口和生产期限接线。
+- 创建高度 h 的义务在 h+1 的 BeginBlock 按该块时间加 timeout 锚定；当前参数 30 秒。
+
+第二项：风险串联
+位置：正文 V-F Availability and guarantor risk，英文第 15 页；III-C 第 4 页的 Terminal holders/Admission and stoppage/Deployment and risk bearer。
+- 0 ≤ S_g ≤ Q_g ≤ B_g 表示固定 grant 下净未偿赔付上界，不是累计终身 Paid。
+- B=300、每笔100、一个 Byzantine 成员与诚实成员轮换签名的三轮可达实例。
+- 控制接收方且后继路由可用时，可用 CAL 不必减少；FUEL 支出及来源/完整费用输入锁定仍存在，未称无成本获利。
+- 额度耗尽停止该 grant 新认证，含该组织路由的最终输出；不取消已存凭证或解除输入锁。
+- 有资金来源的补资增加新增授权份额，不清空历史占用。
+- 准入金额包含找零；终端凭证不单独产生无条件公共兑付权。
+
+后续精确化已落实
+摘要：“making economic closure wait for historical repair”。
+III-C：单项义务关闭消除缺口并更新费用记账；全部输入义务解决才结清 escrow。
+IV 开头重复导语已删除。
+
+验证
+当前 71 个源码/图件及四份 PDF 的摘要与 manifest.json 一致；实际 PDF 中找到上述段落。最新英文正文20页、中文正文21页，中英文补充各29页。上一轮编译及引用/双语对应检查通过，当前源码未再改变；无需重复网络实验。见 minor-revision-verification-2026-10-05.json、source-checks.json、bilingual-checks.json、overleaf-check.json。
+
+本轮 GPT 最终稿核验
+最新两份英文 PDF 已发送到既有 GPT 对话。GPT 实际核读 1 分 46 秒后确认：“已核对最终两个 PDF，没有发现约定修改的漏项，这两项可以结项。”它逐项确认 S1-A 表 S1、期限接线、V-F 净损失上界及轮换实例、成本与停签风险，以及摘要、III-C escrow、IV 导语三处最终文字修改。该结论仅关闭本轮约定的小修，不作为新一轮盲审或期刊接收决定。原文和截图见 gpt-minor-revision-closure-2026-10-05.txt/.png。
+https://chatgpt.com/c/6ac25dfa-9ce4-83ec-823d-8cb8eae6a779
+
+本轮没有重新声称 Claude 审过最终 PDF；其额度不足导致最后发送失败。没有 Git 提交或推送。

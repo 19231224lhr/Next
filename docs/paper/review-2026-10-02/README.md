@@ -2,7 +2,9 @@
 
 **Next: Enabling Continuous UTXO Payments with Direct Guarantees**
 
-**最新交付：2026-10-04 第四轮修订。** 最终构建补证共23,654笔付款闭合；100跳到账中位数4.707s，对照64.479s。完成服务契约、C3消费者、版本桥、证明—代码对应及联合复审；英文正文18页。GPT最终倾向小修后接收，Claude撤回结构性异议（未给最终档位）。[交付与评审总入口](fourth-revision-2026-10-04/README.md) · [英文正文](fourth-revision-2026-10-04/final/Next-fourth-revision-English.pdf) · [中文阅读版](fourth-revision-2026-10-04/final/Next-fourth-revision-Chinese.pdf) · [实验报告](../../experiments/final-evidence-2026-10-04/README.md)。下文保留前序冻结版记录，最新PDF以此入口为准。
+**最新工作稿：2026-10-05 正文独立可读性修订。** 重排模型、支付协议、历史修复与相关工作；用同一组交易、组织和 40/60 CAL 示例解释续付、公共义务、额度及来源闭合。新增证明导读，重绘流程图；保留原有公式、证明、实验数据与补充材料。英文正文 20 页、中文阅读版 21 页，Overleaf 已同步。新对话仅接收英文正文，已正确复述核心机制；其指出的份额持有者、最终输出准入和迟到来源偿还三处歧义已写入双语正文。研究价值判断与可读性结论分开记录。[英文正文](standalone-readability-2026-10-05/pdf/main.pdf) · [中文阅读版](standalone-readability-2026-10-05/pdf/main-zh.pdf) · [LaTeX 源码包](standalone-readability-2026-10-05/Next-standalone-readability-LaTeX.zip) · [本轮报告](standalone-readability-2026-10-05/completion-report.txt) · [正文独读意见](standalone-readability-2026-10-05/gpt-main-only-review.txt) · [样本文献复读记录](standalone-readability-2026-10-05/reading-and-revision-notes.txt)。以下均为前序版本记录。
+
+**前序交付：2026-10-04 第四轮修订。** 最终构建补证共23,654笔付款闭合；100跳到账中位数4.707s，对照64.479s。完成服务契约、C3消费者、版本桥、证明—代码对应及联合复审；英文正文18页。GPT最终倾向小修后接收，Claude撤回结构性异议（未给最终档位）。[交付与评审总入口](fourth-revision-2026-10-04/README.md) · [英文正文](fourth-revision-2026-10-04/final/Next-fourth-revision-English.pdf) · [中文阅读版](fourth-revision-2026-10-04/final/Next-fourth-revision-Chinese.pdf) · [实验报告](../../experiments/final-evidence-2026-10-04/README.md)。此入口保留该轮冻结版记录。
 
 **前序工作稿：2026-10-04 C3 用途补强。** 具体化本地区块归档复核场景，新增原始索引／普通缓存视图／C3 的同授权功能对照；原提交证据与未适配分片反例均已验证。生产支付协议和性能数据不变。[本轮报告与四份 PDF](c3-usecase-2026-10-04/README.md) · [英文正文](c3-usecase-2026-10-04/Next-C3-English.pdf) · [中文阅读版](c3-usecase-2026-10-04/Next-C3-Chinese.pdf)。
 

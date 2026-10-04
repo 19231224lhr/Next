@@ -1,0 +1,18 @@
+补齐你最后指出的两处生产接线，以下为当前源码原文（本轮未修改）：
+
+internal/committee/direct.go:97–102
+func (e *Engine) BeginBlock(v state.ReadView, b BlockContext) (state.Transition, error) {
+ if e.direct == nil { return state.Transition{}, nil }
+ return rules.AnchorDirectDeadlines(v, *e.direct, b.Height, b.Time.Unix())
+}
+
+cmd/committee/main.go:92–101
+if e = configureDirect(network, engine); e != nil { return e }
+var app *committee.App
+if network.Direct != nil {
+ app, e = committee.NewTimedApp(network.ChainID, db, engine.Check, engine.ExecuteAt, engine.BeginBlock)
+} else {
+ app, e = committee.NewApp(network.ChainID, db, engine.Check, engine.Execute, engine.Drain)
+}
+
+请简短确认这一特定材料缺口是否关闭即可。论文中仍应补的集中说明与风险表述继续保留，不把提交源码等同于已改好论文。

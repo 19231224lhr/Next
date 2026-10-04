@@ -1,0 +1,71 @@
+\begin{table}[!ht]
+\centering\small
+\caption{Archived one-organization operating-point runs. Each run sends and completes 150,000 payments. Injection and completion are in payments/s; receipt quantiles are in ms. Completion includes final background drain. Peak is the maximum number of payments with unfinished background processing; Limit hits counts triggers of the 4,096-unfinished-payment limit.}
+\label{tab:supp-throughput}
+\begin{tabular}{@{}rrrrrrrr@{}}
+\toprule
+Run & Target & Injection & Completion & P50 & P95 & Peak & Limit hits \\
+\midrule
+1 & 2000 & 1,964.53 & 1,948.66 & 2.521 & 50.499 & 2159 & 0 \\
+2 & 2000 & 1,969.65 & 1,950.45 & 2.566 & 50.761 & 2205 & 0 \\
+3 & 2200 & 2,127.70 & 2,103.63 & 4.538 & 69.463 & 2655 & 0 \\
+4 & 2200 & 2,127.15 & 2,106.29 & 4.553 & 69.945 & 2548 & 0 \\
+5 & 2400 & 2,206.95 & 2,174.68 & 7.174 & 89.376 & 4096 & 1635 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[!ht]
+\centering\small
+\caption{Baseline source-recovery runs. Each offers 1,200 two-hop units (2,400 payments) over 60 seconds. Receipt quantiles for normal child payments are in ms; elapsed and deadline-to-all-replica-installation observation median are in seconds. The latter includes 250-ms polling. Every run ends with a 60,000-CAL reserve, zero net expenditure, and zero gap.}
+\label{tab:supp-liability}
+\begin{tabular}{@{}rrrrrrr@{}}
+\toprule
+Seed & Withheld & Paid/recovered & Elapsed & Child P50 & Child P95 & Install P50 \\
+\midrule
+23 & 0\% & 0/0 & 61.540 & 1.251 & 1.620 & -- \\
+23 & 1\% & 12/12 & 90.225 & 1.185 & 1.432 & 1.759 \\
+23 & 5\% & 60/60 & 90.096 & 1.191 & 1.536 & 1.257 \\
+37 & 0\% & 0/0 & 61.595 & 1.199 & 1.559 & -- \\
+37 & 1\% & 12/12 & 91.935 & 1.190 & 1.479 & 1.509 \\
+37 & 5\% & 60/60 & 91.530 & 1.192 & 1.426 & 1.257 \\
+59 & 0\% & 0/0 & 61.550 & 1.191 & 1.461 & -- \\
+59 & 1\% & 12/12 & 90.595 & 1.193 & 1.452 & 1.761 \\
+59 & 5\% & 60/60 & 90.346 & 1.194 & 1.494 & 1.507 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[!ht]
+\centering\small
+\caption{Archived finite-reserve runs. One 300-s run per condition; capital values are CAL. Closed counts refer to two-hop units. Adaptive increases are actual transfers from an external funding account. Mean is the time-average organization CAL balance obtained by integrating balance samples over the 300-s input window.}
+\label{tab:supp-reserve}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Condition & Initial & Added & Final & Mean & Closed \\
+\midrule
+Constant / fixed low & 3,600 & 0 & 3,600 & 3,600.0 & 46/6000 \\
+Constant / fixed high & 14,400 & 0 & 14,400 & 14,400.0 & 6000/6000 \\
+Constant / adaptive & 3,600 & 10,800 & 14,400 & 13,801.8 & 6000/6000 \\
+Step / fixed high & 21,600 & 0 & 21,600 & 21,600.0 & 6000/6000 \\
+Step / adaptive & 3,600 & 18,000 & 21,600 & 14,078.7 & 6000/6000 \\
+Delayed / fixed high & 28,800 & 0 & 28,800 & 28,800.0 & 6000/6000 \\
+Delayed / adaptive & 3,600 & 19,700 & 23,300 & 20,611.2 & 6000/6000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!ht]
+\centering\small
+\caption{Synchronous-member continuation controls: 100 hops per run, nine disk-backed services, user-paid FUEL, and NoSync wallets. Durations end at the last certified receipt and are in seconds. N/S order applies to the two fast modes; the synchronous waiting run follows each pair.}
+\label{tab:supp-sync-chain}
+\begin{tabular}{@{}rlrrr@{}}
+\toprule
+Pair & Order & NoSync fast & Sync fast & Sync wait \\
+\midrule
+1 & N/S & 0.681127 & 4.492812 & 64.969480 \\
+2 & S/N & 0.705604 & 4.309984 & 65.193522 \\
+3 & N/S & 0.636821 & 4.470844 & 65.012947 \\
+\midrule
+Median & & 0.681127 & 4.470844 & 65.012947 \\
+\bottomrule
+\end{tabular}
+\end{table}
