@@ -335,31 +335,57 @@ func identityProposalBinding(t *testing.T) {
 }
 
 func identityQCWithoutMatchingProposal(t *testing.T) {
-	for _, partsFirst := range []bool{false, true} {
-		cs, vals, a, pa, b, pb := identityFixture(t)
-		cs.Step = cstypes.RoundStepPrevote
-		cs.Proposal = types.NewProposal(cs.Height, cs.Round, -1, types.BlockID{Hash: a.Hash(), PartSetHeader: pa.Header()})
-		if partsFirst {
-			cs.ProposalBlock, cs.ProposalBlockParts = b, pb
-		} else {
-			cs.ProposalBlock, cs.ProposalBlockParts = a, pa
-		}
-		for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
-			if added, err := cs.addVote(vote, "qc-peer"); err != nil || !added {
-				t.Fatalf("QC: %v %v", added, err)
+	for _, step := range []cstypes.RoundStepType{cstypes.RoundStepPropose, cstypes.RoundStepPrevote} {
+		for _, partsFirst := range []bool{false, true} {
+			// The new early-step case targets handleCompleteProposal: polka
+			// before parts. Parts-first at Propose follows the normal timeout.
+			if step == cstypes.RoundStepPropose && partsFirst {
+				continue
 			}
-		}
-		if !partsFirst {
-			for i := 0; i < int(pb.Total()); i++ {
-				if _, err := cs.addProposalBlockPart(&BlockPartMessage{Height: cs.Height, Round: cs.Round, Part: pb.GetPart(i)}, "qc-peer"); err != nil {
-					t.Fatal(err)
+			cs, vals, a, pa, b, pb := identityFixture(t)
+			cs.Step = step
+			cs.Proposal = types.NewProposal(cs.Height, cs.Round, -1, types.BlockID{Hash: a.Hash(), PartSetHeader: pa.Header()})
+			if partsFirst {
+				cs.ProposalBlock, cs.ProposalBlockParts = b, pb
+			} else {
+				cs.ProposalBlock, cs.ProposalBlockParts = a, pa
+			}
+			for _, vote := range identityVotes(t, cs, vals, cmtproto.PrevoteType, b, pb) {
+				if added, err := cs.addVote(vote, "qc-peer"); err != nil || !added {
+					t.Fatalf("QC: %v %v", added, err)
 				}
 			}
+			if !partsFirst {
+				for i := 0; i < int(pb.Total()); i++ {
+					if _, err := cs.addProposalBlockPart(&BlockPartMessage{Height: cs.Height, Round: cs.Round, Part: pb.GetPart(i)}, "qc-peer"); err != nil {
+						t.Fatal(err)
+					}
+				}
+				cs.handleCompleteProposal(cs.Height)
+			}
+			if cs.LockedBlock == nil || !cs.LockedBlockParts.HasHeader(pb.Header()) || cs.Step != cstypes.RoundStepPrecommit {
+				t.Fatalf("partsFirst=%v: matching QC/candidate stalled behind old proposal", partsFirst)
+			}
+			// Once the precise polka has caused precommit, an old proposal or
+			// duplicate completion cannot cause a late prevote or another precommit.
+			cs.enterPrevote(cs.Height, cs.Round)
 			cs.handleCompleteProposal(cs.Height)
+			select {
+			case msg := <-cs.internalMsgQueue:
+				vote, ok := msg.Msg.(*VoteMessage)
+				if !ok || vote.Vote.Type != cmtproto.PrecommitType || !vote.Vote.BlockID.Equals(types.BlockID{Hash: b.Hash(), PartSetHeader: pb.Header()}) {
+					t.Fatalf("step=%v partsFirst=%v: expected exact precommit, got %v", step, partsFirst, msg)
+				}
+			default:
+				t.Fatal("missing exact precommit")
+			}
+			select {
+			case msg := <-cs.internalMsgQueue:
+				t.Fatalf("step=%v partsFirst=%v: extra vote after precommit: %v", step, partsFirst, msg)
+			default:
+			}
 		}
-		if cs.LockedBlock == nil || !cs.LockedBlockParts.HasHeader(pb.Header()) || cs.Step != cstypes.RoundStepPrecommit {
-			t.Fatalf("partsFirst=%v: matching QC/candidate stalled behind old proposal", partsFirst)
-		}
+
 	}
 }
 

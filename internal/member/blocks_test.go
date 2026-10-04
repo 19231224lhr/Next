@@ -224,7 +224,7 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 			}
 			ledger := store.NewMemory()
 			defer ledger.Close()
-			_, err = committee.NewEngine(committee.EngineConfig{Network: f.Org.Network, Organizations: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Genesis: f.Genesis, Direct: &settings, Accounts: []committee.GenesisAccount{{Owner: f.Org.Org, Asset: protocol.AssetCAL, Balance: 1000000000}, {Owner: f.Org.Org, Asset: protocol.AssetFUEL, Balance: 1000000000}}}, ledger)
+			engine, err := committee.NewEngine(committee.EngineConfig{Network: f.Org.Network, Organizations: []protocol.OrgConfig{f.Org}, Schedule: f.Schedule, Genesis: f.Genesis, Direct: &settings, Accounts: []committee.GenesisAccount{{Owner: f.Org.Org, Asset: protocol.AssetCAL, Balance: 1000000000}, {Owner: f.Org.Org, Asset: protocol.AssetFUEL, Balance: 1000000000}}}, ledger)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -340,6 +340,25 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 					var err error
 					approved[p.Certificate.QC.Fact], err = v.Get(state.Key(state.KeyApproval, p.Certificate.QC.Fact[:]))
 					return err
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			assertChildFee := func() {
+				t.Helper()
+				public, err := engine.DirectPayment(cc.QC.Fact)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := db.View(func(v state.ReadView) error {
+					local, found, err := state.Load[member.LocalProgress](v, member.ProgressKey(cc.QC.Fact))
+					if err != nil {
+						return err
+					}
+					if !found || !reflect.DeepEqual(local.Fee, public.Fee) {
+						t.Fatalf("member/public fee mismatch: local=%+v public=%+v", local.Fee, public.Fee)
+					}
+					return nil
 				}); err != nil {
 					t.Fatal(err)
 				}
@@ -484,6 +503,7 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 						t.Fatal(err)
 					}
 					apply(raw, tr)
+					assertChildFee()
 					// Representation success is not a second public credit event.
 					beforeProgress, e := store.Scan(db, state.Key(122), nil, 100)
 					if e != nil {
@@ -526,6 +546,7 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				}
 			}
 			settle(pp, 132)
+			assertChildFee()
 			if scenario.lateObserver {
 				// The observer had no approval when the repair was followed.
 				// It releases its own later debit; the original signer below
