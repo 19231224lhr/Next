@@ -25,16 +25,17 @@ import (
 )
 
 type Network struct {
-	Members       map[protocol.Hash][4]string
-	CommitteeURLs [4]string
-	ChainID       string
-	GenesisTime   time.Time
-	Organizations []protocol.OrgConfig
-	Committee     [4]protocol.PublicKey
-	Schedule      rules.Schedule
-	Genesis       state.Genesis
-	Accounts      []committee.GenesisAccount
-	Direct        *rules.DirectSettings `json:",omitempty"`
+	EnableInternalPools bool `json:",omitempty"`
+	Members             map[protocol.Hash][4]string
+	CommitteeURLs       [4]string
+	ChainID             string
+	GenesisTime         time.Time
+	Organizations       []protocol.OrgConfig
+	Committee           [4]protocol.PublicKey
+	Schedule            rules.Schedule
+	Genesis             state.Genesis
+	Accounts            []committee.GenesisAccount
+	Direct              *rules.DirectSettings `json:",omitempty"`
 }
 
 func (n Network) Trust() (finality.Trust, error) {
@@ -55,7 +56,7 @@ func (n Network) Trust() (finality.Trust, error) {
 	return trust, nil
 }
 func (n Network) Engine() committee.EngineConfig {
-	return committee.EngineConfig{Network: n.Genesis.Network, Organizations: n.Organizations, Schedule: n.Schedule, Genesis: n.Genesis, Accounts: n.Accounts, Direct: n.Direct}
+	return committee.EngineConfig{EnableInternalPools: n.EnableInternalPools, Network: n.Genesis.Network, Organizations: n.Organizations, Schedule: n.Schedule, Genesis: n.Genesis, Accounts: n.Accounts, Direct: n.Direct}
 }
 
 func (n Network) Schema() uint64 {

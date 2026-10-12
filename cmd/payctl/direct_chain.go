@@ -579,7 +579,8 @@ func submitChain(ctx context.Context, client *http.Client, url string, raw []byt
 		if resp.StatusCode == http.StatusOK {
 			return b, resp.Header, attempt, nil
 		}
-		if resp.StatusCode != http.StatusServiceUnavailable || !bytes.Equal(bytes.TrimSpace(b), []byte("QUORUM_UNAVAILABLE")) {
+		retryable := bytes.Equal(bytes.TrimSpace(b), []byte("QUORUM_UNAVAILABLE")) || bytes.Equal(bytes.TrimSpace(b), []byte("DELIVERY_PERSIST_FAILED_RETRY_SAME_REQUEST"))
+		if resp.StatusCode != http.StatusServiceUnavailable || !retryable {
 			return nil, nil, attempt, fmt.Errorf("gateway HTTP %d: %s", resp.StatusCode, b)
 		}
 		select {

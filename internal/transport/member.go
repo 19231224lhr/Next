@@ -72,6 +72,7 @@ func MemberHandler(m *member.Member, foreground, background int) http.Handler {
 		}
 	}
 	addDirectHandlers(mux, m, fg, bg, wrap)
+	addPoolHandlers(mux, m, fg, wrap)
 	mux.HandleFunc("GET /v4/progress/{spend}", wrap(bg, func(w http.ResponseWriter, r *http.Request) {
 		var id protocol.Hash
 		if err := id.UnmarshalText([]byte(r.PathValue("spend"))); err != nil {

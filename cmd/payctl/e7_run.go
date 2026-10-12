@@ -297,6 +297,14 @@ func (w *e7Wallet) pay(ctx context.Context, o e7RunOptions, task e7Task, s *e7Sa
 		w.mu.Unlock()
 	}
 	client := w.client()
+	if w.config.DirectDelivery {
+		metadata, err := (e7DirectMetadata{Phase: o.Phase, Index: s.Index, Lane: s.Lane, Generation: s.Generation, Hop: s.Hop, Sender: s.Sender, Receiver: s.Receiver, Parent: s.Parent, Tx: s.Tx}).header()
+		if err != nil {
+			s.Error = err.Error()
+			return s
+		}
+		client = e7DeliveryClient(client, metadata)
+	}
 	call, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	encoded, _, attempts, e := submitChain(call, client, w.config.Gateway+"/v3/transactions", raw, false)
@@ -313,12 +321,16 @@ func (w *e7Wallet) pay(ctx context.Context, o e7RunOptions, task e7Task, s *e7Sa
 			d := e7Delivery{Phase: o.Phase, Index: s.Index, Lane: s.Lane, Generation: s.Generation, Hop: s.Hop, Sender: s.Sender, Receiver: s.Receiver, Parent: s.Parent, Output: req.Tx.Body.Outputs[0], Certificate: encoded}
 			delivered := time.Now()
 			var a e7Ack
-			for retry := 0; retry < 3; retry++ {
-				a, e = e7SendReceipt(call, client, w.config.Receivers[s.Receiver%2], d)
-				if e == nil || call.Err() != nil {
-					break
+			if w.config.DirectDelivery {
+				a, e = e7WaitDirectAck(call, w.client(), w.config.Receivers[s.Receiver%2], s.Index, s.Fact)
+			} else {
+				for retry := 0; retry < 3; retry++ {
+					a, e = e7SendReceipt(call, client, w.config.Receivers[s.Receiver%2], d)
+					if e == nil || call.Err() != nil {
+						break
+					}
+					budgetPause(call, 20*time.Millisecond)
 				}
-				budgetPause(call, 20*time.Millisecond)
 			}
 			s.DeliveryNS = int64(time.Since(delivered))
 			s.ReceiveNS = a.ReceiveNS

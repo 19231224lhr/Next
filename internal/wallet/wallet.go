@@ -3,6 +3,7 @@ package wallet
 import (
 	"bytes"
 	"errors"
+	"sync"
 	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/internal/store"
@@ -10,11 +11,14 @@ import (
 )
 
 type Wallet struct {
-	db      store.Store
-	network protocol.Hash
-	owner   protocol.PublicKey
-	orgs    map[protocol.Hash]protocol.OrgConfig
-	bound   protocol.Hash
+	poolMu    sync.Mutex
+	poolReady map[protocol.Hash]protocol.Hash
+	origins   map[protocol.OutputID]state.OriginOutput
+	db        store.Store
+	network   protocol.Hash
+	owner     protocol.PublicKey
+	orgs      map[protocol.Hash]protocol.OrgConfig
+	bound     protocol.Hash
 }
 
 func New(db store.Store, network protocol.Hash, owner protocol.PublicKey, orgs []protocol.OrgConfig) (*Wallet, error) {
@@ -76,6 +80,12 @@ func NewWithGenesis(db store.Store, network protocol.Hash, owner protocol.Public
 		return nil, err
 	}
 	w.bound = bound
+	w.origins = make(map[protocol.OutputID]state.OriginOutput)
+	for _, origin := range genesis.Outputs {
+		if origin.Output.Recipient.Owner == owner {
+			w.origins[origin.ID] = origin
+		}
+	}
 	return w, nil
 }
 

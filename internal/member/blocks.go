@@ -179,6 +179,35 @@ func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
 	}
 	var updates []blockfollow.Apply
 	for _, entry := range b.Transactions() {
+		if entry.Code == 0 && protocol.IsPoolCertificate(entry.Bytes) {
+			if !m.cfg.EnableInternalPools {
+				return nil, protocol.ErrUnsupported
+			}
+			c, err := protocol.DecodePoolCertificate(entry.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			if err = rules.VerifyPoolPublic(c, m.cfg.Organization.Network, m.peers); err != nil {
+				return nil, err
+			}
+			updates = append(updates, func(o *state.Overlay) error {
+				if c.Action.Kind == protocol.PoolDeposit {
+					a := c.Action
+					s, _, err := state.Load[state.Spend](o, rules.DirectSpendKey(a.Input, 0))
+					if err != nil {
+						return err
+					}
+					fact := protocol.SpendFactID(a.ID())
+					if s.Candidate != (protocol.SpendFactID{}) && s.Candidate != fact {
+						if err = m.reclaimPartialByFact(o, s.Candidate, fact, protocol.TxID(a.ID()), a.Input, 0, b.Height()); err != nil {
+							return err
+						}
+					}
+				}
+				return rules.ObservePool(o, c, m.cfg.Organization.Network, m.peers)
+			})
+			continue
+		}
 		if entry.Code == 0 && protocol.IsReserveIncrease(entry.Bytes) {
 			c, err := protocol.DecodeReserveIncrease(entry.Bytes)
 			if err != nil {

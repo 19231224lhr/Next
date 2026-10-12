@@ -61,13 +61,16 @@ func run() (result error) {
 	id := store.Identity{Network: n.Genesis.Network.String(), Role: "member", Node: fmt.Sprintf("%s/%d", org.Org, c.Index), Schema: schema}
 	var db store.Store
 	memory := os.Getenv("UTXO_EXPERIMENT_MEMBER_MEMORY") == "1"
+	if memory && n.EnableInternalPools {
+		return errors.New("internal pools require crash-durable member storage")
+	}
 	syncWrites := os.Getenv("UTXO_EXPERIMENT_MEMBER_SYNC") == "1"
 	if memory && syncWrites {
 		return fmt.Errorf("member memory and synchronized-disk experiments are mutually exclusive")
 	}
 	if memory {
 		db, e = store.OpenEphemeral(filepath.Join(c.DataDir, "member.db"), id)
-	} else if syncWrites {
+	} else if syncWrites || n.EnableInternalPools {
 		db, e = store.Open(filepath.Join(c.DataDir, "member.db"), id)
 	} else {
 		db, e = store.OpenNoSync(filepath.Join(c.DataDir, "member.db"), id)
@@ -85,7 +88,7 @@ func run() (result error) {
 	if *continuation {
 		continuationEntries = 256
 	}
-	m, e := member.New(member.Config{DirectContinuationEntries: continuationEntries, DisableSourceRecovery: os.Getenv("UTXO_EXPERIMENT_DISABLE_SOURCE_RECOVERY") == "1", Organization: org, Index: c.Index, Key: key, Peers: n.Organizations, Committee: trust, Schedule: n.Schedule, Workers: c.Workers, Direct: n.Direct}, group, n.Genesis)
+	m, e := member.New(member.Config{EnableInternalPools: n.EnableInternalPools, DirectContinuationEntries: continuationEntries, DisableSourceRecovery: os.Getenv("UTXO_EXPERIMENT_DISABLE_SOURCE_RECOVERY") == "1", Organization: org, Index: c.Index, Key: key, Peers: n.Organizations, Committee: trust, Schedule: n.Schedule, Workers: c.Workers, Direct: n.Direct}, group, n.Genesis)
 	if e != nil {
 		return e
 	}

@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"utxo/internal/delivery"
 	"utxo/internal/gateway"
 	"utxo/internal/rules"
 	"utxo/internal/state"
@@ -24,6 +25,54 @@ import (
 	"utxo/internal/transport"
 	"utxo/protocol"
 )
+
+func TestDirectDeliveryCommitsBeforeResponseAndDoesNotWaitForRecipient(t *testing.T) {
+	db := store.NewMemory()
+	defer db.Close()
+	c, req, org := directHTTPFixture(t, db)
+	outDB := store.NewMemory()
+	defer outDB.Close()
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	recipient := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+		<-release
+	}))
+	defer recipient.Close()
+	defer close(release)
+	q, e := delivery.New(outDB, []delivery.Route{{Owner: req.Tx.Body.Outputs[0].Recipient.Owner, URL: recipient.URL}}, []protocol.OrgConfig{org})
+	if e != nil {
+		t.Fatal(e)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- q.Run(ctx) }()
+	h, drain := newDirectPaymentHandlerWithDelivery(c, true, q)
+	defer drain()
+	raw, _ := req.MarshalBinary()
+	r := httptest.NewRequest("POST", "/v3/transactions", bytes.NewReader(raw))
+	r.Header.Set("Content-Type", transport.MediaType)
+	rw := httptest.NewRecorder()
+	h(rw, r)
+	if rw.Code != 200 {
+		t.Fatalf("response %d %s", rw.Code, rw.Body.String())
+	}
+	rows, e := store.Scan(outDB, []byte("pending/"), nil, 10)
+	if e != nil || len(rows) != 1 {
+		t.Fatalf("response without durable delivery: %d %v", len(rows), e)
+	}
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("sender-independent delivery missing")
+	}
+	cancel()
+	<-done
+}
 
 type readyDirectMember struct {
 	gateway.MemberClient

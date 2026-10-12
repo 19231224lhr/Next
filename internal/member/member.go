@@ -15,6 +15,7 @@ import (
 )
 
 type Config struct {
+	EnableInternalPools bool
 	// Optional bounded copies of committed approval summaries; zero disables caching.
 	DirectContinuationEntries int
 	// Optional same-configuration certificate reuse; zero entries disables it.
@@ -52,6 +53,9 @@ func (m *Member) BudgetLimits() (counts [6]uint64) {
 }
 
 func New(cfg Config, db store.Store, gen state.Genesis) (*Member, error) {
+	if cfg.EnableInternalPools && cfg.Direct == nil {
+		return nil, protocol.ErrRule
+	}
 	if cfg.Organization.Validate() != nil || cfg.Index >= 4 || len(cfg.Key) != ed25519.PrivateKeySize || cfg.Workers == 0 || cfg.Workers > 256 || cfg.Schedule.Validate() != nil || gen.Network != cfg.Organization.Network {
 		return nil, protocol.ErrRule
 	}
@@ -134,6 +138,9 @@ func (m *Member) bootstrap(gen state.Genesis) error {
 		if m.direct != nil {
 			key := m.direct.Key.KeyID()
 			hash = protocol.Digest("MEMBER_INITIAL_STATE_V5", hash[:], key[:])
+		}
+		if m.cfg.EnableInternalPools {
+			hash = protocol.Digest("MEMBER_INTERNAL_POOLS_V1", hash[:])
 		}
 		if old, found, e := state.Load[protocol.Hash](v, key); e != nil {
 			return nil, e

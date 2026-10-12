@@ -58,6 +58,16 @@ func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.
 	if b.Height <= 0 || b.Time.IsZero() {
 		return state.Transition{}, protocol.ErrRule
 	}
+	if protocol.IsPoolCertificate(raw) {
+		if !e.cfg.EnableInternalPools {
+			return state.Transition{}, protocol.ErrUnsupported
+		}
+		c, err := protocol.DecodePoolCertificate(raw)
+		if err != nil {
+			return state.Transition{}, err
+		}
+		return rules.EvaluatePool(v, c, e.cfg.Network, e.direct.Organizations)
+	}
 	if protocol.IsReserveIncrease(raw) {
 		c, err := protocol.DecodeReserveIncrease(raw)
 		if err != nil {

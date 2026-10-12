@@ -16,12 +16,13 @@ type GenesisAccount struct {
 	Balance uint64
 }
 type EngineConfig struct {
-	Network       protocol.Hash
-	Organizations []protocol.OrgConfig
-	Schedule      rules.Schedule
-	Genesis       state.Genesis
-	Accounts      []GenesisAccount
-	Direct        *rules.DirectSettings `json:",omitempty"`
+	EnableInternalPools bool `json:",omitempty"`
+	Network             protocol.Hash
+	Organizations       []protocol.OrgConfig
+	Schedule            rules.Schedule
+	Genesis             state.Genesis
+	Accounts            []GenesisAccount
+	Direct              *rules.DirectSettings `json:",omitempty"`
 }
 type Engine struct {
 	cache         verificationCache[rules.VerifiedCertificate]
@@ -37,6 +38,9 @@ type Engine struct {
 }
 
 func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
+	if c.EnableInternalPools && c.Direct == nil {
+		return nil, protocol.ErrRule
+	}
 	if c.Network == (protocol.Hash{}) || c.Genesis.Network != c.Network || c.Schedule.Validate() != nil || db == nil {
 		return nil, protocol.ErrRule
 	}
@@ -233,6 +237,16 @@ func (e *Engine) unwrap(raw []byte) ([]byte, error) {
 }
 func (e *Engine) Check(raw []byte) error {
 	if e.direct != nil {
+		if protocol.IsPoolCertificate(raw) {
+			if !e.cfg.EnableInternalPools {
+				return protocol.ErrUnsupported
+			}
+			c, err := protocol.DecodePoolCertificate(raw)
+			if err != nil {
+				return err
+			}
+			return rules.VerifyPoolPublic(c, e.cfg.Network, e.direct.Organizations)
+		}
 		if protocol.IsReserveIncrease(raw) {
 			c, err := protocol.DecodeReserveIncrease(raw)
 			if err != nil {

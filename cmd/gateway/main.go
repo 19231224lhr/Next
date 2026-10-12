@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,10 +16,13 @@ import (
 	"time"
 	cfg "utxo/cmd/internal/config"
 	"utxo/internal/blockfollow"
+	"utxo/internal/delivery"
 	"utxo/internal/gateway"
+	"utxo/internal/recipient"
 	"utxo/internal/requesttrace"
 	"utxo/internal/store"
 	"utxo/internal/transport"
+	"utxo/internal/wallet"
 	"utxo/protocol"
 )
 
@@ -27,6 +31,10 @@ type configuration struct {
 	Organization             protocol.Hash
 	Members                  [4]string
 	TLS                      cfg.TLS
+	RecipientRoutes          []delivery.Route   `json:",omitempty"`
+	RecipientTLS             cfg.TLS            `json:",omitempty"`
+	RecipientOwner           protocol.PublicKey `json:",omitempty"`
+	RecipientKey             string             `json:",omitempty"`
 }
 
 func paymentHandler(collector *gateway.Collector) http.HandlerFunc {
@@ -90,6 +98,8 @@ func run() (result error) {
 	path := flag.String("config", "", "gateway config JSON")
 	continuation := flag.Bool("same-org-continuation", false, "send compact parent quorum proofs to their original same-organization signers")
 	compactApprovals := flag.Bool("compact-direct-approvals", false, "request compact admission-vector and vote responses")
+	directDelivery := flag.Bool("direct-recipient-delivery", false, "durably deliver full payments to operator-configured RecipientRoutes")
+	collectAtRecipient := flag.Bool("collect-at-recipient", false, "enable /v3/recipient/collect for configured RecipientOwner with a durable local receiving wallet")
 	flag.Parse()
 	var c configuration
 	if e := cfg.Read(*path, &c); e != nil {
@@ -98,6 +108,21 @@ func run() (result error) {
 	var n cfg.Network
 	if e := cfg.Read(c.Network, &n); e != nil {
 		return e
+	}
+	if *collectAtRecipient {
+		if n.Direct == nil || c.RecipientKey == "" || os.Getenv("UTXO_EXPERIMENT_GATEWAY_MEMORY") == "1" {
+			return errors.New("recipient collection requires direct protocol, RecipientKey and persistent gateway storage")
+		}
+		key, err := cfg.PrivateKey(c.RecipientKey)
+		if err != nil {
+			return err
+		}
+		var owner protocol.PublicKey
+		copy(owner[:], key[32:])
+		if c.RecipientOwner != (protocol.PublicKey{}) && c.RecipientOwner != owner {
+			return errors.New("RecipientOwner does not match RecipientKey")
+		}
+		c.RecipientOwner = owner
 	}
 	trust, e := n.Trust()
 	if e != nil {
@@ -138,12 +163,49 @@ func run() (result error) {
 		slog.Info("experimental single-collector signing admission enabled")
 	}
 	mux := http.NewServeMux()
+	if *collectAtRecipient {
+		walletDB, err := store.Open(filepath.Join(c.DataDir, "recipient-wallet.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "recipient-wallet", Node: fmt.Sprintf("%x", c.RecipientOwner), Schema: 1})
+		if err != nil {
+			return err
+		}
+		defer walletDB.Close()
+		local, err := wallet.NewWithGenesis(walletDB, n.Genesis.Network, c.RecipientOwner, n.Organizations, n.Genesis)
+		if err != nil {
+			return err
+		}
+		h, err := recipient.New(collector, local, c.RecipientOwner, org, db)
+		if err != nil {
+			return err
+		}
+		defer h.Close()
+		mux.Handle("POST /v3/recipient/collect", h)
+		mux.HandleFunc("POST /v3/recipient/prepare", h.PrepareHTTP)
+	}
 	requesttrace.RegisterTimeline(mux)
 	mux.HandleFunc("POST /v1/transactions", paymentHandler(collector))
 	drainDirect := func() {}
+	var recipientOutbox *delivery.Outbox
+	if *directDelivery {
+		if n.Direct == nil || len(c.RecipientRoutes) == 0 {
+			return errors.New("direct recipient delivery requires direct protocol and RecipientRoutes")
+		}
+		deliveryDB, err := store.Open(filepath.Join(c.DataDir, "recipient-delivery.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "recipient-delivery", Node: org.Org.String(), Schema: 1})
+		if err != nil {
+			return err
+		}
+		defer deliveryDB.Close()
+		client, err := recipientHTTP(c.RecipientTLS)
+		if err != nil {
+			return err
+		}
+		recipientOutbox, err = delivery.NewWithClient(deliveryDB, c.RecipientRoutes, n.Organizations, client)
+		if err != nil {
+			return err
+		}
+	}
 	if n.Direct != nil {
 		var handler http.HandlerFunc
-		handler, drainDirect = directPaymentHandler(collector)
+		handler, drainDirect = newDirectPaymentHandlerWithDelivery(collector, true, recipientOutbox)
 		mux.HandleFunc("POST /v3/transactions", handler)
 		if os.Getenv("UTXO_EXPERIMENT_BUDGET") == "1" {
 			collectOnly, drainCollect := newDirectPaymentHandler(collector, false)
@@ -159,6 +221,19 @@ func run() (result error) {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if recipientOutbox != nil {
+		deliveryCtx, deliveryCancel := context.WithCancel(ctx)
+		deliveryDone := make(chan error, 1)
+		go func() {
+			err := recipientOutbox.Run(deliveryCtx)
+			if err != nil {
+				slog.Error("recipient delivery stopped", "error", err)
+				stop()
+			}
+			deliveryDone <- err
+		}()
+		defer func() { deliveryCancel(); result = errors.Join(result, <-deliveryDone) }()
+	}
 	relayCtx, relayCancel := context.WithCancel(ctx)
 	relay := &gateway.Relay{DB: db, Public: transport.NewCommitteeClient(n.CommitteeURLs[0], n.CommitteeURLs[1:]...), Trust: trust, Organizations: make(map[protocol.Hash]protocol.OrgConfig), Members: make(map[protocol.Hash][4]gateway.MemberClient)}
 	relay.Direct = n.Direct != nil

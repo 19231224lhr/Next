@@ -27,9 +27,24 @@ func (m *Member) consumePublicInput(o *state.Overlay, winner protocol.DirectSubm
 }
 
 func (m *Member) reclaimPartial(o *state.Overlay, fact protocol.SpendFactID, winner protocol.DirectSubmission, output protocol.OutputID, instance uint8, height int64) error {
+	return m.reclaimPartialByFact(o, fact, winner.Authorization.Fact, winner.Tx.ID(), output, instance, height)
+}
+
+func (m *Member) reclaimPartialByFact(o *state.Overlay, fact, winnerFact protocol.SpendFactID, winnerTx protocol.TxID, output protocol.OutputID, instance uint8, height int64) error {
 	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
 	if err != nil {
 		return err
+	}
+	if !found && m.cfg.EnableInternalPools {
+		proposal, exists, e := state.Load[protocol.PoolAction](o, poolApprovalKey(protocol.Hash(fact)))
+		if e != nil {
+			return e
+		}
+		if exists && proposal.Kind == protocol.PoolDeposit && proposal.ID() == protocol.Hash(fact) && proposal.Input == output && instance == 0 && proposal.Config == m.cfg.Organization.Hash() {
+			// A pool entry vote allocates no admission resources. The public
+			// winner consumes the shared input lock; retain its vote archive.
+			return nil
+		}
 	}
 	if !found || a.Fact != fact || a.Direct == nil {
 		return rules.ErrAccounting
@@ -37,7 +52,7 @@ func (m *Member) reclaimPartial(o *state.Overlay, fact protocol.SpendFactID, win
 	if a.Direct.Body.Config != m.cfg.Organization.Hash() {
 		return rules.ErrAccounting
 	}
-	if a.Direct.ID() == winner.Tx.ID() {
+	if a.Direct.ID() == winnerTx {
 		return rules.ErrAccounting
 	}
 	shared := false
@@ -103,7 +118,7 @@ func (m *Member) reclaimPartial(o *state.Overlay, fact protocol.SpendFactID, win
 		p.Applied[i] = d.Cap
 	}
 	p.Invalidated = true
-	p.SupersededBy = winner.Authorization.Fact
+	p.SupersededBy = winnerFact
 	p.InvalidatedHeight = height
 	return state.Put(o, ProgressKey(fact), p)
 }

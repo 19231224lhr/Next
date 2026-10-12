@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"utxo/internal/delivery"
 	"utxo/internal/gateway"
 	"utxo/internal/requesttrace"
 	"utxo/internal/transport"
@@ -22,6 +23,10 @@ func directPaymentHandler(c *gateway.Collector) (http.HandlerFunc, func()) {
 }
 
 func newDirectPaymentHandler(c *gateway.Collector, publish bool) (http.HandlerFunc, func()) {
+	return newDirectPaymentHandlerWithDelivery(c, publish, nil)
+}
+
+func newDirectPaymentHandlerWithDelivery(c *gateway.Collector, publish bool, outbox *delivery.Outbox) (http.HandlerFunc, func()) {
 	slots := make(chan struct{}, 128)
 	saves := make(chan struct{}, directPersistenceLimit)
 	var pending sync.WaitGroup
@@ -70,6 +75,12 @@ func newDirectPaymentHandler(c *gateway.Collector, publish bool) (http.HandlerFu
 			return
 		}
 		requesttrace.Mark(ctx, "request_decoded")
+		if outbox != nil {
+			if len(r.Header.Get(delivery.MetadataHeader)) > delivery.MaxMetadata || outbox.CheckRoutes(req.Tx) != nil {
+				http.Error(w, "DELIVERY_ROUTE_UNAVAILABLE", 400)
+				return
+			}
+		}
 		cert, err := c.CollectDirect(ctx, req)
 		if err != nil {
 			if errors.Is(err, gateway.ErrSigningBusy) {
@@ -89,6 +100,16 @@ func newDirectPaymentHandler(c *gateway.Collector, publish bool) (http.HandlerFu
 		}
 		requesttrace.Mark(ctx, "response_ready")
 		requesttrace.Payment("certificate_ready", cert.QC.Fact)
+		payment := protocol.DirectPayment{Tx: req.Tx, Certificate: cert, InputCertificates: req.InputCertificates}
+		if outbox != nil {
+			if err = outbox.Enqueue(payment, r.Header.Get(delivery.MetadataHeader)); err != nil {
+				// A valid QC already exists. Preserve public recovery even when delivery
+				// storage fails; the client must retry the same signed request.
+				persist(payment)
+				http.Error(w, "DELIVERY_PERSIST_FAILED_RETRY_SAME_REQUEST", 503)
+				return
+			}
+		}
 		if requesttrace.Enabled(ctx) {
 			w.Header().Set(requesttrace.HeaderName, requesttrace.Header(ctx))
 		}
@@ -99,7 +120,6 @@ func newDirectPaymentHandler(c *gateway.Collector, publish bool) (http.HandlerFu
 		if !publish {
 			return
 		} // E2 controls parent publication independently.
-		payment := protocol.DirectPayment{Tx: req.Tx, Certificate: cert, InputCertificates: req.InputCertificates}
 		if c.OfferDirect != nil {
 			c.OfferDirect(payment)
 		}

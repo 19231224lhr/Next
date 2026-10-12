@@ -32,6 +32,21 @@ type blockCoin struct {
 func collectBlockCoins(network protocol.Hash, owners map[protocol.PublicKey]bool, entries []finality.ExecutedTx) ([]blockCoin, error) {
 	var coins []blockCoin
 	for _, entry := range entries {
+		if entry.Code == 0 && protocol.IsPoolCertificate(entry.Bytes) {
+			// This function consumes a verified public block, never a bare QC.
+			c, err := protocol.DecodePoolCertificate(entry.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			a := c.Action
+			if a.Network != network {
+				return nil, protocol.ErrAuth
+			}
+			if a.Kind == protocol.PoolExit && owners[a.To.Owner] {
+				coins = append(coins, blockCoin{DirectCoinKey(a.OutputID(), 0), DirectCoin{Output: protocol.Output{Asset: protocol.AssetCAL, Amount: a.Amount, Recipient: a.To}, Final: a.CreationFact()}})
+			}
+			continue
+		}
 		if entry.Code != 0 || len(entry.Data) == 0 {
 			continue
 		}

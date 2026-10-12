@@ -27,6 +27,8 @@ type e7WalletConfig struct {
 	Dir, Network, Listen, Gateway string
 	Site                          int
 	Receivers                     [2]string
+	DirectDelivery                bool `json:",omitempty"`
+	Durable                       bool `json:",omitempty"`
 }
 type e7RunOptions struct {
 	Phase                            string
@@ -99,7 +101,11 @@ func e7WalletCommand(args []string) error {
 	if e := cfg.Read(c.Network, &n); e != nil {
 		return e
 	}
-	db, e := store.OpenNoSync(filepath.Join(c.Dir, fmt.Sprintf("e7-wallet%d.db", c.Site)), store.Identity{Network: n.ChainID, Role: "e7-wallet", Node: fmt.Sprint(c.Site), Schema: 4})
+	openStore := store.OpenNoSync
+	if c.DirectDelivery || c.Durable {
+		openStore = store.Open
+	}
+	db, e := openStore(filepath.Join(c.Dir, fmt.Sprintf("e7-wallet%d.db", c.Site)), store.Identity{Network: n.ChainID, Role: "e7-wallet", Node: fmt.Sprint(c.Site), Schema: 4})
 	if e != nil {
 		return e
 	}
@@ -154,6 +160,10 @@ func e7WalletCommand(args []string) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) { io.WriteString(rw, "alive") })
 	mux.HandleFunc("/receive", w.receive)
+	if c.DirectDelivery {
+		mux.Handle("POST /v3/receive", w.directReceiver())
+		mux.HandleFunc("GET /v3/receive/ack", w.directAck)
+	}
 	mux.HandleFunc("/run", func(rw http.ResponseWriter, r *http.Request) {
 		var o e7RunOptions
 		if e := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&o); e != nil {
@@ -225,21 +235,34 @@ func (w *e7Wallet) receive(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, e.Error(), 400)
 		return
 	}
-	if d.Index < 0 || d.Receiver < 0 || d.Receiver >= 64 || d.Receiver%2 != w.config.Site || d.Hop < 1 || d.Hop > 10 {
-		http.Error(rw, "invalid recipient", 400)
-		return
-	}
 	cert, e := protocol.DecodeOutputCertificate(d.Certificate)
 	if e != nil {
 		http.Error(rw, e.Error(), 400)
 		return
 	}
+	ack, e := w.acceptDelivery(d, cert, true)
+	if e != nil {
+		http.Error(rw, e.Error(), 400)
+		return
+	}
+	json.NewEncoder(rw).Encode(ack)
+}
+
+func (w *e7Wallet) acceptDelivery(d e7Delivery, cert protocol.OutputCertificate, verify bool) (e7Ack, error) {
+	if d.Index < 0 || d.Receiver < 0 || d.Receiver >= len(w.wallets) || d.Receiver%2 != w.config.Site || d.Hop < 1 || d.Hop > 10 || w.wallets[d.Receiver] == nil {
+		return e7Ack{}, fmt.Errorf("invalid recipient")
+	}
 	ack, e := w.receipts.accept(d.Index, func() (e7Ack, error) {
 		start := time.Now()
-		if e := w.wallets[d.Receiver].ReceiveDirect(d.Output, cert, 0); e != nil {
-			return e7Ack{}, e
+		if verify {
+			if e := w.wallets[d.Receiver].ReceiveDirect(d.Output, cert, 0); e != nil {
+				return e7Ack{}, e
+			}
 		}
 		elapsed := int64(time.Since(start))
+		if !verify {
+			elapsed = 0
+		} // Verification was already committed by the direct receiver.
 		now := time.Now()
 		w.mu.Lock()
 		defer w.mu.Unlock()
@@ -262,11 +285,10 @@ func (w *e7Wallet) receive(rw http.ResponseWriter, r *http.Request) {
 		}
 		return e7Ack{Index: d.Index, ReceiveNS: elapsed, Fact: cert.QC.Fact}, nil
 	})
-	if e != nil {
-		http.Error(rw, e.Error(), 400)
-		return
+	if e == nil && ack.Fact != cert.QC.Fact {
+		return e7Ack{}, fmt.Errorf("receipt fact mismatch")
 	}
-	json.NewEncoder(rw).Encode(ack)
+	return ack, e
 }
 
 func e7SendReceipt(ctx context.Context, client *http.Client, url string, d e7Delivery) (e7Ack, error) {
