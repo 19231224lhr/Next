@@ -137,14 +137,6 @@ func EvaluateSettlement(v state.ReadView, verified VerifiedCertificate, s Schedu
 		grants[i] = g
 	}
 	if !registered {
-		// Intent binds retries even if clients change certificate signature subsets.
-		prior, found, e := state.Load[protocol.TxID](o, state.Key(state.KeyIntent, t.Intent[:]))
-		if e != nil {
-			return state.Transition{}, e
-		}
-		if found && prior != t.ID() {
-			return state.Transition{}, ErrConflict
-		}
 		for i, a := range c.Admission {
 			if e = updateUsage(o, a.Key, a.Cap, 0, grants[i].Amount, true); e != nil {
 				return state.Transition{}, e
@@ -159,9 +151,6 @@ func EvaluateSettlement(v state.ReadView, verified VerifiedCertificate, s Schedu
 		}
 		p = PublicPayment{Certificate: verified.raw, Fee: escrow}
 		if e = payStage(o, &p, FeeRegister, c); e != nil {
-			return state.Transition{}, e
-		}
-		if e = state.Put(o, state.Key(state.KeyIntent, t.Intent[:]), t.ID()); e != nil {
 			return state.Transition{}, e
 		}
 	}

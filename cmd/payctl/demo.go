@@ -143,7 +143,6 @@ func demo(args []string) error {
 				}
 			}
 		}
-		b.Intent = b.IntentID()
 		signed := protocol.SignedTx{Body: b, Auth: []protocol.OwnerAuth{protocol.SignOwner(b.ID(), keys[sender])}}
 		request := protocol.PaymentRequest{Tx: signed}
 		if parent != nil {

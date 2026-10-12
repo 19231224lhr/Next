@@ -105,7 +105,6 @@ func TestX01CrossOrganizationWithoutParentInstall(t *testing.T) {
 	for _, g := range b.gen.Grants {
 		child.Body.Admission = append(child.Body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
 	}
-	child.Body.Intent = child.Body.IntentID()
 	child.Body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: cert.Effects.Outputs[0], Evidence: protocol.Hash(cert.QC.Fact)}}
 	child.Body.Outputs[0].Amount = 100
 	child.Body.Outputs[0].Recipient = a.gen.Outputs[0].Output.Recipient

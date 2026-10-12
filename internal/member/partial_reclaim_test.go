@@ -50,7 +50,6 @@ func TestPartialReclaimMultipleInputs(t *testing.T) {
 				claims[0], claims[1] = claims[1], claims[0]
 			}
 			body.Outputs[0].Amount = 200
-			body.Intent = body.IntentID()
 			old, err := protocol.NewFastTx(body, claims, x.p.Key)
 			if err != nil {
 				t.Fatal(err)
@@ -62,7 +61,6 @@ func TestPartialReclaimMultipleInputs(t *testing.T) {
 				winners = []protocol.DirectPayment{x.approve(t, x.tx(t, 0, 3, false), 1, 2, 3), x.approve(t, x.tx(t, 1, 4, false), 1, 2, 3)}
 			} else {
 				body.Nonce = x.tx(t, 0, 3, false).Body.Nonce
-				body.Intent = body.IntentID()
 				win, err := protocol.NewFastTx(body, old.Claims, x.p.Key)
 				if err != nil {
 					t.Fatal(err)
@@ -263,7 +261,6 @@ func (x *reclaimLab) tx(t *testing.T, index int, nonce uint64, owner bool) proto
 				body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
 			}
 		}
-		body.Intent = body.IntentID()
 		tx, err = protocol.NewFastTx(body, tx.Claims, x.p.Key)
 		if err != nil {
 			t.Fatal(err)
@@ -449,7 +446,6 @@ func TestPartialReclaimPublicConflict(t *testing.T) {
 			body := next.Body
 			id := win.Certificate.Summary.OutputID(0)
 			body.Inputs = []protocol.Input{{Kind: protocol.FinalInput, Output: id, Evidence: protocol.CreationIdentity(body.Network, win.Tx.ID(), 0, 0)}}
-			body.Intent = body.IntentID()
 			next, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: win.Tx.Body.Outputs[0]}}, x.p.Key)
 			if err != nil {
 				t.Fatal(err)

@@ -28,6 +28,11 @@ import (
 )
 
 type chainHop struct {
+	MemberInputGate                                                             *chainMemberGate   `json:",omitempty"`
+	RequestRaw                                                                  []byte             `json:",omitempty"`
+	HTTPAttempts                                                                []chainHTTPAttempt `json:",omitempty"`
+	PublicWaitDoneUnixNS                                                        int64              `json:",omitempty"`
+	PublicWaitMS                                                                float64            `json:",omitempty"`
 	Hop, Sender, Receiver                                                       int
 	Tx                                                                          protocol.TxID
 	Input, Output                                                               protocol.OutputID
@@ -43,6 +48,7 @@ type chainHop struct {
 }
 
 type chainReport struct {
+	WaitMemberInputs, RecordAttempts          bool
 	Mode                                      string
 	Requested                                 int
 	WalletNoSync                              bool
@@ -73,6 +79,10 @@ func chainInput(id protocol.OutputID, coin wallet.DirectCoin) (protocol.Input, [
 // Setup runs before any node starts. Existing policy semantics authorize each
 // wallet separately; adding recipients must not bypass fee-subject checks.
 func prepareChain(dir string, lab cfg.Lab, n cfg.Network) error {
+	return prepareChainRouting(dir, lab, n, false)
+}
+
+func prepareChainRouting(dir string, lab cfg.Lab, n cfg.Network, crossOrg bool) error {
 	path := filepath.Join(dir, "keys", "chain-c.key")
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		return fmt.Errorf("chain fixture already exists: %s", path)
@@ -88,10 +98,14 @@ func prepareChain(dir string, lab cfg.Lab, n cfg.Network) error {
 	if err != nil {
 		return err
 	}
-	org := n.Organizations[0]
-	for _, k := range []ed25519.PrivateKey{b, key} {
+	for i, k := range []ed25519.PrivateKey{b, key} {
+		org := n.Organizations[0]
+		if crossOrg && i == 0 {
+			org = n.Organizations[1]
+		}
 		var owner protocol.PublicKey
 		copy(owner[:], k[32:])
+		bindFixtureWallet(&n, protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: org.Org}, k))
 		account := protocol.Digest("POLICY", org.Org[:], owner[:])
 		n.Genesis.Grants = append(n.Genesis.Grants, state.Grant{ID: protocol.Digest("CHAIN_POLICY", account[:]), Organization: org.Hash(), Key: protocol.ResourceKey{Kind: protocol.ResourcePolicy, Account: account, Version: 1}, Amount: 1_000_000_000_000, Subject: owner})
 	}
@@ -103,8 +117,11 @@ func chainDirect(args []string) error {
 	dir := f.String("dir", "", "fresh laboratory directory")
 	length := f.Int("length", 10, "number of dependent payments, 1..100")
 	waitFinal := f.Bool("wait-final", false, "wait for verified wallet finality before the next payment")
+	waitMembers := f.Bool("wait-member-inputs", false, "experiment: require three routed members to observe the parent; requires wait-final and e5-owner-fuel")
+	recordAttempts := f.Bool("record-chain-attempts", false, "experiment: archive exact signed request and HTTP attempt timings; requires e5-owner-fuel")
 	trace := f.Bool("trace", false, "foreground diagnostic trace")
 	prepare := f.Bool("prepare", false, "authorize three wallets before starting the laboratory")
+	crossOrg := f.Bool("cross-org", false, "prepare Alice and Carol bound to A, Bob bound to B")
 	auditOnly := f.Bool("audit", false, "audit the completed chain against stopped committee stores")
 	e5 := f.Bool("e5-owner-fuel", false, "E5: each wallet pays with its own final FUEL")
 	originIndex := f.Int("origin-index", -1, "experiment: select the owner's CAL origin by index; -1 keeps the default")
@@ -115,6 +132,9 @@ func chainDirect(args []string) error {
 	}
 	if *dir == "" || *length < 1 || *length > 100 || *originIndex < -1 || *fuelOffset < 0 || *payerFuelOffset < 0 {
 		return protocol.ErrRule
+	}
+	if (*waitMembers && (!*waitFinal || !*e5)) || (*recordAttempts && !*e5) {
+		return fmt.Errorf("member input gate requires wait-final and e5-owner-fuel; attempt recording requires e5-owner-fuel")
 	}
 	var lab cfg.Lab
 	if err := cfg.Read(filepath.Join(*dir, "lab.json"), &lab); err != nil {
@@ -128,7 +148,7 @@ func chainDirect(args []string) error {
 		return protocol.ErrRule
 	}
 	if *prepare {
-		if err := prepareChain(*dir, lab, n); err != nil {
+		if err := prepareChainRouting(*dir, lab, n, *crossOrg); err != nil {
 			return err
 		}
 		if *e5 {
@@ -139,10 +159,10 @@ func chainDirect(args []string) error {
 	if *auditOnly {
 		return auditChain(*dir, lab)
 	}
-	return runChain(*dir, lab, n, *length, *waitFinal, *trace, *e5, *originIndex, *fuelOffset, *payerFuelOffset)
+	return runChain(*dir, lab, n, *length, *waitFinal, *trace, *e5, *originIndex, *fuelOffset, *payerFuelOffset, *waitMembers, *recordAttempts)
 }
 
-func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, trace, e5 bool, originIndex, fuelOffset, payerFuelOffset int) (err error) {
+func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, trace, e5 bool, originIndex, fuelOffset, payerFuelOffset int, waitMembers, recordAttempts bool) (err error) {
 	var e5Samples []faultSample
 	if e5 {
 		defer func() {
@@ -167,9 +187,9 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 	if err != nil {
 		return err
 	}
-	org := n.Organizations[0]
 	var keys [3]ed25519.PrivateKey
 	var descriptors [3]protocol.ReceiveDescriptor
+	var walletOrgs [3]int
 	var wallets [3]*wallet.Wallet
 	var dbs [3]*store.Group
 	for i, path := range []string{lab.Owners[0], lab.Owners[1], filepath.Join(dir, "keys", "chain-c.key")} {
@@ -177,7 +197,19 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		if err != nil {
 			return err
 		}
-		descriptors[i] = protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: org.Org}, keys[i])
+		descriptors[i], err = boundDescriptor(n, keys[i])
+		if err != nil {
+			return err
+		}
+		found := false
+		for j, candidate := range n.Organizations {
+			if candidate.Org == descriptors[i].Route.Org {
+				walletOrgs[i], found = j, true
+			}
+		}
+		if !found {
+			return protocol.ErrAuth
+		}
 		db, e := store.OpenNoSync(filepath.Join(dir, fmt.Sprintf("chain-wallet-%d.db", i)), store.Identity{Network: n.ChainID, Role: "chain-wallet", Node: fmt.Sprint(i), Schema: 4})
 		if e != nil {
 			return e
@@ -189,7 +221,7 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		}
 		dbs[i] = g
 		defer g.Close()
-		wallets[i], err = wallet.New(g, n.Genesis.Network, descriptors[i].Owner, n.Organizations)
+		wallets[i], err = wallet.NewWithGenesis(g, n.Genesis.Network, descriptors[i].Owner, n.Organizations, n.Genesis)
 		if err != nil {
 			return err
 		}
@@ -231,23 +263,35 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		defer stop()
 	}
 	batchCtx, stopBatches := context.WithCancel(ctx)
-	var batches [4]*progressBatcher
-	for i, url := range n.Members[org.Org] {
-		batches[i] = newProgressBatcher(batchCtx, length, func(ctx context.Context, facts []protocol.SpendFactID) ([]member.DirectStatus, error) {
-			return loadProgressBatch(ctx, client, url, facts)
-		})
+	var organizationBatches [2][4]*progressBatcher
+	for j, org := range n.Organizations {
+		if j >= len(organizationBatches) {
+			return protocol.ErrRule
+		}
+		for i, url := range n.Members[org.Org] {
+			organizationBatches[j][i] = newProgressBatcher(batchCtx, length, func(ctx context.Context, facts []protocol.SpendFactID) ([]member.DirectStatus, error) {
+				return loadProgressBatch(ctx, client, url, facts)
+			})
+		}
 	}
 	defer func() {
 		stopBatches()
-		for _, b := range batches {
-			<-b.done
+		for _, batches := range organizationBatches {
+			for _, b := range batches {
+				if b != nil {
+					<-b.done
+				}
+			}
 		}
 	}()
 	var observers sync.WaitGroup
 	observerErrors := make(chan error, length)
-	report := chainReport{Mode: "fast", Requested: length, WalletNoSync: true}
+	report := chainReport{Mode: "fast", Requested: length, WalletNoSync: true, WaitMemberInputs: waitMembers, RecordAttempts: recordAttempts}
 	if waitFinal {
 		report.Mode = "wait_final"
+	}
+	if waitMembers {
+		report.Mode = "wait_member_inputs"
 	}
 	var start time.Time
 	defer func() {
@@ -305,8 +349,13 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 			}
 		}
 	}
+	usedFees := make(map[protocol.OutputID]bool)
 	for i := 0; i < length; i++ {
 		h := &chainHop{Hop: i + 1, Sender: i % 3, Receiver: (i + 1) % 3, Input: id, BuildStartUnixNS: time.Now().UnixNano()}
+		orgIndex := walletOrgs[h.Sender]
+		org := n.Organizations[orgIndex]
+		batches := organizationBatches[orgIndex]
+		gateway := lab.Gateways[orgIndex]
 		buildStart := time.Now()
 		coin := wallet.DirectCoin{Output: origin.Output, Final: origin.Fact}
 		if i > 0 {
@@ -334,7 +383,7 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		if waitFinal && h.CertificateInput {
 			return fmt.Errorf("wait-final selected an unconfirmed input")
 		}
-		body := protocol.TxBody{Wire: 4, Version: 4, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: coin.Output.Recipient.Owner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: p.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: coin.Output.Amount, Recipient: descriptors[h.Receiver]}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
+		body := protocol.TxBody{Wire: protocol.DirectVersion, Version: protocol.DirectVersion, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: coin.Output.Recipient.Owner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: p.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: coin.Output.Amount, Recipient: descriptors[h.Receiver]}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
 		for _, g := range n.Genesis.Grants {
 			if g.Organization != org.Hash() || (g.Key.Kind == protocol.ResourcePolicy && g.Subject != body.Subject) {
 				continue
@@ -346,7 +395,6 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		}
 		nonce := protocol.Digest("CHAIN_V4", id[:])
 		copy(body.Nonce[:], nonce[:])
-		body.Intent = body.IntentID()
 		var tx protocol.FastTx
 		var request protocol.DirectRequest
 		if e5 {
@@ -381,13 +429,43 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		h.OutputData = body.Outputs[0]
 		h.BuildDoneUnixNS = time.Now().UnixNano()
 		h.BuildMS = float64(time.Since(buildStart)) / 1e6
-		sent := time.Now()
-		if start.IsZero() {
-			start = sent
-			report.StartedUnixNS = sent.UnixNano()
+		if recordAttempts {
+			h.RequestRaw = raw
 		}
-		h.SentUnixNS = sent.UnixNano()
-		h.SentOffsetMS = float64(sent.Sub(start)) / 1e6
+		if waitMembers {
+			var parent *chainHop
+			var parentFact protocol.SpendFactID
+			if i > 0 {
+				parent = report.Hops[i-1]
+				parentFact = parent.Fact
+			}
+			if e = validateChainWaitInputs(request, parent, n.Genesis.Outputs, usedFees); e != nil {
+				return fmt.Errorf("hop %d input gate: %w", i+1, e)
+			}
+			gate, gateErr := waitChainMembers(ctx, parentFact, i > 0, func(call context.Context, index int, fact protocol.SpendFactID) (member.DirectStatus, error) {
+				return batches[index].Check(call, fact)
+			})
+			gate.GenesisFeeValidated = true
+			h.MemberInputGate = &gate
+			if gateErr != nil {
+				report.Hops = append(report.Hops, h)
+				return fmt.Errorf("hop %d member input gate: %w", i+1, gateErr)
+			}
+			usedFees[body.Fee.Inputs[0].Output] = true
+		}
+		sent := time.Now()
+		markSent := func(actual time.Time) {
+			sent = actual
+			if start.IsZero() {
+				start = actual
+				report.StartedUnixNS = actual.UnixNano()
+			}
+			h.SentUnixNS = actual.UnixNano()
+			h.SentOffsetMS = float64(actual.Sub(start)) / 1e6
+		}
+		if !recordAttempts {
+			markSent(sent)
+		}
 		report.Hops = append(report.Hops, h)
 		var b []byte
 		var header http.Header
@@ -395,13 +473,26 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		if e5 {
 			call, stop := context.WithTimeout(ctx, 30*time.Second)
 			var c *protocol.OutputCertificate
-			c, attempts, e = faultSend(call, client, lab.Gateways[0]+"/v3/transactions", raw, true)
+			if recordAttempts {
+				b, h.HTTPAttempts, e = measuredFaultSend(call, client, gateway+"/v3/transactions", raw, markSent)
+				attempts = len(h.HTTPAttempts)
+				if e == nil {
+					// Keep faultSend's decode/re-encode path identical in all arms.
+					decoded, decodeErr := protocol.DecodeOutputCertificate(b)
+					e = decodeErr
+					if e == nil {
+						b, e = decoded.MarshalBinary()
+					}
+				}
+			} else {
+				c, attempts, e = faultSend(call, client, gateway+"/v3/transactions", raw, true)
+			}
 			stop()
-			if e == nil {
+			if e == nil && !recordAttempts {
 				b, e = c.MarshalBinary()
 			}
 		} else {
-			b, header, attempts, e = submitChain(ctx, client, lab.Gateways[0]+"/v3/transactions", raw, trace)
+			b, header, attempts, e = submitChain(ctx, client, gateway+"/v3/transactions", raw, trace)
 		}
 		h.Attempts = attempts
 		if e != nil {
@@ -442,6 +533,11 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		if waitFinal {
 			select {
 			case <-finalReady:
+				if recordAttempts {
+					waitDone := time.Now()
+					h.PublicWaitDoneUnixNS = waitDone.UnixNano()
+					h.PublicWaitMS = float64(waitDone.Sub(ready)) / 1e6
+				}
 			case <-ctx.Done():
 				return ctx.Err()
 			}

@@ -22,7 +22,6 @@ func sample(t *testing.T) (TxBody, ed25519.PrivateKey, OrgConfig) {
 	}
 	desc := NewDescriptor(net, Route{Kind: OrgRoute, Org: org}, owner)
 	tx := TxBody{Wire: 2, Version: 2, Network: net, Kind: FastTransfer, Subject: desc.Owner, Nonce: Nonce{1}, Certifier: org, Epoch: 1, Config: cfg.Hash(), Rules: RuleIDs{Digest("fee", nil), Digest("work", nil), Digest("account", nil)}, Inputs: []Input{{Kind: FinalInput, Output: OutputID(Digest("input", nil)), Evidence: Digest("final", nil)}}, Outputs: []Output{{Asset: AssetCAL, Amount: 100, Recipient: desc}}, Fee: FeeTerms{Source: OrgReserve, Account: org, Version: 1, Maximum: 100, Policy: Digest("policy", nil)}, Work: WorkLimit{Execution: 100, Bytes: 4096, Depth: 64, Ancestors: 256}}
-	tx.Intent = tx.IntentID()
 	return tx, owner, cfg
 }
 func TestC02CanonicalTxAndAuthorization(t *testing.T) {

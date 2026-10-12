@@ -24,9 +24,8 @@ type LocalProgress struct {
 	Applied []uint64 `json:",omitempty"`
 }
 
-// DirectStoreSchema prevents old binaries from ignoring cumulative credits or
-// invalidated approvals and re-signing after their capacity was reclaimed.
-const DirectStoreSchema uint64 = 8
+// DirectStoreSchema separates the fixed-wallet direct protocol from prior stores.
+const DirectStoreSchema uint64 = 9
 
 func localApplied(a state.Approval, p LocalProgress) ([]uint64, error) {
 	values := p.Applied

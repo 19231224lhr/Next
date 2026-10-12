@@ -73,7 +73,6 @@ func TestExposedSourceReconstructionAcrossOrganizationsAndDepth(t *testing.T) {
 	body.Outputs = append([]protocol.Output(nil), root.Body.Outputs...)
 	body.Outputs[0].Recipient = other.Genesis.Outputs[0].Output.Recipient
 	body.Nonce[0] = 42
-	body.Intent = body.IntentID()
 	source, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: root.Body.Outputs[0]}}, p.Key)
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +95,6 @@ func TestExposedSourceReconstructionAcrossOrganizationsAndDepth(t *testing.T) {
 	}
 	body = child.Body
 	body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: sc.Summary.OutputID(0), Evidence: protocol.Hash(sc.QC.Fact)}}
-	body.Intent = body.IntentID()
 	child, err = protocol.NewFastTx(body, []protocol.InputClaim{{Output: source.Body.Outputs[0]}}, p.Key)
 	if err != nil {
 		t.Fatal(err)

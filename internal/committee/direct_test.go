@@ -11,6 +11,8 @@ import (
 
 func TestDirectPaymentAtomicFeeAndRoute(t *testing.T) {
 	f := testkit.NewFixture("direct", "a", 1)
+	f.Genesis.Wallets = []state.WalletBinding{{Owner: f.Genesis.Outputs[0].Output.Recipient.Owner, Organization: f.Org.Org}}
+	refund := f.Genesis.Outputs[0].Output.Recipient
 	retail := protocol.NewDescriptor(f.Org.Network, protocol.Route{Kind: protocol.CommitteeRoute}, f.Owner)
 	f.Genesis.Outputs[0].Output.Recipient = retail
 	fuel := state.OriginOutput{ID: protocol.OutputID(protocol.Digest("retail-fuel", nil)), Fact: protocol.Digest("retail-fuel-final", nil), Output: protocol.Output{Asset: protocol.AssetFUEL, Amount: 1000, Recipient: retail}}
@@ -23,12 +25,13 @@ func TestDirectPaymentAtomicFeeAndRoute(t *testing.T) {
 	}
 	b := f.Transaction(0, 1).Body
 	b.Kind = protocol.DirectTransfer
+	b.Outputs[0].Recipient = refund
 	b.Certifier = protocol.Hash{}
 	b.Config = protocol.Hash{}
 	b.Epoch = 0
 	b.Admission = nil
 	b.Work = protocol.WorkLimit{}
-	b.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: 100, Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: fuel.ID, Evidence: fuel.Fact}}, Refund: retail}
+	b.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: 100, Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: fuel.ID, Evidence: fuel.Fact}}, Refund: refund}
 	tx := f.Sign(b)
 	raw, _ := tx.MarshalBinary()
 	var facts []protocol.FinalFact

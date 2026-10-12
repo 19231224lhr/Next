@@ -44,7 +44,7 @@ func TestE7ReceiverVerifiesAndQueuesBeforeACK(t *testing.T) {
 	encoded, _ := cert.MarshalBinary()
 	db := store.NewMemory()
 	defer db.Close()
-	receiver, e := wallet.New(db, tx.Body.Network, tx.Body.Outputs[0].Recipient.Owner, []protocol.OrgConfig{f.Org})
+	receiver, e := wallet.NewWithGenesis(db, tx.Body.Network, tx.Body.Outputs[0].Recipient.Owner, []protocol.OrgConfig{f.Org}, f.Genesis)
 	if e != nil {
 		t.Fatal(e)
 	}

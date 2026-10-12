@@ -6,9 +6,10 @@ import (
 	"utxo/crypto/chameleon"
 )
 
-const DirectVersion uint64 = 4
+const DirectVersion uint64 = 5
+const DirectWireVersion uint64 = 5
 
-var directMagic = []byte{'U', 'T', 'X', 'O', '4', 'C', 'H', 0}
+var directMagic = []byte{'U', 'T', 'X', 'O', '5', 'C', 'H', 0}
 
 // InputClaim is immutable. Instance 1 is created only by a finalized late parent
 // after compensation; an old certificate never authorizes that instance.
@@ -63,16 +64,16 @@ func (t FastTx) ID() TxID {
 	for _, c := range t.Commitments {
 		e.Fixed(c[:])
 	}
-	return TxID(Digest("TX_V3", e.Data()))
+	return TxID(Digest("TX_V5", e.Data()))
 }
 func (t FastTx) FundingContext(index int, key [32]byte) []byte {
-	core := Digest("TX_CORE_V3", t.core())
+	core := Digest("TX_CORE_V5", t.core())
 	e := new(Encoder)
 	e.Fixed(t.Body.Network[:])
 	e.Fixed(core[:])
 	e.U32(uint32(index))
 	e.Fixed(key[:])
-	h := Digest("INPUT_CH_V3", e.Data())
+	h := Digest("INPUT_CH_V5", e.Data())
 	return h[:]
 }
 func (f Funding) ReferenceBytes() []byte {
@@ -84,7 +85,7 @@ func (f Funding) ReferenceBytes() []byte {
 
 func NewFastTx(body TxBody, claims []InputClaim, key *chameleon.Public) (FastTx, error) {
 	t := FastTx{Body: body, Claims: claims}
-	if err := body.validateVersion(4, 4); err != nil {
+	if err := body.validateVersion(DirectWireVersion, DirectVersion); err != nil {
 		return t, err
 	}
 	if len(claims) != len(body.Inputs) || key == nil {
@@ -106,7 +107,7 @@ func NewFastTx(body TxBody, claims []InputClaim, key *chameleon.Public) (FastTx,
 }
 
 func (t FastTx) VerifyAuth() error {
-	if err := t.Body.validateVersion(4, 4); err != nil {
+	if err := t.Body.validateVersion(DirectWireVersion, DirectVersion); err != nil {
 		return err
 	}
 	if len(t.Claims) != len(t.Body.Inputs) || len(t.Funding) != len(t.Claims) || len(t.Commitments) != len(t.Claims) || len(t.Auth) == 0 || len(t.Auth) > MaxInputs {
@@ -208,7 +209,7 @@ func DecodeFastTx(b []byte) (t FastTx, err error) {
 	}
 	d := NewDecoder(fixed)
 	core := NewDecoder(d.Bytes(MaxTxBytes))
-	t.Body, err = decodeTxVersion(core.Bytes(MaxTxBytes), 4, 4)
+	t.Body, err = decodeTxVersion(core.Bytes(MaxTxBytes), DirectWireVersion, DirectVersion)
 	if err != nil {
 		return t, err
 	}
@@ -266,7 +267,7 @@ type OutputCertificate struct {
 
 func (s OutputSummary) encode() []byte {
 	e := new(Encoder)
-	e.U64(4)
+	e.U64(DirectVersion)
 	e.Fixed(s.Network[:])
 	e.Fixed(s.Tx[:])
 	e.Fixed(s.Issuer[:])
@@ -285,7 +286,7 @@ func (s OutputSummary) encode() []byte {
 	}
 	return e.Data()
 }
-func (s OutputSummary) Fact() SpendFactID              { return SpendFactID(Digest("DIRECT_CERT_V3", s.encode())) }
+func (s OutputSummary) Fact() SpendFactID              { return SpendFactID(Digest("DIRECT_CERT_V5", s.encode())) }
 func (s OutputSummary) OutputID(index uint32) OutputID { return OutputIdentity(s.Network, s.Tx, index) }
 
 func SummaryFor(t FastTx, vector AdmissionVector) OutputSummary {
@@ -348,10 +349,7 @@ func (c OutputCertificate) VerifyOutput(cfg OrgConfig, index uint32, o Output) e
 	if err := c.Verify(cfg); err != nil {
 		return err
 	}
-	if int(index) >= len(c.Summary.Outputs) || o.Asset != AssetCAL || o.Recipient.Verify(c.Summary.Network) != nil || c.Summary.Outputs[index] != (OutputCommitment{Digest: OutputDigest(o), Amount: o.Amount}) {
-		return ErrAuth
-	}
-	return nil
+	return verifyOutputCommitment(c.Summary.Network, c.Summary.Outputs, index, o)
 }
 func (c OutputCertificate) MarshalBinary() ([]byte, error) {
 	if err := c.Summary.Validate(); err != nil {
@@ -380,7 +378,7 @@ func DecodeOutputCertificate(b []byte) (c OutputCertificate, err error) {
 		return c, ErrEncoding
 	}
 	s := NewDecoder(d.Bytes(MaxCertificateBytes))
-	if s.U64() != 4 {
+	if s.U64() != DirectVersion {
 		return c, ErrEncoding
 	}
 	copy(c.Summary.Network[:], s.Fixed(32))

@@ -83,7 +83,7 @@ func budgetRelease(ctx context.Context, at time.Time, submit func(context.Contex
 }
 
 func budgetRequest(n cfg.Network, p rules.DirectPolicy, org protocol.OrgConfig, key ed25519.PrivateKey, in protocol.Input, coin protocol.Output, to protocol.ReceiveDescriptor, proofs []protocol.InputCertificate, fee ...state.OriginOutput) (protocol.DirectRequest, error) {
-	body := protocol.TxBody{Wire: 4, Version: 4, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: coin.Recipient.Owner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: p.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: coin.Amount, Recipient: to}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
+	body := protocol.TxBody{Wire: protocol.DirectVersion, Version: protocol.DirectVersion, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: coin.Recipient.Owner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: p.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: coin.Amount, Recipient: to}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
 	if len(fee) > 0 {
 		body.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: 1000, Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: fee[0].ID, Evidence: fee[0].Fact}}, Refund: coin.Recipient}
 	}
@@ -98,7 +98,6 @@ func budgetRequest(n cfg.Network, p rules.DirectPolicy, org protocol.OrgConfig, 
 	}
 	nonce := protocol.Digest("E2_BUDGET", in.Output[:])
 	copy(body.Nonce[:], nonce[:])
-	body.Intent = body.IntentID()
 	tx, e := protocol.NewFastTx(body, []protocol.InputClaim{{Output: coin}}, p.Key)
 	if e != nil {
 		return protocol.DirectRequest{}, e
@@ -182,7 +181,7 @@ func budgetDirect(args []string) error {
 		}
 		dbs[i] = g
 		defer g.Close()
-		wallets[i], err = wallet.New(g, n.Genesis.Network, desc[i].Owner, n.Organizations)
+		wallets[i], err = wallet.NewWithGenesis(g, n.Genesis.Network, desc[i].Owner, n.Organizations, n.Genesis)
 		if err != nil {
 			return err
 		}

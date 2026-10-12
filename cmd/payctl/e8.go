@@ -250,7 +250,7 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 	defer group.Close()
 	ws := make([]*wallet.Wallet, o.Wallets)
 	for i := range ws {
-		ws[i], e = wallet.New(group, n.Genesis.Network, ds[i].Owner, n.Organizations)
+		ws[i], e = wallet.NewWithGenesis(group, n.Genesis.Network, ds[i].Owner, n.Organizations, n.Genesis)
 		if e != nil {
 			return e
 		}

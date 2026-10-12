@@ -1,7 +1,9 @@
 package wallet
 
 import (
+	"bytes"
 	"errors"
+	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/protocol"
 )
@@ -22,7 +24,7 @@ func DirectCoinKey(id protocol.OutputID, instance uint8) []byte {
 }
 
 func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
-	if req.Tx.Body.Network != w.network || req.Tx.Body.Subject != w.owner {
+	if w.bound == (protocol.Hash{}) || req.Tx.Body.Network != w.network || req.Tx.Body.Subject != w.owner {
 		return protocol.ErrAuth
 	}
 	raw, err := req.MarshalBinary()
@@ -31,15 +33,13 @@ func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
 	}
 	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
+		if err := rules.ValidateWalletDescriptors(o, req.Tx); err != nil {
+			return nil, err
+		}
 		id := req.Tx.ID()
-		intent := req.Tx.Body.Intent
-		key := state.Key(state.KeyWalletIntent, intent[:])
+		key := state.Key(state.KeyWalletRequest, id[:])
 		if old, err := v.Get(key); err == nil {
-			prior, err := protocol.DecodeDirectRequest(old)
-			if err != nil {
-				return nil, err
-			}
-			if prior.Tx.ID() != id {
+			if !bytes.Equal(old, raw) {
 				return nil, protocol.ErrAuth
 			}
 			return nil, nil
@@ -89,7 +89,10 @@ func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
 // Durability depends on the configured Store; memory/NoSync is experimental.
 func (w *Wallet) ReceiveDirect(output protocol.Output, c protocol.OutputCertificate, index uint32) error {
 	org, ok := w.orgs[c.Summary.Config]
-	if !ok || c.Summary.Network != w.network || output.Recipient.Owner != w.owner || c.VerifyOutput(org, index, output) != nil {
+	if w.bound == (protocol.Hash{}) || !ok || c.Summary.Network != w.network || output.Recipient.Owner != w.owner || c.VerifyOutput(org, index, output) != nil {
+		return protocol.ErrAuth
+	}
+	if output.Recipient.Route.Kind != protocol.OrgRoute || output.Recipient.Route.Org != w.bound {
 		return protocol.ErrAuth
 	}
 	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {

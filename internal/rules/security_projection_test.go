@@ -16,7 +16,6 @@ func TestSecurityPartialOutputRepairAndLateSource(t *testing.T) {
 	half := f.output
 	half.Amount = 50
 	body.Outputs = []protocol.Output{half, half}
-	body.Intent = body.IntentID()
 	tx, err := protocol.NewFastTx(body, base.Tx.Claims, f.policy.Key)
 	if err != nil {
 		t.Fatal(err)

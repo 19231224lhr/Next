@@ -22,7 +22,14 @@ func ValidateDirectFee(v state.ReadView, tx protocol.FastTx) (uint64, error) {
 			return 0, ErrMissing
 		}
 		out := c.Output
-		if out.Asset != protocol.AssetFUEL || out.Amount == 0 || out.Recipient.Route.Kind != protocol.OrgRoute || out.Recipient.Route.Org != tx.Body.Certifier {
+		if out.Asset != protocol.AssetFUEL || out.Amount == 0 {
+			return 0, protocol.ErrAuth
+		}
+		org, err := validateWalletDescriptor(v, tx.Body.Network, out.Recipient)
+		if err != nil {
+			return 0, err
+		}
+		if org != tx.Body.Certifier {
 			return 0, protocol.ErrAuth
 		}
 		signed := false

@@ -105,7 +105,6 @@ func paymentRepairMonetaryReplay(t *testing.T, repayBefore bool) {
 	body := parent.Body
 	body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(0), Evidence: protocol.Hash(pc.QC.Fact)}}
 	body.Nonce[0] = 40
-	body.Intent = body.IntentID()
 	child, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: parent.Body.Outputs[0]}}, pub)
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +123,6 @@ func paymentRepairMonetaryReplay(t *testing.T, repayBefore bool) {
 	body = child.Body
 	body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: cc.Summary.OutputID(0), Evidence: protocol.Hash(cc.QC.Fact)}}
 	body.Nonce[0] = 42
-	body.Intent = body.IntentID()
 	grandchild, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: child.Body.Outputs[0]}}, pub)
 	if err != nil {
 		t.Fatal(err)
@@ -141,7 +139,6 @@ func paymentRepairMonetaryReplay(t *testing.T, repayBefore bool) {
 	body = grandchild.Body
 	body.Inputs = []protocol.Input{{Kind: protocol.FinalInput, Output: gc.Summary.OutputID(0), Evidence: protocol.CreationIdentity(f.Org.Network, grandchild.ID(), 0, 0)}}
 	body.Nonce[0] = 43
-	body.Intent = body.IntentID()
 	next, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: grandchild.Body.Outputs[0]}}, pub)
 	if err != nil {
 		t.Fatal(err)

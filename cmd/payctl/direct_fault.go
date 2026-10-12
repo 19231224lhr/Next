@@ -132,7 +132,10 @@ func faultRequests(lab cfg.Lab, n cfg.Network, count int) ([]protocol.DirectRequ
 		return nil, err
 	}
 	org := n.Organizations[0]
-	dest := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: org.Org}, to)
+	dest, err := boundDescriptor(n, to)
+	if err != nil {
+		return nil, err
+	}
 	policy, err := n.Direct.Policy(n.Schedule, n.Organizations)
 	if err != nil {
 		return nil, err
@@ -220,11 +223,11 @@ func runFaultLoad(dir string, lab cfg.Lab, n cfg.Network, count int, rate float6
 		return err
 	}
 	defer group.Close()
-	sender, err := wallet.New(group, n.Genesis.Network, requests[0].Tx.Body.Subject, n.Organizations)
+	sender, err := wallet.NewWithGenesis(group, n.Genesis.Network, requests[0].Tx.Body.Subject, n.Organizations, n.Genesis)
 	if err != nil {
 		return err
 	}
-	receiver, err := wallet.New(group, n.Genesis.Network, requests[0].Tx.Body.Outputs[0].Recipient.Owner, n.Organizations)
+	receiver, err := wallet.NewWithGenesis(group, n.Genesis.Network, requests[0].Tx.Body.Outputs[0].Recipient.Owner, n.Organizations, n.Genesis)
 	if err != nil {
 		return err
 	}

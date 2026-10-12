@@ -15,6 +15,11 @@ import (
 )
 
 type Config struct {
+	// Optional bounded copies of committed approval summaries; zero disables caching.
+	DirectContinuationEntries int
+	// Optional same-configuration certificate reuse; zero entries disables it.
+	DirectCacheEntries      int
+	ReuseDirectVerification bool
 	// Experiment control: disables only autonomous reconstruction, not INSTALL relay.
 	DisableSourceRecovery bool
 	Committee             finality.Trust
@@ -29,11 +34,13 @@ type Config struct {
 type Request = protocol.PaymentRequest
 type Approval = protocol.Approval
 type Member struct {
-	cfg           Config
-	db            store.Store
-	peers         map[protocol.Hash]protocol.OrgConfig
-	direct        *rules.DirectPolicy
-	budgetLimited [6]atomic.Uint64
+	approvalSummaries *approvalSummaryCache
+	directCache       *directCertificateCache
+	cfg               Config
+	db                store.Store
+	peers             map[protocol.Hash]protocol.OrgConfig
+	direct            *rules.DirectPolicy
+	budgetLimited     [6]atomic.Uint64
 }
 
 // BudgetLimits counts actual resource rejections, including retried requests.
@@ -63,6 +70,18 @@ func New(cfg Config, db store.Store, gen state.Genesis) (*Member, error) {
 		return nil, err
 	}
 	m := &Member{cfg: cfg, db: db, peers: make(map[protocol.Hash]protocol.OrgConfig)}
+	if cfg.DirectContinuationEntries < 0 || cfg.DirectContinuationEntries > 4096 {
+		return nil, protocol.ErrRule
+	}
+	if cfg.DirectContinuationEntries > 0 {
+		m.approvalSummaries = &approvalSummaryCache{limit: cfg.DirectContinuationEntries, entries: make(map[protocol.SpendFactID]protocol.OutputSummary)}
+	}
+	if cfg.DirectCacheEntries < 0 || cfg.DirectCacheEntries > 4096 {
+		return nil, protocol.ErrRule
+	}
+	if cfg.DirectCacheEntries > 0 {
+		m.directCache = newDirectCertificateCache(cfg.DirectCacheEntries, cfg.Organization.Hash())
+	}
 	for _, p := range cfg.Peers {
 		m.peers[p.Hash()] = p
 	}
@@ -80,6 +99,22 @@ func New(cfg Config, db store.Store, gen state.Genesis) (*Member, error) {
 	return m, nil
 }
 func (m *Member) bootstrap(gen state.Genesis) error {
+	if m.direct != nil {
+		known := make(map[protocol.Hash]bool, len(m.peers))
+		for _, org := range m.peers {
+			known[org.Org] = true
+		}
+		for _, binding := range gen.Wallets {
+			if !known[binding.Organization] {
+				return protocol.ErrAuth
+			}
+		}
+		for _, origin := range gen.Outputs {
+			if route := origin.Output.Recipient.Route; route.Kind == protocol.OrgRoute && !known[route.Org] {
+				return protocol.ErrAuth
+			}
+		}
+	}
 	return m.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		key := state.Key(state.KeyGenesis)
 		genHash := gen.Hash()
@@ -98,7 +133,7 @@ func (m *Member) bootstrap(gen state.Genesis) error {
 		hash := protocol.Digest("MEMBER_INITIAL_STATE", genHash[:], orgHash[:], ids.Fee[:], ids.Work[:], ids.Accounting[:], layout.Data(), committeeHash, []byte(m.cfg.Committee.ChainID))
 		if m.direct != nil {
 			key := m.direct.Key.KeyID()
-			hash = protocol.Digest("MEMBER_INITIAL_STATE_V3", hash[:], key[:])
+			hash = protocol.Digest("MEMBER_INITIAL_STATE_V5", hash[:], key[:])
 		}
 		if old, found, e := state.Load[protocol.Hash](v, key); e != nil {
 			return nil, e
@@ -109,6 +144,11 @@ func (m *Member) bootstrap(gen state.Genesis) error {
 			return nil, nil
 		}
 		o := state.NewOverlay(v)
+		if m.direct != nil {
+			if err := rules.InitializeWalletBindings(o, gen); err != nil {
+				return nil, err
+			}
+		}
 		seen := make(map[protocol.OutputID]bool)
 		for _, g := range gen.Outputs {
 			if seen[g.ID] || g.ID == (protocol.OutputID{}) || g.Fact == (protocol.Hash{}) || g.Output.Amount == 0 || g.Output.Recipient.Verify(gen.Network) != nil {

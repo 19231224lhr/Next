@@ -58,7 +58,6 @@ func newBoundaryLab(t *testing.T, denySponsor ...bool) *boundaryLab {
 	_, _, vals, keys := committee(t)
 	x := &boundaryLab{vals: vals, keys: keys, last: &types.Commit{}}
 	x.f[0], x.f[1] = testkit.NewFixture(chain, "boundary-a", 5), testkit.NewFixture(chain, "boundary-b", 5)
-	x.f[1].Owner = x.f[0].Owner
 	raw, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +153,7 @@ func (x *boundaryLab) tx(t *testing.T, org, index int, nonce uint64, ownerFee bo
 		claims = []protocol.InputClaim{{Output: parent.Tx.Body.Outputs[0]}}
 		parents = []protocol.InputCertificate{{Certificate: parent.Certificate, Index: 0}}
 	}
-	b.Outputs[0].Recipient = protocol.NewDescriptor(f.Org.Network, protocol.Route{Kind: protocol.OrgRoute, Org: x.f[dest].Org.Org}, f.Owner)
+	b.Outputs[0].Recipient = protocol.NewDescriptor(f.Org.Network, protocol.Route{Kind: protocol.OrgRoute, Org: x.f[dest].Org.Org}, x.f[dest].Owner)
 	if ownerFee {
 		fee := x.fees[org][feeIndex]
 		b.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: 1000, Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: fee.ID, Evidence: fee.Fact}}, Refund: fee.Output.Recipient}
@@ -165,7 +164,6 @@ func (x *boundaryLab) tx(t *testing.T, org, index int, nonce uint64, ownerFee bo
 			}
 		}
 	}
-	b.Intent = b.IntentID()
 	tx, err = protocol.NewFastTx(b, claims, x.p.Key)
 	if err != nil {
 		t.Fatal(err)
@@ -480,7 +478,7 @@ func TestRevisionCapacityFragmentationAndFunding(t *testing.T) {
 	x := newBoundaryLab(t)
 	reqs := make([]protocol.DirectRequest, 4)
 	facts := make([]protocol.SpendFactID, 4)
-	inputs, fees, intents := map[protocol.OutputID]bool{}, map[protocol.OutputID]bool{}, map[protocol.Hash]bool{}
+	inputs, fees, transactions := map[protocol.OutputID]bool{}, map[protocol.OutputID]bool{}, map[protocol.TxID]bool{}
 	for i := range reqs {
 		reqs[i] = x.tx(t, 0, i, uint64(i+1), true, i, nil, 0)
 		p := x.approve(t, 0, reqs[i], i, (i+3)%4)
@@ -489,13 +487,13 @@ func TestRevisionCapacityFragmentationAndFunding(t *testing.T) {
 			t.Fatal("expected exactly two approvals")
 		}
 		r := reqs[i]
-		in, fee, intent := r.Tx.Body.Inputs[0].Output, r.Tx.Body.Fee.Inputs[0].Output, protocol.Hash(r.Tx.Body.Intent)
-		if inputs[in] || fees[fee] || intents[intent] {
+		in, fee, transaction := r.Tx.Body.Inputs[0].Output, r.Tx.Body.Fee.Inputs[0].Output, r.Tx.ID()
+		if inputs[in] || fees[fee] || transactions[transaction] {
 			t.Fatal("fixture requests overlap")
 		}
 		inputs[in] = true
 		fees[fee] = true
-		intents[intent] = true
+		transactions[transaction] = true
 	}
 	x.snapshot(t, "four_independent_requests_two_votes_each")
 	for i := range x.m[0] {
@@ -581,131 +579,121 @@ func TestRevisionSplitInputNotUnlockedByFunding(t *testing.T) {
 	}
 }
 
-func TestRevisionIntentTwoRoundCompensation(t *testing.T) {
+func TestRevisionDelayedSourcesTwoRoundCompensationAndRepayment(t *testing.T) {
 	for _, owner := range []bool{true, false} {
 		t.Run(fmt.Sprintf("owner_fee_%t", owner), func(t *testing.T) {
 			x := newBoundaryLab(t)
-			var returned *protocol.DirectPayment
+			var lastChild *protocol.DirectPayment
 			for round := 0; round < 2; round++ {
 				nonce := uint64(100 + round)
-				losingReq := x.tx(t, 0, 0, nonce, owner, round, returned, 1)
-				loser := x.approve(t, 0, losingReq, 0, 1, 2)
-				winner := x.approve(t, 1, x.tx(t, 1, round, nonce, owner, round, nil, 1), 0, 1, 2)
-				if loser.Tx.Body.Intent != winner.Tx.Body.Intent {
-					t.Fatal("fixture must collide in global Intent")
+				source := x.approve(t, 0, x.tx(t, 0, round, nonce, owner, round, nil, 1), 0, 1, 2)
+				independent := x.approve(t, 1, x.tx(t, 1, round, nonce, owner, round, nil, 1), 0, 1, 2)
+				if source.Tx.ID() == independent.Tx.ID() || source.Tx.Body.Inputs[0].Output == independent.Tx.Body.Inputs[0].Output {
+					t.Fatal("round needs independently funded transactions")
 				}
-				x.append(t, boundaryWire(t, winner))
-				raw := boundaryWire(t, loser)
-				before := boundaryRows(t, x.ledger)
-				err := x.ledger.Update(func(v state.ReadView) ([]state.Change, error) {
-					tr, e := x.engine.ExecuteAt(v, raw, apppkg.BlockContext{Height: x.height + 1, Time: time.Unix(1700000000+40*(x.height+1), 0)})
-					return tr.Changes, e
-				})
-				after := boundaryRows(t, x.ledger)
-				if !errors.Is(err, rules.ErrConflict) || !reflect.DeepEqual(before, after) {
-					t.Fatal("Intent loser affected public state", err)
-				}
-				// Include the rejected command and authenticated failure result in the
-				// actual retained history; following it must preserve local locks/credit.
-				var localBefore [4]member.LocalProgress
-				for i := range localBefore {
-					localBefore[i] = boundaryLoad[member.LocalProgress](t, x.db[0][i], member.ProgressKey(loser.Certificate.QC.Fact))
-				}
-				x.appendOne(t, raw, true)
-				x.appendOne(t, nil)
-				for i := range localBefore {
-					if got := boundaryLoad[member.LocalProgress](t, x.db[0][i], member.ProgressKey(loser.Certificate.QC.Fact)); !reflect.DeepEqual(got, localBefore[i]) {
-						t.Fatal("failed result changed progress")
-					}
-					if i < 3 {
-						x.quota(t, i, 200-uint64(round+1)*100, uint64(round+1)*100)
-					}
-				}
-				dest := 0
-				if round == 1 {
-					dest = 1
-				}
-				child := x.approve(t, 1, x.tx(t, 1, 0, uint64(200+round), owner, round+3, &loser, dest), 0, 1, 2)
+				x.append(t, boundaryWire(t, independent))
+				child := x.approve(t, 1, x.tx(t, 1, 0, uint64(200+round), owner, round+3, &source, 1), 0, 1, 2)
 				h := x.append(t, boundaryWire(t, child))
-				out := loser.Certificate.Summary.OutputID(0)
+				out := source.Certificate.Summary.OutputID(0)
 				x.append(t, protocol.ClockTick(x.f[0].Org.Network, x.height+1))
 				x.snapshot(t, fmt.Sprintf("round%d_before_compensation", round+1))
 				decision := protocol.CompensationDecision{Network: x.f[0].Org.Network, Output: out, Height: h, Transaction: 0, Input: 0}
-				d, e := decision.MarshalBinary()
-				if e != nil {
-					t.Fatal(e)
+				d, err := decision.MarshalBinary()
+				if err != nil {
+					t.Fatal(err)
 				}
 				x.append(t, d)
 				if err := x.ledger.View(func(v state.ReadView) error {
-					tr, e := x.engine.ExecuteAt(v, d, apppkg.BlockContext{Height: x.height + 1, Time: time.Unix(1700000000+40*(x.height+1), 0)})
-					if e != nil {
-						return e
+					tr, err := x.engine.ExecuteAt(v, d, apppkg.BlockContext{Height: x.height + 1, Time: time.Unix(1700000000+40*(x.height+1), 0)})
+					if err != nil {
+						return err
 					}
-					result, effects, e := protocol.DecodePublicExecution(x.f[0].Org.Network, d, tr.Data)
-					if e != nil || len(tr.Changes) != 0 || result.Applied || len(effects) != 0 || len(result.FeeOutputs) != 0 {
-						t.Fatal("duplicate compensation effects", e)
+					result, effects, err := protocol.DecodePublicExecution(x.f[0].Org.Network, d, tr.Data)
+					if err != nil || len(tr.Changes) != 0 || result.Applied || len(effects) != 0 || len(result.FeeOutputs) != 0 {
+						t.Fatal("duplicate compensation effects", err)
 					}
 					return nil
 				}); err != nil {
 					t.Fatal(err)
 				}
 				x.append(t, d)
-				bal := boundaryLoad[uint64](t, x.ledger, rules.AccountKey(x.f[0].Org.Org, protocol.AssetCAL))
-				if bal != 300-uint64(round+1)*100 {
-					t.Fatal("wrong net reserve loss", bal)
+				if bal := boundaryLoad[uint64](t, x.ledger, rules.AccountKey(x.f[0].Org.Org, protocol.AssetCAL)); bal != 200 {
+					t.Fatal("wrong temporary reserve debit", bal)
 				}
-				spend := boundaryLoad[state.Spend](t, x.ledger, rules.DirectSpendKey(loser.Tx.Body.Inputs[0].Output, 0))
-				creation := boundaryRequire[state.Creation](t, x.ledger, rules.DirectCreationKey(loser.Tx.Body.Inputs[0].Output, 0))
-				if !creation.Final {
-					t.Fatal("original principal not final")
-				}
-				if spend.Consumed != (protocol.SpendFactID{}) {
-					t.Fatal("rejected source input consumed")
+				spend := boundaryLoad[state.Spend](t, x.ledger, rules.DirectSpendKey(source.Tx.Body.Inputs[0].Output, 0))
+				creation := boundaryRequire[state.Creation](t, x.ledger, rules.DirectCreationKey(source.Tx.Body.Inputs[0].Output, 0))
+				if !creation.Final || spend.Consumed != (protocol.SpendFactID{}) {
+					t.Fatal("delayed source principal consumed before execution")
 				}
 				for i := 0; i < 3; i++ {
-					x.quota(t, i, 200-uint64(round+1)*100, uint64(round+1)*100)
-					p := boundaryRequire[member.LocalProgress](t, x.db[0][i], member.ProgressKey(loser.Certificate.QC.Fact))
-					if p.Settled || p.Paid != 100 || p.Recovered != 0 {
-						t.Fatal("loser progress", p)
+					x.quota(t, i, 100, 100)
+					progress := boundaryRequire[member.LocalProgress](t, x.db[0][i], member.ProgressKey(source.Certificate.QC.Fact))
+					if progress.Settled || progress.Paid != 100 || progress.Recovered != 0 {
+						t.Fatal("delayed source progress", progress)
 					}
-					local := boundaryLoad[state.Spend](t, x.db[0][i], rules.DirectSpendKey(loser.Tx.Body.Inputs[0].Output, 0))
-					if local.Candidate != loser.Certificate.QC.Fact {
+					if local := boundaryLoad[state.Spend](t, x.db[0][i], rules.DirectSpendKey(source.Tx.Body.Inputs[0].Output, 0)); local.Candidate != source.Certificate.QC.Fact {
 						t.Fatal("original source lock disappeared")
 					}
 				}
 				x.quota(t, 3, 200, 0)
-				u := boundaryRequire[rules.PublicUsage](t, x.ledger, state.Key(state.KeyUsage, x.f[0].Genesis.Grants[0].Key.Encode()))
-				if u.Reserved != 0 || u.Spent != uint64(round+1)*100 {
-					t.Fatal("net public usage", u)
+				usage := boundaryRequire[rules.PublicUsage](t, x.ledger, state.Key(state.KeyUsage, x.f[0].Genesis.Grants[0].Key.Encode()))
+				if usage.Reserved != 0 || usage.Spent != 100 {
+					t.Fatal("temporary public usage", usage)
 				}
 				if owner {
-					fee := loser.Tx.Body.Fee.Inputs[0]
+					fee := source.Tx.Body.Fee.Inputs[0]
 					c := boundaryRequire[state.Creation](t, x.ledger, rules.DirectCreationKey(fee.Output, 0))
 					s := boundaryLoad[state.Spend](t, x.ledger, rules.DirectSpendKey(fee.Output, 0))
 					if !c.Final || c.Output.Amount != 10000 || s.Consumed != (protocol.SpendFactID{}) {
-						t.Fatal("locked fee principal", c, s)
+						t.Fatal("delayed fee principal", c, s)
 					}
 					for i := 0; i < 3; i++ {
-						if boundaryRequire[state.Spend](t, x.db[0][i], rules.DirectSpendKey(fee.Output, 0)).Candidate != loser.Certificate.QC.Fact {
+						if boundaryRequire[state.Spend](t, x.db[0][i], rules.DirectSpendKey(fee.Output, 0)).Candidate != source.Certificate.QC.Fact {
 							t.Fatal("fee lock lost")
 						}
 					}
 				}
 				x.snapshot(t, fmt.Sprintf("round%d_paid_duplicate_noop", round+1))
-				returned = &child
-			}
-			// The first three members have 200 reserved and cannot issue a third QC;
-			// this slice stoppage happens before the 300-CAL reserve is empty.
-			next := x.tx(t, 0, 4, 999, owner, 8, nil, 1)
-			for i := 0; i < 3; i++ {
-				if _, e := x.m[0][i].ApproveDirect(context.Background(), next); !errors.Is(e, rules.ErrLimited) {
-					t.Fatal("expected exhausted signer slice", e)
+				wire := boundaryWire(t, source)
+				x.append(t, wire)
+				if bal := boundaryLoad[uint64](t, x.ledger, rules.AccountKey(x.f[0].Org.Org, protocol.AssetCAL)); bal != 300 {
+					t.Fatal("late source did not repay reserve", bal)
 				}
+				usage = boundaryRequire[rules.PublicUsage](t, x.ledger, state.Key(state.KeyUsage, x.f[0].Genesis.Grants[0].Key.Encode()))
+				if usage.Reserved != 0 || usage.Spent != 0 {
+					t.Fatal("repayment left public exposure", usage)
+				}
+				for i := 0; i < 3; i++ {
+					x.quota(t, i, 200, 0)
+					progress := boundaryRequire[member.LocalProgress](t, x.db[0][i], member.ProgressKey(source.Certificate.QC.Fact))
+					if !progress.Settled || progress.Paid != 100 || progress.Recovered != 100 {
+						t.Fatal("late source progress", progress)
+					}
+				}
+				before := boundaryRows(t, x.ledger)
+				if err := x.ledger.Update(func(v state.ReadView) ([]state.Change, error) {
+					tr, err := x.engine.ExecuteAt(v, wire, apppkg.BlockContext{Height: x.height + 1, Time: time.Unix(1700000000+40*(x.height+1), 0)})
+					if len(tr.Changes) != 0 {
+						t.Fatal("source retry emitted public effects")
+					}
+					return tr.Changes, err
+				}); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(before, boundaryRows(t, x.ledger)) {
+					t.Fatal("source retry changed public accounting")
+				}
+				x.append(t, wire)
+				x.snapshot(t, fmt.Sprintf("round%d_late_source_repaid", round+1))
+				lastChild = &child
 			}
-			// The final compensation-funded descendant is actually spendable at B.
-			usable := x.approve(t, 1, x.tx(t, 1, 0, 1000, owner, 9, returned, 1), 0, 1, 2)
+			// Both rounds restore the original issuer's capacity, and the paid
+			// descendant remains spendable under its recipient wallet's binding.
+			next := x.approve(t, 0, x.tx(t, 0, 4, 999, owner, 8, nil, 1), 0, 1, 2)
+			x.append(t, boundaryWire(t, next))
+			usable := x.approve(t, 1, x.tx(t, 1, 0, 1000, owner, 9, lastChild, 1), 0, 1, 2)
 			x.append(t, boundaryWire(t, usable))
-			x.snapshot(t, "two_round_stop_original_signers")
+			x.snapshot(t, "two_round_repaid_capacity_reused")
 		})
 	}
 }
@@ -748,7 +736,7 @@ func TestRevisionUnauthorizedSponsorAndLegacyEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 	if x.engine.Check(legacy) == nil {
-		t.Fatal("wire4 accepted legacy envelope")
+		t.Fatal("direct version5 accepted legacy envelope")
 	}
 	err = x.ledger.View(func(v state.ReadView) error {
 		tr, e := x.engine.ExecuteAt(v, legacy, apppkg.BlockContext{Height: 1, Time: time.Unix(1700000040, 0)})

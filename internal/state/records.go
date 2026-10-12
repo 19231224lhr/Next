@@ -11,7 +11,6 @@ const (
 	KeySpend    uint8 = 11
 	KeyApproval uint8 = 20
 	KeyInstall  uint8 = 21
-	KeyIntent   uint8 = 22
 	KeySlice    uint8 = 30
 	KeyGrant    uint8 = 31
 	KeyOutbox   uint8 = 40
@@ -75,6 +74,14 @@ type Genesis struct {
 	Network protocol.Hash
 	Outputs []OriginOutput
 	Grants  []Grant
+	Wallets []WalletBinding `json:",omitempty"`
+}
+
+// WalletBinding fixes a wallet's consumption organization in this genesis.
+// Genesis outputs may supply the same binding; contradictory routes are invalid.
+type WalletBinding struct {
+	Owner        protocol.PublicKey
+	Organization protocol.Hash
 }
 
 func (g Genesis) Hash() protocol.Hash {
@@ -131,12 +138,16 @@ const KeyDirect uint8 = 87
 const KeyCollected uint8 = 88
 
 const (
-	KeyWalletIntent      uint8 = 89
 	KeyWalletSpend       uint8 = 90
 	KeyWalletCertificate uint8 = 91
 )
 
 const KeyCustody uint8 = 92
+
+const (
+	KeyWalletBinding uint8 = 97
+	KeyWalletRequest uint8 = 98
+)
 
 type Custody struct {
 	Fact, Certificate, Effects protocol.Hash

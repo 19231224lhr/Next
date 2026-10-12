@@ -32,6 +32,7 @@ type configuration struct {
 
 func run() (result error) {
 	path := flag.String("config", "", "member config JSON")
+	continuation := flag.Bool("same-org-continuation", false, "cache committed approval summaries for immediate same-organization continuation")
 	flag.Parse()
 	var c configuration
 	if e := cfg.Read(*path, &c); e != nil {
@@ -80,7 +81,11 @@ func run() (result error) {
 		return e
 	}
 	defer func() { result = errors.Join(result, group.Close()) }()
-	m, e := member.New(member.Config{DisableSourceRecovery: os.Getenv("UTXO_EXPERIMENT_DISABLE_SOURCE_RECOVERY") == "1", Organization: org, Index: c.Index, Key: key, Peers: n.Organizations, Committee: trust, Schedule: n.Schedule, Workers: c.Workers, Direct: n.Direct}, group, n.Genesis)
+	continuationEntries := 0
+	if *continuation {
+		continuationEntries = 256
+	}
+	m, e := member.New(member.Config{DirectContinuationEntries: continuationEntries, DisableSourceRecovery: os.Getenv("UTXO_EXPERIMENT_DISABLE_SOURCE_RECOVERY") == "1", Organization: org, Index: c.Index, Key: key, Peers: n.Organizations, Committee: trust, Schedule: n.Schedule, Workers: c.Workers, Direct: n.Direct}, group, n.Genesis)
 	if e != nil {
 		return e
 	}

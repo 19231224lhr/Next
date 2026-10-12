@@ -80,7 +80,9 @@ func Read(path string, dst any) error {
 	defer file.Close()
 	// Includes large laboratory genesis configurations for sustained benchmarks.
 	limit := int64(64 << 20)
-	if os.Getenv("UTXO_E8_LARGE_GENESIS") == "1" { limit = 1 << 30 }
+	if os.Getenv("UTXO_E8_LARGE_GENESIS") == "1" {
+		limit = 1 << 30
+	}
 	decoder := json.NewDecoder(io.LimitReader(file, limit))
 	decoder.DisallowUnknownFields()
 	if e = decoder.Decode(dst); e != nil {
@@ -143,7 +145,9 @@ func (t TLS) Server(listen string) (*tls.Config, error) {
 	return &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{cert}, ClientCAs: pool, ClientAuth: tls.RequireAndVerifyClientCert}, nil
 }
 func HTTP(listen string, handler http.Handler, t TLS) (*http.Server, error) {
-	if os.Getenv("UTXO_E8_METRICS") == "1" { handler = e8HTTP(handler) }
+	if os.Getenv("UTXO_E8_METRICS") == "1" {
+		handler = e8HTTP(handler)
+	}
 	secure, e := t.Server(listen)
 	if e != nil {
 		return nil, e

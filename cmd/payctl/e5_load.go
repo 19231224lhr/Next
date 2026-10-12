@@ -22,7 +22,10 @@ func prepareE5Chain(dir string, lab cfg.Lab, count int) error {
 		if e != nil {
 			return e
 		}
-		d := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: n.Organizations[0].Org}, key)
+		d, e := boundDescriptor(n, key)
+		if e != nil {
+			return e
+		}
 		fuelCount := count
 		if user == 0 {
 			fuelCount += 100

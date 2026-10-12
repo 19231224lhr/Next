@@ -26,7 +26,6 @@ func TestFeeClosureMultipleObligations(t *testing.T) {
 					body.Outputs = []protocol.Output{half, half}
 					makeTx := func(b protocol.TxBody, claims []protocol.InputClaim) protocol.FastTx {
 						t.Helper()
-						b.Intent = b.IntentID()
 						tx, err := protocol.NewFastTx(b, claims, f.policy.Key)
 						if err != nil {
 							t.Fatal(err)
@@ -175,7 +174,6 @@ func TestFeeClosureFulfillmentBeforeCompensation(t *testing.T) {
 					}
 				}
 			}
-			body.Intent = body.IntentID()
 			tx, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: f.output}, {Output: f.output}}, f.policy.Key)
 			if err != nil {
 				t.Fatal(err)

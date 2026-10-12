@@ -15,6 +15,11 @@ type MemberClient interface {
 	Install(context.Context, protocol.TXCer) error
 }
 type Collector struct {
+	// SameOrgContinuation uses parent signers' retained approval material.
+	// Set before serving requests. Full requests remain the compatibility path.
+	SameOrgContinuation bool
+	// CompactDirectApprovals is a generic response encoding optimization.
+	CompactDirectApprovals bool
 	// OfferDirect is optional, nonblocking early delivery; PersistDirect still runs.
 	OfferDirect func(protocol.DirectPayment) bool
 	// NotifyPersisted is a best-effort scheduling hint, never the durable queue.

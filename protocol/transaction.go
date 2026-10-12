@@ -131,7 +131,6 @@ type TxBody struct {
 	Wire, Version uint64
 	Network       Hash
 	Kind          TxKind
-	Intent        Hash
 	Subject       PublicKey
 	Nonce         Nonce
 	Certifier     Hash
@@ -145,7 +144,6 @@ type TxBody struct {
 	Work          WorkLimit
 }
 
-func (t TxBody) IntentID() Hash { return Digest("INTENT", t.Network[:], t.Subject[:], t.Nonce[:]) }
 func (t TxBody) Validate() error {
 	return t.validateVersion(WireVersion, ProtocolVersion)
 }
@@ -154,7 +152,7 @@ func (t TxBody) validateVersion(wire, version uint64) error {
 	if t.Wire != wire || t.Version != version {
 		return ErrUnsupported
 	}
-	if t.Network == (Hash{}) || t.Intent != t.IntentID() || t.Subject == (PublicKey{}) || t.Rules.Fee == (Hash{}) || t.Rules.Work == (Hash{}) || t.Rules.Accounting == (Hash{}) {
+	if t.Network == (Hash{}) || t.Subject == (PublicKey{}) || t.Rules.Fee == (Hash{}) || t.Rules.Work == (Hash{}) || t.Rules.Accounting == (Hash{}) {
 		return ErrRule
 	}
 	if len(t.Inputs) == 0 || len(t.Inputs) > MaxInputs || len(t.Outputs) == 0 || len(t.Outputs) > MaxOutputs || len(t.Fee.Inputs) > MaxInputs || len(t.Admission) > MaxAdmission || len(t.Inputs)+len(t.Fee.Inputs) > MaxInputs {
@@ -239,7 +237,6 @@ func (t TxBody) encode() []byte {
 	e.U64(t.Version)
 	e.Fixed(t.Network[:])
 	e.U8(uint8(t.Kind))
-	e.Fixed(t.Intent[:])
 	e.Fixed(t.Subject[:])
 	e.Fixed(t.Nonce[:])
 	t.Rules.encode(e)
@@ -307,7 +304,6 @@ func decodeTxVersion(b []byte, wire, version uint64) (t TxBody, err error) {
 	t.Version = d.U64()
 	copy(t.Network[:], d.Fixed(32))
 	t.Kind = TxKind(d.U8())
-	copy(t.Intent[:], d.Fixed(32))
 	copy(t.Subject[:], d.Fixed(32))
 	copy(t.Nonce[:], d.Fixed(16))
 	t.Rules = decodeRules(d)

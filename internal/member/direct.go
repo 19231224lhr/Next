@@ -29,7 +29,7 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 	if m.direct == nil {
 		return protocol.DirectApproval{}, protocol.ErrUnsupported
 	}
-	req, err := protocol.DecodeDirectRequest(raw)
+	req, err := m.decodeDirectRequest(raw)
 	if err != nil {
 		return protocol.DirectApproval{}, err
 	}
@@ -44,28 +44,38 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 	if err != nil {
 		return protocol.DirectApproval{}, err
 	}
+	requesttrace.Mark(ctx, "vector_prepared")
 	summary := protocol.SummaryFor(tx, vector)
 	fact := summary.Fact()
-	parents := map[protocol.OutputID]protocol.InputCertificate{}
+	type verifiedParent struct {
+		protocol.InputCertificate
+		outputs protocol.VerifiedOutputs
+	}
+	parents := map[protocol.OutputID]verifiedParent{}
 	for _, parent := range req.InputCertificates {
 		c := parent.Certificate
 		org, ok := m.peers[c.Summary.Config]
-		if !ok || c.Verify(org) != nil || c.Summary.Rules != m.direct.Rules() || int(parent.Index) >= len(c.Summary.Outputs) {
+		if !ok || c.Summary.Rules != m.direct.Rules() || uint64(parent.Index) >= uint64(len(c.Summary.Outputs)) {
+			return protocol.DirectApproval{}, protocol.ErrAuth
+		}
+		outputs, err := m.directCache.verify(c, org, m.cfg.ReuseDirectVerification)
+		if err != nil {
 			return protocol.DirectApproval{}, protocol.ErrAuth
 		}
 		id := c.Summary.OutputID(parent.Index)
 		if _, exists := parents[id]; exists {
 			return protocol.DirectApproval{}, protocol.ErrRule
 		}
-		parents[id] = parent
+		parents[id] = verifiedParent{InputCertificate: parent, outputs: outputs}
 	}
+	requesttrace.Mark(ctx, "parents_verified")
 	var totalIn, totalOut uint64
 	used := map[protocol.OutputID]bool{}
 	for i, in := range t.Inputs {
 		claim := tx.Claims[i]
 		if in.Kind == protocol.CertificateInput {
 			p, ok := parents[in.Output]
-			if !ok || in.Evidence != protocol.Hash(p.Certificate.QC.Fact) || p.Certificate.VerifyOutput(m.peers[p.Certificate.Summary.Config], p.Index, claim.Output) != nil {
+			if !ok || in.Evidence != protocol.Hash(p.Certificate.QC.Fact) || p.outputs.VerifyOutput(p.Index, claim.Output) != nil {
 				return protocol.DirectApproval{}, protocol.ErrAuth
 			}
 			used[in.Output] = true
@@ -91,6 +101,9 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		requesttrace.Mark(ctx, "update_started")
 		o := state.NewOverlay(v)
+		if err := rules.ValidateWalletRoutes(o, tx); err != nil {
+			return nil, err
+		}
 		key := state.Key(state.KeyApproval, fact[:])
 		if _, found, err := state.Load[state.Approval](o, key); err != nil {
 			return nil, err
@@ -107,11 +120,6 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
 			return nil, err
 		} else if found {
-			return nil, rules.ErrConflict
-		}
-		if old, found, err := state.Load[protocol.TxID](o, state.Key(state.KeyIntent, t.Intent[:])); err != nil {
-			return nil, err
-		} else if found && old != id {
 			return nil, rules.ErrConflict
 		}
 		for i, in := range t.Inputs {
@@ -188,9 +196,6 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 		if err := state.Put(o, key, a); err != nil {
 			return nil, err
 		}
-		if err := state.Put(o, state.Key(state.KeyIntent, t.Intent[:]), id); err != nil {
-			return nil, err
-		}
 		requesttrace.Mark(ctx, "update_evaluated")
 		return o.Changes(), nil
 	})
@@ -198,6 +203,7 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 		return protocol.DirectApproval{}, err
 	}
 	requesttrace.Mark(ctx, "commit_returned")
+	m.approvalSummaries.put(summary)
 	vote := protocol.SignSpend(fact, m.cfg.Index, m.cfg.Key)
 	requesttrace.Mark(ctx, "vote_signed")
 	return protocol.DirectApproval{Summary: summary, Vote: vote}, nil
@@ -219,6 +225,13 @@ func (m *Member) InstallDirectClassified(payment protocol.DirectPayment) (bool, 
 	}
 	if _, err := rules.VerifyDirectPayment(payment, *m.direct); err != nil {
 		return false, err
+	}
+	// Background delivery can warm the next same-organization request. It still
+	// authenticates the complete certificate, never just this member's own vote.
+	if m.directCache != nil && payment.Certificate.Summary.Config == m.cfg.Organization.Hash() {
+		if _, err := m.directCache.verify(payment.Certificate, m.cfg.Organization, true); err != nil {
+			return false, err
+		}
 	}
 	raw, err := payment.MarshalBinary()
 	if err != nil {

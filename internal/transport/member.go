@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -24,6 +23,10 @@ const MediaType = "application/vnd.utxofast.v2"
 
 func ErrorCode(e error) (string, int) {
 	switch {
+	case errors.Is(e, member.ErrParentApprovalMissing):
+		return "PARENT_APPROVAL_MISSING", http.StatusPreconditionRequired
+	case errors.Is(e, member.ErrCertificateCacheMiss):
+		return "CERTIFICATE_CACHE_MISS", http.StatusPreconditionRequired
 	case errors.Is(e, rules.ErrLimited):
 		return "LIMITED", http.StatusTooManyRequests
 	case errors.Is(e, rules.ErrMissing), errors.Is(e, state.ErrNotFound):
@@ -171,8 +174,9 @@ func MemberHandler(m *member.Member, foreground, background int) http.Handler {
 }
 
 type MemberClient struct {
-	BaseURL string
-	HTTP    *http.Client
+	PreferDirectReferences bool
+	BaseURL                string
+	HTTP                   *http.Client
 }
 
 func NewMemberClient(url string) *MemberClient {
@@ -184,7 +188,7 @@ func (c *MemberClient) post(ctx context.Context, path string, raw []byte, limit 
 		return nil, e
 	}
 	request.Header.Set("Content-Type", MediaType)
-	if (path == "/v1/transactions" || path == "/v3/transactions") && requesttrace.Enabled(ctx) {
+	if (path == "/v1/transactions" || strings.HasPrefix(path, "/v3/transactions")) && requesttrace.Enabled(ctx) {
 		request.Header.Set(requesttrace.HeaderName, "1")
 		request = traceMemberRequest(request, c.BaseURL)
 	}
@@ -205,7 +209,7 @@ func (c *MemberClient) post(ctx context.Context, path string, raw []byte, limit 
 		return nil, protocol.ErrEncoding
 	}
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusNoContent {
-		return nil, fmt.Errorf("member HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
+		return nil, &memberHTTPError{status: response.StatusCode, code: strings.TrimSpace(string(body))}
 	}
 	return body, nil
 }

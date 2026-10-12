@@ -54,7 +54,6 @@ func faultConflicts(dir string, lab cfg.Lab, n cfg.Network, count int) error {
 		return err
 	}
 	rebuild := func(req protocol.DirectRequest, body protocol.TxBody) (protocol.DirectRequest, error) {
-		body.Intent = body.IntentID()
 		tx, e := protocol.NewFastTx(body, req.Tx.Claims, policy.Key)
 		if e != nil {
 			return req, e
@@ -72,7 +71,7 @@ func faultConflicts(dir string, lab cfg.Lab, n cfg.Network, count int) error {
 		return err
 	}
 	defer db.Close()
-	receiver, err := wallet.New(db, n.Genesis.Network, requests[0].Tx.Body.Outputs[0].Recipient.Owner, n.Organizations)
+	receiver, err := wallet.NewWithGenesis(db, n.Genesis.Network, requests[0].Tx.Body.Outputs[0].Recipient.Owner, n.Organizations, n.Genesis)
 	if err != nil {
 		return err
 	}

@@ -81,14 +81,13 @@ func TestV3TransactionStableIdentity(t *testing.T) {
 	_, owner, _ := ed25519.GenerateKey(rand.Reader)
 	net, org := Digest("v3-network"), Digest("v3-org")
 	desc := NewDescriptor(net, Route{Kind: OrgRoute, Org: org}, owner)
-	base := TxBody{Wire: 4, Version: 4, Network: net, Kind: FastTransfer, Certifier: org, Config: Digest("config"), Epoch: 1,
+	base := TxBody{Wire: DirectWireVersion, Version: DirectVersion, Network: net, Kind: FastTransfer, Certifier: org, Config: Digest("config"), Epoch: 1,
 		Rules:   RuleIDs{Fee: Digest("fee"), Work: Digest("work"), Accounting: Digest("account")},
 		Inputs:  []Input{{Kind: CertificateInput, Output: OutputID(Digest("input")), Evidence: Digest("evidence")}},
 		Outputs: []Output{{Asset: AssetCAL, Amount: 100, Recipient: desc}},
 		Fee:     FeeTerms{Source: OrgReserve, Account: org, Policy: Digest("policy"), Version: 1, Maximum: 100},
 		Work:    WorkLimit{Execution: 1000, Bytes: 100000, Depth: 1, Ancestors: 1}}
 	copy(base.Subject[:], owner.Public().(ed25519.PublicKey))
-	base.Intent = base.IntentID()
 	tx, err := NewFastTx(base, []InputClaim{{Output: base.Outputs[0]}}, pub)
 	if err != nil {
 		t.Fatal(err)

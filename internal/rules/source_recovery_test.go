@@ -82,12 +82,11 @@ func TestSourceRecoveryAllFourHopOrders(t *testing.T) {
 						if i+1 < len(payments) {
 							body.Outputs[0].Recipient = orgs[routes[i+1]].output.Recipient
 						}
-						body.Intent = body.IntentID()
 						tx, err := protocol.NewFastTx(body, base.Tx.Claims, f.policy.Key)
 						if err != nil {
 							t.Fatal(err)
 						}
-						tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.owner)}
+						tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), issuer.owner)}
 						payments[i] = ownerPayment(t, issuer, issuer.certify(t, tx, base.InputCertificates), seedOwnerFee(t, issuer, fmt.Sprint("route-fee-", i), 1500))
 					}
 					baseline := projectMoney(t, f.db)
@@ -164,7 +163,7 @@ func TestSourceRecoveryAllFourHopOrders(t *testing.T) {
 }
 
 // Each organization has independent members, reserve and admission grants.
-// The same owner forwards between explicitly routed outputs.
+// Each owner keeps its fixed organization while payments cross routes.
 func recoveryOrganizations(t *testing.T, first directFixture, routes []int) []directFixture {
 	t.Helper()
 	count := 1
@@ -176,7 +175,7 @@ func recoveryOrganizations(t *testing.T, first directFixture, routes []int) []di
 	orgs := []directFixture{first}
 	for i := 1; i < count; i++ {
 		g := newDirectFixture(t)
-		g.db, g.owner = first.db, first.owner
+		g.db = first.db
 		g.org.Org = protocol.Digest("recovery-org", []byte{byte(i)})
 		g.output.Recipient = protocol.NewDescriptor(g.org.Network, protocol.Route{Kind: protocol.OrgRoute, Org: g.org.Org}, g.owner)
 		first.policy.Organizations[g.org.Hash()] = g.org
@@ -192,6 +191,9 @@ func recoveryOrganizations(t *testing.T, first directFixture, routes []int) []di
 		// These tests use owner-paid FUEL instead, constructed below.
 		if err := first.db.Update(func(v state.ReadView) ([]state.Change, error) {
 			o := state.NewOverlay(v)
+			if err := InitializeWalletBindings(o, state.Genesis{Network: g.org.Network, Wallets: []state.WalletBinding{{Owner: g.output.Recipient.Owner, Organization: g.org.Org}}}); err != nil {
+				return nil, err
+			}
 			for _, r := range g.grants {
 				if r.Key.Kind == protocol.ResourcePolicy {
 					continue

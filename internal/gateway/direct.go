@@ -18,7 +18,14 @@ type DirectMemberClient interface {
 
 func (c *Collector) CollectDirect(ctx context.Context, request protocol.DirectRequest) (protocol.OutputCertificate, error) {
 	requesttrace.Mark(ctx, "collect_enter")
-	raw, err := request.MarshalBinary()
+	var raw, compact []byte
+	var signers uint8
+	var err error
+	if c.SameOrgContinuation {
+		raw, compact, signers, err = request.MarshalForContinuation()
+	} else {
+		raw, err = request.MarshalBinary()
+	}
 	if err != nil {
 		return protocol.OutputCertificate{}, err
 	}
@@ -67,7 +74,19 @@ func (c *Collector) CollectDirect(ctx context.Context, request protocol.DirectRe
 			var err error
 			// HTTP peers share one immutable encoding; in-process peers retain
 			// their typed interface. Each receiver still validates independently.
-			if encoded, ok := client.(interface {
+			if prepared, ok := client.(interface {
+				ApproveDirectPrepared(context.Context, protocol.FastTx, []byte, []byte) (protocol.DirectApproval, error)
+			}); ok && c.CompactDirectApprovals {
+				var abbreviated []byte
+				if signers&(1<<i) != 0 {
+					abbreviated = compact
+				}
+				a, err = prepared.ApproveDirectPrepared(run, request.Tx, raw, abbreviated)
+			} else if continued, ok := client.(interface {
+				ApproveDirectContinuation(context.Context, []byte, []byte) (protocol.DirectApproval, error)
+			}); ok && len(compact) > 0 && signers&(1<<i) != 0 {
+				a, err = continued.ApproveDirectContinuation(run, compact, raw)
+			} else if encoded, ok := client.(interface {
 				ApproveDirectBytes(context.Context, []byte) (protocol.DirectApproval, error)
 			}); ok {
 				a, err = encoded.ApproveDirectBytes(run, raw)

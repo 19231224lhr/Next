@@ -116,7 +116,6 @@ func securityComposition(t *testing.T, workers uint32, extraApproval, repair, la
 	body := parent.Body
 	body.Outputs = []protocol.Output{body.Outputs[0], body.Outputs[0]}
 	body.Outputs[0].Amount, body.Outputs[1].Amount = 40, 60
-	body.Intent = body.IntentID()
 	parent, err = protocol.NewFastTx(body, parent.Claims, policy.Key)
 	if err != nil {
 		t.Fatal(err)
@@ -127,7 +126,6 @@ func securityComposition(t *testing.T, workers uint32, extraApproval, repair, la
 	body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: pp.Certificate.Summary.OutputID(0), Evidence: protocol.Hash(pp.Certificate.QC.Fact)}}
 	body.Outputs = []protocol.Output{body.Outputs[0]}
 	body.Nonce[0] = 42
-	body.Intent = body.IntentID()
 	child, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: body.Outputs[0]}}, policy.Key)
 	if err != nil {
 		t.Fatal(err)

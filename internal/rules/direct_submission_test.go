@@ -88,7 +88,6 @@ func TestInputGuaranteeRegistrationHandlesSplitOutputsAndLateConsumer(t *testing
 			body := template.Tx.Body
 			body.Outputs = []protocol.Output{f.output, f.output}
 			body.Outputs[0].Amount, body.Outputs[1].Amount = 40, 60
-			body.Intent = body.IntentID()
 			tx, err := protocol.NewFastTx(body, template.Tx.Claims, f.policy.Key)
 			if err != nil {
 				t.Fatal(err)
@@ -100,7 +99,6 @@ func TestInputGuaranteeRegistrationHandlesSplitOutputsAndLateConsumer(t *testing
 				b.Nonce[0] = byte(10 + index)
 				b.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: parent.Certificate.Summary.OutputID(index), Evidence: protocol.Hash(parent.Certificate.QC.Fact)}}
 				b.Outputs = []protocol.Output{parent.Tx.Body.Outputs[index]}
-				b.Intent = b.IntentID()
 				tx, err := protocol.NewFastTx(b, []protocol.InputClaim{{Output: b.Outputs[0]}}, f.policy.Key)
 				if err != nil {
 					t.Fatal(err)

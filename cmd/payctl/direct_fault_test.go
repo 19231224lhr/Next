@@ -65,7 +65,6 @@ func TestFaultTamperPreservesPayerAuthButInvalidatesCertificate(t *testing.T) {
 	body := tx.Body
 	body.Outputs = append([]protocol.Output(nil), body.Outputs...)
 	body.Outputs[0].Amount++
-	body.Intent = body.IntentID()
 	changed, err := protocol.NewFastTx(body, tx.Claims, pub)
 	if err != nil {
 		t.Fatal(err)

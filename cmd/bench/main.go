@@ -68,7 +68,6 @@ func (r *runner) request(lane, sequence int, input protocol.Input, parent *proto
 			}
 		}
 	}
-	body.Intent = body.IntentID()
 	request := protocol.PaymentRequest{Tx: protocol.SignedTx{Body: body, Auth: []protocol.OwnerAuth{protocol.SignOwner(body.ID(), r.keys[sender])}}}
 	if parent != nil {
 		request.Parents = []protocol.TXCer{*parent}

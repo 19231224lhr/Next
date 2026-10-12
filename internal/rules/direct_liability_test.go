@@ -16,7 +16,7 @@ func TestDirectTwoOrganizationsGrandchildFirst(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			g0, g1 := newDirectFixture(t), newDirectFixture(t)
-			g1.db, g1.owner = g0.db, g0.owner
+			g1.db = g0.db
 			g1.org.Org = protocol.Digest("E3-second-org")
 			g1.output.Recipient = protocol.NewDescriptor(g1.org.Network, protocol.Route{Kind: protocol.OrgRoute, Org: g1.org.Org}, g1.owner)
 			g0.policy.Organizations[g1.org.Hash()] = g1.org
@@ -32,6 +32,9 @@ func TestDirectTwoOrganizationsGrandchildFirst(t *testing.T) {
 			}
 			if err := g0.db.Update(func(v state.ReadView) ([]state.Change, error) {
 				o := state.NewOverlay(v)
+				if err := InitializeWalletBindings(o, state.Genesis{Network: g1.org.Network, Wallets: []state.WalletBinding{{Owner: g1.output.Recipient.Owner, Organization: g1.org.Org}}}); err != nil {
+					return nil, err
+				}
 				for _, ref := range g1.grants {
 					if err := state.Put(o, state.Key(state.KeyGrant, ref.Key.Encode()), state.Grant{ID: ref.Grant, Organization: g1.org.Hash(), Key: ref.Key, Amount: 10000000}); err != nil {
 						return nil, err
@@ -52,7 +55,7 @@ func TestDirectTwoOrganizationsGrandchildFirst(t *testing.T) {
 					in.Kind, in.Evidence = protocol.CertificateInput, protocol.Hash(parent.QC.Fact)
 					parents = []InputCertificate{{Certificate: *parent, Index: 0}}
 				}
-				body := protocol.TxBody{Wire: 4, Version: 4, Network: f.org.Network, Kind: protocol.FastTransfer, Subject: coin.Recipient.Owner, Certifier: f.org.Org, Config: f.org.Hash(), Epoch: 1, Rules: f.policy.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: 100, Recipient: recipient}}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
+				body := protocol.TxBody{Wire: protocol.DirectWireVersion, Version: protocol.DirectVersion, Network: f.org.Network, Kind: protocol.FastTransfer, Subject: coin.Recipient.Owner, Certifier: f.org.Org, Config: f.org.Hash(), Epoch: 1, Rules: f.policy.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: 100, Recipient: recipient}}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
 				body.Nonce[0] = nonce
 				for _, ref := range f.grants {
 					if ref.Key.Kind != protocol.ResourceFUEL && ref.Key.Kind != protocol.ResourcePolicy {
@@ -69,7 +72,6 @@ func TestDirectTwoOrganizationsGrandchildFirst(t *testing.T) {
 					t.Fatal(err)
 				}
 				body.Fee = protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: 1000, Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: feeID, Evidence: feeFact}}, Refund: coin.Recipient}
-				body.Intent = body.IntentID()
 				tx, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: coin}}, f.policy.Key)
 				if err != nil {
 					t.Fatal(err)

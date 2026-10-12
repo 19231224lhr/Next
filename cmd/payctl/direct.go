@@ -85,7 +85,7 @@ func demoDirect(args []string) error {
 	}
 	origin := outputs[selected]
 	build := func(org protocol.OrgConfig, input protocol.Input, claim protocol.Output, to protocol.ReceiveDescriptor, nonce byte) (protocol.FastTx, error) {
-		body := protocol.TxBody{Wire: 4, Version: 4, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: claim.Recipient.Owner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: p.Rules(), Inputs: []protocol.Input{input}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: claim.Amount, Recipient: to}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
+		body := protocol.TxBody{Wire: protocol.DirectVersion, Version: protocol.DirectVersion, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: claim.Recipient.Owner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: p.Rules(), Inputs: []protocol.Input{input}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: claim.Amount, Recipient: to}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
 		for _, g := range n.Genesis.Grants {
 			if g.Organization == org.Hash() {
 				body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
@@ -96,7 +96,6 @@ func demoDirect(args []string) error {
 		}
 		unique := protocol.Digest("DIRECT_DEMO_NONCE", input.Output[:], []byte{nonce})
 		copy(body.Nonce[:], unique[:])
-		body.Intent = body.IntentID()
 		tx, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: claim}}, p.Key)
 		if err != nil {
 			return tx, err
@@ -118,11 +117,11 @@ func demoDirect(args []string) error {
 		return err
 	}
 	defer db1.Close()
-	w0, err := wallet.New(db0, n.Genesis.Network, desc0.Owner, n.Organizations)
+	w0, err := wallet.NewWithGenesis(db0, n.Genesis.Network, desc0.Owner, n.Organizations, n.Genesis)
 	if err != nil {
 		return err
 	}
-	w1, err := wallet.New(db1, n.Genesis.Network, desc1.Owner, n.Organizations)
+	w1, err := wallet.NewWithGenesis(db1, n.Genesis.Network, desc1.Owner, n.Organizations, n.Genesis)
 	if err != nil {
 		return err
 	}

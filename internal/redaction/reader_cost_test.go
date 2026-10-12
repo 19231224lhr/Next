@@ -477,7 +477,6 @@ func newReaderFixture(t *testing.T, path string, n, m int) *readerFixture {
 			body := tx.Body
 			body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(0), Evidence: protocol.Hash(pc.QC.Fact)}}
 			body.Nonce[15] = 1
-			body.Intent = body.IntentID()
 			tx, e = protocol.NewFastTx(body, []protocol.InputClaim{{Output: tx.Body.Outputs[0]}}, pub)
 			readerOK(t, e)
 			tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), lab.Owner)}

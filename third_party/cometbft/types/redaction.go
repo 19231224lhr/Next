@@ -16,7 +16,7 @@ import (
 var redactionKey *chameleon.Public
 var redactionChain string
 var redactionConfig sync.Mutex
-var txMagic = []byte{'U', 'T', 'X', 'O', '4', 'C', 'H', 0}
+var txMagic = []byte{'U', 'T', 'X', 'O', '5', 'C', 'H', 0}
 var partMagic = []byte{'P', 'A', 'R', 'T', '3', 'C', 'H', 0}
 var ErrRedaction = errors.New("invalid wire-v3 redaction")
 

@@ -32,7 +32,8 @@ func initialize(args []string) error {
 	dir := flags.String("dir", "", "new laboratory directory")
 	base := flags.Int("port", 18000, "base loopback port")
 	outputs := flags.Int("outputs", 1024, "finite initial CAL outputs per owner")
-	direct := flags.Bool("v4", false, "new direct-liability genesis with a 3-of-4 repair key")
+	direct := flags.Bool("v4", false, "direct-liability laboratory (current protocol), with a 3-of-4 repair key")
+	flags.BoolVar(direct, "v5", false, "current protocol: fixed wallet binding without payment Intent")
 	if e := flags.Parse(args); e != nil {
 		return e
 	}
@@ -100,6 +101,9 @@ func initialize(args []string) error {
 		}
 		lab.Owners[orgIndex] = ownerFile
 		descriptor := protocol.NewDescriptor(network.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: org.Org}, owner)
+		if *direct {
+			network.Genesis.Wallets = append(network.Genesis.Wallets, state.WalletBinding{Owner: descriptor.Owner, Organization: org.Org})
+		}
 		for i := 0; i < *outputs; i++ {
 			id := protocol.OutputID(protocol.Digest("GENESIS_OUTPUT", org.Org[:], []byte(fmt.Sprint(i))))
 			network.Genesis.Outputs = append(network.Genesis.Outputs, state.OriginOutput{ID: id, Output: protocol.Output{Asset: protocol.AssetCAL, Amount: 100, Recipient: descriptor}, Fact: protocol.Digest("GENESIS_OUTPUT_FACT", id[:])})

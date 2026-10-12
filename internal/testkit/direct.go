@@ -14,8 +14,8 @@ func (f *Fixture) EnableDirect() {
 func (f Fixture) FastTransaction(index int, nonce uint64, p rules.DirectPolicy) (protocol.FastTx, error) {
 	// Reuse the fixture's ordinary transaction and replace only v3 semantics.
 	b := f.Transaction(index, nonce).Body
-	b.Wire = 4
-	b.Version = 4
+	b.Wire = protocol.DirectVersion
+	b.Version = protocol.DirectVersion
 	b.Rules = p.Rules()
 	b.Fee.Maximum = 1000
 	b.Work.Depth = 1
@@ -26,7 +26,6 @@ func (f Fixture) FastTransaction(index int, nonce uint64, p rules.DirectPolicy) 
 			b.Fee.Policy = g.Key.Account
 		}
 	}
-	b.Intent = b.IntentID()
 	tx, err := protocol.NewFastTx(b, []protocol.InputClaim{{Output: f.Genesis.Outputs[index].Output}}, p.Key)
 	if err != nil {
 		return tx, err

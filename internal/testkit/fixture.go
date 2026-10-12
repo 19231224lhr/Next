@@ -56,7 +56,6 @@ func (f Fixture) Transaction(index int, nonce uint64) protocol.SignedTx {
 	return f.Sign(b)
 }
 func (f Fixture) Sign(b protocol.TxBody) protocol.SignedTx {
-	b.Intent = b.IntentID()
 	return protocol.SignedTx{Body: b, Auth: []protocol.OwnerAuth{protocol.SignOwner(b.ID(), f.Owner)}}
 }
 func (f Fixture) Member(index int, db store.Store) (*member.Member, error) {

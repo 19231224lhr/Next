@@ -59,13 +59,29 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 			return nil, err
 		}
 		engine.direct = &p
-		engine.genesis = protocol.Digest("PUBLIC_GENESIS_V3", b)
+		engine.genesis = protocol.Digest("PUBLIC_GENESIS_V5", b)
 	}
 	for _, org := range c.Organizations {
 		if _, ok := engine.orgs[org.Hash()]; ok {
 			return nil, protocol.ErrRule
 		}
 		engine.orgs[org.Hash()] = org
+	}
+	if c.Direct != nil || len(c.Genesis.Wallets) > 0 {
+		known := make(map[protocol.Hash]bool)
+		for _, org := range c.Organizations {
+			known[org.Org] = true
+		}
+		for _, binding := range c.Genesis.Wallets {
+			if !known[binding.Organization] {
+				return nil, protocol.ErrAuth
+			}
+		}
+		for _, output := range c.Genesis.Outputs {
+			if output.Output.Recipient.Route.Kind == protocol.OrgRoute && !known[output.Output.Recipient.Route.Org] {
+				return nil, protocol.ErrAuth
+			}
+		}
 	}
 	// Account roles are static, just like organizations and grant identities.
 	// Validate before the stored-genesis shortcut so reopening cannot bypass it.
@@ -99,6 +115,9 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 			return nil, nil
 		}
 		o := state.NewOverlay(v)
+		if e := rules.InitializeWalletBindings(o, c.Genesis); e != nil {
+			return nil, e
+		}
 		for _, a := range c.Accounts {
 			if a.Owner == (protocol.Hash{}) || (a.Asset != protocol.AssetFUEL && (c.Direct == nil || a.Asset != protocol.AssetCAL)) || a.Balance == 0 {
 				return nil, protocol.ErrRule

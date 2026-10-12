@@ -125,7 +125,6 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 	}
 	body.Nonce[0] = 40
 	body.Work.Ancestors = 1
-	body.Intent = body.IntentID()
 	tx, err := protocol.NewFastTx(body, claims, pub)
 	if err != nil {
 		t.Fatal(err)
@@ -226,7 +225,6 @@ func testAtomicRepairBatch(t *testing.T, count int, acrossParts ...bool) {
 	successorBody := tx.Body
 	successorBody.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: cert.Summary.OutputID(0), Evidence: protocol.Hash(cert.QC.Fact)}}
 	successorBody.Nonce[0] = 41
-	successorBody.Intent = successorBody.IntentID()
 	successor, e := protocol.NewFastTx(successorBody, []protocol.InputClaim{{Output: tx.Body.Outputs[0]}}, pub)
 	if e != nil {
 		t.Fatal(e)

@@ -46,7 +46,6 @@ func TestDirectABCIChildBeforeParentReplay(t *testing.T) {
 	body := parent.Body
 	body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(0), Evidence: protocol.Hash(pc.QC.Fact)}}
 	body.Nonce[0] = 42
-	body.Intent = body.IntentID()
 	child, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: parent.Body.Outputs[0]}}, p.Key)
 	if err != nil {
 		t.Fatal(err)

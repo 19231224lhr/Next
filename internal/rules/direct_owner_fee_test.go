@@ -36,7 +36,6 @@ func ownerPayment(t *testing.T, f directFixture, pay DirectPayment, fee protocol
 			b.Admission = append(b.Admission, g)
 		}
 	}
-	b.Intent = b.IntentID()
 	tx, err := protocol.NewFastTx(b, pay.Tx.Claims, f.policy.Key)
 	if err != nil {
 		t.Fatal(err)
@@ -207,7 +206,6 @@ func TestDirectOwnerFeeRefundCanPayNextTransaction(t *testing.T) {
 	body := next.Tx.Body
 	body.Inputs[0] = protocol.Input{Kind: protocol.FinalInput, Output: parent.Certificate.Summary.OutputID(0), Evidence: protocol.CreationIdentity(f.org.Network, parent.Tx.ID(), 0, 0)}
 	body.Fee.Maximum = 100
-	body.Intent = body.IntentID()
 	tx, err := protocol.NewFastTx(body, next.Tx.Claims, f.policy.Key)
 	if err != nil {
 		t.Fatal(err)

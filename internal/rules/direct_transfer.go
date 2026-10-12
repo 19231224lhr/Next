@@ -34,6 +34,9 @@ func EvaluateDirectTransfer(v state.ReadView, verified VerifiedDirect, s Schedul
 	if t.Kind != protocol.DirectTransfer {
 		return state.Transition{}, protocol.ErrAuth
 	}
+	if err := validateCommitteeWalletRoutes(v, tx); err != nil {
+		return state.Transition{}, err
+	}
 	id := t.ID()
 	factID := protocol.SpendFactID(protocol.Digest("DIRECT_SPEND", t.Network[:], id[:]))
 	o := state.NewOverlay(v)
@@ -42,11 +45,6 @@ func EvaluateDirectTransfer(v state.ReadView, verified VerifiedDirect, s Schedul
 		return state.Transition{}, e
 	} else if done {
 		return state.Transition{}, nil
-	}
-	if prior, found, e := state.Load[protocol.TxID](o, state.Key(state.KeyIntent, t.Intent[:])); e != nil {
-		return state.Transition{}, e
-	} else if found && prior != id {
-		return state.Transition{}, ErrConflict
 	}
 	owners := make(map[protocol.PublicKey]bool)
 	for _, a := range tx.Auth {
@@ -149,9 +147,6 @@ func EvaluateDirectTransfer(v state.ReadView, verified VerifiedDirect, s Schedul
 	body.U64(t.Fee.Maximum - cost)
 	facts = append(facts, makeFact(protocol.FactFeeClosed, protocol.Hash(feeID), body.Data()))
 	if e = state.Put(o, key, true); e != nil {
-		return state.Transition{}, e
-	}
-	if e = state.Put(o, state.Key(state.KeyIntent, t.Intent[:]), id); e != nil {
 		return state.Transition{}, e
 	}
 	return state.Transition{Changes: o.Changes(), Facts: facts}, nil

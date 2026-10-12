@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 	"utxo/internal/member"
@@ -129,7 +130,6 @@ func TestDirectDurableApprovalAndBackgroundInstall(t *testing.T) {
 	body := tx.Body
 	body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: cert.Summary.OutputID(0), Evidence: protocol.Hash(cert.QC.Fact)}}
 	body.Nonce[0] = 3
-	body.Intent = body.IntentID()
 	child, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: tx.Body.Outputs[0]}}, p.Key)
 	if err != nil {
 		t.Fatal(err)
@@ -137,9 +137,30 @@ func TestDirectDurableApprovalAndBackgroundInstall(t *testing.T) {
 	child.Auth = []protocol.OwnerAuth{protocol.SignOwner(child.ID(), f.Owner)}
 	req := protocol.DirectRequest{Tx: child, InputCertificates: []protocol.InputCertificate{{Certificate: cert, Index: 0}}}
 	for i, m := range members {
+		before, err := m.Quota(f.Genesis.Grants[0].Key, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		checkBadParent := func() {
+			t.Helper()
+			bad := req
+			bad.InputCertificates = append([]protocol.InputCertificate(nil), req.InputCertificates...)
+			bad.InputCertificates[0].Certificate.QC.Votes = slices.Clone(cert.QC.Votes)
+			bad.InputCertificates[0].Certificate.QC.Votes[0].Signature[0] ^= 1
+			if _, err := m.ApproveDirect(context.Background(), bad); err == nil {
+				t.Fatal("forged parent certificate accepted")
+			}
+		}
+		checkBadParent()
+		after, err := m.Quota(f.Genesis.Grants[0].Key, 0)
+		if err != nil || after != before {
+			t.Fatalf("invalid parent changed quota: before=%+v after=%+v err=%v", before, after, err)
+		}
 		if _, err = m.ApproveDirect(context.Background(), req); err != nil {
 			t.Fatalf("successor waited for INSTALL: %v", err)
 		}
+		// A saved approval must not bypass verification of a later request.
+		checkBadParent()
 		if err = m.InstallDirect(protocol.DirectPayment{Tx: tx, Certificate: cert}); err != nil {
 			t.Fatal(err)
 		}

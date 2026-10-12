@@ -25,7 +25,7 @@ func (p DirectPolicy) Rules() protocol.RuleIDs {
 	e.Fixed(r.Accounting[:])
 	e.U64(uint64(p.TimeoutSeconds))
 	e.U64(p.RepairCost)
-	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V5_DECISION_FIRST", e.Data())
+	r.Accounting = protocol.Digest("DIRECT_ACCOUNTING_V5_WALLET_BINDING_NO_INTENT", e.Data())
 	return r
 }
 
@@ -580,6 +580,9 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 	if fact == (protocol.SpendFactID{}) || t.Rules != policy.Rules() || now <= 0 || policy.TimeoutSeconds <= 0 || now > math.MaxInt64-policy.TimeoutSeconds {
 		return state.Transition{}, protocol.ErrRule
 	}
+	if err := ValidateWalletRoutes(v, tx); err != nil {
+		return state.Transition{}, err
+	}
 	e := newDirectEval(v, policy, t.Network)
 	key := state.Key(keyDirectPayment, fact[:])
 	old, found, err := state.Load[directPayment](e.o, key)
@@ -588,11 +591,6 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 	}
 	if found && old.Settled {
 		return state.Transition{}, nil
-	}
-	if prior, found, err := state.Load[protocol.TxID](e.o, state.Key(state.KeyIntent, t.Intent[:])); err != nil {
-		return state.Transition{}, err
-	} else if found && prior != tx.ID() {
-		return state.Transition{}, ErrConflict
 	}
 	p := directPayment{Summary: summary, FeeAccount: t.Fee.Account, FeeSource: t.Fee.Source, FeeRefund: t.Fee.Refund}
 	e.resultData.Applied = true
@@ -760,9 +758,6 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 			return state.Transition{}, err
 		}
 
-	}
-	if err = state.Put(e.o, state.Key(state.KeyIntent, t.Intent[:]), tx.ID()); err != nil {
-		return state.Transition{}, err
 	}
 	return e.result()
 }

@@ -64,6 +64,9 @@ func newDirectFixture(t *testing.T) directFixture {
 	}
 	err = f.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
+		if err := InitializeWalletBindings(o, state.Genesis{Network: net, Outputs: []state.OriginOutput{{ID: f.genesis, Output: f.output}}}); err != nil {
+			return nil, err
+		}
 		if err := state.Put(o, DirectCreationKey(f.genesis, 0), state.Creation{Output: f.output, Fact: protocol.Digest("genesis-fact"), Final: true}); err != nil {
 			return nil, err
 		}
@@ -94,10 +97,9 @@ func (f directFixture) payment(t *testing.T, input protocol.OutputID, parent *pr
 		in.Evidence = protocol.Hash(parent.QC.Fact)
 		parents = []InputCertificate{{Certificate: *parent, Index: 0}}
 	}
-	body := protocol.TxBody{Wire: 4, Version: 4, Network: f.org.Network, Kind: protocol.FastTransfer, Subject: f.output.Recipient.Owner, Certifier: f.org.Org, Config: f.org.Hash(), Epoch: 1, Rules: f.policy.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{f.output}, Admission: f.grants,
+	body := protocol.TxBody{Wire: protocol.DirectWireVersion, Version: protocol.DirectVersion, Network: f.org.Network, Kind: protocol.FastTransfer, Subject: f.output.Recipient.Owner, Certifier: f.org.Org, Config: f.org.Hash(), Epoch: 1, Rules: f.policy.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{f.output}, Admission: f.grants,
 		Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: f.org.Org, Policy: protocol.Digest("policy"), Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
 	body.Nonce[0] = nonce
-	body.Intent = body.IntentID()
 	tx, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: f.output}}, f.policy.Key)
 	if err != nil {
 		t.Fatal(err)

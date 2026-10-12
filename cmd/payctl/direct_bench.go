@@ -70,11 +70,13 @@ func benchDirect(args []string) error {
 		return err
 	}
 	org := n.Organizations[0]
-	targetOrg := n.Organizations[1].Org
-	if *sameOrg {
-		targetOrg = org.Org
+	target, err := boundDescriptor(n, recipient)
+	if err != nil {
+		return err
 	}
-	target := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: targetOrg}, recipient)
+	if *sameOrg && target.Route.Org != org.Org {
+		return fmt.Errorf("same-org requires a recipient bound to the issuer in genesis")
+	}
 	var publicOwner protocol.PublicKey
 	copy(publicOwner[:], owner[32:])
 	var inputs []int
@@ -100,11 +102,11 @@ func benchDirect(args []string) error {
 		return err
 	}
 	defer group.Close()
-	sender, err := wallet.New(group, n.Genesis.Network, publicOwner, n.Organizations)
+	sender, err := wallet.NewWithGenesis(group, n.Genesis.Network, publicOwner, n.Organizations, n.Genesis)
 	if err != nil {
 		return err
 	}
-	receiver, err := wallet.New(group, n.Genesis.Network, target.Owner, n.Organizations)
+	receiver, err := wallet.NewWithGenesis(group, n.Genesis.Network, target.Owner, n.Organizations, n.Genesis)
 	if err != nil {
 		return err
 	}
@@ -112,7 +114,7 @@ func benchDirect(args []string) error {
 	encoded := make([][]byte, *count)
 	for i := range requests {
 		origin := n.Genesis.Outputs[inputs[*start+i]]
-		body := protocol.TxBody{Wire: 4, Version: 4, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: publicOwner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: policy.Rules(), Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: origin.Output.Amount, Recipient: target}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
+		body := protocol.TxBody{Wire: protocol.DirectVersion, Version: protocol.DirectVersion, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: publicOwner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: policy.Rules(), Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: origin.Output.Amount, Recipient: target}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
 		for _, g := range n.Genesis.Grants {
 			if g.Organization == org.Hash() {
 				body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
@@ -123,7 +125,6 @@ func benchDirect(args []string) error {
 		}
 		nonce := protocol.Digest("BENCH_V3", origin.ID[:])
 		copy(body.Nonce[:], nonce[:])
-		body.Intent = body.IntentID()
 		tx, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: origin.Output}}, policy.Key)
 		if err != nil {
 			return err

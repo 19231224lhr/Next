@@ -168,12 +168,6 @@ func EvaluatePrepare(v state.ReadView, tx protocol.SignedTx, inputs []state.Crea
 	} else if observed {
 		return nil, fact, ErrConflict
 	}
-	id := tx.Body.ID()
-	if prior, found, e := state.Load[protocol.TxID](o, state.Key(state.KeyIntent, tx.Body.Intent[:])); e != nil {
-		return nil, fact, e
-	} else if found && prior != id {
-		return nil, fact, ErrConflict
-	}
 	for i, in := range tx.Body.Inputs {
 		spend, _, e := state.Load[state.Spend](o, state.Key(state.KeySpend, in.Output[:]))
 		if e != nil {
@@ -239,9 +233,6 @@ func EvaluatePrepare(v state.ReadView, tx protocol.SignedTx, inputs []state.Crea
 		approval.Parents = append(approval.Parents, material.Certificate)
 	}
 	if e := state.Put(o, state.Key(state.KeyApproval, fact[:]), approval); e != nil {
-		return nil, fact, e
-	}
-	if e := state.Put(o, state.Key(state.KeyIntent, tx.Body.Intent[:]), id); e != nil {
 		return nil, fact, e
 	}
 	// The durable approval is the signing intent; its exact vote can be rebuilt.

@@ -1,7 +1,9 @@
 package wallet
 
 import (
+	"bytes"
 	"errors"
+	"utxo/internal/rules"
 	"utxo/internal/state"
 	"utxo/internal/store"
 	"utxo/protocol"
@@ -12,6 +14,7 @@ type Wallet struct {
 	network protocol.Hash
 	owner   protocol.PublicKey
 	orgs    map[protocol.Hash]protocol.OrgConfig
+	bound   protocol.Hash
 }
 
 func New(db store.Store, network protocol.Hash, owner protocol.PublicKey, orgs []protocol.OrgConfig) (*Wallet, error) {
@@ -25,11 +28,59 @@ func New(db store.Store, network protocol.Hash, owner protocol.PublicKey, orgs [
 	for _, o := range orgs {
 		w.orgs[o.Hash()] = o
 	}
+	if err := db.View(func(v state.ReadView) error {
+		binding, _, err := state.Load[protocol.Hash](v, state.Key(state.KeyWalletBinding, owner[:]))
+		w.bound = binding
+		return err
+	}); err != nil {
+		return nil, err
+	}
 	return w, nil
 }
 
-// SaveRequest fixes the exact signed intent and chosen inputs before submission.
-// A timeout leaves this intent pending; it never makes its inputs selectable again.
+// NewWithGenesis loads the fixed wallet routes used by the direct protocol.
+func NewWithGenesis(db store.Store, network protocol.Hash, owner protocol.PublicKey, orgs []protocol.OrgConfig, genesis state.Genesis) (*Wallet, error) {
+	w, err := New(db, network, owner, orgs)
+	if err != nil {
+		return nil, err
+	}
+	if genesis.Network != network {
+		return nil, protocol.ErrAuth
+	}
+	var bound protocol.Hash
+	err = db.Update(func(v state.ReadView) ([]state.Change, error) {
+		o := state.NewOverlay(v)
+		if err := rules.InitializeWalletBindings(o, genesis); err != nil {
+			return nil, err
+		}
+		binding, found, err := state.Load[protocol.Hash](o, state.Key(state.KeyWalletBinding, owner[:]))
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, protocol.ErrAuth
+		}
+		known := false
+		for _, org := range orgs {
+			if org.Org == binding {
+				known = true
+			}
+		}
+		if !known {
+			return nil, protocol.ErrAuth
+		}
+		bound = binding
+		return o.Changes(), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	w.bound = bound
+	return w, nil
+}
+
+// SaveRequest fixes the exact signed request and chosen inputs before submission.
+// A timeout keeps the request pending and its inputs reserved.
 func (w *Wallet) SaveRequest(request protocol.PaymentRequest) error {
 	if request.Tx.Body.Network != w.network || request.Tx.Body.Subject != w.owner {
 		return protocol.ErrAuth
@@ -41,15 +92,10 @@ func (w *Wallet) SaveRequest(request protocol.PaymentRequest) error {
 	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
 		id := request.Tx.Body.ID()
-		intent := request.Tx.Body.Intent
-		key := state.Key(state.KeyWalletIntent, intent[:])
+		key := state.Key(state.KeyWalletRequest, id[:])
 		if previous, e := v.Get(key); e == nil {
-			old, e := protocol.DecodeRequest(previous)
-			if e != nil {
-				return nil, e
-			}
-			if old.Tx.Body.ID() != id {
-				return nil, errors.New("wallet intent already fixes a different body")
+			if !bytes.Equal(previous, raw) {
+				return nil, errors.New("wallet transaction already fixes a different request")
 			}
 			return nil, nil
 		} else if !errors.Is(e, state.ErrNotFound) {

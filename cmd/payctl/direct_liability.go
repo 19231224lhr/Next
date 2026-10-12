@@ -54,6 +54,7 @@ func liabilityGenesis(n cfg.Network, desc [3]protocol.ReceiveDescriptor) cfg.Net
 	}
 	n.Accounts = accounts
 	for i, d := range desc {
+		bindFixtureWallet(&n, d)
 		id := protocol.OutputID(protocol.Digest("E3_SEQUENCE_FUEL", n.Genesis.Network[:], []byte{byte(i)}))
 		n.Genesis.Outputs = append(n.Genesis.Outputs, state.OriginOutput{ID: id, Fact: protocol.Digest("E3_SEQUENCE_FINAL", id[:]), Output: protocol.Output{Asset: protocol.AssetFUEL, Amount: 10000, Recipient: d}})
 	}
@@ -84,7 +85,7 @@ func liabilityDirect(args []string) (err error) {
 		return auditLiability(*dir, lab, n)
 	}
 	if *prepare {
-		if err = prepareChain(*dir, lab, n); err != nil {
+		if err = prepareChainRouting(*dir, lab, n, *mode == "cross"); err != nil {
 			return err
 		}
 		if err = cfg.Read(lab.Network, &n); err != nil {
@@ -129,7 +130,7 @@ func liabilityDirect(args []string) (err error) {
 		}
 		dbs[i] = g
 		defer g.Close()
-		wallets[i], err = wallet.New(g, n.Genesis.Network, desc[i].Owner, n.Organizations)
+		wallets[i], err = wallet.NewWithGenesis(g, n.Genesis.Network, desc[i].Owner, n.Organizations, n.Genesis)
 		if err != nil {
 			return err
 		}

@@ -88,6 +88,8 @@ func paymentHandler(collector *gateway.Collector) http.HandlerFunc {
 
 func run() (result error) {
 	path := flag.String("config", "", "gateway config JSON")
+	continuation := flag.Bool("same-org-continuation", false, "send compact parent quorum proofs to their original same-organization signers")
+	compactApprovals := flag.Bool("compact-direct-approvals", false, "request compact admission-vector and vote responses")
 	flag.Parse()
 	var c configuration
 	if e := cfg.Read(*path, &c); e != nil {
@@ -129,6 +131,8 @@ func run() (result error) {
 	if e != nil {
 		return e
 	}
+	collector.SameOrgContinuation = *continuation
+	collector.CompactDirectApprovals = *compactApprovals
 	if os.Getenv("UTXO_EXPERIMENT_SERIAL_DIRECT") == "1" {
 		collector.EnableSerialDirect()
 		slog.Info("experimental single-collector signing admission enabled")

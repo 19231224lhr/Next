@@ -76,7 +76,7 @@ func TestRepairBatchMaximumFollowerResult(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(wd, f.Org.Network, f.Genesis.Outputs[0].Output.Recipient.Owner, []protocol.OrgConfig{f.Org})
+	w, err := wallet.NewWithGenesis(wd, f.Org.Network, f.Genesis.Outputs[0].Output.Recipient.Owner, []protocol.OrgConfig{f.Org}, f.Genesis)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 			}
 			wdb := store.NewMemory()
 			defer wdb.Close()
-			w, err := wallet.New(wdb, f.Org.Network, f.Genesis.Outputs[0].Output.Recipient.Owner, []protocol.OrgConfig{f.Org})
+			w, err := wallet.NewWithGenesis(wdb, f.Org.Network, f.Genesis.Outputs[0].Output.Recipient.Owner, []protocol.OrgConfig{f.Org}, f.Genesis)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -236,7 +236,6 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				body := parent.Body
 				body.Outputs = []protocol.Output{body.Outputs[0], body.Outputs[0]}
 				body.Outputs[0].Amount, body.Outputs[1].Amount = 40, 60
-				body.Intent = body.IntentID()
 				parent, err = protocol.NewFastTx(body, parent.Claims, policy.Key)
 				if err != nil {
 					t.Fatal(err)
@@ -252,7 +251,6 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 						body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
 					}
 				}
-				body.Intent = body.IntentID()
 				parent, err = protocol.NewFastTx(body, parent.Claims, policy.Key)
 				if err != nil {
 					t.Fatal(err)
@@ -281,7 +279,6 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				body.Fee.Inputs = []protocol.Input{{Kind: protocol.FinalInput, Output: feeOrigins[1].ID, Evidence: feeOrigins[1].Fact}}
 			}
 			body.Nonce[0] = 42
-			body.Intent = body.IntentID()
 			child, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: parent.Body.Outputs[0]}}, policy.Key)
 			if err != nil {
 				t.Fatal(err)
@@ -300,7 +297,6 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				b.Outputs = []protocol.Output{parent.Body.Outputs[1]}
 				b.Nonce[0] = 43
 				b.Fee.Inputs = []protocol.Input{{Kind: protocol.FinalInput, Output: feeOrigins[2].ID, Evidence: feeOrigins[2].Fact}}
-				b.Intent = b.IntentID()
 				tx, e := protocol.NewFastTx(b, []protocol.InputClaim{{Output: b.Outputs[0]}}, policy.Key)
 				if e != nil {
 					t.Fatal(e)
@@ -321,7 +317,6 @@ func TestBlockFollowerMissingRepairLateAndDuplicate(t *testing.T) {
 				if scenario.owner && p.Tx.ID() == child.ID() {
 					bad := child
 					bad.Body.Fee.Inputs = append([]protocol.Input(nil), parent.Body.Fee.Inputs...)
-					bad.Body.Intent = bad.Body.IntentID()
 					bad, err = protocol.NewFastTx(bad.Body, bad.Claims, policy.Key)
 					if err != nil {
 						t.Fatal(err)

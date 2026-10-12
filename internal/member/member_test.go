@@ -51,7 +51,6 @@ func (f fixture) tx(n byte) protocol.SignedTx {
 	for _, g := range f.gen.Grants {
 		b.Admission = append(b.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
 	}
-	b.Intent = b.IntentID()
 	return protocol.SignedTx{Body: b, Auth: []protocol.OwnerAuth{protocol.SignOwner(b.ID(), f.owner)}}
 }
 func (f fixture) node(t *testing.T, i int, path string) (*member.Member, store.Store) {
@@ -87,7 +86,7 @@ func TestM01P02DurableApprovalAndNoDoubleSpend(t *testing.T) {
 	defer db.Close()
 	again, e = m.Approve(member.Request{Tx: tx})
 	if e != nil || again.Vote != first.Vote {
-		t.Fatal("restart lost signed intent")
+		t.Fatal("restart lost signed approval")
 	}
 	if _, e = m.Approve(member.Request{Tx: f.tx(2)}); e == nil {
 		t.Fatal("restart forgot lock")
@@ -119,7 +118,6 @@ func TestQ01CertificateCanBeSpentBeforeInstall(t *testing.T) {
 	}
 	child := f.tx(2)
 	child.Body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: c.Effects.Outputs[0], Evidence: protocol.Hash(c.QC.Fact)}}
-	child.Body.Intent = child.Body.IntentID()
 	child.Auth = []protocol.OwnerAuth{protocol.SignOwner(child.Body.ID(), f.owner)}
 	for i := 0; i < 3; i++ {
 		if _, e := members[i].Approve(member.Request{Tx: child, Parents: []protocol.TXCer{c}}); e != nil {
@@ -133,7 +131,6 @@ func TestQ01CertificateCanBeSpentBeforeInstall(t *testing.T) {
 	}
 	conflict := child
 	conflict.Body.Nonce[0] = 3
-	conflict.Body.Intent = conflict.Body.IntentID()
 	conflict.Auth = []protocol.OwnerAuth{protocol.SignOwner(conflict.Body.ID(), f.owner)}
 	for i := 0; i < 3; i++ {
 		if _, e := members[i].Approve(member.Request{Tx: conflict, Parents: []protocol.TXCer{c}}); e == nil {

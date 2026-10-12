@@ -51,12 +51,11 @@ func TestSourceRecoverySplitMergeOrders(t *testing.T) {
 						}
 					}
 					body.Outputs = outputs
-					body.Intent = body.IntentID()
 					tx, e := protocol.NewFastTx(body, claims, f.policy.Key)
 					if e != nil {
 						t.Fatal(e)
 					}
-					tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.owner)}
+					tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), issuer.owner)}
 					return ownerPayment(t, issuer, issuer.certify(t, tx, certs), seedOwnerFee(t, issuer, fmt.Sprintf("dag-fee-%d", nonce), 1500))
 				}
 				left, right := orgs[1].output, orgs[1].output
