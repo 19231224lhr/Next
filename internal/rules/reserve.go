@@ -28,8 +28,12 @@ func EvaluateReserveIncrease(v state.ReadView, c protocol.ReserveIncrease, prote
 	if g.Amount != c.Previous {
 		return tr, protocol.ErrRule
 	}
-	source := AccountKey(protocol.ReserveFundingAccount(c.Network, c.Subject), protocol.AssetCAL)
-	destination := AccountKey(c.Key.Account, protocol.AssetCAL)
+	asset := protocol.AssetCAL
+	if c.Key.Kind == protocol.ResourceFUEL {
+		asset = protocol.AssetFUEL
+	}
+	source := AccountKey(protocol.ReserveFundingAccount(c.Network, c.Subject), asset)
+	destination := AccountKey(c.Key.Account, asset)
 	_, sourceProtected := protectedCAL[string(source)]
 	_, destinationProtected := protectedCAL[string(destination)]
 	if string(source) == string(destination) || sourceProtected || !destinationProtected {

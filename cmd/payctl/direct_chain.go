@@ -234,7 +234,7 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 			profileStores[i] = &chainBuildStore{Store: g}
 			walletStore = profileStores[i]
 		}
-		wallets[i], err = wallet.NewWithGenesis(walletStore, n.Genesis.Network, descriptors[i].Owner, n.Organizations, n.Genesis)
+		wallets[i], err = wallet.NewWithGenesis(walletStore, n.Genesis.Network, descriptors[i].Owner, n.Organizations, n.Genesis, p)
 		if err != nil {
 			return err
 		}
@@ -445,6 +445,9 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 			tx = request.Tx
 			body = tx.Body
 		} else {
+			if e = bindC3(&body, n, p); e != nil {
+				return e
+			}
 			tx, e = protocol.NewFastTx(body, []protocol.InputClaim{{Output: coin.Output}}, p.Key)
 			if e != nil {
 				return e

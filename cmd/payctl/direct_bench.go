@@ -102,11 +102,11 @@ func benchDirect(args []string) error {
 		return err
 	}
 	defer group.Close()
-	sender, err := wallet.NewWithGenesis(group, n.Genesis.Network, publicOwner, n.Organizations, n.Genesis)
+	sender, err := wallet.NewWithGenesis(group, n.Genesis.Network, publicOwner, n.Organizations, n.Genesis, policy)
 	if err != nil {
 		return err
 	}
-	receiver, err := wallet.NewWithGenesis(group, n.Genesis.Network, target.Owner, n.Organizations, n.Genesis)
+	receiver, err := wallet.NewWithGenesis(group, n.Genesis.Network, target.Owner, n.Organizations, n.Genesis, policy)
 	if err != nil {
 		return err
 	}
@@ -125,6 +125,9 @@ func benchDirect(args []string) error {
 		}
 		nonce := protocol.Digest("BENCH_V3", origin.ID[:])
 		copy(body.Nonce[:], nonce[:])
+		if err := bindC3(&body, n, policy); err != nil {
+			return err
+		}
 		tx, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: origin.Output}}, policy.Key)
 		if err != nil {
 			return err

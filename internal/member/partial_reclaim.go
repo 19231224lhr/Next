@@ -77,7 +77,7 @@ func (m *Member) reclaimPartialByFact(o *state.Overlay, fact, winnerFact protoco
 	if p.Invalidated {
 		return nil
 	}
-	if p.Settled || p.Pending != 0 || p.Paid != 0 || p.Recovered != 0 || p.Fee != (rules.Escrow{}) {
+	if p.Settled || p.Pending != 0 || p.Paid != 0 || p.Recovered != 0 || p.Fee != (rules.Escrow{}) || p.C3 != nil {
 		return rules.ErrAccounting
 	}
 	for _, prefix := range []byte{state.KeyObserved, state.KeyInstall, state.KeyOutbox} {

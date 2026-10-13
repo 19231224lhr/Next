@@ -33,9 +33,13 @@ func initialize(args []string) error {
 	base := flags.Int("port", 18000, "base loopback port")
 	outputs := flags.Int("outputs", 1024, "finite initial CAL outputs per owner")
 	direct := flags.Bool("v4", false, "direct-liability laboratory (current protocol), with a 3-of-4 repair key")
+	c3 := flags.Bool("c3", false, "issuer-funded fixed-quote laboratory (implies v5)")
 	flags.BoolVar(direct, "v5", false, "current protocol: fixed wallet binding without payment Intent")
 	if e := flags.Parse(args); e != nil {
 		return e
+	}
+	if *c3 {
+		*direct = true
 	}
 	if *dir == "" || *outputs < 1 || *outputs > 100000 || *base < 1024 || *base > 65000-301 {
 		return fmt.Errorf("invalid laboratory parameters")
@@ -145,6 +149,11 @@ func initialize(args []string) error {
 		lab.Nodes = append(lab.Nodes, nodeSpec{Name: name, Binary: "gateway", Config: file, URL: url})
 	}
 	var committeeFiles [4]string
+	if *c3 {
+		if e = configureC3Lab(&network); e != nil {
+			return e
+		}
+	}
 	var peers [4]string
 	for i := 0; i < 4; i++ {
 		name := fmt.Sprintf("committee%d", i)

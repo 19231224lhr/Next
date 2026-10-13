@@ -90,6 +90,23 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 	// Account roles are static, just like organizations and grant identities.
 	// Validate before the stored-genesis shortcut so reopening cannot bypass it.
 	engine.protectedCAL = make(map[string]struct{})
+	if engine.direct != nil && engine.direct.C3 != nil {
+		for _, issuer := range engine.direct.C3.Issuers {
+			found := false
+			for _, g := range c.Genesis.Grants {
+				if g.Key == issuer.Funding.Key {
+					if g.ID != issuer.Funding.Grant || g.Organization != issuer.Config {
+						return nil, protocol.ErrAuth
+					}
+					found = true
+				}
+			}
+			if !found {
+				return nil, protocol.ErrAuth
+			}
+			engine.protectedCAL[string(rules.AccountKey(issuer.Funding.Key.Account, protocol.AssetFUEL))] = struct{}{}
+		}
+	}
 	for _, org := range c.Organizations {
 		engine.protectedCAL[string(rules.AccountKey(org.Org, protocol.AssetCAL))] = struct{}{}
 	}
@@ -99,8 +116,12 @@ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
 		}
 	}
 	for _, g := range c.Genesis.Grants {
-		if g.Key.Kind == protocol.ResourceCAL {
-			source := rules.AccountKey(protocol.ReserveFundingAccount(c.Network, g.Subject), protocol.AssetCAL)
+		if g.Key.Kind == protocol.ResourceCAL || (g.Key.Kind == protocol.ResourceFUEL && engine.direct != nil && engine.direct.IsC3Pool(g.Key.Account)) {
+			asset := protocol.AssetCAL
+			if g.Key.Kind == protocol.ResourceFUEL {
+				asset = protocol.AssetFUEL
+			}
+			source := rules.AccountKey(protocol.ReserveFundingAccount(c.Network, g.Subject), asset)
 			if _, protected := engine.protectedCAL[string(source)]; protected {
 				return nil, protocol.ErrRule
 			}

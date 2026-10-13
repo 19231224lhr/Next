@@ -40,7 +40,7 @@ func (c *ReserveIncrease) Sign(key ed25519.PrivateKey) {
 	copy(c.Signature[:], ed25519.Sign(key, id[:]))
 }
 func (c ReserveIncrease) Verify() error {
-	if c.Network == (Hash{}) || c.Organization == (Hash{}) || c.Grant == (Hash{}) || c.Key.Kind != ResourceCAL || c.Key.Account == (Hash{}) || c.Key.Version == 0 || c.Previous == 0 || c.Amount == 0 {
+	if c.Network == (Hash{}) || c.Organization == (Hash{}) || c.Grant == (Hash{}) || (c.Key.Kind != ResourceCAL && c.Key.Kind != ResourceFUEL) || c.Key.Account == (Hash{}) || c.Key.Version == 0 || c.Previous == 0 || c.Amount == 0 {
 		return ErrRule
 	}
 	if _, err := Add(c.Previous, c.Amount); err != nil {

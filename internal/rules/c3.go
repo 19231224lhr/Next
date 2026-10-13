@@ -115,7 +115,8 @@ func (s C3Escrow) Validate() error {
 }
 
 // MaxFutureCost is exact for a validated state, including source execution and
-// repayment after all outputs have been compensated. Invalid states return 0.
+// repayment after all outputs have been compensated. Call Validate first when
+// reading persisted state; this query derives cost from the immutable event masks.
 func (s C3Escrow) MaxFutureCost() uint64 {
 	_, _, _, h, e := s.totals()
 	if e != nil {

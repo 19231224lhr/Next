@@ -12,6 +12,7 @@ import (
 
 // DirectPolicy belongs to a fixed genesis. Timeouts use committed block time.
 type DirectPolicy struct {
+	C3             *C3Settings `json:",omitempty"`
 	Base           Schedule
 	TimeoutSeconds int64
 	RepairCost     uint64
@@ -129,9 +130,11 @@ func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.Admission
 			return nil, err
 		}
 	}
-	escrow, err := NewEscrow(t.Fee.Maximum, p.Base.Fee)
-	if err != nil {
+	if err := p.ValidateC3(t.Fee.C3, t.Config); err != nil {
 		return nil, err
+	}
+	if p.IsC3Pool(t.Fee.Account) {
+		return nil, protocol.ErrAuth
 	}
 	var certified uint64
 	for _, in := range t.Inputs {
@@ -139,21 +142,27 @@ func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.Admission
 			certified++
 		}
 	}
-	reserve, err := protocol.MulDiv(certified, p.RepairCost, 1)
-	if err != nil {
-		return nil, err
-	}
-	minimum, err := protocol.Add(p.Base.Fee.Register, p.Base.Fee.Settle)
-	if err != nil {
-		return nil, err
-	}
-	minimum, err = protocol.Add(minimum, p.Base.Fee.Close)
-	if err != nil {
-		return nil, err
-	}
-	minimum, err = protocol.Add(minimum, reserve)
-	if err != nil || minimum > escrow.Maximum {
-		return nil, ErrLimited
+	if !t.Fee.C3.Enabled() {
+		escrow, err := NewEscrow(t.Fee.Maximum, p.Base.Fee)
+		if err != nil {
+			return nil, err
+		}
+		reserve, err := protocol.MulDiv(certified, p.RepairCost, 1)
+		if err != nil {
+			return nil, err
+		}
+		minimum, err := protocol.Add(p.Base.Fee.Register, p.Base.Fee.Settle)
+		if err != nil {
+			return nil, err
+		}
+		minimum, err = protocol.Add(minimum, p.Base.Fee.Close)
+		if err != nil {
+			return nil, err
+		}
+		minimum, err = protocol.Add(minimum, reserve)
+		if err != nil || minimum > escrow.Maximum {
+			return nil, ErrLimited
+		}
 	}
 	inputCost, err := protocol.MulDiv(uint64(len(t.Inputs)+len(t.Fee.Inputs)), p.Base.InputExecution, 1)
 	if err != nil {
@@ -200,6 +209,41 @@ func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.Admission
 	}
 	if exec > uint64(t.Work.Execution) || retained > uint64(t.Work.Bytes) {
 		return nil, ErrLimited
+	}
+	if t.Fee.C3.Enabled() {
+		var vector protocol.AdmissionVector
+		for _, ref := range t.Admission {
+			var cap uint64
+			switch ref.Key.Kind {
+			case protocol.ResourceCAL:
+				cap = cal
+			case protocol.ResourceFUEL:
+				if ref.Key == t.Fee.C3.Funding().Key {
+					cap = t.Fee.C3.Budget
+				} else {
+					if ref.Key.Account != t.Fee.Account || ref.Key.Version != t.Fee.Version {
+						return nil, protocol.ErrAuth
+					}
+					cap = t.Fee.Maximum
+				}
+			case protocol.ResourcePolicy:
+				if ref.Key.Account != t.Fee.Policy || ref.Key.Version != t.Fee.Version {
+					return nil, protocol.ErrAuth
+				}
+				cap = t.Fee.Maximum
+			case protocol.ResourceExecution:
+				cap = uint64(t.Work.Execution)
+			case protocol.ResourceBytes:
+				cap = uint64(t.Work.Bytes)
+			default:
+				return nil, protocol.ErrRule
+			}
+			vector = append(vector, protocol.Allocation{Key: ref.Key, Cap: cap})
+		}
+		if err := vector.Validate(); err != nil {
+			return nil, err
+		}
+		return vector, ValidateC3Summary(protocol.SummaryFor(tx, vector), p)
 	}
 	amounts := map[protocol.ResourceKind]uint64{protocol.ResourceCAL: cal, protocol.ResourceFUEL: t.Fee.Maximum, protocol.ResourceExecution: exec, protocol.ResourceBytes: retained, protocol.ResourcePolicy: t.Fee.Maximum}
 	if t.Fee.Source == protocol.OwnerFinalUTXO {
@@ -292,6 +336,12 @@ func VerifyDirectSubmission(payment protocol.DirectSubmission, p DirectPolicy) (
 			return VerifiedDirectPayment{}, err
 		}
 		c := parent.Certificate
+		if t := tx.Body; t.Fee.C3.Enabled() && !c.Summary.C3.Enabled() {
+			return VerifiedDirectPayment{}, protocol.ErrUnsupported
+		}
+		if err := ValidateC3Summary(c.Summary, p); err != nil {
+			return VerifiedDirectPayment{}, err
+		}
 		cfg, ok := p.Organizations[c.Summary.Config]
 		if !ok || c.Verify(cfg) != nil || c.Summary.Network != tx.Body.Network || c.Summary.Rules != p.Rules() || int(parent.Index) >= len(c.Summary.Outputs) {
 			return VerifiedDirectPayment{}, protocol.ErrAuth
@@ -359,6 +409,9 @@ func (e *directEval) grant(s protocol.OutputSummary, index int) (state.Grant, er
 }
 func (e *directEval) register(c protocol.OutputCertificate) error {
 	s := c.Summary
+	if err := e.c3Attach(s); err != nil {
+		return err
+	}
 	fact := c.QC.Fact
 	key := state.Key(keyDirectCoverage, fact[:])
 	if _, found, err := state.Load[directCoverage](e.o, key); err != nil {
@@ -490,6 +543,13 @@ func (e *directEval) feeStage(p *directPayment, action FeeAction) error {
 }
 
 func (e *directEval) closeFee(p *directPayment) error {
+	if p.Summary.C3.Enabled() {
+		if p.Pending != 0 || p.Fee.Closed {
+			return nil
+		}
+		p.Fee.Closed = true
+		return nil
+	}
 	if p.Pending != 0 || p.Fee.Closed {
 		return nil
 	}
@@ -547,7 +607,23 @@ func (e *directEval) endObligation(ob *DirectObligation, paid bool) error {
 		return ErrAccounting
 	}
 	p.Pending--
-	if paid {
+	coverage, _, err := state.Load[directCoverage](e.o, state.Key(keyDirectCoverage, ob.Certificate[:]))
+	if err != nil {
+		return err
+	}
+	if paid && coverage.Summary.C3.Enabled() {
+		promise, ok, err := state.Load[directPromise](e.o, state.Key(keyDirectPromise, ob.Output[:]))
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return ErrMissing
+		}
+		if err = e.c3Stage(coverage.Summary, C3Compensate, promise.Index); err != nil {
+			return err
+		}
+	}
+	if paid && !coverage.Summary.C3.Enabled() {
 		p.Fee.Held, err = protocol.Sub(p.Fee.Held, e.policy.RepairCost)
 		if err != nil {
 			return err
@@ -593,6 +669,9 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 		return state.Transition{}, nil
 	}
 	p := directPayment{Summary: summary, FeeAccount: t.Fee.Account, FeeSource: t.Fee.Source, FeeRefund: t.Fee.Refund}
+	if err = e.c3Attach(summary); err != nil {
+		return state.Transition{}, err
+	}
 	e.resultData.Applied = true
 	for i, a := range summary.Admission {
 		g, err := e.grant(summary, i)
@@ -604,6 +683,9 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 				return state.Transition{}, ErrLimited
 			}
 			continue // New final outputs need no temporary coverage registration.
+		}
+		if t.Fee.C3.Enabled() && a.Key == t.Fee.C3.Funding().Key {
+			continue
 		}
 		if a.Key.Kind == protocol.ResourcePolicy && g.Subject != t.Subject {
 			return state.Transition{}, protocol.ErrAuth
@@ -636,12 +718,18 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 	} else if err = changeAmount(e.o, AccountKey(t.Fee.Account, protocol.AssetFUEL), t.Fee.Maximum, true); err != nil {
 		return state.Transition{}, err
 	}
-	p.Fee, err = NewEscrow(t.Fee.Maximum, policy.Base.Fee)
-	if err != nil {
-		return state.Transition{}, err
-	}
-	if err = e.feeStage(&p, FeeRegister); err != nil {
-		return state.Transition{}, err
+	if t.Fee.C3.Enabled() {
+		if err = changeAmount(e.o, AccountKey(t.Fee.C3.Revenue, protocol.AssetFUEL), t.Fee.Maximum, false); err != nil {
+			return state.Transition{}, err
+		}
+	} else {
+		p.Fee, err = NewEscrow(t.Fee.Maximum, policy.Base.Fee)
+		if err != nil {
+			return state.Transition{}, err
+		}
+		if err = e.feeStage(&p, FeeRegister); err != nil {
+			return state.Transition{}, err
+		}
 	}
 	var incoming, outgoing uint64
 	for i, in := range t.Inputs {
@@ -667,6 +755,9 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 				return state.Transition{}, ErrMissing
 			}
 			if err = e.register(parent.Certificate); err != nil {
+				return state.Transition{}, err
+			}
+			if err = e.c3Stage(parent.Certificate.Summary, C3Open, parent.Index); err != nil {
 				return state.Transition{}, err
 			}
 			if _, exists, err := state.Load[DirectObligation](e.o, DirectObligationKey(in.Output)); err != nil {
@@ -713,7 +804,27 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 		return state.Transition{}, ErrAccounting
 	}
 	p.Settled = true
-	if err = e.feeStage(&p, FeeSettle); err != nil {
+	if t.Fee.C3.Enabled() {
+		if err = e.c3Stage(summary, C3Execute, C3WholeTransaction); err != nil {
+			return state.Transition{}, err
+		}
+		for i, a := range summary.Admission {
+			if a.Key.Kind == protocol.ResourceCAL || a.Key == t.Fee.C3.Funding().Key {
+				continue
+			}
+			g, err := e.grant(summary, i)
+			if err != nil {
+				return state.Transition{}, err
+			}
+			spent := uint64(0)
+			if a.Key.Kind == protocol.ResourceFUEL || a.Key.Kind == protocol.ResourcePolicy {
+				spent = a.Cap
+			}
+			if err = updateUsage(e.o, a.Key, a.Cap, spent, g.Amount, false); err != nil {
+				return state.Transition{}, err
+			}
+		}
+	} else if err = e.feeStage(&p, FeeSettle); err != nil {
 		return state.Transition{}, err
 	}
 	if err = e.closeFee(&p); err != nil {

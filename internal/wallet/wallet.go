@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"sync"
 	"utxo/internal/rules"
@@ -19,6 +20,7 @@ type Wallet struct {
 	owner     protocol.PublicKey
 	orgs      map[protocol.Hash]protocol.OrgConfig
 	bound     protocol.Hash
+	direct    *rules.DirectPolicy
 }
 
 func New(db store.Store, network protocol.Hash, owner protocol.PublicKey, orgs []protocol.OrgConfig) (*Wallet, error) {
@@ -43,10 +45,32 @@ func New(db store.Store, network protocol.Hash, owner protocol.PublicKey, orgs [
 }
 
 // NewWithGenesis loads the fixed wallet routes used by the direct protocol.
-func NewWithGenesis(db store.Store, network protocol.Hash, owner protocol.PublicKey, orgs []protocol.OrgConfig, genesis state.Genesis) (*Wallet, error) {
+func NewWithGenesis(db store.Store, network protocol.Hash, owner protocol.PublicKey, orgs []protocol.OrgConfig, genesis state.Genesis, policies ...rules.DirectPolicy) (*Wallet, error) {
 	w, err := New(db, network, owner, orgs)
 	if err != nil {
 		return nil, err
+	}
+	if len(policies) > 1 {
+		return nil, protocol.ErrRule
+	}
+	if len(policies) == 1 {
+		p := policies[0]
+		p.Organizations = w.orgs
+		if p.C3 != nil {
+			raw, err := json.Marshal(p.C3)
+			if err != nil {
+				return nil, err
+			}
+			var frozen rules.C3Settings
+			if err = json.Unmarshal(raw, &frozen); err != nil {
+				return nil, err
+			}
+			p.C3 = &frozen
+			if err = p.C3.Validate(w.orgs); err != nil {
+				return nil, err
+			}
+		}
+		w.direct = &p
 	}
 	if genesis.Network != network {
 		return nil, protocol.ErrAuth

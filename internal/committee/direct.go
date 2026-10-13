@@ -76,6 +76,19 @@ func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.
 		if c.Network != e.cfg.Network {
 			return state.Transition{}, protocol.ErrAuth
 		}
+		if c.Key.Kind == protocol.ResourceFUEL {
+			authorized := false
+			if e.direct.C3 != nil {
+				for _, i := range e.direct.C3.Issuers {
+					if i.Config == c.Organization && i.Funding.Key == c.Key && i.Funding.Grant == c.Grant {
+						authorized = true
+					}
+				}
+			}
+			if !authorized {
+				return state.Transition{}, protocol.ErrAuth
+			}
+		}
 		return rules.EvaluateReserveIncrease(v, c, e.protectedCAL)
 	}
 	if protocol.IsClockTick(raw, e.cfg.Network) {

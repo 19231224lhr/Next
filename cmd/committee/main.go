@@ -206,6 +206,9 @@ func run() (result error) {
 	defer func() { consensus.Stop(); consensus.Wait() }()
 	client := local.New(consensus)
 	mux := http.NewServeMux()
+	if network.Direct != nil && network.Direct.C3 != nil {
+		addC3Queries(mux, engine)
+	}
 	if os.Getenv("UTXO_EXPERIMENT_BUDGET") == "1" {
 		mux.Handle("GET /debug/budget", budgetprobe.Handler(db, network.Genesis.Grants, network.Organizations[0], 0, nil))
 	}

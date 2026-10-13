@@ -43,14 +43,14 @@ func prepareE5Chain(dir string, lab cfg.Lab, count int) error {
 	}
 	gs := n.Genesis.Grants[:0]
 	for _, g := range n.Genesis.Grants {
-		if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+		if c3Pool(n, g.Key.Account) || (g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy) {
 			gs = append(gs, g)
 		}
 	}
 	n.Genesis.Grants = gs
 	as := n.Accounts[:0]
 	for _, a := range n.Accounts {
-		if a.Asset != protocol.AssetFUEL {
+		if a.Asset != protocol.AssetFUEL || c3Pool(n, a.Owner) {
 			as = append(as, a)
 		}
 	}

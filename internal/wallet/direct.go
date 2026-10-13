@@ -31,6 +31,13 @@ func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
 // SaveDirectRequestBytes returns the exact signed request only after its request
 // journal and input reservations have been committed by the configured Store.
 func (w *Wallet) SaveDirectRequestBytes(req protocol.DirectRequest) ([]byte, error) {
+	if w.direct != nil {
+		if err := w.direct.ValidateC3(req.Tx.Body.Fee.C3, req.Tx.Body.Config); err != nil {
+			return nil, err
+		}
+	} else if req.Tx.Body.Fee.C3.Enabled() {
+		return nil, protocol.ErrAuth
+	}
 	if w.bound == (protocol.Hash{}) || req.Tx.Body.Network != w.network || req.Tx.Body.Subject != w.owner {
 		return nil, protocol.ErrAuth
 	}
@@ -99,6 +106,13 @@ func (w *Wallet) SaveDirectRequestBytes(req protocol.DirectRequest) ([]byte, err
 // verified, output binding checked and the local coin transaction committed.
 // Durability depends on the configured Store; memory/NoSync is experimental.
 func (w *Wallet) ReceiveDirect(output protocol.Output, c protocol.OutputCertificate, index uint32) error {
+	if w.direct != nil {
+		if err := rules.ValidateC3Summary(c.Summary, *w.direct); err != nil {
+			return err
+		}
+	} else if c.Summary.C3.Enabled() {
+		return protocol.ErrAuth
+	}
 	org, ok := w.orgs[c.Summary.Config]
 	if w.bound == (protocol.Hash{}) || !ok || c.Summary.Network != w.network || output.Recipient.Owner != w.owner || c.VerifyOutput(org, index, output) != nil {
 		return protocol.ErrAuth

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"errors"
 	"sync/atomic"
 	"utxo/finality"
@@ -138,6 +139,13 @@ func (m *Member) bootstrap(gen state.Genesis) error {
 		if m.direct != nil {
 			key := m.direct.Key.KeyID()
 			hash = protocol.Digest("MEMBER_INITIAL_STATE_V5", hash[:], key[:])
+			if m.direct.C3 != nil {
+				raw, err := json.Marshal(m.direct.C3)
+				if err != nil {
+					return nil, err
+				}
+				hash = protocol.Digest("MEMBER_C3_GENESIS_V1", hash[:], raw)
+			}
 		}
 		if m.cfg.EnableInternalPools {
 			hash = protocol.Digest("MEMBER_INTERNAL_POOLS_V1", hash[:])

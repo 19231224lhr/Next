@@ -54,6 +54,12 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 	parents := map[protocol.OutputID]verifiedParent{}
 	for _, parent := range req.InputCertificates {
 		c := parent.Certificate
+		if t.Fee.C3.Enabled() && !c.Summary.C3.Enabled() {
+			return protocol.DirectApproval{}, protocol.ErrUnsupported
+		}
+		if err := rules.ValidateC3Summary(c.Summary, *m.direct); err != nil {
+			return protocol.DirectApproval{}, err
+		}
 		org, ok := m.peers[c.Summary.Config]
 		if !ok || c.Summary.Rules != m.direct.Rules() || uint64(parent.Index) >= uint64(len(c.Summary.Outputs)) {
 			return protocol.DirectApproval{}, protocol.ErrAuth

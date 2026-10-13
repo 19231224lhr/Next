@@ -166,14 +166,14 @@ func prepareE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) error {
 	}
 	gs := n.Genesis.Grants[:0]
 	for _, g := range n.Genesis.Grants {
-		if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+		if c3Pool(n, g.Key.Account) || (g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy) {
 			gs = append(gs, g)
 		}
 	}
 	n.Genesis.Grants = gs
 	accounts := n.Accounts[:0]
 	for _, a := range n.Accounts {
-		if a.Asset != protocol.AssetFUEL {
+		if a.Asset != protocol.AssetFUEL || c3Pool(n, a.Owner) {
 			accounts = append(accounts, a)
 		}
 	}
@@ -248,9 +248,13 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 		return e
 	}
 	defer group.Close()
+	walletPolicy, e := n.Direct.Policy(n.Schedule, n.Organizations)
+	if e != nil {
+		return e
+	}
 	ws := make([]*wallet.Wallet, o.Wallets)
 	for i := range ws {
-		ws[i], e = wallet.NewWithGenesis(group, n.Genesis.Network, ds[i].Owner, n.Organizations, n.Genesis)
+		ws[i], e = wallet.NewWithGenesis(group, n.Genesis.Network, ds[i].Owner, n.Organizations, n.Genesis, walletPolicy)
 		if e != nil {
 			return e
 		}

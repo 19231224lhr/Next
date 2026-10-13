@@ -9,6 +9,7 @@ import (
 
 // DirectSettings is genesis-bound and contains no private key material.
 type DirectSettings struct {
+	C3             *C3Settings `json:",omitempty"`
 	Modulus        []byte
 	TimeoutSeconds int64
 	RepairCost     uint64
@@ -31,6 +32,10 @@ func (s DirectSettings) Policy(base Schedule, organizations []protocol.OrgConfig
 	p.Key = key
 	for _, org := range organizations {
 		p.Organizations[org.Hash()] = org
+	}
+	p.C3 = s.C3.clone()
+	if err := p.C3.Validate(p.Organizations); err != nil {
+		return p, err
 	}
 	return p, nil
 }

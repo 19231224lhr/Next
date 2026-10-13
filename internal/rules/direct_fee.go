@@ -22,6 +22,9 @@ func ValidateDirectFee(v state.ReadView, tx protocol.FastTx) (uint64, error) {
 			return 0, ErrMissing
 		}
 		out := c.Output
+		if tx.Body.Fee.C3.Enabled() && out.Recipient.Owner != tx.Body.Fee.C3.Payer {
+			return 0, protocol.ErrAuth
+		}
 		if out.Asset != protocol.AssetFUEL || out.Amount == 0 {
 			return 0, protocol.ErrAuth
 		}

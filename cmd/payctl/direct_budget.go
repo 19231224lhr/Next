@@ -98,6 +98,9 @@ func budgetRequest(n cfg.Network, p rules.DirectPolicy, org protocol.OrgConfig, 
 	}
 	nonce := protocol.Digest("E2_BUDGET", in.Output[:])
 	copy(body.Nonce[:], nonce[:])
+	if e := bindC3(&body, n, p); e != nil {
+		return protocol.DirectRequest{}, e
+	}
 	tx, e := protocol.NewFastTx(body, []protocol.InputClaim{{Output: coin}}, p.Key)
 	if e != nil {
 		return protocol.DirectRequest{}, e
@@ -181,7 +184,7 @@ func budgetDirect(args []string) error {
 		}
 		dbs[i] = g
 		defer g.Close()
-		wallets[i], err = wallet.NewWithGenesis(g, n.Genesis.Network, desc[i].Owner, n.Organizations, n.Genesis)
+		wallets[i], err = wallet.NewWithGenesis(g, n.Genesis.Network, desc[i].Owner, n.Organizations, n.Genesis, p)
 		if err != nil {
 			return err
 		}
@@ -573,14 +576,14 @@ func prepareBudgetOwnerFuel(lab cfg.Lab, n cfg.Network, desc [3]protocol.Receive
 	}
 	grants := n.Genesis.Grants[:0]
 	for _, g := range n.Genesis.Grants {
-		if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+		if c3Pool(n, g.Key.Account) || (g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy) {
 			grants = append(grants, g)
 		}
 	}
 	n.Genesis.Grants = grants
 	accounts := n.Accounts[:0]
 	for _, a := range n.Accounts {
-		if a.Asset != protocol.AssetFUEL {
+		if a.Asset != protocol.AssetFUEL || c3Pool(n, a.Owner) {
 			accounts = append(accounts, a)
 		}
 	}

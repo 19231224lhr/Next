@@ -15,6 +15,7 @@ type LocalProgress struct {
 	Paid              uint64
 	Recovered         uint64
 	Fee               rules.Escrow
+	C3                *rules.C3Escrow `json:",omitempty"`
 	Height            int64
 	Invalidated       bool                 `json:",omitempty"`
 	SupersededBy      protocol.SpendFactID `json:",omitempty"`
@@ -72,7 +73,18 @@ func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgre
 	if err != nil {
 		return err
 	}
-	if p.Settled && p.Pending == 0 && !p.Fee.Closed {
+	isC3 := a.Direct != nil && a.Direct.Body.Fee.C3.Enabled()
+	if isC3 {
+		rec, found, err := state.Load[rules.C3Record](o, rules.C3EscrowKey(a.Fact))
+		if err != nil {
+			return err
+		}
+		if found {
+			p.C3 = &rec.Escrow
+		}
+		p.Fee.Closed = p.Settled && p.Pending == 0
+	}
+	if !isC3 && p.Settled && p.Pending == 0 && !p.Fee.Closed {
 		next, err := p.Fee.Complete(rules.FeeClose)
 		if err != nil {
 			return err
@@ -92,7 +104,15 @@ func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgre
 				return err
 			}
 		}
-		if d.Key.Kind != protocol.ResourceCAL && p.Fee.Closed {
+		if isC3 && d.Key.Kind != protocol.ResourceCAL {
+			if d.Key == a.Direct.Body.Fee.C3.Funding().Key {
+				if p.C3 != nil {
+					target = p.C3.Released
+				}
+			} else if p.Settled && d.Key.Kind != protocol.ResourceFUEL && d.Key.Kind != protocol.ResourcePolicy {
+				target = d.Cap
+			}
+		} else if d.Key.Kind != protocol.ResourceCAL && p.Fee.Closed {
 			target = d.Cap
 			if d.Key.Kind == protocol.ResourceFUEL || d.Key.Kind == protocol.ResourcePolicy {
 				paid, err := protocol.Add(p.Fee.Rewards, p.Fee.Burned)
@@ -135,7 +155,7 @@ func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgre
 	}
 	return state.Put(o, ProgressKey(a.Fact), *p)
 }
-func (m *Member) resolveLocal(o *state.Overlay, id protocol.OutputID, paid bool) error {
+func (m *Member) resolveLocal(o *state.Overlay, id protocol.OutputID, paid bool, c3Source ...bool) error {
 	fact, found, err := state.Load[protocol.SpendFactID](o, waitingKey(id))
 	if err != nil || !found {
 		return err
@@ -155,7 +175,7 @@ func (m *Member) resolveLocal(o *state.Overlay, id protocol.OutputID, paid bool)
 		return rules.ErrAccounting
 	}
 	p.Pending--
-	if paid {
+	if paid && (len(c3Source) == 0 || !c3Source[0]) && (a.Direct == nil || !a.Direct.Body.Fee.C3.Enabled()) {
 		p.Fee.Held, err = protocol.Sub(p.Fee.Held, m.direct.RepairCost)
 		if err != nil {
 			return err
@@ -268,6 +288,9 @@ func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
 }
 
 func (m *Member) applyRepairEffect(o *state.Overlay, effect protocol.RepairEffect) error {
+	if err := m.c3Compensate(o, effect.ParentFact, effect.Output); err != nil {
+		return err
+	}
 	if waiting, found, err := state.Load[protocol.SpendFactID](o, waitingKey(effect.Output)); err != nil {
 		return err
 	} else if found && waiting != effect.ConsumerFact {
@@ -291,7 +314,11 @@ func (m *Member) applyRepairEffect(o *state.Overlay, effect protocol.RepairEffec
 			return err
 		}
 	}
-	if err = m.resolveLocal(o, effect.Output, true); err != nil {
+	_, sourceC3, err := state.Load[rules.C3Record](o, rules.C3EscrowKey(effect.ParentFact))
+	if err != nil {
+		return err
+	}
+	if err = m.resolveLocal(o, effect.Output, true, sourceC3); err != nil {
 		return err
 	}
 	return nil
@@ -305,6 +332,29 @@ func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, r
 	}
 	if err := m.recoverExposedSources(o, pay.InputCertificates); err != nil {
 		return err
+	}
+	for _, i := range result.MissingInputs {
+		if int(i) >= len(tx.Body.Inputs) {
+			return protocol.ErrRule
+		}
+		id := tx.Body.Inputs[i].Output
+		for _, parent := range pay.InputCertificates {
+			s := parent.Certificate.Summary
+			if s.OutputID(parent.Index) == id && s.C3.Enabled() {
+				f := s.Fact()
+				if err := state.Put(o, state.Key(171, f[:]), s); err != nil {
+					return err
+				}
+				if err := m.c3Event(o, s, rules.C3Open, parent.Index); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if tx.Body.Fee.C3.Enabled() {
+		if err := m.c3Event(o, pay.Summary(), rules.C3Execute, rules.C3WholeTransaction); err != nil {
+			return err
+		}
 	}
 	recovered := make(map[uint32]bool, len(result.RecoveredOutputs))
 	var returned uint64
@@ -340,14 +390,16 @@ func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, r
 		p.Settled = true
 		p.Height = height
 		p.Pending = uint32(len(result.MissingInputs))
-		p.Fee, err = rules.NewEscrow(tx.Body.Fee.Maximum, m.direct.Base.Fee)
-		if err != nil {
-			return err
-		}
-		for _, stage := range []rules.FeeAction{rules.FeeRegister, rules.FeeSettle} {
-			p.Fee, err = p.Fee.Complete(stage)
+		if !tx.Body.Fee.C3.Enabled() {
+			p.Fee, err = rules.NewEscrow(tx.Body.Fee.Maximum, m.direct.Base.Fee)
 			if err != nil {
 				return err
+			}
+			for _, stage := range []rules.FeeAction{rules.FeeRegister, rules.FeeSettle} {
+				p.Fee, err = p.Fee.Complete(stage)
+				if err != nil {
+					return err
+				}
 			}
 		}
 		for _, i := range result.MissingInputs {
