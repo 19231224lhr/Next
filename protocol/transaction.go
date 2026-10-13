@@ -52,6 +52,7 @@ const (
 )
 
 type FeeTerms struct {
+	C3              FeeCommitment
 	Source          FeeSource
 	Account, Policy Hash
 	Version         uint64
@@ -151,6 +152,9 @@ func (t TxBody) Validate() error {
 func (t TxBody) validateVersion(wire, version uint64) error {
 	if t.Wire != wire || t.Version != version {
 		return ErrUnsupported
+	}
+	if err := t.Fee.C3.validateBody(t); err != nil {
+		return err
 	}
 	if t.Network == (Hash{}) || t.Subject == (PublicKey{}) || t.Rules.Fee == (Hash{}) || t.Rules.Work == (Hash{}) || t.Rules.Accounting == (Hash{}) {
 		return ErrRule
@@ -271,7 +275,12 @@ func (t TxBody) encode() []byte {
 		e.U64(uint64(t.Work.Bytes))
 		e.U32(t.Work.Depth)
 		e.U32(t.Work.Ancestors)
-		e.Optional(false)
+		e.Optional(t.Fee.C3.Enabled())
+		if t.Fee.C3.Enabled() {
+			c := new(Encoder)
+			t.Fee.C3.encode(c)
+			e.Bytes(c.Data())
+		}
 	}
 	return e.Data()
 }
@@ -336,7 +345,10 @@ func decodeTxVersion(b []byte, wire, version uint64) (t TxBody, err error) {
 		}
 		t.Work = WorkLimit{ExecUnits(d.U64()), RetainedBytes(d.U64()), d.U32(), d.U32()}
 		if d.Optional() {
-			return t, ErrUnsupported
+			t.Fee.C3, err = DecodeFeeCommitment(d.Bytes(MaxFeeCommitmentBytes))
+			if err != nil {
+				return t, err
+			}
 		}
 	}
 	if e := d.Done(); e != nil {

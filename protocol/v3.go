@@ -124,7 +124,7 @@ func (t FastTx) VerifyAuth() error {
 		}
 		owners[a.Owner] = true
 	}
-	if !owners[t.Body.Subject] {
+	if !owners[t.Body.Subject] || (t.Body.Fee.C3.Enabled() && t.Body.Fee.Source == OwnerFinalUTXO && !owners[t.Body.Fee.C3.Payer]) {
 		return ErrAuth
 	}
 	for i, c := range t.Claims {
@@ -251,6 +251,7 @@ type OutputCommitment struct {
 	Amount uint64
 }
 type OutputSummary struct {
+	C3             FeeCommitment
 	Network        Hash
 	Tx             TxID
 	Issuer, Config Hash
@@ -267,7 +268,11 @@ type OutputCertificate struct {
 
 func (s OutputSummary) encode() []byte {
 	e := new(Encoder)
-	e.U64(DirectVersion)
+	if s.C3.Enabled() {
+		e.U64(C3SummaryVersion)
+	} else {
+		e.U64(DirectVersion)
+	}
 	e.Fixed(s.Network[:])
 	e.Fixed(s.Tx[:])
 	e.Fixed(s.Issuer[:])
@@ -284,6 +289,11 @@ func (s OutputSummary) encode() []byte {
 	for _, g := range s.Grants {
 		e.Fixed(g[:])
 	}
+	if s.C3.Enabled() {
+		c := new(Encoder)
+		s.C3.encode(c)
+		e.Bytes(c.Data())
+	}
 	return e.Data()
 }
 func (s OutputSummary) Fact() SpendFactID              { return SpendFactID(Digest("DIRECT_CERT_V5", s.encode())) }
@@ -291,6 +301,7 @@ func (s OutputSummary) OutputID(index uint32) OutputID { return OutputIdentity(s
 
 func SummaryFor(t FastTx, vector AdmissionVector) OutputSummary {
 	s := OutputSummary{Network: t.Body.Network, Tx: t.ID(), Issuer: t.Body.Certifier, Config: t.Body.Config, Epoch: t.Body.Epoch, Rules: t.Body.Rules, Admission: vector}
+	s.C3 = t.Body.Fee.C3
 	for _, o := range t.Body.Outputs {
 		s.Outputs = append(s.Outputs, OutputCommitment{Digest: OutputDigest(o), Amount: o.Amount})
 	}
@@ -301,6 +312,14 @@ func SummaryFor(t FastTx, vector AdmissionVector) OutputSummary {
 }
 
 func (s OutputSummary) Validate() error {
+	if s.C3 != (FeeCommitment{}) {
+		if err := s.C3.Validate(); err != nil {
+			return err
+		}
+		if s.C3.Issuer != s.Issuer || s.C3.Resources.Outputs != uint32(len(s.Outputs)) || s.C3.Resources.Admissions != uint32(len(s.Admission)) {
+			return ErrRule
+		}
+	}
 	if s.Network == (Hash{}) || s.Tx == (TxID{}) || s.Issuer == (Hash{}) || s.Config == (Hash{}) || s.Epoch == 0 || len(s.Outputs) == 0 || len(s.Outputs) > MaxOutputs || len(s.Grants) != len(s.Admission) || s.Rules == (RuleIDs{}) {
 		return ErrRule
 	}
@@ -378,7 +397,8 @@ func DecodeOutputCertificate(b []byte) (c OutputCertificate, err error) {
 		return c, ErrEncoding
 	}
 	s := NewDecoder(d.Bytes(MaxCertificateBytes))
-	if s.U64() != DirectVersion {
+	version := s.U64()
+	if version != DirectVersion && version != C3SummaryVersion {
 		return c, ErrEncoding
 	}
 	copy(c.Summary.Network[:], s.Fixed(32))
@@ -403,6 +423,12 @@ func DecodeOutputCertificate(b []byte) (c OutputCertificate, err error) {
 	c.Summary.Grants = make([]Hash, s.Count(MaxAdmission))
 	for i := range c.Summary.Grants {
 		copy(c.Summary.Grants[i][:], s.Fixed(32))
+	}
+	if version == C3SummaryVersion {
+		c.Summary.C3, err = DecodeFeeCommitment(s.Bytes(MaxFeeCommitmentBytes))
+		if err != nil {
+			return c, err
+		}
 	}
 	if err = s.Done(); err != nil {
 		return c, err
