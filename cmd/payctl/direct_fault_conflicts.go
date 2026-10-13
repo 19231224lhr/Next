@@ -71,7 +71,7 @@ func faultConflicts(dir string, lab cfg.Lab, n cfg.Network, count int) error {
 		return err
 	}
 	defer db.Close()
-	receiver, err := wallet.NewWithGenesis(db, n.Genesis.Network, requests[0].Tx.Body.Outputs[0].Recipient.Owner, n.Organizations, n.Genesis)
+	receiver, err := wallet.NewWithGenesis(db, n.Genesis.Network, requests[0].Tx.Body.Outputs[0].Recipient.Owner, n.Organizations, n.Genesis, policy)
 	if err != nil {
 		return err
 	}

@@ -33,7 +33,7 @@ type liabilityReport struct {
 func liabilityGenesis(n cfg.Network, desc [3]protocol.ReceiveDescriptor) cfg.Network {
 	grants := n.Genesis.Grants[:0]
 	for _, g := range n.Genesis.Grants {
-		if g.Key.Kind == protocol.ResourceFUEL || g.Key.Kind == protocol.ResourcePolicy {
+		if (g.Key.Kind == protocol.ResourceFUEL || g.Key.Kind == protocol.ResourcePolicy) && !c3Pool(n, g.Key.Account) {
 			continue
 		}
 		if g.Key.Kind == protocol.ResourceCAL {
@@ -44,7 +44,7 @@ func liabilityGenesis(n cfg.Network, desc [3]protocol.ReceiveDescriptor) cfg.Net
 	n.Genesis.Grants = grants
 	accounts := n.Accounts[:0]
 	for _, a := range n.Accounts {
-		if a.Asset == protocol.AssetFUEL {
+		if a.Asset == protocol.AssetFUEL && !c3Pool(n, a.Owner) {
 			continue
 		}
 		if a.Asset == protocol.AssetCAL {
@@ -130,7 +130,7 @@ func liabilityDirect(args []string) (err error) {
 		}
 		dbs[i] = g
 		defer g.Close()
-		wallets[i], err = wallet.NewWithGenesis(g, n.Genesis.Network, desc[i].Owner, n.Organizations, n.Genesis)
+		wallets[i], err = wallet.NewWithGenesis(g, n.Genesis.Network, desc[i].Owner, n.Organizations, n.Genesis, policy)
 		if err != nil {
 			return err
 		}

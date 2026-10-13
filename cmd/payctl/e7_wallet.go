@@ -134,7 +134,7 @@ func e7WalletCommand(args []string) error {
 			return e
 		}
 		owners[w.descriptors[i].Owner] = true
-		w.wallets[i], e = wallet.NewWithGenesis(group, n.Genesis.Network, w.descriptors[i].Owner, n.Organizations, n.Genesis)
+		w.wallets[i], e = wallet.NewWithGenesis(group, n.Genesis.Network, w.descriptors[i].Owner, n.Organizations, n.Genesis, p)
 		if e != nil {
 			return e
 		}

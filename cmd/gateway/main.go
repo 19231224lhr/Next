@@ -37,6 +37,17 @@ type configuration struct {
 	RecipientKey             string             `json:",omitempty"`
 }
 
+func newRecipientWallet(n cfg.Network, db store.Store, owner protocol.PublicKey) (*wallet.Wallet, error) {
+	if n.Direct != nil {
+		policy, err := n.Direct.Policy(n.Schedule, n.Organizations)
+		if err != nil {
+			return nil, err
+		}
+		return wallet.NewWithGenesis(db, n.Genesis.Network, owner, n.Organizations, n.Genesis, policy)
+	}
+	return wallet.NewWithGenesis(db, n.Genesis.Network, owner, n.Organizations, n.Genesis)
+}
+
 func paymentHandler(collector *gateway.Collector) http.HandlerFunc {
 	slots := make(chan struct{}, 128)
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -169,7 +180,7 @@ func run() (result error) {
 			return err
 		}
 		defer walletDB.Close()
-		local, err := wallet.NewWithGenesis(walletDB, n.Genesis.Network, c.RecipientOwner, n.Organizations, n.Genesis)
+		local, err := newRecipientWallet(n, walletDB, c.RecipientOwner)
 		if err != nil {
 			return err
 		}

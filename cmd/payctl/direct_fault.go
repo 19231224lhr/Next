@@ -64,14 +64,14 @@ func prepareFault(lab cfg.Lab, n cfg.Network, count int) error {
 	}
 	gs := n.Genesis.Grants[:0]
 	for _, g := range n.Genesis.Grants {
-		if g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy {
+		if (g.Key.Kind != protocol.ResourceFUEL && g.Key.Kind != protocol.ResourcePolicy) || c3Pool(n, g.Key.Account) {
 			gs = append(gs, g)
 		}
 	}
 	n.Genesis.Grants = gs
 	as := n.Accounts[:0]
 	for _, a := range n.Accounts {
-		if a.Asset != protocol.AssetFUEL {
+		if a.Asset != protocol.AssetFUEL || c3Pool(n, a.Owner) {
 			as = append(as, a)
 		}
 	}
@@ -223,11 +223,15 @@ func runFaultLoad(dir string, lab cfg.Lab, n cfg.Network, count int, rate float6
 		return err
 	}
 	defer group.Close()
-	sender, err := wallet.NewWithGenesis(group, n.Genesis.Network, requests[0].Tx.Body.Subject, n.Organizations, n.Genesis)
+	policy, err := n.Direct.Policy(n.Schedule, n.Organizations)
 	if err != nil {
 		return err
 	}
-	receiver, err := wallet.NewWithGenesis(group, n.Genesis.Network, requests[0].Tx.Body.Outputs[0].Recipient.Owner, n.Organizations, n.Genesis)
+	sender, err := wallet.NewWithGenesis(group, n.Genesis.Network, requests[0].Tx.Body.Subject, n.Organizations, n.Genesis, policy)
+	if err != nil {
+		return err
+	}
+	receiver, err := wallet.NewWithGenesis(group, n.Genesis.Network, requests[0].Tx.Body.Outputs[0].Recipient.Owner, n.Organizations, n.Genesis, policy)
 	if err != nil {
 		return err
 	}
