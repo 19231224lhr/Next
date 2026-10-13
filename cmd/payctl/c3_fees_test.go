@@ -1,14 +1,83 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 	cfg "utxo/cmd/internal/config"
 	"utxo/finality"
 	"utxo/internal/rules"
 	"utxo/internal/state"
+	"utxo/internal/wallet"
 	"utxo/protocol"
 )
+
+func TestC3FeesRefundNetAccounting(t *testing.T) {
+	h := c3FeePayment{FeeInput: state.OriginOutput{Output: protocol.Output{Amount: 10000}}, FeeChange: wallet.DirectCoin{Output: protocol.Output{Amount: 9990}}}
+	net, e := c3ObservedFeeNet(h)
+	if e != nil || net != 10 {
+		t.Fatalf("absent refund: %d %v", net, e)
+	}
+	h.FeeRefund = &wallet.DirectCoin{Output: protocol.Output{Amount: 3}}
+	net, e = c3ObservedFeeNet(h)
+	if e == nil || net != 7 {
+		t.Fatalf("separate refund must reduce measured net and fail C3 assertion: %d %v", net, e)
+	}
+}
+
+func TestC3FeesSubmissionAttempts(t *testing.T) {
+	var rows []c3SubmitAttempt
+	calls := 0
+	start := time.Now()
+	submit := func(context.Context, []byte) error {
+		calls++
+		if calls < 3 {
+			return errors.New("committee submission HTTP 503")
+		}
+		return nil
+	}
+	for i := 0; i < 3; i++ {
+		_ = c3SubmitRecorded(context.Background(), start, []byte{1}, submit, &rows)
+	}
+	if len(rows) != 3 || rows[0].Error == "" || rows[1].Error == "" || rows[2].Error != "" || !rows[2].Accepted || rows[0].Accepted {
+		t.Fatalf("lost retry outcomes: %+v", rows)
+	}
+	for _, r := range rows {
+		if r.EndOffsetNS < r.StartOffsetNS {
+			t.Fatal("negative attempt duration")
+		}
+	}
+}
+
+func TestC3FeesReplayExactEvidence(t *testing.T) {
+	raw := []byte{1, 2, 3}
+	blocks := []c3FeeBlock{{Height: 5, Transactions: []finality.ExecutedTx{{Bytes: raw}}}, {Height: 6, Transactions: []finality.ExecutedTx{{Bytes: []byte{9}}}}}
+	if c3FindReplay(blocks, raw, 5) != nil {
+		t.Fatal("unrelated newer block is not replay evidence")
+	}
+	blocks = append(blocks, c3FeeBlock{Height: 7, Transactions: []finality.ExecutedTx{{Bytes: []byte{9}}, {Bytes: raw, Code: 12, Data: []byte{4}}}})
+	got := c3FindReplay(blocks, raw, 5)
+	if got == nil || got.Height != 7 || got.Index != 1 || got.Code != 12 {
+		t.Fatalf("wrong inclusion: %+v", got)
+	}
+}
+
+func TestC3FeesReplayHTTPOutcome(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "duplicate", 503) }))
+	out, e := c3ReplaySubmit(context.Background(), s.Client(), s.URL, []byte{1})
+	if e != nil || out.Outcome != "http-rejected" || out.HTTPStatus != 503 || out.ResponseBody == "" {
+		t.Fatalf("HTTP rejection missing: %+v %v", out, e)
+	}
+	s.Close()
+	out, e = c3ReplaySubmit(context.Background(), s.Client(), s.URL, []byte{1})
+	if e == nil || out.Outcome != "transport-inconclusive" || out.HTTPStatus != 0 {
+		t.Fatalf("transport failure misclassified: %+v %v", out, e)
+	}
+}
 
 func TestC3FeesFixtureAndSignedQuote(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "lab")

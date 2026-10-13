@@ -36,11 +36,15 @@ type c3FeePayment struct {
 	Output                                                                protocol.OutputID
 	FeeInput                                                              state.OriginOutput
 	FeeChange                                                             wallet.DirectCoin
+	FeeRefund                                                             *wallet.DirectCoin
+	RefundChecked                                                         bool
+	FeeObservedHeight                                                     int64
 	FinalCoin                                                             wallet.DirectCoin
 	FeeNet                                                                uint64
 	RequestRaw, CertificateRaw, SubmissionRaw                             []byte
 	BuildNS, ReceiptNS, CertifiedOffsetNS, SubmitOffsetNS, PublicOffsetNS int64
 	SubmitAttempts                                                        int
+	SubmitAttemptLog                                                      []c3SubmitAttempt
 	CertificateAttempts                                                   int
 	MembersClosed                                                         [4]member.DirectStatus
 	ExecutionHeight                                                       int64
@@ -60,7 +64,8 @@ type c3FeePair struct {
 	ReplayBefore, ReplayAfter *committee.C3Snapshot
 	Repair                    *repairTrial `json:",omitempty"`
 	ReplayError               string       `json:",omitempty"`
-	Error                     string       `json:",omitempty"`
+	Replay                    c3ReplayEvidence
+	Error                     string `json:",omitempty"`
 }
 type c3FeeMember struct {
 	URL      string
@@ -291,16 +296,17 @@ func c3Get(ctx context.Context, client *http.Client, url string, dst any) (bool,
 }
 
 type c3FeeClient struct {
-	n       cfg.Network
-	lab     cfg.Lab
-	policy  rules.DirectPolicy
-	client  *http.Client
-	public  *transport.CommitteeClient
-	keys    [2]ed25519.PrivateKey
-	ds      [2]protocol.ReceiveDescriptor
-	wallets [2]*wallet.Wallet
-	dbs     [2]*store.Group
-	start   time.Time
+	n          cfg.Network
+	lab        cfg.Lab
+	policy     rules.DirectPolicy
+	client     *http.Client
+	public     *transport.CommitteeClient
+	keys       [2]ed25519.PrivateKey
+	ds         [2]protocol.ReceiveDescriptor
+	wallets    [2]*wallet.Wallet
+	dbs        [2]*store.Group
+	start      time.Time
+	findReplay func([]byte, int64) *c3ReplayInclusion
 }
 
 func (c *c3FeeClient) pools(ctx context.Context) ([]committee.C3PoolSnapshot, error) {
@@ -386,7 +392,9 @@ func (c *c3FeeClient) collect(ctx context.Context, owner int, r protocol.DirectR
 	return cert, e
 }
 func (c *c3FeeClient) submit(ctx context.Context, h *c3FeePayment, at time.Time) error {
-	return budgetRelease(ctx, at, func(ctx context.Context) error { return c.public.Submit(ctx, h.SubmissionRaw) }, func() {
+	return budgetRelease(ctx, at, func(ctx context.Context) error {
+		return c3SubmitRecorded(ctx, c.start, h.SubmissionRaw, c.public.Submit, &h.SubmitAttemptLog)
+	}, func() {
 		h.SubmitAttempts++
 		if h.SubmitOffsetNS == 0 {
 			h.SubmitOffsetNS = time.Since(c.start).Nanoseconds()
@@ -431,10 +439,6 @@ func (c *c3FeeClient) feeAndClosed(ctx context.Context, h *c3FeePayment, owner i
 			if h.FeeChange.Output.Asset != protocol.AssetFUEL || h.FeeChange.Output.Recipient.Owner != c.ds[owner].Owner || h.FeeChange.Output.Amount > h.FeeInput.Output.Amount {
 				return fmt.Errorf("invalid verified fee change")
 			}
-			h.FeeNet = h.FeeInput.Output.Amount - h.FeeChange.Output.Amount
-			if h.FeeNet != 10 {
-				return fmt.Errorf("user fee is %d", h.FeeNet)
-			}
 			break
 		}
 		if e = budgetPause(ctx, 10*time.Millisecond); e != nil {
@@ -454,12 +458,62 @@ func (c *c3FeeClient) feeAndClosed(ctx context.Context, h *c3FeePayment, owner i
 			}
 		}
 		if complete {
-			return nil
+			break
 		}
 		if e := budgetPause(ctx, 25*time.Millisecond); e != nil {
 			return e
 		}
 	}
+	// Observe both fee-output identities only after the local verified follower
+	// has caught up to every member closure height. Height is a lower bound on
+	// the consistent wallet snapshot, which can advance between these reads.
+	var closedHeight int64
+	for _, s := range h.MembersClosed {
+		closedHeight = max(closedHeight, s.Height)
+	}
+	for {
+		height, e := blockfollow.Height(c.dbs[owner])
+		if e != nil {
+			return e
+		}
+		if height >= closedHeight {
+			h.FeeObservedHeight = height
+			break
+		}
+		if e = budgetPause(ctx, 10*time.Millisecond); e != nil {
+			return e
+		}
+	}
+	refundID := protocol.OutputIdentity(c.n.Genesis.Network, h.Tx, protocol.FeeRefundIndex)
+	if e := c.dbs[owner].View(func(v state.ReadView) error {
+		var found bool
+		var e error
+		h.FeeChange, found, e = state.Load[wallet.DirectCoin](v, wallet.DirectCoinKey(id, 0))
+		if e != nil {
+			return e
+		}
+		if !found {
+			return state.ErrNotFound
+		}
+		refund, found, e := state.Load[wallet.DirectCoin](v, wallet.DirectCoinKey(refundID, 0))
+		if e != nil {
+			return e
+		}
+		h.FeeRefund = nil
+		if found {
+			h.FeeRefund = &refund
+		}
+		h.RefundChecked = true
+		return nil
+	}); e != nil {
+		return e
+	}
+	if h.FeeRefund != nil && (h.FeeRefund.Final == (protocol.Hash{}) || h.FeeRefund.Output.Asset != protocol.AssetFUEL || h.FeeRefund.Output.Recipient.Owner != c.ds[owner].Owner) {
+		return fmt.Errorf("invalid verified fee refund")
+	}
+	var e error
+	h.FeeNet, e = c3ObservedFeeNet(*h)
+	return e
 }
 
 func (c *c3FeeClient) pair(ctx context.Context, p *c3FeePair, mode string, delay time.Duration, requests c3FeesRequests, fees [2]state.OriginOutput) (err error) {
@@ -603,24 +657,28 @@ func (c *c3FeeClient) pair(ctx context.Context, p *c3FeePair, mode string, delay
 	if e != nil {
 		return e
 	}
-	if e := c.public.Submit(ctx, p.Source.SubmissionRaw); e != nil {
+	p.Replay, e = c3ReplaySubmit(ctx, c.client, c.n.CommitteeURLs[0], p.Source.SubmissionRaw)
+	if e != nil {
 		p.ReplayError = e.Error()
+		return fmt.Errorf("replay inconclusive: %w", e)
 	}
-	for p.ReplayError == "" {
-		h, e := blockfollow.Height(c.dbs[0])
-		if e != nil {
-			return e
-		}
-		if h > height {
-			break
-		}
-		if e = budgetPause(ctx, 25*time.Millisecond); e != nil {
-			return e
-		}
-	}
-	if p.ReplayError != "" {
-		if e = budgetPause(ctx, 250*time.Millisecond); e != nil {
-			return e
+	if p.Replay.Outcome == "http-rejected" {
+		p.ReplayError = fmt.Sprintf("HTTP %d: %s", p.Replay.HTTPStatus, p.Replay.ResponseBody)
+	} else {
+		replayCtx, stop := context.WithTimeout(ctx, 5*time.Second)
+		defer stop()
+		for {
+			p.Replay.Inclusion = c.findReplay(p.Source.SubmissionRaw, height)
+			if p.Replay.Inclusion != nil {
+				p.Replay.Outcome = "accepted-and-observed"
+				break
+			}
+			if e = budgetPause(replayCtx, 25*time.Millisecond); e != nil {
+				p.Replay.Outcome = "accepted-unobserved"
+				p.Replay.Error = e.Error()
+				p.ReplayError = e.Error()
+				return fmt.Errorf("accepted replay lacks exact verified inclusion: %w", e)
+			}
 		}
 	}
 	p.ReplayAfter, e = c.escrow(ctx, p.Source.Fact)
@@ -630,7 +688,7 @@ func (c *c3FeeClient) pair(ctx context.Context, p *c3FeePair, mode string, delay
 	if !reflect.DeepEqual(p.ReplayBefore.Record, p.ReplayAfter.Record) {
 		return fmt.Errorf("closed replay changed escrow")
 	}
-	return nil
+	return c.feeAndClosed(ctx, &p.Source, 0)
 }
 
 func c3FeesCommand(args []string) (err error) {
@@ -705,6 +763,11 @@ func c3FeesCommand(args []string) (err error) {
 		}
 	}()
 	var blocksMu sync.Mutex
+	c.findReplay = func(raw []byte, after int64) *c3ReplayInclusion {
+		blocksMu.Lock()
+		defer blocksMu.Unlock()
+		return c3FindReplay(report.Blocks, raw, after)
+	}
 	for i := range c.wallets {
 		c.keys[i], err = cfg.PrivateKey(lab.Owners[i])
 		if err != nil {
