@@ -1,0 +1,116 @@
+package wallet
+
+import (
+	"bytes"
+	"errors"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+type DirectCoin struct {
+	Output      protocol.Output
+	Instance    uint8
+	Certificate *protocol.OutputCertificate
+	Index       uint32
+	Final       protocol.Hash
+	// Recovered is a terminal observation, not a spendable coin. The source
+	// executed after compensation and its value repaid the reserve payer.
+	Recovered bool `json:",omitempty"`
+}
+
+func DirectCoinKey(id protocol.OutputID, instance uint8) []byte {
+	return state.Key(state.KeyWalletCertificate, id[:], []byte{instance})
+}
+
+func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
+	if w.bound == (protocol.Hash{}) || req.Tx.Body.Network != w.network || req.Tx.Body.Subject != w.owner {
+		return protocol.ErrAuth
+	}
+	raw, err := req.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		o := state.NewOverlay(v)
+		if err := rules.ValidateWalletDescriptors(o, req.Tx); err != nil {
+			return nil, err
+		}
+		id := req.Tx.ID()
+		key := state.Key(state.KeyWalletRequest, id[:])
+		if old, err := v.Get(key); err == nil {
+			if !bytes.Equal(old, raw) {
+				return nil, protocol.ErrAuth
+			}
+			return nil, nil
+		} else if !errors.Is(err, state.ErrNotFound) {
+			return nil, err
+		}
+		for i, in := range req.Tx.Body.Inputs {
+			coin, found, err := state.Load[DirectCoin](o, DirectCoinKey(in.Output, req.Tx.Claims[i].Instance))
+			if err != nil {
+				return nil, err
+			}
+			if found && coin.Recovered {
+				return nil, protocol.ErrAuth
+			}
+			key := state.Key(state.KeyWalletSpend, in.Output[:], []byte{req.Tx.Claims[i].Instance})
+			prior, found, err := state.Load[protocol.TxID](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if found && prior != id {
+				return nil, protocol.ErrAuth
+			}
+			if err = state.Put(o, key, id); err != nil {
+				return nil, err
+			}
+		}
+		for _, in := range req.Tx.Body.Fee.Inputs {
+			k := state.Key(state.KeyWalletSpend, in.Output[:], []byte{0})
+			prior, found, err := state.Load[protocol.TxID](o, k)
+			if err != nil {
+				return nil, err
+			}
+			if found && prior != id {
+				return nil, protocol.ErrAuth
+			}
+			if err = state.Put(o, k, id); err != nil {
+				return nil, err
+			}
+		}
+		o.Set(key, raw)
+		return o.Changes(), nil
+	})
+}
+
+// ReceiveDirect is the end of the fast-payment measurement: issuer signature
+// verified, output binding checked and the local coin transaction committed.
+// Durability depends on the configured Store; memory/NoSync is experimental.
+func (w *Wallet) ReceiveDirect(output protocol.Output, c protocol.OutputCertificate, index uint32) error {
+	org, ok := w.orgs[c.Summary.Config]
+	if w.bound == (protocol.Hash{}) || !ok || c.Summary.Network != w.network || output.Recipient.Owner != w.owner || c.VerifyOutput(org, index, output) != nil {
+		return protocol.ErrAuth
+	}
+	if output.Recipient.Route.Kind != protocol.OrgRoute || output.Recipient.Route.Org != w.bound {
+		return protocol.ErrAuth
+	}
+	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		o := state.NewOverlay(v)
+		key := DirectCoinKey(c.Summary.OutputID(index), 0)
+		old, found, err := state.Load[DirectCoin](v, key)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			if old.Output != output {
+				return nil, protocol.ErrAuth
+			}
+			return nil, nil
+		}
+		if err = state.Put(o, key, DirectCoin{Output: output, Certificate: &c, Index: index}); err != nil {
+			return nil, err
+		}
+		return o.Changes(), nil
+	})
+}

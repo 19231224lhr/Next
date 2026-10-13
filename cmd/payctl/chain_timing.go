@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"sort"
 	"sync"
 	"time"
@@ -20,8 +21,9 @@ type chainFollowTiming struct {
 
 type chainTimingSource struct {
 	blockfollow.Source
-	mu   sync.Mutex
-	rows map[int64]chainFollowTiming
+	mu            sync.Mutex
+	rows          map[int64]chainFollowTiming
+	commitChanged chan struct{}
 }
 
 func (s *chainTimingSource) Block(ctx context.Context, height int64) (finality.BlockData, error) {
@@ -56,12 +58,33 @@ func (s *chainTimingSource) verified(height int64) {
 	s.rows[height] = r
 }
 
+// Subscribe before checking wallet state so a concurrent commit cannot be lost.
+func (s *chainTimingSource) commitNotification() <-chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.commitChanged == nil {
+		s.commitChanged = make(chan struct{})
+	}
+	return s.commitChanged
+}
+
+type chainCommitNotificationKey struct{}
+
+// Keep polling only as an explicit experiment comparator.
+func chainCommitNotificationsEnabled() bool {
+	return os.Getenv("UTXO_CHAIN_COMMIT_NOTIFICATIONS") != "0"
+}
+
 func (s *chainTimingSource) committed(height int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	r := s.rows[height]
 	r.CommittedNS = time.Now().UnixNano()
 	s.rows[height] = r
+	if s.commitChanged != nil {
+		close(s.commitChanged)
+		s.commitChanged = make(chan struct{})
+	}
 }
 
 func (s *chainTimingSource) snapshot() []chainFollowTiming {

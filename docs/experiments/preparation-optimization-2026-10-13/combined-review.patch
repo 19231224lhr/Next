@@ -1,0 +1,1238 @@
+commit 3848284e99a4a4e3e3d0e85027aa9bcb530ce29f
+Author:     19231224lhr <1836080103@qq.com>
+AuthorDate: Tue Oct 13 17:09:36 2026 +0800
+Commit:     19231224lhr <1836080103@qq.com>
+CommitDate: Tue Oct 13 17:09:36 2026 +0800
+
+    wallet: return direct request bytes after saving
+---
+ internal/wallet/direct.go            |  17 ++-
+ internal/wallet/direct_bytes_test.go | 252 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 266 insertions(+), 3 deletions(-)
+
+diff --git a/internal/wallet/direct.go b/internal/wallet/direct.go
+index 5c3b8ec..6f01957 100644
+--- a/internal/wallet/direct.go
++++ b/internal/wallet/direct.go
+@@ -17,28 +17,35 @@ type DirectCoin struct {
+ 	// Recovered is a terminal observation, not a spendable coin. The source
+ 	// executed after compensation and its value repaid the reserve payer.
+ 	Recovered bool `json:",omitempty"`
+ }
+ 
+ func DirectCoinKey(id protocol.OutputID, instance uint8) []byte {
+ 	return state.Key(state.KeyWalletCertificate, id[:], []byte{instance})
+ }
+ 
+ func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
++	_, err := w.SaveDirectRequestBytes(req)
++	return err
++}
++
++// SaveDirectRequestBytes returns the exact signed request only after its request
++// journal and input reservations have been committed by the configured Store.
++func (w *Wallet) SaveDirectRequestBytes(req protocol.DirectRequest) ([]byte, error) {
+ 	if w.bound == (protocol.Hash{}) || req.Tx.Body.Network != w.network || req.Tx.Body.Subject != w.owner {
+-		return protocol.ErrAuth
++		return nil, protocol.ErrAuth
+ 	}
+ 	raw, err := req.MarshalBinary()
+ 	if err != nil {
+-		return err
++		return nil, err
+ 	}
+-	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
++	err = w.db.Update(func(v state.ReadView) ([]state.Change, error) {
+ 		o := state.NewOverlay(v)
+ 		if err := rules.ValidateWalletDescriptors(o, req.Tx); err != nil {
+ 			return nil, err
+ 		}
+ 		id := req.Tx.ID()
+ 		key := state.Key(state.KeyWalletRequest, id[:])
+ 		if old, err := v.Get(key); err == nil {
+ 			if !bytes.Equal(old, raw) {
+ 				return nil, protocol.ErrAuth
+ 			}
+@@ -75,20 +82,24 @@ func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
+ 			if found && prior != id {
+ 				return nil, protocol.ErrAuth
+ 			}
+ 			if err = state.Put(o, k, id); err != nil {
+ 				return nil, err
+ 			}
+ 		}
+ 		o.Set(key, raw)
+ 		return o.Changes(), nil
+ 	})
++	if err != nil {
++		return nil, err
++	}
++	return raw, nil
+ }
+ 
+ // ReceiveDirect is the end of the fast-payment measurement: issuer signature
+ // verified, output binding checked and the local coin transaction committed.
+ // Durability depends on the configured Store; memory/NoSync is experimental.
+ func (w *Wallet) ReceiveDirect(output protocol.Output, c protocol.OutputCertificate, index uint32) error {
+ 	org, ok := w.orgs[c.Summary.Config]
+ 	if w.bound == (protocol.Hash{}) || !ok || c.Summary.Network != w.network || output.Recipient.Owner != w.owner || c.VerifyOutput(org, index, output) != nil {
+ 		return protocol.ErrAuth
+ 	}
+diff --git a/internal/wallet/direct_bytes_test.go b/internal/wallet/direct_bytes_test.go
+new file mode 100644
+index 0000000..0770e0a
+--- /dev/null
++++ b/internal/wallet/direct_bytes_test.go
+@@ -0,0 +1,252 @@
++package wallet
++
++import (
++	"bytes"
++	"crypto/x509"
++	"encoding/pem"
++	"errors"
++	"os"
++	"path/filepath"
++	"reflect"
++	"sync"
++	"testing"
++	"time"
++	"utxo/internal/rules"
++	"utxo/internal/state"
++	"utxo/internal/store"
++	"utxo/internal/testkit"
++	"utxo/protocol"
++)
++
++func directBytesFixture(t *testing.T, db store.Store) (*Wallet, protocol.DirectRequest) {
++	t.Helper()
++	f := testkit.NewFixture("wallet-saved-bytes", "a", 1)
++	f.EnableDirect()
++	raw, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
++	if err != nil {
++		t.Fatal(err)
++	}
++	block, _ := pem.Decode(raw)
++	if block == nil {
++		t.Fatal("missing test RSA key")
++	}
++	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
++	if err != nil {
++		t.Fatal(err)
++	}
++	p, err := (rules.DirectSettings{Modulus: key.N.Bytes(), TimeoutSeconds: 30, RepairCost: 5}).Policy(f.Schedule, []protocol.OrgConfig{f.Org})
++	if err != nil {
++		t.Fatal(err)
++	}
++	tx, err := f.FastTransaction(0, 19, p)
++	if err != nil {
++		t.Fatal(err)
++	}
++	w, err := NewWithGenesis(db, f.Org.Network, f.Genesis.Outputs[0].Output.Recipient.Owner, []protocol.OrgConfig{f.Org}, f.Genesis)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return w, protocol.DirectRequest{Tx: tx}
++}
++
++func savedDirectBytes(t *testing.T, db store.Store, req protocol.DirectRequest) []byte {
++	t.Helper()
++	var raw []byte
++	id := req.Tx.ID()
++	if err := db.View(func(v state.ReadView) error {
++		var err error
++		raw, err = v.Get(state.Key(state.KeyWalletRequest, id[:]))
++		return err
++	}); err != nil {
++		t.Fatal(err)
++	}
++	return raw
++}
++
++func TestSaveDirectRequestBytesPersistsExactBytes(t *testing.T) {
++	for _, backend := range []string{"memory", "bolt"} {
++		t.Run(backend, func(t *testing.T) {
++			var db store.Store = store.NewMemory()
++			if backend == "bolt" {
++				var err error
++				db, err = store.Open(filepath.Join(t.TempDir(), "wallet.db"), store.Identity{Network: "wallet-saved-bytes", Role: "wallet", Node: "a", Schema: 1})
++				if err != nil {
++					t.Fatal(err)
++				}
++			}
++			t.Cleanup(func() { db.Close() })
++			w, req := directBytesFixture(t, db)
++			want, err := req.MarshalBinary()
++			if err != nil {
++				t.Fatal(err)
++			}
++			raw, err := w.SaveDirectRequestBytes(req)
++			if err != nil || !bytes.Equal(raw, want) {
++				t.Fatalf("saved bytes differ from signed request: err=%v", err)
++			}
++			if !bytes.Equal(savedDirectBytes(t, db, req), raw) {
++				t.Fatal("returned bytes differ from persisted request")
++			}
++			raw[0] ^= 1
++			if !bytes.Equal(savedDirectBytes(t, db, req), want) {
++				t.Fatal("mutating returned bytes changed persisted request")
++			}
++			before, err := store.Scan(db, nil, nil, 1000)
++			if err != nil {
++				t.Fatal(err)
++			}
++			retry, err := w.SaveDirectRequestBytes(req)
++			if err != nil || !bytes.Equal(retry, want) {
++				t.Fatalf("exact retry did not return saved bytes: err=%v", err)
++			}
++			if err := w.SaveDirectRequest(req); err != nil {
++				t.Fatal("compatibility retry failed", err)
++			}
++			after, err := store.Scan(db, nil, nil, 1000)
++			if err != nil || !reflect.DeepEqual(before, after) {
++				t.Fatal("exact retry changed wallet state", err)
++			}
++		})
++	}
++}
++
++func TestSaveDirectRequestBytesRejectsChangedOpening(t *testing.T) {
++	db := store.NewMemory()
++	t.Cleanup(func() { db.Close() })
++	w, req := directBytesFixture(t, db)
++	if _, err := w.SaveDirectRequestBytes(req); err != nil {
++		t.Fatal(err)
++	}
++	before, err := store.Scan(db, nil, nil, 1000)
++	if err != nil {
++		t.Fatal(err)
++	}
++	altered := req
++	altered.Tx.Funding = append([]protocol.Funding(nil), req.Tx.Funding...)
++	altered.Tx.Funding[0].Opening[0] ^= 1
++	if altered.Tx.ID() != req.Tx.ID() {
++		t.Fatal("changed opening must retain immutable TxID")
++	}
++	if raw, err := w.SaveDirectRequestBytes(altered); !errors.Is(err, protocol.ErrAuth) || raw != nil {
++		t.Fatalf("changed opening returned raw=%x, err=%v", raw, err)
++	}
++	after, err := store.Scan(db, nil, nil, 1000)
++	if err != nil || !reflect.DeepEqual(before, after) {
++		t.Fatal("rejected retry changed wallet state", err)
++	}
++}
++
++func TestSaveDirectRequestBytesRejectsBadAuthorization(t *testing.T) {
++	db := store.NewMemory()
++	t.Cleanup(func() { db.Close() })
++	w, req := directBytesFixture(t, db)
++	before, err := store.Scan(db, nil, nil, 1000)
++	if err != nil {
++		t.Fatal(err)
++	}
++	req.Tx.Auth[0].Signature[0] ^= 1
++	if raw, err := w.SaveDirectRequestBytes(req); !errors.Is(err, protocol.ErrAuth) || raw != nil {
++		t.Fatalf("bad authorization returned raw=%x, err=%v", raw, err)
++	}
++	after, err := store.Scan(db, nil, nil, 1000)
++	if err != nil || !reflect.DeepEqual(before, after) {
++		t.Fatal("bad authorization changed wallet state", err)
++	}
++}
++
++type directBytesFailingStore struct {
++	store.Store
++	err error
++}
++
++func (s directBytesFailingStore) Update(fn func(state.ReadView) ([]state.Change, error)) error {
++	return s.Store.Update(func(v state.ReadView) ([]state.Change, error) {
++		if _, err := fn(v); err != nil {
++			return nil, err
++		}
++		return nil, s.err
++	})
++}
++
++func TestSaveDirectRequestBytesStoreFailureReturnsNil(t *testing.T) {
++	db := store.NewMemory()
++	t.Cleanup(func() { db.Close() })
++	w, req := directBytesFixture(t, db)
++	before, err := store.Scan(db, nil, nil, 1000)
++	if err != nil {
++		t.Fatal(err)
++	}
++	failure := errors.New("request commit failed")
++	w.db = directBytesFailingStore{Store: db, err: failure}
++	if raw, err := w.SaveDirectRequestBytes(req); !errors.Is(err, failure) || raw != nil {
++		t.Fatalf("store failure returned raw=%x, err=%v", raw, err)
++	}
++	after, err := store.Scan(db, nil, nil, 1000)
++	if err != nil || !reflect.DeepEqual(before, after) {
++		t.Fatal("failed update changed wallet state", err)
++	}
++	w.db = db
++	if err := db.Close(); err != nil {
++		t.Fatal(err)
++	}
++	if raw, err := w.SaveDirectRequestBytes(req); !errors.Is(err, store.ErrClosed) || raw != nil {
++		t.Fatalf("closed store returned raw=%x, err=%v", raw, err)
++	}
++}
++
++type directBytesGatedStore struct {
++	store.Store
++	entered chan struct{}
++	release chan struct{}
++}
++
++func (s directBytesGatedStore) Update(fn func(state.ReadView) ([]state.Change, error)) error {
++	return s.Store.Update(func(v state.ReadView) ([]state.Change, error) {
++		changes, err := fn(v)
++		if err != nil {
++			return nil, err
++		}
++		close(s.entered)
++		<-s.release
++		return changes, nil
++	})
++}
++
++func TestSaveDirectRequestBytesWaitsForUpdate(t *testing.T) {
++	db := store.NewMemory()
++	t.Cleanup(func() { db.Close() })
++	w, req := directBytesFixture(t, db)
++	gate := directBytesGatedStore{Store: db, entered: make(chan struct{}), release: make(chan struct{})}
++	w.db = gate
++	var once sync.Once
++	unblock := func() { once.Do(func() { close(gate.release) }) }
++	t.Cleanup(unblock)
++	type result struct {
++		raw []byte
++		err error
++	}
++	done := make(chan result, 1)
++	go func() {
++		raw, err := w.SaveDirectRequestBytes(req)
++		done <- result{raw: raw, err: err}
++	}()
++	select {
++	case <-gate.entered:
++	case <-time.After(5 * time.Second):
++		t.Fatal("request did not reach update commit boundary")
++	}
++	select {
++	case got := <-done:
++		t.Fatalf("returned before update completed: raw=%x, err=%v", got.raw, got.err)
++	case <-time.After(50 * time.Millisecond):
++	}
++	unblock()
++	select {
++	case got := <-done:
++		if got.err != nil || len(got.raw) == 0 || !bytes.Equal(got.raw, savedDirectBytes(t, db, req)) {
++			t.Fatal("completed update did not return persisted bytes", got.err)
++		}
++	case <-time.After(5 * time.Second):
++		t.Fatal("request did not return after update completed")
++	}
++}
+diff --git a/cmd/payctl/chain_timing.go b/cmd/payctl/chain_timing.go
+index c11cf63..4ca494d 100644
+--- a/cmd/payctl/chain_timing.go
++++ b/cmd/payctl/chain_timing.go
+@@ -1,34 +1,36 @@
+ package main
+ 
+ import (
+ 	"context"
++	"os"
+ 	"sort"
+ 	"sync"
+ 	"time"
+ 	"utxo/finality"
+ 	"utxo/internal/blockfollow"
+ )
+ 
+ // Client observations only. FetchDone is successful receipt of the complete
+ // evidence, not its earliest availability at a committee. No protocol state is
+ // changed, and the normal follower still verifies and commits every block.
+ type chainFollowTiming struct {
+ 	Height, FirstAttemptNS, LastFailedNS, FetchStartNS, FetchDoneNS int64
+ 	VerifiedNS, CommittedNS                                         int64
+ 	Attempts                                                        int
+ }
+ 
+ type chainTimingSource struct {
+ 	blockfollow.Source
+-	mu   sync.Mutex
+-	rows map[int64]chainFollowTiming
++	mu            sync.Mutex
++	rows          map[int64]chainFollowTiming
++	commitChanged chan struct{}
+ }
+ 
+ func (s *chainTimingSource) Block(ctx context.Context, height int64) (finality.BlockData, error) {
+ 	start := time.Now().UnixNano()
+ 	b, err := s.Source.Block(ctx, height)
+ 	end := time.Now().UnixNano()
+ 	s.mu.Lock()
+ 	defer s.mu.Unlock()
+ 	if s.rows == nil {
+ 		s.rows = make(map[int64]chainFollowTiming)
+@@ -49,26 +51,47 @@ func (s *chainTimingSource) Block(ctx context.Context, height int64) (finality.B
+ }
+ 
+ func (s *chainTimingSource) verified(height int64) {
+ 	s.mu.Lock()
+ 	defer s.mu.Unlock()
+ 	r := s.rows[height]
+ 	r.VerifiedNS = time.Now().UnixNano()
+ 	s.rows[height] = r
+ }
+ 
++// Subscribe before checking wallet state so a concurrent commit cannot be lost.
++func (s *chainTimingSource) commitNotification() <-chan struct{} {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	if s.commitChanged == nil {
++		s.commitChanged = make(chan struct{})
++	}
++	return s.commitChanged
++}
++
++type chainCommitNotificationKey struct{}
++
++// Keep polling only as an explicit experiment comparator.
++func chainCommitNotificationsEnabled() bool {
++	return os.Getenv("UTXO_CHAIN_COMMIT_NOTIFICATIONS") != "0"
++}
++
+ func (s *chainTimingSource) committed(height int64) {
+ 	s.mu.Lock()
+ 	defer s.mu.Unlock()
+ 	r := s.rows[height]
+ 	r.CommittedNS = time.Now().UnixNano()
+ 	s.rows[height] = r
++	if s.commitChanged != nil {
++		close(s.commitChanged)
++		s.commitChanged = make(chan struct{})
++	}
+ }
+ 
+ func (s *chainTimingSource) snapshot() []chainFollowTiming {
+ 	s.mu.Lock()
+ 	defer s.mu.Unlock()
+ 	rows := make([]chainFollowTiming, 0, len(s.rows))
+ 	for _, r := range s.rows {
+ 		rows = append(rows, r)
+ 	}
+ 	sort.Slice(rows, func(i, j int) bool { return rows[i].Height < rows[j].Height })
+diff --git a/cmd/payctl/chain_timing_test.go b/cmd/payctl/chain_timing_test.go
+index d86f86e..3cf4b13 100644
+--- a/cmd/payctl/chain_timing_test.go
++++ b/cmd/payctl/chain_timing_test.go
+@@ -1,19 +1,80 @@
+ package main
+ 
+ import (
+ 	"context"
+ 	"errors"
+ 	"testing"
+ 	"utxo/finality"
+ )
+ 
++func TestChainCommitNotificationsDefaultAndOverride(t *testing.T) {
++	for _, tc := range []struct {
++		value   string
++		enabled bool
++	}{{"", true}, {"1", true}, {"0", false}} {
++		t.Run(tc.value, func(t *testing.T) {
++			t.Setenv("UTXO_CHAIN_COMMIT_NOTIFICATIONS", tc.value)
++			if got := chainCommitNotificationsEnabled(); got != tc.enabled {
++				t.Fatalf("value %q: enabled=%v, want %v", tc.value, got, tc.enabled)
++			}
++		})
++	}
++}
++
++func TestChainCommitWakesAllSubscribers(t *testing.T) {
++	s := &chainTimingSource{rows: make(map[int64]chainFollowTiming)}
++	first, second := s.commitNotification(), s.commitNotification()
++	s.committed(1)
++	for i, notification := range []<-chan struct{}{first, second} {
++		select {
++		case <-notification:
++		default:
++			t.Fatalf("subscriber %d missed commit", i)
++		}
++	}
++}
++
++func TestChainCommitNotificationTracksSuccessiveCommits(t *testing.T) {
++	s := &chainTimingSource{rows: make(map[int64]chainFollowTiming)}
++	first := s.commitNotification()
++	select {
++	case <-first:
++		t.Fatal("notification fired before commit")
++	default:
++	}
++	s.verified(1)
++	select {
++	case <-first:
++		t.Fatal("verification woke observer before wallet commit")
++	default:
++	}
++	s.committed(1)
++	select {
++	case <-first:
++	default:
++		t.Fatal("commit did not wake observer")
++	}
++	second := s.commitNotification()
++	select {
++	case <-second:
++		t.Fatal("new observer received stale commit notification")
++	default:
++	}
++	s.committed(2)
++	select {
++	case <-second:
++	default:
++		t.Fatal("second commit did not wake observer")
++	}
++}
++
+ type timingSource struct{ calls int }
+ 
+ func (s *timingSource) Block(context.Context, int64) (finality.BlockData, error) {
+ 	s.calls++
+ 	if s.calls == 1 {
+ 		return finality.BlockData{}, errors.New("not available")
+ 	}
+ 	return finality.BlockData{}, nil
+ }
+ 
+diff --git a/cmd/payctl/direct.go b/cmd/payctl/direct.go
+index 2f1b133..25ac655 100644
+--- a/cmd/payctl/direct.go
++++ b/cmd/payctl/direct.go
+@@ -125,25 +125,21 @@ func demoDirect(args []string) error {
+ 	if err != nil {
+ 		return err
+ 	}
+ 	httpClient := transport.NewHTTPClient(10 * time.Second)
+ 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+ 	defer cancel()
+ 	observeUntil := time.Now().Add(*observeFor)
+ 	defer blockfollow.Start(ctx, cancel, db0, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w0.PrepareBlock)()
+ 	defer blockfollow.Start(ctx, cancel, db1, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w1.PrepareBlock)()
+ 	var sent time.Time
+-	send := func(org int, req protocol.DirectRequest) (protocol.OutputCertificate, error) {
+-		raw, err := req.MarshalBinary()
+-		if err != nil {
+-			return protocol.OutputCertificate{}, err
+-		}
++	send := func(org int, raw []byte) (protocol.OutputCertificate, error) {
+ 		r, err := http.NewRequestWithContext(ctx, "POST", lab.Gateways[org]+"/v3/transactions", bytes.NewReader(raw))
+ 		if err != nil {
+ 			return protocol.OutputCertificate{}, err
+ 		}
+ 		r.Header.Set("Content-Type", transport.MediaType)
+ 		sent = time.Now()
+ 		resp, err := httpClient.Do(r)
+ 		if err != nil {
+ 			return protocol.OutputCertificate{}, err
+ 		}
+@@ -155,59 +151,61 @@ func demoDirect(args []string) error {
+ 		if resp.StatusCode != 200 {
+ 			return protocol.OutputCertificate{}, fmt.Errorf("gateway %d: %s", resp.StatusCode, b)
+ 		}
+ 		return protocol.DecodeOutputCertificate(b)
+ 	}
+ 	parent, err := build(n.Organizations[0], protocol.Input{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}, origin.Output, desc1, 1)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	req := protocol.DirectRequest{Tx: parent}
+-	if err = w0.SaveDirectRequest(req); err != nil {
++	parentRaw, err := w0.SaveDirectRequestBytes(req)
++	if err != nil {
+ 		return err
+ 	}
+ 	sent = time.Now()
+ 	var pc protocol.OutputCertificate
+ 	if *withhold {
+ 		var clients [4]gateway.MemberClient
+ 		for i, url := range n.Members[n.Organizations[0].Org] {
+ 			clients[i] = transport.NewMemberClient(url)
+ 		}
+ 		collector, err := gateway.New(n.Organizations[0], clients, db0)
+ 		if err != nil {
+ 			return err
+ 		}
+ 		pc, err = collector.CollectDirect(ctx, req)
+ 		if err != nil {
+ 			return err
+ 		}
+ 	} else {
+-		pc, err = send(0, req)
++		pc, err = send(0, parentRaw)
+ 		if err != nil {
+ 			return err
+ 		}
+ 	}
+ 	if err = w1.ReceiveDirect(parent.Body.Outputs[0], pc, 0); err != nil {
+ 		return err
+ 	}
+ 	parentFast := time.Since(sent)
+ 	emit("parent_ready", map[string]any{"sent_unix_ns": sent.UnixNano(), "fact": protocol.Hash(pc.QC.Fact).String(), "output": protocol.Hash(pc.Summary.OutputID(0)).String()})
+ 	child, err := build(n.Organizations[1], protocol.Input{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(0), Evidence: protocol.Hash(pc.QC.Fact)}, parent.Body.Outputs[0], desc0, 2)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	childReq := protocol.DirectRequest{Tx: child, InputCertificates: []protocol.InputCertificate{{Certificate: pc, Index: 0}}}
+-	if err = w1.SaveDirectRequest(childReq); err != nil {
++	childRaw, err := w1.SaveDirectRequestBytes(childReq)
++	if err != nil {
+ 		return err
+ 	}
+ 	sent = time.Now()
+-	cc, err := send(1, childReq)
++	cc, err := send(1, childRaw)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	if err = w0.ReceiveDirect(child.Body.Outputs[0], cc, 0); err != nil {
+ 		return err
+ 	}
+ 	childFast := time.Since(sent)
+ 	emit("child_ready", map[string]any{"sent_unix_ns": sent.UnixNano(), "fact": protocol.Hash(cc.QC.Fact).String(), "output": protocol.Hash(cc.Summary.OutputID(0)).String()})
+ 	public := transport.NewCommitteeClient(n.CommitteeURLs[0])
+ 	var finalElapsed time.Duration
+diff --git a/cmd/payctl/direct_bench.go b/cmd/payctl/direct_bench.go
+index c030c15..939bc3f 100644
+--- a/cmd/payctl/direct_bench.go
++++ b/cmd/payctl/direct_bench.go
+@@ -109,39 +109,36 @@ func benchDirect(args []string) error {
+ 	receiver, err := wallet.NewWithGenesis(group, n.Genesis.Network, target.Owner, n.Organizations, n.Genesis)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	requests := make([]protocol.DirectRequest, *count)
+ 	encoded := make([][]byte, *count)
+ 	for i := range requests {
+ 		origin := n.Genesis.Outputs[inputs[*start+i]]
+ 		body := protocol.TxBody{Wire: protocol.DirectVersion, Version: protocol.DirectVersion, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: publicOwner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: policy.Rules(), Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: origin.Output.Amount, Recipient: target}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
+ 		for _, g := range n.Genesis.Grants {
+-			if g.Organization == org.Hash() {
++			if g.Organization == org.Hash() && (g.Key.Kind != protocol.ResourcePolicy || g.Subject == body.Subject) {
+ 				body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
+ 				if g.Key.Kind == protocol.ResourcePolicy {
+ 					body.Fee.Policy = g.Key.Account
+ 				}
+ 			}
+ 		}
+ 		nonce := protocol.Digest("BENCH_V3", origin.ID[:])
+ 		copy(body.Nonce[:], nonce[:])
+ 		tx, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: origin.Output}}, policy.Key)
+ 		if err != nil {
+ 			return err
+ 		}
+ 		tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), owner)}
+ 		requests[i] = protocol.DirectRequest{Tx: tx}
+-		if err = sender.SaveDirectRequest(requests[i]); err != nil {
+-			return err
+-		}
+-		encoded[i], err = requests[i].MarshalBinary()
++		encoded[i], err = sender.SaveDirectRequestBytes(requests[i])
+ 		if err != nil {
+ 			return err
+ 		}
+ 	}
+ 	samples := make([]directBenchSample, *count)
+ 	for i := range samples {
+ 		samples[i].Index = *start + i
+ 		samples[i].Error = "not dispatched"
+ 		samples[i].Outcome = "NOT_SENT"
+ 	}
+diff --git a/cmd/payctl/direct_budget.go b/cmd/payctl/direct_budget.go
+index 74a8a07..ffe0acf 100644
+--- a/cmd/payctl/direct_budget.go
++++ b/cmd/payctl/direct_budget.go
+@@ -334,34 +334,31 @@ func budgetDirect(args []string) error {
+ 				u.ParentError = err.Error()
+ 				return
+ 			}
+ 			u.Parent = chainHop{Hop: 1, Sender: 0, Receiver: 1, Input: origin.ID, Tx: parent.Tx.ID(), OutputData: parent.Tx.Body.Outputs[0], SentUnixNS: time.Now().UnixNano()}
+ 			vector, err := rules.PrepareDirectVector(parent.Tx, p)
+ 			if err != nil {
+ 				u.ParentError = err.Error()
+ 				return
+ 			}
+ 			u.Parent.Fact = protocol.SummaryFor(parent.Tx, vector).Fact()
+-			if err = wallets[0].SaveDirectRequest(parent); err != nil {
++			parentRaw, err := wallets[0].SaveDirectRequestBytes(parent)
++			if err != nil {
+ 				u.ParentError = err.Error()
+ 				return
+ 			}
+ 			monitor.begin(parent.Tx.ID())
+ 			var pc protocol.OutputCertificate
+ 			for {
+ 				u.Parent.Attempts++
+ 				if *gatewayParent {
+-					var encoded []byte
+-					encoded, err = parent.MarshalBinary()
+-					if err == nil {
+-						pc, err = budgetSend(ctx, client, lab.Gateways[0]+"/debug/budget/collect", encoded)
+-					}
++					pc, err = budgetSend(ctx, client, lab.Gateways[0]+"/debug/budget/collect", parentRaw)
+ 				} else {
+ 					pc, err = collector.CollectDirect(ctx, parent)
+ 				}
+ 				if err == nil {
+ 					break
+ 				}
+ 				u.ParentFailures[err.Error()]++
+ 				if err = budgetPause(ctx, 200*time.Millisecond); err != nil {
+ 					u.ParentError = err.Error()
+ 					return
+@@ -450,25 +447,21 @@ func budgetDirect(args []string) error {
+ 			in, proofs, err := chainInput(u.Parent.Output, coin)
+ 			if err != nil {
+ 				u.ChildError = err.Error()
+ 				return
+ 			}
+ 			child, err := budgetRequest(n, p, org, keys[1], in, coin.Output, desc[2], proofs, childFee...)
+ 			if err != nil {
+ 				u.ChildError = err.Error()
+ 				return
+ 			}
+-			if err = wallets[1].SaveDirectRequest(child); err != nil {
+-				u.ChildError = err.Error()
+-				return
+-			}
+-			childRaw, err := child.MarshalBinary()
++			childRaw, err := wallets[1].SaveDirectRequestBytes(child)
+ 			if err != nil {
+ 				u.ChildError = err.Error()
+ 				return
+ 			}
+ 			u.Child = chainHop{Hop: 2, Sender: 1, Receiver: 2, Input: in.Output, Tx: child.Tx.ID(), OutputData: child.Tx.Body.Outputs[0], CertificateInput: in.Kind == protocol.CertificateInput, SentUnixNS: time.Now().UnixNano()}
+ 			vector, err = rules.PrepareDirectVector(child.Tx, p)
+ 			if err != nil {
+ 				u.ChildError = err.Error()
+ 				return
+ 			}
+diff --git a/cmd/payctl/direct_chain.go b/cmd/payctl/direct_chain.go
+index 655d55b..207f1ec 100644
+--- a/cmd/payctl/direct_chain.go
++++ b/cmd/payctl/direct_chain.go
+@@ -5,64 +5,69 @@ import (
+ 	"context"
+ 	"crypto/ed25519"
+ 	"crypto/rand"
+ 	"encoding/json"
+ 	"flag"
+ 	"fmt"
+ 	"io"
+ 	"net/http"
+ 	"os"
+ 	"path/filepath"
++	"runtime/pprof"
+ 	"sync"
+ 	"time"
+ 	cfg "utxo/cmd/internal/config"
+ 	"utxo/finality"
+ 	"utxo/internal/blockfollow"
+ 	"utxo/internal/member"
+ 	"utxo/internal/requesttrace"
+ 	"utxo/internal/rules"
+ 	"utxo/internal/state"
+ 	"utxo/internal/store"
+ 	"utxo/internal/transport"
+ 	"utxo/internal/wallet"
+ 	"utxo/protocol"
+ )
+ 
+ type chainHop struct {
++	BuildStagesMS                                                               map[string]float64 `json:",omitempty"`
++	BuildSaveStagesMS                                                           map[string]float64 `json:",omitempty"`
++	FinalChecks                                                                 int                `json:",omitempty"`
+ 	MemberInputGate                                                             *chainMemberGate   `json:",omitempty"`
+ 	RequestRaw                                                                  []byte             `json:",omitempty"`
+ 	HTTPAttempts                                                                []chainHTTPAttempt `json:",omitempty"`
+ 	PublicWaitDoneUnixNS                                                        int64              `json:",omitempty"`
+ 	PublicWaitMS                                                                float64            `json:",omitempty"`
+ 	Hop, Sender, Receiver                                                       int
+ 	Tx                                                                          protocol.TxID
+ 	Input, Output                                                               protocol.OutputID
+ 	Fact                                                                        protocol.SpendFactID
+ 	OutputData                                                                  protocol.Output
+ 	CertificateInput                                                            bool
+ 	RequestBytes, CertificateBytes, Attempts                                    int
+ 	ProgressErrors                                                              int
+ 	BuildStartUnixNS, BuildDoneUnixNS, SentUnixNS, ReadyUnixNS                  int64
+ 	FinalUnixNS, MemberClosedUnixNS                                             int64
+ 	BuildMS, FastMS, SentOffsetMS, ReadyOffsetMS, FinalOffsetMS, MemberOffsetMS float64
+ 	Foreground                                                                  []requesttrace.Event `json:",omitempty"`
+ }
+ 
+ type chainReport struct {
+-	WaitMemberInputs, RecordAttempts          bool
+-	Mode                                      string
+-	Requested                                 int
+-	WalletNoSync                              bool
+-	StartedUnixNS                             int64
+-	FastChainMS, PublicChainMS, ClosedChainMS float64
+-	Hops                                      []*chainHop
+-	Error                                     string `json:",omitempty"`
++	SavedRequestBytesReused, CommitNotifications bool
++	WaitMemberInputs, RecordAttempts             bool
++	Mode                                         string
++	Requested                                    int
++	WalletNoSync                                 bool
++	StartedUnixNS                                int64
++	FastChainMS, PublicChainMS, ClosedChainMS    float64
++	Hops                                         []*chainHop
++	Error                                        string `json:",omitempty"`
+ }
+ 
+ // chainInput reads the coin actually received by this wallet. Finality takes
+ // precedence over a retained certificate; no ancestor bundle is manufactured.
+ func chainInput(id protocol.OutputID, coin wallet.DirectCoin) (protocol.Input, []protocol.InputCertificate, error) {
+ 	in := protocol.Input{Output: id}
+ 	if coin.Instance != 0 || coin.Recovered {
+ 		return in, nil, protocol.ErrRule
+ 	}
+ 	if coin.Final != (protocol.Hash{}) {
+@@ -156,20 +161,23 @@ func chainDirect(args []string) error {
+ 		}
+ 		return nil
+ 	}
+ 	if *auditOnly {
+ 		return auditChain(*dir, lab)
+ 	}
+ 	return runChain(*dir, lab, n, *length, *waitFinal, *trace, *e5, *originIndex, *fuelOffset, *payerFuelOffset, *waitMembers, *recordAttempts)
+ }
+ 
+ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, trace, e5 bool, originIndex, fuelOffset, payerFuelOffset int, waitMembers, recordAttempts bool) (err error) {
++	profileBuild := os.Getenv("UTXO_CHAIN_BUILD_PROFILE") == "1"
++	commitNotifications := chainCommitNotificationsEnabled()
++	var profileStores [3]*chainBuildStore
+ 	var e5Samples []faultSample
+ 	if e5 {
+ 		defer func() {
+ 			f, e := os.Create(filepath.Join(dir, "reports", "fault-v4.json"))
+ 			if e != nil {
+ 				if err == nil {
+ 					err = e
+ 				}
+ 				return
+ 			}
+@@ -214,21 +222,26 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
+ 		if e != nil {
+ 			return e
+ 		}
+ 		g, e := store.NewGroup(db, 256, 64)
+ 		if e != nil {
+ 			db.Close()
+ 			return e
+ 		}
+ 		dbs[i] = g
+ 		defer g.Close()
+-		wallets[i], err = wallet.NewWithGenesis(g, n.Genesis.Network, descriptors[i].Owner, n.Organizations, n.Genesis)
++		walletStore := store.Store(g)
++		if profileBuild {
++			profileStores[i] = &chainBuildStore{Store: g}
++			walletStore = profileStores[i]
++		}
++		wallets[i], err = wallet.NewWithGenesis(walletStore, n.Genesis.Network, descriptors[i].Owner, n.Organizations, n.Genesis)
+ 		if err != nil {
+ 			return err
+ 		}
+ 	}
+ 	var origin *state.OriginOutput
+ 	calIndex := 0
+ 	for i := range n.Genesis.Outputs {
+ 		if n.Genesis.Outputs[i].Output.Asset == protocol.AssetCAL && n.Genesis.Outputs[i].Output.Recipient.Owner == descriptors[0].Owner {
+ 			if originIndex >= 0 && calIndex != originIndex {
+ 				calIndex++
+@@ -279,21 +292,21 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
+ 		for _, batches := range organizationBatches {
+ 			for _, b := range batches {
+ 				if b != nil {
+ 					<-b.done
+ 				}
+ 			}
+ 		}
+ 	}()
+ 	var observers sync.WaitGroup
+ 	observerErrors := make(chan error, length)
+-	report := chainReport{Mode: "fast", Requested: length, WalletNoSync: true, WaitMemberInputs: waitMembers, RecordAttempts: recordAttempts}
++	report := chainReport{Mode: "fast", Requested: length, WalletNoSync: true, WaitMemberInputs: waitMembers, RecordAttempts: recordAttempts, SavedRequestBytesReused: true, CommitNotifications: commitNotifications}
+ 	if waitFinal {
+ 		report.Mode = "wait_final"
+ 	}
+ 	if waitMembers {
+ 		report.Mode = "wait_member_inputs"
+ 	}
+ 	var start time.Time
+ 	defer func() {
+ 		cancel()
+ 		observers.Wait()
+@@ -343,99 +356,131 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
+ 			if o.Output.Asset == protocol.AssetFUEL {
+ 				for j, d := range descriptors {
+ 					if o.Output.Recipient.Owner == d.Owner {
+ 						fuels[j] = append(fuels[j], o)
+ 					}
+ 				}
+ 			}
+ 		}
+ 	}
+ 	usedFees := make(map[protocol.OutputID]bool)
++	profileCPU := os.Getenv("UTXO_CHAIN_CPU_PROFILE")
++	stopCPU := func() {}
++	if profileCPU != "" {
++		f, e := os.Create(profileCPU)
++		if e != nil {
++			return e
++		}
++		if e = pprof.StartCPUProfile(f); e != nil {
++			f.Close()
++			return e
++		}
++		var stopped sync.Once
++		stopCPU = func() { stopped.Do(func() { pprof.StopCPUProfile(); f.Close() }) }
++		defer stopCPU()
++	}
++	buildContext := pprof.WithLabels(ctx, pprof.Labels("task", "chain_preparation"))
+ 	for i := 0; i < length; i++ {
+ 		h := &chainHop{Hop: i + 1, Sender: i % 3, Receiver: (i + 1) % 3, Input: id, BuildStartUnixNS: time.Now().UnixNano()}
+ 		orgIndex := walletOrgs[h.Sender]
+ 		org := n.Organizations[orgIndex]
+ 		batches := organizationBatches[orgIndex]
+ 		gateway := lab.Gateways[orgIndex]
+ 		buildStart := time.Now()
++		buildTrace := newChainBuildTrace(profileBuild, time.Now)
++		if profileCPU != "" {
++			pprof.SetGoroutineLabels(buildContext)
++		}
+ 		coin := wallet.DirectCoin{Output: origin.Output, Final: origin.Fact}
+ 		if i > 0 {
+ 			err = dbs[h.Sender].View(func(v state.ReadView) error {
+ 				var found bool
+ 				var e error
+ 				coin, found, e = state.Load[wallet.DirectCoin](v, wallet.DirectCoinKey(id, 0))
+ 				if e != nil {
+ 					return e
+ 				}
+ 				if !found {
+ 					return state.ErrNotFound
+ 				}
+ 				return nil
+ 			})
+ 			if err != nil {
+ 				return err
+ 			}
+ 		}
++		buildTrace.mark("read_coin")
+ 		in, proofs, e := chainInput(id, coin)
+ 		if e != nil {
+ 			return e
+ 		}
+ 		h.CertificateInput = in.Kind == protocol.CertificateInput
+ 		if waitFinal && h.CertificateInput {
+ 			return fmt.Errorf("wait-final selected an unconfirmed input")
+ 		}
+ 		body := protocol.TxBody{Wire: protocol.DirectVersion, Version: protocol.DirectVersion, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: coin.Output.Recipient.Owner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: p.Rules(), Inputs: []protocol.Input{in}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: coin.Output.Amount, Recipient: descriptors[h.Receiver]}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
+ 		for _, g := range n.Genesis.Grants {
+ 			if g.Organization != org.Hash() || (g.Key.Kind == protocol.ResourcePolicy && g.Subject != body.Subject) {
+ 				continue
+ 			}
+ 			body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
+ 			if g.Key.Kind == protocol.ResourcePolicy {
+ 				body.Fee.Policy = g.Key.Account
+ 			}
+ 		}
+ 		nonce := protocol.Digest("CHAIN_V4", id[:])
+ 		copy(body.Nonce[:], nonce[:])
++		buildTrace.mark("assemble_body")
+ 		var tx protocol.FastTx
+ 		var request protocol.DirectRequest
+ 		if e5 {
+ 			j := h.Sender
+ 			if fuelIndex[j] >= len(fuels[j]) {
+ 				return fmt.Errorf("E5 wallet FUEL fixture exhausted")
+ 			}
+ 			request, e = budgetRequest(n, p, org, keys[j], in, coin.Output, descriptors[h.Receiver], proofs, fuels[j][fuelIndex[j]])
+ 			if e != nil {
+ 				return e
+ 			}
+ 			fuelIndex[j]++
+ 			tx = request.Tx
+ 			body = tx.Body
+ 		} else {
+ 			tx, e = protocol.NewFastTx(body, []protocol.InputClaim{{Output: coin.Output}}, p.Key)
+ 			if e != nil {
+ 				return e
+ 			}
++			buildTrace.mark("generate_transaction")
+ 			tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), keys[h.Sender])}
+ 			request = protocol.DirectRequest{Tx: tx, InputCertificates: proofs}
++			buildTrace.mark("sign_transaction")
+ 		}
+-		if e = wallets[h.Sender].SaveDirectRequest(request); e != nil {
+-			return e
+-		}
+-		raw, e := request.MarshalBinary()
++		raw, e := wallets[h.Sender].SaveDirectRequestBytes(request)
+ 		if e != nil {
+ 			return e
+ 		}
++		buildTrace.mark("save_request")
++		if profileBuild {
++			h.BuildSaveStagesMS = profileStores[h.Sender].last
++			h.BuildSaveStagesMS["encode_before_update"] = buildTrace.stages["save_request"] - h.BuildSaveStagesMS["update_total"]
++		}
++		buildTrace.mark("encode_request")
+ 		h.RequestBytes = len(raw)
+ 		h.Tx = tx.ID()
+ 		h.OutputData = body.Outputs[0]
++		buildTrace.mark("record_identifiers")
++		h.BuildStagesMS = buildTrace.stages
+ 		h.BuildDoneUnixNS = time.Now().UnixNano()
+ 		h.BuildMS = float64(time.Since(buildStart)) / 1e6
++		if profileCPU != "" {
++			pprof.SetGoroutineLabels(ctx)
++		}
+ 		if recordAttempts {
+ 			h.RequestRaw = raw
+ 		}
+ 		if waitMembers {
+ 			var parent *chainHop
+ 			var parentFact protocol.SpendFactID
+ 			if i > 0 {
+ 				parent = report.Hops[i-1]
+ 				parentFact = parent.Fact
+ 			}
+@@ -518,38 +563,45 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
+ 		if e5 {
+ 			e5Samples = append(e5Samples, faultSample{Index: i, Request: request, Certificate: &cert, SentNS: h.SentUnixNS, ReadyNS: h.ReadyUnixNS})
+ 		}
+ 		h.Output = cert.Summary.OutputID(0)
+ 		h.CertificateBytes = len(b)
+ 		id = h.Output
+ 		finalReady := make(chan struct{})
+ 		observers.Add(1)
+ 		go func(h *chainHop) {
+ 			defer observers.Done()
+-			if e := observeChainHop(ctx, batches, wallets[h.Receiver], h, start, finalReady); e != nil {
++			observerCtx := ctx
++			if commitNotifications {
++				observerCtx = context.WithValue(ctx, chainCommitNotificationKey{}, followTiming[h.Receiver].commitNotification)
++			}
++			if e := observeChainHop(observerCtx, batches, wallets[h.Receiver], h, start, finalReady); e != nil {
+ 				observerErrors <- e
+ 				cancel()
+ 			}
+ 		}(h)
+ 		if waitFinal {
+ 			select {
+ 			case <-finalReady:
+ 				if recordAttempts {
+ 					waitDone := time.Now()
+ 					h.PublicWaitDoneUnixNS = waitDone.UnixNano()
+ 					h.PublicWaitMS = float64(waitDone.Sub(ready)) / 1e6
+ 				}
+ 			case <-ctx.Done():
+ 				return ctx.Err()
+ 			}
+ 		}
+ 	}
++	if os.Getenv("UTXO_CHAIN_CPU_FOREGROUND_ONLY") == "1" {
++		stopCPU()
++	}
+ 	observers.Wait()
+ 	select {
+ 	case err = <-observerErrors:
+ 		return err
+ 	default:
+ 		return nil
+ 	}
+ }
+ 
+ // Wallet and members follow independently. A final coin can reach the wallet
+@@ -588,36 +640,48 @@ func submitChain(ctx context.Context, client *http.Client, url string, raw []byt
+ 			return nil, nil, attempt, ctx.Err()
+ 		case <-time.After(25 * time.Millisecond):
+ 		}
+ 	}
+ }
+ 
+ func observeChainHop(ctx context.Context, batches [4]*progressBatcher, w *wallet.Wallet, h *chainHop, start time.Time, finalReady chan<- struct{}, recovered ...bool) error {
+ 	expectRecovery := len(recovered) > 0 && recovered[0]
+ 	tick := time.NewTicker(5 * time.Millisecond)
+ 	defer tick.Stop()
++	notify, eventDriven := ctx.Value(chainCommitNotificationKey{}).(func() <-chan struct{})
++	if eventDriven {
++		tick.Stop()
++	}
+ 	for {
++		wake := tick.C
++		var committed <-chan struct{}
++		if eventDriven {
++			wake = nil
++			committed = notify()
++		}
++		h.FinalChecks++
+ 		ok, err := sourceObserved(w, h.Output, expectRecovery)
+ 		if err != nil {
+ 			return err
+ 		}
+ 		if ok {
+ 			now := time.Now()
+ 			h.FinalUnixNS = now.UnixNano()
+ 			h.FinalOffsetMS = float64(now.Sub(start)) / 1e6
+ 			close(finalReady)
+ 			break
+ 		}
+ 		select {
+ 		case <-ctx.Done():
+ 			return ctx.Err()
+-		case <-tick.C:
++		case <-wake:
++		case <-committed:
+ 		}
+ 	}
+ 	var completed [4]bool
+ 	for {
+ 		all := true
+ 		for i, b := range batches {
+ 			if completed[i] {
+ 				continue
+ 			}
+ 			status, err := b.Check(ctx, h.Fact)
+diff --git a/cmd/payctl/direct_fault.go b/cmd/payctl/direct_fault.go
+index 277f96a..fe419bc 100644
+--- a/cmd/payctl/direct_fault.go
++++ b/cmd/payctl/direct_fault.go
+@@ -226,24 +226,21 @@ func runFaultLoad(dir string, lab cfg.Lab, n cfg.Network, count int, rate float6
+ 	sender, err := wallet.NewWithGenesis(group, n.Genesis.Network, requests[0].Tx.Body.Subject, n.Organizations, n.Genesis)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	receiver, err := wallet.NewWithGenesis(group, n.Genesis.Network, requests[0].Tx.Body.Outputs[0].Recipient.Owner, n.Organizations, n.Genesis)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	raws := make([][]byte, count)
+ 	for i, req := range requests {
+-		if err = sender.SaveDirectRequest(req); err != nil {
+-			return err
+-		}
+-		raws[i], err = req.MarshalBinary()
++		raws[i], err = sender.SaveDirectRequestBytes(req)
+ 		if err != nil {
+ 			return err
+ 		}
+ 	}
+ 	trust, err := n.Trust()
+ 	if err != nil {
+ 		return err
+ 	}
+ 	ctx, cancel := context.WithCancel(context.Background())
+ 	defer cancel()
+diff --git a/cmd/payctl/direct_liability.go b/cmd/payctl/direct_liability.go
+index 6ae1bd8..5d3d69e 100644
+--- a/cmd/payctl/direct_liability.go
++++ b/cmd/payctl/direct_liability.go
+@@ -204,24 +204,21 @@ func liabilityDirect(args []string) (err error) {
+ 		in, proofs, e := chainInput(id, coin)
+ 		if e != nil {
+ 			return e
+ 		}
+ 		request, e := budgetRequest(n, policy, n.Organizations[orgIndex[sender]], keys[sender], in, coin.Output, desc[receiver], proofs, fees[sender])
+ 		if e != nil {
+ 			return e
+ 		}
+ 		h := &report.Hops[i]
+ 		*h = chainHop{Hop: i + 1, Sender: sender, Receiver: receiver, Input: id, Tx: request.Tx.ID(), OutputData: request.Tx.Body.Outputs[0], CertificateInput: in.Kind == protocol.CertificateInput, SentUnixNS: time.Now().UnixNano()}
+-		if err = wallets[sender].SaveDirectRequest(request); err != nil {
+-			return err
+-		}
+-		encoded, e := request.MarshalBinary()
++		encoded, e := wallets[sender].SaveDirectRequestBytes(request)
+ 		if e != nil {
+ 			return e
+ 		}
+ 		path := "/v3/transactions"
+ 		if i == 0 || (*mode == "cross" && i == 1) {
+ 			path = "/debug/budget/collect"
+ 		}
+ 		cert, e := budgetSend(ctx, client, lab.Gateways[orgIndex[sender]]+path, encoded)
+ 		if e != nil {
+ 			return e
+diff --git a/cmd/payctl/e7_run.go b/cmd/payctl/e7_run.go
+index a588771..063e7b3 100644
+--- a/cmd/payctl/e7_run.go
++++ b/cmd/payctl/e7_run.go
+@@ -263,24 +263,21 @@ func (w *e7Wallet) pay(ctx context.Context, o e7RunOptions, task e7Task, s *e7Sa
+ 	if e == nil {
+ 		var in protocol.Input
+ 		var proofs []protocol.InputCertificate
+ 		in, proofs, e = chainInput(task.Input, coin)
+ 		s.CertificateInput = in.Kind == protocol.CertificateInput
+ 		if e == nil {
+ 			req, e = budgetRequest(w.network, w.policy, w.network.Organizations[w.config.Site], w.keys[s.Sender], in, coin.Output, w.descriptors[s.Receiver], proofs, fee)
+ 		}
+ 	}
+ 	if e == nil {
+-		e = w.wallets[s.Sender].SaveDirectRequest(req)
+-	}
+-	if e == nil {
+-		raw, e = req.MarshalBinary()
++		raw, e = w.wallets[s.Sender].SaveDirectRequestBytes(req)
+ 	}
+ 	if e != nil {
+ 		s.Error = e.Error()
+ 		return s
+ 	}
+ 	if !time.Now().Before(end) {
+ 		s.Error = "not sent: window ended"
+ 		return s
+ 	}
+ 	s.Tx = req.Tx.ID()
+diff --git a/cmd/payctl/e8.go b/cmd/payctl/e8.go
+index 6c9b9f9..509b080 100644
+--- a/cmd/payctl/e8.go
++++ b/cmd/payctl/e8.go
+@@ -390,26 +390,23 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
+ 						done <- s
+ 						continue
+ 					}
+ 				}
+ 				in, proofs, e := chainInput(j.lane.ID, coin)
+ 				s.CertificateInput = in.Kind == protocol.CertificateInput
+ 				var req protocol.DirectRequest
+ 				if e == nil {
+ 					req, e = budgetRequest(n, policy, n.Organizations[0], keys[s.Sender], in, coin.Output, ds[s.Receiver], proofs, j.fee)
+ 				}
+-				if e == nil {
+-					e = ws[s.Sender].SaveDirectRequest(req)
+-				}
+ 				var raw []byte
+ 				if e == nil {
+-					raw, e = req.MarshalBinary()
++					raw, e = ws[s.Sender].SaveDirectRequestBytes(req)
+ 				}
+ 				if e == nil {
+ 					s.Tx = req.Tx.ID()
+ 					s.Output = protocol.OutputIdentity(n.Genesis.Network, s.Tx, 0)
+ 					s.RequestBytes = len(raw)
+ 					if !time.Now().Before(endTime) {
+ 						s.Error = "not sent: window ended"
+ 						done <- s
+ 						continue
+ 					}

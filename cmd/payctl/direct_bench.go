@@ -116,7 +116,7 @@ func benchDirect(args []string) error {
 		origin := n.Genesis.Outputs[inputs[*start+i]]
 		body := protocol.TxBody{Wire: protocol.DirectVersion, Version: protocol.DirectVersion, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: publicOwner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: policy.Rules(), Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: origin.Output.Amount, Recipient: target}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
 		for _, g := range n.Genesis.Grants {
-			if g.Organization == org.Hash() {
+			if g.Organization == org.Hash() && (g.Key.Kind != protocol.ResourcePolicy || g.Subject == body.Subject) {
 				body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
 				if g.Key.Kind == protocol.ResourcePolicy {
 					body.Fee.Policy = g.Key.Account
@@ -131,10 +131,7 @@ func benchDirect(args []string) error {
 		}
 		tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), owner)}
 		requests[i] = protocol.DirectRequest{Tx: tx}
-		if err = sender.SaveDirectRequest(requests[i]); err != nil {
-			return err
-		}
-		encoded[i], err = requests[i].MarshalBinary()
+		encoded[i], err = sender.SaveDirectRequestBytes(requests[i])
 		if err != nil {
 			return err
 		}

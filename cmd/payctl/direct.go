@@ -132,11 +132,7 @@ func demoDirect(args []string) error {
 	defer blockfollow.Start(ctx, cancel, db0, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w0.PrepareBlock)()
 	defer blockfollow.Start(ctx, cancel, db1, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w1.PrepareBlock)()
 	var sent time.Time
-	send := func(org int, req protocol.DirectRequest) (protocol.OutputCertificate, error) {
-		raw, err := req.MarshalBinary()
-		if err != nil {
-			return protocol.OutputCertificate{}, err
-		}
+	send := func(org int, raw []byte) (protocol.OutputCertificate, error) {
 		r, err := http.NewRequestWithContext(ctx, "POST", lab.Gateways[org]+"/v3/transactions", bytes.NewReader(raw))
 		if err != nil {
 			return protocol.OutputCertificate{}, err
@@ -162,7 +158,8 @@ func demoDirect(args []string) error {
 		return err
 	}
 	req := protocol.DirectRequest{Tx: parent}
-	if err = w0.SaveDirectRequest(req); err != nil {
+	parentRaw, err := w0.SaveDirectRequestBytes(req)
+	if err != nil {
 		return err
 	}
 	sent = time.Now()
@@ -181,7 +178,7 @@ func demoDirect(args []string) error {
 			return err
 		}
 	} else {
-		pc, err = send(0, req)
+		pc, err = send(0, parentRaw)
 		if err != nil {
 			return err
 		}
@@ -196,11 +193,12 @@ func demoDirect(args []string) error {
 		return err
 	}
 	childReq := protocol.DirectRequest{Tx: child, InputCertificates: []protocol.InputCertificate{{Certificate: pc, Index: 0}}}
-	if err = w1.SaveDirectRequest(childReq); err != nil {
+	childRaw, err := w1.SaveDirectRequestBytes(childReq)
+	if err != nil {
 		return err
 	}
 	sent = time.Now()
-	cc, err := send(1, childReq)
+	cc, err := send(1, childRaw)
 	if err != nil {
 		return err
 	}

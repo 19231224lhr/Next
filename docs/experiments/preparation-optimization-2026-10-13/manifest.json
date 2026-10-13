@@ -1,0 +1,162 @@
+{
+  "source_head_at_capture": "3848284e99a4a4e3e3d0e85027aa9bcb530ce29f",
+  "branch": "fix/partial-approval-reclamation",
+  "go_version": "go version go1.27.1 windows/amd64",
+  "next_binaries_sha256": {
+    "before": {
+      "payctl": "1ed240999b1cbfae4d4fc08f404dee99390fb4a770b799291930a6683a2036b6",
+      "member": "08f246d7c5064e92b4892128ffc6421cbe144fd7948037aa526c8dc9250003ee",
+      "gateway": "38c23e4cf99e6cbdb2701ad6535750b59f50123f2f9585609bc6d6bbc4f47153",
+      "committee": "70424a77f73c4ac400de144ca2376b32690cade09163355dd3f7f5614dfcf843"
+    },
+    "after": {
+      "payctl": "cff84d30a719aad0e25c5e4794141a922896d01478f3070b22f73ec86f929b56",
+      "member": "08f246d7c5064e92b4892128ffc6421cbe144fd7948037aa526c8dc9250003ee",
+      "gateway": "38c23e4cf99e6cbdb2701ad6535750b59f50123f2f9585609bc6d6bbc4f47153",
+      "committee": "70424a77f73c4ac400de144ca2376b32690cade09163355dd3f7f5614dfcf843"
+    }
+  },
+  "fastpay_binaries_sha256": {
+    "server": "c85381756c81ef055c86f93c7e8cf16cdb26fdf46a05fab00b85ad009a5cc869",
+    "examples/baseline_client": "50306e4c512d7ce8870abf4938ab9030aa18bc462f673f8662aa461450198a60"
+  },
+  "fastpay_source_commit": "db39bb0cddc94b8c34dc235b1cfdae4c1285c6f2",
+  "source_sha256": {
+    "internal/wallet/direct.go": "53a0c7c34feb283e5f8b318a0cb35023f5f779b98e88057c51b00ff1dcee843c",
+    "internal/wallet/direct_bytes_test.go": "f0cfa2a048d1b2914694fe5be341bed81dd6d80aeac53f7f8354d5245da78d61",
+    "cmd/payctl/direct_chain.go": "c39fc8dd408b39f18e8118a8f27f8d36491543ef402c72162d6411d1a1327f91",
+    "cmd/payctl/direct_bench.go": "738deb5c6939a0cc5158401ee541d5ae827dbf5f5da7f55e3deba9e266121fc5",
+    "cmd/payctl/direct_fault.go": "72917d076ce1b4d3b0659f5cf4c4ec2dc38f065a93efed7cd80016c0aa995311",
+    "cmd/payctl/direct_liability.go": "23a62bed6707ce16e5aa388c6bbda3c52781a2a63b2a1fe4ad010203190361f4",
+    "cmd/payctl/direct_budget.go": "d740d62c90f344694112c2bebe291c12ac51b04a543d4c65f94b034299524ec3",
+    "cmd/payctl/direct.go": "c268b82038517d4324d757b30e719517b8ef3a06e5fcf0667cacb13b71eada1a",
+    "cmd/payctl/e7_run.go": "35738a6d064b5bd2368f52aebea4ea45bec82731377170c33b1e1c6ff67fe6f2",
+    "cmd/payctl/e8.go": "fccdb421dcc264a8ea44bf263d39d4aa0bc0ca8cdb7d4260bd4ca738c6ac6ea0",
+    "cmd/payctl/chain_timing.go": "6c6c6ad4e85e3378e6ee7620e0afcb95e9da52ef5e38dd6e05b331c4f6de2653",
+    "cmd/payctl/chain_timing_test.go": "fbe51b142f6852346b08306352ed856b2e13c0f9f1b8137f7395c2c15d8bee7d",
+    "cmd/payctl/chain_build_profile.go": "9803e90fb96f2305a18f70b13387735a6c14fd3e9ccbfeff988ad325d823e458",
+    "cmd/payctl/chain_build_profile_test.go": "9dbc2f7ec51f2a7ca65d5fc9fa33318cad6ba1c2ef57bb7674128a5d5532fdb3",
+    "cmd/payctl/chain_build_profile_bench_test.go": "3835cf8d74c9e53e86307b994362fe6d87864f056afb32f94b891ac2e6559402",
+    "go.mod": "48babf5a8fcfe984024966eaf29cd60a658ba81035a9a199aafe13bf527324cd",
+    "go.sum": "27c7f99829e6a90acdfa8b3f9163070683acb057d14e5c914f65e8f63d2d303a"
+  },
+  "baseline_runner_sha256": {
+    "run_next.py": "0ab8c0e191821525aa823f312b97ec39c873e41c566e553312d43896f691c340",
+    "run_fastpay.py": "90732c5acafc1b68038e43d56e23efcb19817b26ca44068a1657afc694e2da65"
+  },
+  "shared_affinity_cpus": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "GOMAXPROCS": 4,
+  "run_order": [
+    [
+      "before",
+      "after",
+      "fastpay"
+    ],
+    [
+      "fastpay",
+      "after",
+      "before"
+    ],
+    [
+      "before",
+      "fastpay",
+      "after"
+    ],
+    [
+      "after",
+      "before",
+      "fastpay"
+    ],
+    [
+      "fastpay",
+      "before",
+      "after"
+    ]
+  ],
+  "conditions": {
+    "workload": "100 real dependent transfers among 3 rotating wallets, only first funded",
+    "next": "4 members, 4 real committee services, 1 gateway; normal public execution/follow; memory server modes and ext4 NoSync Bolt wallets; ordinary Direct, short-source/compact approvals disabled, no Pool",
+    "fastpay": "4 authorities, 1 shard, quorum3, memory native server/wallet, TCP, receiver-confirmed client with funding guard, receiver sync and unmeasured spendability/conservation probe",
+    "diagnostics": "Build phase and Store callback times enabled in both Next arms; CPU profiles disabled; notification override unset so each binary uses its original/default mode"
+  },
+  "checks": {
+    "next_receipts": 1035,
+    "fastpay_measured_receipts": 500,
+    "all_closures_complete": true,
+    "timed_next_requests_all_single_attempt": true,
+    "public_wait_smoke_retries": 3,
+    "public_wait_adapter_recovered_from_validation_error": true
+  },
+  "artifact_sha256": {
+    "analysis.json": "a0472155c45812b7b359492fbf418a8979915f1a2abb0249a84e58ec7c41a530",
+    "analyze.py": "b9e133b43d983e915c2f9dedbaa4094490f99b12f4d26e8965a8cf25a5e9b24c",
+    "capture_provenance.py": "6b18ab99cbade340ebe62c967439d10ee5b0a76d69810689ca5921f6bbd482ed",
+    "combined-review.patch": "2a42e0f9c71cac94723a6923f76fe0ae5855ca19e18fa278dcbbecfacc102110",
+    "REPORT.zh-CN.md": "1fa17068070e40cce3c92c826eddc632b6674d685c023c45eda2248103fd05a7",
+    "review.md": "d7aed0d5673437b711ee86b3c0815aabd1376d31e3ccd1a33eb5745175e72357",
+    "run_compare.sh": "7b56f70ef71e7d2167500302bab0516e33f7d8ada364ed1a64bb386da2f3e739",
+    "run_wait_smoke.py": "bda9c6df0a323fc78f3c4ac75fb596b7265c68ba77881e5bbf18dd69a34b739d",
+    "run_wait_smoke.sh": "aaefb482b0453ce6d1617288d2723cddba236d59c73ff714b957851eb2b7f08b",
+    "wallet-review.patch": "8b9c891d34823ba5ca11c5000fe3eaad44c5a523d7c27b75b5cb7e6ce5dea6bb",
+    "after-source/go.mod": "48babf5a8fcfe984024966eaf29cd60a658ba81035a9a199aafe13bf527324cd",
+    "after-source/go.sum": "27c7f99829e6a90acdfa8b3f9163070683acb057d14e5c914f65e8f63d2d303a",
+    "before-source/chain_timing.go": "2782eac9ba94e87ea7be112be5c9c0abf3fc0e3f53a41c753a61f34599753250",
+    "before-source/direct.go": "8708d72815d6601eb404090742ffab441b0e0fccd11583bf85e05085dd92ed05",
+    "before-source/direct_bench.go": "c5d1e43c58eb0f3f8ffbfcf91c1d1bf57d46f9f7e1dfce32fb72250951a1f048",
+    "before-source/direct_chain.go": "cc77f6432c7864bcab43cc6cf0b083ce670a782bd82d9dbf395f82253557c1a4",
+    "results/independent-smoke-native.json": "fa88fb17d56250ba6f42e44d855acadfd49dc4627f9766f9cfe3ea9612eb3a6f",
+    "results/independent-smoke.json": "b207d0acd44b182e7c11f0f9834e6f2b3928e99f984ee5f54a57870e79af3d1c",
+    "results/r0-after-native.json": "7f7fcff121ea45a5de542c5dd5dcc8e2a05b5a9c134b6df19ff96b163b9aadd5",
+    "results/r0-after.json": "98d8d6495381a73a54e6feb16e3187195221199f8d0f469ba9d5652b53b78101",
+    "results/r0-before-native.json": "1e25660e2104a92f853ffbe8a26e17c306632ed69bab166f9bd764dcf782f134",
+    "results/r0-before.json": "6055f85c144f03703e262f0c3953d7b51e16029fb4e6d35f62575af55f535591",
+    "results/r0-fastpay-native.json": "0bcdfe15b6100f02f0e5508d80baa6bf4efe357668273e787999a1e2149e76a1",
+    "results/r0-fastpay.json": "068c0fc317ba5110a398069572ae468a88b269df3d4b8040c6f8f1880b50e0b9",
+    "results/r1-after-native.json": "3cc06f03d4c9876a0e0ebf49bdf43ef06ec85632aba0c529ba8e8f250d4cdeae",
+    "results/r1-after.json": "42a2c452e1545a19247e8bf4a5f74f3697799f0beb904c71d2142dd6d9e36577",
+    "results/r1-before-native.json": "a6089448fb83550e27dc4c8b600f13bc8248af7fce6bfa9d8df459dfe5c711e6",
+    "results/r1-before.json": "8a9b2e5517d8f6c76dcccb258ce10ba777e8e41ef05e261e86fb1a183bd95649",
+    "results/r1-fastpay-native.json": "9b4116546f37f05bd7403f5113b6e01c3f75d496b5790c1a331bdc52400c9757",
+    "results/r1-fastpay.json": "c952f7fdfbcb97db4ab9da7b0cfc14a0e13fd170fd1624b00e08dea8056fceaa",
+    "results/r2-after-native.json": "2f5fa52f28d6d3028c840e22f847a4e2d0e6911f6841eef78600785909c9cde9",
+    "results/r2-after.json": "72d57613a0ca2142f66ea14ecfce0c801e6faa1fac37a890966e5e017025f2bd",
+    "results/r2-before-native.json": "40302740e65b904253f7d57f9c805a335919f90298c75c98ecd1bdd9df48866a",
+    "results/r2-before.json": "375cc261c6856071625bb2401f4c3d85906e44ddfd2047243ee7ff092593574d",
+    "results/r2-fastpay-native.json": "f3109a2a3c919d6f480ac76b0beee56acf2a2ae60e8e8c28c7fe87a0b51f9eee",
+    "results/r2-fastpay.json": "c960aab1745b96320e3de0f47e181238641182afe4017b3c6c1a96c19a4c7719",
+    "results/r3-after-native.json": "8e0cf82fef02c9b75387ae192997ba54e9b3fb6c31f4b0b87ec275241c6e4095",
+    "results/r3-after.json": "66a3b13c813ecc27f32e05fad9da1afe492643206948f6ba7d603f1a34d2e9fc",
+    "results/r3-before-native.json": "5abceded2940472ada9354e996f37c59f769dc832506bcaf448894612f4dbd9e",
+    "results/r3-before.json": "91563d80869789b04ea5701c956161f5040c758651c7c33270cd67d82f5e3f6c",
+    "results/r3-fastpay-native.json": "3dcc50e83769866b487163bbb4c2cf77f1f5fbde91dbaa88549548f0f7450258",
+    "results/r3-fastpay.json": "fdb1ac698a0f6fdbc664cb853de3d7d9c55d337d769710bdb5ac6d29cd62583b",
+    "results/r4-after-native.json": "b21a6eb2d8e5b4d7cb86087c167176ee89467ab26de6e0be1e7f430394444c47",
+    "results/r4-after.json": "552c953e8a2c8a374b5cc124ec4332fbe621998c2dcd78755474dca1078bf6f5",
+    "results/r4-before-native.json": "d220cb564c1d896a36db97a0e1368236401b156625e40d886473fddd7dafcf51",
+    "results/r4-before.json": "26638e40e3f2d7463f05b01a95f676f936cd3a7c85c673c442f579fc8dc5168b",
+    "results/r4-fastpay-native.json": "0e202fa8ff7f4e2c3ec214d3e83cad1d56bb53d5ba203a5fbdb9be2b14c35635",
+    "results/r4-fastpay.json": "39ac9a916dff2ac533c2c3302c710d3646fc66d1c6f32ecf1697c40ceef5e982",
+    "results/wait-smoke-native.json": "da257e39f6466ef91e1b23145eb7d3a01610f63df1965dfed40f68a2a915494b",
+    "results/wait-smoke.json": "03f83e0e0068d19b8b16d95f4ec67767f46c25732725a512e39e632e2c41db82",
+    "after-source/cmd/payctl/chain_build_profile.go": "9803e90fb96f2305a18f70b13387735a6c14fd3e9ccbfeff988ad325d823e458",
+    "after-source/cmd/payctl/chain_build_profile_bench_test.go": "3835cf8d74c9e53e86307b994362fe6d87864f056afb32f94b891ac2e6559402",
+    "after-source/cmd/payctl/chain_build_profile_test.go": "9dbc2f7ec51f2a7ca65d5fc9fa33318cad6ba1c2ef57bb7674128a5d5532fdb3",
+    "after-source/cmd/payctl/chain_timing.go": "6c6c6ad4e85e3378e6ee7620e0afcb95e9da52ef5e38dd6e05b331c4f6de2653",
+    "after-source/cmd/payctl/chain_timing_test.go": "fbe51b142f6852346b08306352ed856b2e13c0f9f1b8137f7395c2c15d8bee7d",
+    "after-source/cmd/payctl/direct.go": "c268b82038517d4324d757b30e719517b8ef3a06e5fcf0667cacb13b71eada1a",
+    "after-source/cmd/payctl/direct_bench.go": "738deb5c6939a0cc5158401ee541d5ae827dbf5f5da7f55e3deba9e266121fc5",
+    "after-source/cmd/payctl/direct_budget.go": "d740d62c90f344694112c2bebe291c12ac51b04a543d4c65f94b034299524ec3",
+    "after-source/cmd/payctl/direct_chain.go": "c39fc8dd408b39f18e8118a8f27f8d36491543ef402c72162d6411d1a1327f91",
+    "after-source/cmd/payctl/direct_fault.go": "72917d076ce1b4d3b0659f5cf4c4ec2dc38f065a93efed7cd80016c0aa995311",
+    "after-source/cmd/payctl/direct_liability.go": "23a62bed6707ce16e5aa388c6bbda3c52781a2a63b2a1fe4ad010203190361f4",
+    "after-source/cmd/payctl/e7_run.go": "35738a6d064b5bd2368f52aebea4ea45bec82731377170c33b1e1c6ff67fe6f2",
+    "after-source/cmd/payctl/e8.go": "fccdb421dcc264a8ea44bf263d39d4aa0bc0ca8cdb7d4260bd4ca738c6ac6ea0",
+    "after-source/internal/wallet/direct.go": "53a0c7c34feb283e5f8b318a0cb35023f5f779b98e88057c51b00ff1dcee843c",
+    "after-source/internal/wallet/direct_bytes_test.go": "f0cfa2a048d1b2914694fe5be341bed81dd6d80aeac53f7f8354d5245da78d61"
+  }
+}

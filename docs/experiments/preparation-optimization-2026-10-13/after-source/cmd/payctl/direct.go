@@ -1,0 +1,309 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"net/http"
+	"path/filepath"
+	"time"
+	cfg "utxo/cmd/internal/config"
+	"utxo/internal/blockfollow"
+	"utxo/internal/gateway"
+	"utxo/internal/rules"
+	"utxo/internal/store"
+	"utxo/internal/transport"
+	"utxo/internal/wallet"
+	"utxo/protocol"
+)
+
+func demoDirect(args []string) error {
+	flags := flag.NewFlagSet("demo-v3", flag.ContinueOnError)
+	dir := flags.String("dir", "", "laboratory directory")
+	index := flags.Int("input", 0, "genesis output index per owner")
+	withhold := flags.Bool("withhold-parent", false, "certify parent but withhold its submission to exercise compensation")
+	recoverSource := flags.Bool("recover-source", false, "expect exposed certificate to recover withheld source without publisher")
+	waitPhysical := flags.Bool("wait-repair", false, "observe all physical repairs after late-source recovery")
+	events := flags.Bool("events", false, "print experiment observation timestamps as EVENT JSON lines")
+	observeFor := flags.Duration("observe-for", 0, "keep experiment wallets following blocks for this duration")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	emit := func(stage string, fields map[string]any) {
+		if *events {
+			fields["stage"], fields["unix_ns"], fields["input"] = stage, time.Now().UnixNano(), *index
+			raw, _ := json.Marshal(fields)
+			fmt.Println("EVENT", string(raw))
+		}
+	}
+	var lab cfg.Lab
+	if err := cfg.Read(filepath.Join(*dir, "lab.json"), &lab); err != nil {
+		return err
+	}
+	var n cfg.Network
+	if err := cfg.Read(lab.Network, &n); err != nil {
+		return err
+	}
+	if n.Direct == nil || *index < 0 {
+		return protocol.ErrRule
+	}
+	p, err := n.Direct.Policy(n.Schedule, n.Organizations)
+	if err != nil {
+		return err
+	}
+	trust, err := n.Trust()
+	if err != nil {
+		return err
+	}
+	owner0, err := cfg.PrivateKey(lab.Owners[0])
+	if err != nil {
+		return err
+	}
+	owner1, err := cfg.PrivateKey(lab.Owners[1])
+	if err != nil {
+		return err
+	}
+	desc0 := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: n.Organizations[0].Org}, owner0)
+	desc1 := protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: n.Organizations[1].Org}, owner1)
+	outputs := n.Genesis.Outputs
+	selected := -1
+	count := 0
+	for i, out := range outputs {
+		if out.Output.Recipient.Owner == desc0.Owner {
+			if count == *index {
+				selected = i
+				break
+			}
+			count++
+		}
+	}
+	if selected < 0 {
+		return protocol.ErrRule
+	}
+	origin := outputs[selected]
+	build := func(org protocol.OrgConfig, input protocol.Input, claim protocol.Output, to protocol.ReceiveDescriptor, nonce byte) (protocol.FastTx, error) {
+		body := protocol.TxBody{Wire: protocol.DirectVersion, Version: protocol.DirectVersion, Network: n.Genesis.Network, Kind: protocol.FastTransfer, Subject: claim.Recipient.Owner, Certifier: org.Org, Config: org.Hash(), Epoch: org.Epoch, Rules: p.Rules(), Inputs: []protocol.Input{input}, Outputs: []protocol.Output{{Asset: protocol.AssetCAL, Amount: claim.Amount, Recipient: to}}, Fee: protocol.FeeTerms{Source: protocol.OrgReserve, Account: org.Org, Version: 1, Maximum: 1000}, Work: protocol.WorkLimit{Execution: 100000, Bytes: 10000000, Depth: 1, Ancestors: 1}}
+		for _, g := range n.Genesis.Grants {
+			if g.Organization == org.Hash() {
+				body.Admission = append(body.Admission, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
+				if g.Key.Kind == protocol.ResourcePolicy {
+					body.Fee.Policy = g.Key.Account
+				}
+			}
+		}
+		unique := protocol.Digest("DIRECT_DEMO_NONCE", input.Output[:], []byte{nonce})
+		copy(body.Nonce[:], unique[:])
+		tx, err := protocol.NewFastTx(body, []protocol.InputClaim{{Output: claim}}, p.Key)
+		if err != nil {
+			return tx, err
+		}
+		key := owner0
+		if claim.Recipient.Owner == desc1.Owner {
+			key = owner1
+		}
+		tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), key)}
+		return tx, nil
+	}
+	db0, err := store.Open(filepath.Join(*dir, fmt.Sprintf("wallet-v4-%d-a.db", *index)), store.Identity{Network: n.ChainID, Role: "wallet", Node: "a", Schema: 4})
+	if err != nil {
+		return err
+	}
+	defer db0.Close()
+	db1, err := store.Open(filepath.Join(*dir, fmt.Sprintf("wallet-v4-%d-b.db", *index)), store.Identity{Network: n.ChainID, Role: "wallet", Node: "b", Schema: 4})
+	if err != nil {
+		return err
+	}
+	defer db1.Close()
+	w0, err := wallet.NewWithGenesis(db0, n.Genesis.Network, desc0.Owner, n.Organizations, n.Genesis)
+	if err != nil {
+		return err
+	}
+	w1, err := wallet.NewWithGenesis(db1, n.Genesis.Network, desc1.Owner, n.Organizations, n.Genesis)
+	if err != nil {
+		return err
+	}
+	httpClient := transport.NewHTTPClient(10 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	observeUntil := time.Now().Add(*observeFor)
+	defer blockfollow.Start(ctx, cancel, db0, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w0.PrepareBlock)()
+	defer blockfollow.Start(ctx, cancel, db1, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, w1.PrepareBlock)()
+	var sent time.Time
+	send := func(org int, raw []byte) (protocol.OutputCertificate, error) {
+		r, err := http.NewRequestWithContext(ctx, "POST", lab.Gateways[org]+"/v3/transactions", bytes.NewReader(raw))
+		if err != nil {
+			return protocol.OutputCertificate{}, err
+		}
+		r.Header.Set("Content-Type", transport.MediaType)
+		sent = time.Now()
+		resp, err := httpClient.Do(r)
+		if err != nil {
+			return protocol.OutputCertificate{}, err
+		}
+		defer resp.Body.Close()
+		b, err := io.ReadAll(io.LimitReader(resp.Body, protocol.MaxCertificateBytes))
+		if err != nil {
+			return protocol.OutputCertificate{}, err
+		}
+		if resp.StatusCode != 200 {
+			return protocol.OutputCertificate{}, fmt.Errorf("gateway %d: %s", resp.StatusCode, b)
+		}
+		return protocol.DecodeOutputCertificate(b)
+	}
+	parent, err := build(n.Organizations[0], protocol.Input{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}, origin.Output, desc1, 1)
+	if err != nil {
+		return err
+	}
+	req := protocol.DirectRequest{Tx: parent}
+	parentRaw, err := w0.SaveDirectRequestBytes(req)
+	if err != nil {
+		return err
+	}
+	sent = time.Now()
+	var pc protocol.OutputCertificate
+	if *withhold {
+		var clients [4]gateway.MemberClient
+		for i, url := range n.Members[n.Organizations[0].Org] {
+			clients[i] = transport.NewMemberClient(url)
+		}
+		collector, err := gateway.New(n.Organizations[0], clients, db0)
+		if err != nil {
+			return err
+		}
+		pc, err = collector.CollectDirect(ctx, req)
+		if err != nil {
+			return err
+		}
+	} else {
+		pc, err = send(0, parentRaw)
+		if err != nil {
+			return err
+		}
+	}
+	if err = w1.ReceiveDirect(parent.Body.Outputs[0], pc, 0); err != nil {
+		return err
+	}
+	parentFast := time.Since(sent)
+	emit("parent_ready", map[string]any{"sent_unix_ns": sent.UnixNano(), "fact": protocol.Hash(pc.QC.Fact).String(), "output": protocol.Hash(pc.Summary.OutputID(0)).String()})
+	child, err := build(n.Organizations[1], protocol.Input{Kind: protocol.CertificateInput, Output: pc.Summary.OutputID(0), Evidence: protocol.Hash(pc.QC.Fact)}, parent.Body.Outputs[0], desc0, 2)
+	if err != nil {
+		return err
+	}
+	childReq := protocol.DirectRequest{Tx: child, InputCertificates: []protocol.InputCertificate{{Certificate: pc, Index: 0}}}
+	childRaw, err := w1.SaveDirectRequestBytes(childReq)
+	if err != nil {
+		return err
+	}
+	sent = time.Now()
+	cc, err := send(1, childRaw)
+	if err != nil {
+		return err
+	}
+	if err = w0.ReceiveDirect(child.Body.Outputs[0], cc, 0); err != nil {
+		return err
+	}
+	childFast := time.Since(sent)
+	emit("child_ready", map[string]any{"sent_unix_ns": sent.UnixNano(), "fact": protocol.Hash(cc.QC.Fact).String(), "output": protocol.Hash(cc.Summary.OutputID(0)).String()})
+	public := transport.NewCommitteeClient(n.CommitteeURLs[0])
+	var finalElapsed time.Duration
+	ticker := time.NewTicker(25 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		ok, err := w0.DirectFinal(cc.Summary.OutputID(0), 0)
+		if err != nil {
+			return err
+		}
+		if ok {
+			finalElapsed = time.Since(sent)
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+	report := map[string]any{"timing_origin": "wallet_http_submit_v4", "parent_fast_ms": float64(parentFast) / float64(time.Millisecond), "child_fast_ms": float64(childFast) / float64(time.Millisecond), "child_block_observed_ms": float64(finalElapsed) / float64(time.Millisecond), "parent_output": protocol.Hash(pc.Summary.OutputID(0)).String(), "child_output": protocol.Hash(cc.Summary.OutputID(0)).String(), "parent_withheld": *withhold}
+	emit("child_public_observed", map[string]any{})
+	fmt.Println("Child finalized; observing withheld-source outcome.")
+	if *withhold {
+		url := n.CommitteeURLs[0] + "/v3/obligations/" + protocol.Hash(pc.Summary.OutputID(0)).String()
+		for {
+			resp, err := httpClient.Get(url)
+			if err == nil {
+				var ob rules.DirectObligation
+				err = json.NewDecoder(resp.Body).Decode(&ob)
+				resp.Body.Close()
+				if err == nil && *recoverSource && ob.Status == rules.DirectFulfilled {
+					report["autonomous_source_observed_ms"] = float64(time.Since(sent)) / float64(time.Millisecond)
+					report["compensation_avoided"] = true
+					emit("source_fulfilled_observed", map[string]any{"obligation": ob})
+					break
+				}
+				if err == nil && ob.Status == rules.DirectRepaired {
+					report["compensation_observed_ms"] = float64(time.Since(sent)) / float64(time.Millisecond)
+					emit("compensation_observed", map[string]any{"obligation": ob})
+					break
+				}
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-ticker.C:
+			}
+		}
+		if !*recoverSource {
+			raw, err := (protocol.DirectPayment{Tx: parent, Certificate: pc}).Submission().MarshalBinary()
+			if err != nil {
+				return err
+			}
+			emit("late_source_submit_start", map[string]any{})
+			if err = public.Submit(ctx, raw); err != nil {
+				return err
+			}
+			for {
+				ok, err := w1.DirectRecovered(pc.Summary.OutputID(0))
+				if err != nil {
+					return err
+				}
+				if ok {
+					report["late_parent_reserve_recovered"] = true
+					emit("source_repaid_observed", map[string]any{})
+					break
+				}
+
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-ticker.C:
+				}
+			}
+		}
+	}
+	path := filepath.Join(*dir, "reports", fmt.Sprintf("direct-%d.json", *index))
+	if err = cfg.Write(path, report); err != nil {
+		return err
+	}
+	if *waitPhysical {
+		var trial repairTrial
+		if err := waitRepair(ctx, httpClient, n.CommitteeURLs[:], pc.Summary.OutputID(0), &trial); err != nil {
+			return err
+		}
+		report["physical_repair"] = trial
+		report["physical_repair_observed_ms"] = float64(time.Since(sent)) / float64(time.Millisecond)
+		emit("materialization_observed", map[string]any{})
+		if err := cfg.Write(path, report); err != nil {
+			return err
+		}
+	}
+	pretty, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(pretty))
+	if remaining := time.Until(observeUntil); remaining > 0 {
+		return budgetPause(ctx, remaining)
+	}
+	return nil
+}

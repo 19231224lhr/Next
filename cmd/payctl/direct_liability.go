@@ -211,10 +211,7 @@ func liabilityDirect(args []string) (err error) {
 		}
 		h := &report.Hops[i]
 		*h = chainHop{Hop: i + 1, Sender: sender, Receiver: receiver, Input: id, Tx: request.Tx.ID(), OutputData: request.Tx.Body.Outputs[0], CertificateInput: in.Kind == protocol.CertificateInput, SentUnixNS: time.Now().UnixNano()}
-		if err = wallets[sender].SaveDirectRequest(request); err != nil {
-			return err
-		}
-		encoded, e := request.MarshalBinary()
+		encoded, e := wallets[sender].SaveDirectRequestBytes(request)
 		if e != nil {
 			return e
 		}

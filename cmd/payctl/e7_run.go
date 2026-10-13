@@ -270,10 +270,7 @@ func (w *e7Wallet) pay(ctx context.Context, o e7RunOptions, task e7Task, s *e7Sa
 		}
 	}
 	if e == nil {
-		e = w.wallets[s.Sender].SaveDirectRequest(req)
-	}
-	if e == nil {
-		raw, e = req.MarshalBinary()
+		raw, e = w.wallets[s.Sender].SaveDirectRequestBytes(req)
 	}
 	if e != nil {
 		s.Error = e.Error()

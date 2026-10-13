@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"sync"
 	"time"
 	cfg "utxo/cmd/internal/config"
@@ -28,6 +29,9 @@ import (
 )
 
 type chainHop struct {
+	BuildStagesMS                                                               map[string]float64 `json:",omitempty"`
+	BuildSaveStagesMS                                                           map[string]float64 `json:",omitempty"`
+	FinalChecks                                                                 int                `json:",omitempty"`
 	MemberInputGate                                                             *chainMemberGate   `json:",omitempty"`
 	RequestRaw                                                                  []byte             `json:",omitempty"`
 	HTTPAttempts                                                                []chainHTTPAttempt `json:",omitempty"`
@@ -48,14 +52,15 @@ type chainHop struct {
 }
 
 type chainReport struct {
-	WaitMemberInputs, RecordAttempts          bool
-	Mode                                      string
-	Requested                                 int
-	WalletNoSync                              bool
-	StartedUnixNS                             int64
-	FastChainMS, PublicChainMS, ClosedChainMS float64
-	Hops                                      []*chainHop
-	Error                                     string `json:",omitempty"`
+	SavedRequestBytesReused, CommitNotifications bool
+	WaitMemberInputs, RecordAttempts             bool
+	Mode                                         string
+	Requested                                    int
+	WalletNoSync                                 bool
+	StartedUnixNS                                int64
+	FastChainMS, PublicChainMS, ClosedChainMS    float64
+	Hops                                         []*chainHop
+	Error                                        string `json:",omitempty"`
 }
 
 // chainInput reads the coin actually received by this wallet. Finality takes
@@ -163,6 +168,9 @@ func chainDirect(args []string) error {
 }
 
 func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, trace, e5 bool, originIndex, fuelOffset, payerFuelOffset int, waitMembers, recordAttempts bool) (err error) {
+	profileBuild := os.Getenv("UTXO_CHAIN_BUILD_PROFILE") == "1"
+	commitNotifications := chainCommitNotificationsEnabled()
+	var profileStores [3]*chainBuildStore
 	var e5Samples []faultSample
 	if e5 {
 		defer func() {
@@ -221,7 +229,12 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		}
 		dbs[i] = g
 		defer g.Close()
-		wallets[i], err = wallet.NewWithGenesis(g, n.Genesis.Network, descriptors[i].Owner, n.Organizations, n.Genesis)
+		walletStore := store.Store(g)
+		if profileBuild {
+			profileStores[i] = &chainBuildStore{Store: g}
+			walletStore = profileStores[i]
+		}
+		wallets[i], err = wallet.NewWithGenesis(walletStore, n.Genesis.Network, descriptors[i].Owner, n.Organizations, n.Genesis)
 		if err != nil {
 			return err
 		}
@@ -286,7 +299,7 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 	}()
 	var observers sync.WaitGroup
 	observerErrors := make(chan error, length)
-	report := chainReport{Mode: "fast", Requested: length, WalletNoSync: true, WaitMemberInputs: waitMembers, RecordAttempts: recordAttempts}
+	report := chainReport{Mode: "fast", Requested: length, WalletNoSync: true, WaitMemberInputs: waitMembers, RecordAttempts: recordAttempts, SavedRequestBytesReused: true, CommitNotifications: commitNotifications}
 	if waitFinal {
 		report.Mode = "wait_final"
 	}
@@ -350,6 +363,22 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		}
 	}
 	usedFees := make(map[protocol.OutputID]bool)
+	profileCPU := os.Getenv("UTXO_CHAIN_CPU_PROFILE")
+	stopCPU := func() {}
+	if profileCPU != "" {
+		f, e := os.Create(profileCPU)
+		if e != nil {
+			return e
+		}
+		if e = pprof.StartCPUProfile(f); e != nil {
+			f.Close()
+			return e
+		}
+		var stopped sync.Once
+		stopCPU = func() { stopped.Do(func() { pprof.StopCPUProfile(); f.Close() }) }
+		defer stopCPU()
+	}
+	buildContext := pprof.WithLabels(ctx, pprof.Labels("task", "chain_preparation"))
 	for i := 0; i < length; i++ {
 		h := &chainHop{Hop: i + 1, Sender: i % 3, Receiver: (i + 1) % 3, Input: id, BuildStartUnixNS: time.Now().UnixNano()}
 		orgIndex := walletOrgs[h.Sender]
@@ -357,6 +386,10 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		batches := organizationBatches[orgIndex]
 		gateway := lab.Gateways[orgIndex]
 		buildStart := time.Now()
+		buildTrace := newChainBuildTrace(profileBuild, time.Now)
+		if profileCPU != "" {
+			pprof.SetGoroutineLabels(buildContext)
+		}
 		coin := wallet.DirectCoin{Output: origin.Output, Final: origin.Fact}
 		if i > 0 {
 			err = dbs[h.Sender].View(func(v state.ReadView) error {
@@ -375,6 +408,7 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 				return err
 			}
 		}
+		buildTrace.mark("read_coin")
 		in, proofs, e := chainInput(id, coin)
 		if e != nil {
 			return e
@@ -395,6 +429,7 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		}
 		nonce := protocol.Digest("CHAIN_V4", id[:])
 		copy(body.Nonce[:], nonce[:])
+		buildTrace.mark("assemble_body")
 		var tx protocol.FastTx
 		var request protocol.DirectRequest
 		if e5 {
@@ -414,21 +449,31 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 			if e != nil {
 				return e
 			}
+			buildTrace.mark("generate_transaction")
 			tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), keys[h.Sender])}
 			request = protocol.DirectRequest{Tx: tx, InputCertificates: proofs}
+			buildTrace.mark("sign_transaction")
 		}
-		if e = wallets[h.Sender].SaveDirectRequest(request); e != nil {
-			return e
-		}
-		raw, e := request.MarshalBinary()
+		raw, e := wallets[h.Sender].SaveDirectRequestBytes(request)
 		if e != nil {
 			return e
 		}
+		buildTrace.mark("save_request")
+		if profileBuild {
+			h.BuildSaveStagesMS = profileStores[h.Sender].last
+			h.BuildSaveStagesMS["encode_before_update"] = buildTrace.stages["save_request"] - h.BuildSaveStagesMS["update_total"]
+		}
+		buildTrace.mark("encode_request")
 		h.RequestBytes = len(raw)
 		h.Tx = tx.ID()
 		h.OutputData = body.Outputs[0]
+		buildTrace.mark("record_identifiers")
+		h.BuildStagesMS = buildTrace.stages
 		h.BuildDoneUnixNS = time.Now().UnixNano()
 		h.BuildMS = float64(time.Since(buildStart)) / 1e6
+		if profileCPU != "" {
+			pprof.SetGoroutineLabels(ctx)
+		}
 		if recordAttempts {
 			h.RequestRaw = raw
 		}
@@ -525,7 +570,11 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		observers.Add(1)
 		go func(h *chainHop) {
 			defer observers.Done()
-			if e := observeChainHop(ctx, batches, wallets[h.Receiver], h, start, finalReady); e != nil {
+			observerCtx := ctx
+			if commitNotifications {
+				observerCtx = context.WithValue(ctx, chainCommitNotificationKey{}, followTiming[h.Receiver].commitNotification)
+			}
+			if e := observeChainHop(observerCtx, batches, wallets[h.Receiver], h, start, finalReady); e != nil {
 				observerErrors <- e
 				cancel()
 			}
@@ -542,6 +591,9 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 				return ctx.Err()
 			}
 		}
+	}
+	if os.Getenv("UTXO_CHAIN_CPU_FOREGROUND_ONLY") == "1" {
+		stopCPU()
 	}
 	observers.Wait()
 	select {
@@ -595,7 +647,18 @@ func observeChainHop(ctx context.Context, batches [4]*progressBatcher, w *wallet
 	expectRecovery := len(recovered) > 0 && recovered[0]
 	tick := time.NewTicker(5 * time.Millisecond)
 	defer tick.Stop()
+	notify, eventDriven := ctx.Value(chainCommitNotificationKey{}).(func() <-chan struct{})
+	if eventDriven {
+		tick.Stop()
+	}
 	for {
+		wake := tick.C
+		var committed <-chan struct{}
+		if eventDriven {
+			wake = nil
+			committed = notify()
+		}
+		h.FinalChecks++
 		ok, err := sourceObserved(w, h.Output, expectRecovery)
 		if err != nil {
 			return err
@@ -610,7 +673,8 @@ func observeChainHop(ctx context.Context, batches [4]*progressBatcher, w *wallet
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-tick.C:
+		case <-wake:
+		case <-committed:
 		}
 	}
 	var completed [4]bool

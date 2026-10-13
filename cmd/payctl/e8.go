@@ -397,12 +397,9 @@ func runE8(dir string, lab cfg.Lab, n cfg.Network, o e8Options) (err error) {
 				if e == nil {
 					req, e = budgetRequest(n, policy, n.Organizations[0], keys[s.Sender], in, coin.Output, ds[s.Receiver], proofs, j.fee)
 				}
-				if e == nil {
-					e = ws[s.Sender].SaveDirectRequest(req)
-				}
 				var raw []byte
 				if e == nil {
-					raw, e = req.MarshalBinary()
+					raw, e = ws[s.Sender].SaveDirectRequestBytes(req)
 				}
 				if e == nil {
 					s.Tx = req.Tx.ID()

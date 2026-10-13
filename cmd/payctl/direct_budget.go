@@ -341,7 +341,8 @@ func budgetDirect(args []string) error {
 				return
 			}
 			u.Parent.Fact = protocol.SummaryFor(parent.Tx, vector).Fact()
-			if err = wallets[0].SaveDirectRequest(parent); err != nil {
+			parentRaw, err := wallets[0].SaveDirectRequestBytes(parent)
+			if err != nil {
 				u.ParentError = err.Error()
 				return
 			}
@@ -350,11 +351,7 @@ func budgetDirect(args []string) error {
 			for {
 				u.Parent.Attempts++
 				if *gatewayParent {
-					var encoded []byte
-					encoded, err = parent.MarshalBinary()
-					if err == nil {
-						pc, err = budgetSend(ctx, client, lab.Gateways[0]+"/debug/budget/collect", encoded)
-					}
+					pc, err = budgetSend(ctx, client, lab.Gateways[0]+"/debug/budget/collect", parentRaw)
 				} else {
 					pc, err = collector.CollectDirect(ctx, parent)
 				}
@@ -457,11 +454,7 @@ func budgetDirect(args []string) error {
 				u.ChildError = err.Error()
 				return
 			}
-			if err = wallets[1].SaveDirectRequest(child); err != nil {
-				u.ChildError = err.Error()
-				return
-			}
-			childRaw, err := child.MarshalBinary()
+			childRaw, err := wallets[1].SaveDirectRequestBytes(child)
 			if err != nil {
 				u.ChildError = err.Error()
 				return

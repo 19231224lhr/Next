@@ -233,10 +233,7 @@ func runFaultLoad(dir string, lab cfg.Lab, n cfg.Network, count int, rate float6
 	}
 	raws := make([][]byte, count)
 	for i, req := range requests {
-		if err = sender.SaveDirectRequest(req); err != nil {
-			return err
-		}
-		raws[i], err = req.MarshalBinary()
+		raws[i], err = sender.SaveDirectRequestBytes(req)
 		if err != nil {
 			return err
 		}
