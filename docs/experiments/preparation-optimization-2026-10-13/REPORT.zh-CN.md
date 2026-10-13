@@ -75,7 +75,7 @@
 - `run_wait_smoke.py` / `run_wait_smoke.sh`：真实公开等待路径；`--read-existing` 保留和验证已完成运行。
 - `analyze.py` / `analysis.json`：逐笔校验、阶段累计、分位数、配对降幅及中位数比值。
 - `results/`：全部原始 native 数据和适配器结果。
-- `before-source/`：优化前的关键源码；两个二进制目录是 `.scratch/preparation-before-bin` 与 `.scratch/preparation-after-bin`。
+- `before-source/`：优化前的关键源码，以 `.go.txt` 保存，避免作为 Go 包参与构建；两个二进制目录是 `.scratch/preparation-before-bin` 与 `.scratch/preparation-after-bin`。
 - `wallet-review.patch`、`combined-review.patch`、`review.md`：修改内容和独立复核结论。
 - `manifest.json`：来源、条件、源码/二进制和材料哈希。
 
