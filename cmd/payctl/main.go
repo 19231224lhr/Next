@@ -12,6 +12,8 @@ func main() {
 	}
 	var err error
 	switch os.Args[1] {
+	case "c3-fees":
+		err = c3FeesCommand(os.Args[2:])
 	case "e7":
 		err = e7Command(os.Args[2:])
 	case "e7-wallet":
