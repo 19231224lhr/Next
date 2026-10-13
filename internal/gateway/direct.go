@@ -33,6 +33,9 @@ func (c *Collector) CollectDirect(ctx context.Context, request protocol.DirectRe
 	if request.Tx.Body.Config != c.org.Hash() {
 		return protocol.OutputCertificate{}, protocol.ErrAuth
 	}
+	// Only the admission vector varies between responses; transaction identity,
+	// output commitments and grant references are fixed by the signed request.
+	summaryTemplate := protocol.SummaryFor(request.Tx, nil)
 	complete := false
 	if c.directGate != nil {
 		if cert, found, err := c.directResult(request, raw); err != nil || found {
@@ -112,8 +115,10 @@ func (c *Collector) CollectDirect(ctx context.Context, request protocol.DirectRe
 			}
 			s := r.approval.Summary
 			fact := s.Fact()
+			expected := summaryTemplate
+			expected.Admission = s.Admission
 			signed := protocol.Digest("SPEND_VOTE", fact[:])
-			if s.Fact() != protocol.SummaryFor(request.Tx, s.Admission).Fact() || s.Validate() != nil || !ed25519.Verify(c.org.Members[r.index][:], signed[:], r.approval.Vote.Signature[:]) {
+			if fact != expected.Fact() || s.Validate() != nil || !ed25519.Verify(c.org.Members[r.index][:], signed[:], r.approval.Vote.Signature[:]) {
 				continue
 			}
 			cert := groups[fact]

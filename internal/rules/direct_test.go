@@ -25,7 +25,7 @@ type directFixture struct {
 	grants  []protocol.AdmissionRef
 }
 
-func newDirectFixture(t *testing.T) directFixture {
+func newDirectFixture(t testing.TB) directFixture {
 	t.Helper()
 	f := directFixture{db: store.NewMemory()}
 	t.Cleanup(func() { f.db.Close() })
@@ -88,7 +88,7 @@ func newDirectFixture(t *testing.T) directFixture {
 	return f
 }
 
-func (f directFixture) payment(t *testing.T, input protocol.OutputID, parent *protocol.OutputCertificate, nonce byte) DirectPayment {
+func (f directFixture) payment(t testing.TB, input protocol.OutputID, parent *protocol.OutputCertificate, nonce byte) DirectPayment {
 	t.Helper()
 	in := protocol.Input{Kind: protocol.FinalInput, Output: input, Evidence: protocol.Digest("genesis-fact")}
 	var parents []InputCertificate
@@ -108,7 +108,7 @@ func (f directFixture) payment(t *testing.T, input protocol.OutputID, parent *pr
 	return f.certify(t, tx, parents)
 }
 
-func (f directFixture) certify(t *testing.T, tx protocol.FastTx, parents []InputCertificate) DirectPayment {
+func (f directFixture) certify(t testing.TB, tx protocol.FastTx, parents []InputCertificate) DirectPayment {
 	t.Helper()
 	vector, err := PrepareDirectVector(tx, f.policy)
 	if err != nil {

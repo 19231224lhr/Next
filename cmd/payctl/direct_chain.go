@@ -117,10 +117,14 @@ func prepareChainRouting(dir string, lab cfg.Lab, n cfg.Network, crossOrg bool) 
 	return cfg.Write(lab.Network, n)
 }
 
+func validChainLength(length int, e5 bool) bool {
+	return length >= 1 && length <= 1000 && (!e5 || length <= 100)
+}
+
 func chainDirect(args []string) error {
 	f := flag.NewFlagSet("chain-v4", flag.ContinueOnError)
 	dir := f.String("dir", "", "fresh laboratory directory")
-	length := f.Int("length", 10, "number of dependent payments, 1..100")
+	length := f.Int("length", 10, "number of dependent payments, 1..1000 (E5: 1..100)")
 	waitFinal := f.Bool("wait-final", false, "wait for verified wallet finality before the next payment")
 	waitMembers := f.Bool("wait-member-inputs", false, "experiment: require three routed members to observe the parent; requires wait-final and e5-owner-fuel")
 	recordAttempts := f.Bool("record-chain-attempts", false, "experiment: archive exact signed request and HTTP attempt timings; requires e5-owner-fuel")
@@ -135,7 +139,7 @@ func chainDirect(args []string) error {
 	if err := f.Parse(args); err != nil {
 		return err
 	}
-	if *dir == "" || *length < 1 || *length > 100 || *originIndex < -1 || *fuelOffset < 0 || *payerFuelOffset < 0 {
+	if *dir == "" || !validChainLength(*length, *e5) || *originIndex < -1 || *fuelOffset < 0 || *payerFuelOffset < 0 {
 		return protocol.ErrRule
 	}
 	if (*waitMembers && (!*waitFinal || !*e5)) || (*recordAttempts && !*e5) {

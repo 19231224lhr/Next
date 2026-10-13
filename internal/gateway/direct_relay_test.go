@@ -229,9 +229,9 @@ func TestDirectRelaySkipsNotDueBeforeDecoding(t *testing.T) {
 		t.Fatal(err)
 	}
 	called := false
-	err := r.runDirectTask(context.Background(), directTask{fact, -1}, func() (protocol.DirectPayment, error) {
+	err := r.runDirectTask(context.Background(), directTask{fact, -1}, func() (directPreparedPayment, error) {
 		called = true
-		return protocol.DirectPayment{}, protocol.ErrAuth
+		return directPreparedPayment{}, protocol.ErrAuth
 	})
 	if err != nil || called {
 		t.Fatalf("not-due action decoded: called=%v err=%v", called, err)

@@ -116,7 +116,9 @@ func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.Admission
 	if p.Key == nil || p.TimeoutSeconds <= 0 || p.RepairCost == 0 || p.Base.Validate() != nil || t.Rules != p.Rules() || t.Kind != protocol.FastTransfer || (t.Fee.Source != protocol.OrgReserve && t.Fee.Source != protocol.OwnerFinalUTXO) {
 		return nil, protocol.ErrRule
 	}
-	if err := tx.VerifyInitial(p.Key); err != nil {
+	// Authenticate once and retain those exact bytes for the work-size check.
+	raw, err := tx.MarshalInitial(p.Key)
+	if err != nil {
 		return nil, err
 	}
 	if t.Work.Depth != 1 || t.Work.Ancestors != 1 {
@@ -190,10 +192,6 @@ func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.Admission
 		return nil, err
 	}
 	exec, err = protocol.Add(exec, repairExec)
-	if err != nil {
-		return nil, err
-	}
-	raw, err := tx.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
@@ -329,6 +327,7 @@ func VerifyDirectSubmission(payment protocol.DirectSubmission, p DirectPolicy) (
 		return VerifiedDirectPayment{}, protocol.ErrRule
 	}
 	parents := make(map[protocol.OutputID]InputCertificate, len(payment.InputCertificates))
+	verifiedOutputs := make(map[protocol.OutputID]protocol.VerifiedOutputs, len(payment.InputCertificates))
 	frozen := make([]InputCertificate, 0, len(payment.InputCertificates))
 	for _, parent := range payment.InputCertificates {
 		parent.Certificate, err = freeze(parent.Certificate)
@@ -343,7 +342,11 @@ func VerifyDirectSubmission(payment protocol.DirectSubmission, p DirectPolicy) (
 			return VerifiedDirectPayment{}, err
 		}
 		cfg, ok := p.Organizations[c.Summary.Config]
-		if !ok || c.Verify(cfg) != nil || c.Summary.Network != tx.Body.Network || c.Summary.Rules != p.Rules() || int(parent.Index) >= len(c.Summary.Outputs) {
+		if !ok {
+			return VerifiedDirectPayment{}, protocol.ErrAuth
+		}
+		outputs, verifyErr := c.VerifyOutputs(cfg)
+		if verifyErr != nil || c.Summary.Network != tx.Body.Network || c.Summary.Rules != p.Rules() || int(parent.Index) >= len(c.Summary.Outputs) {
 			return VerifiedDirectPayment{}, protocol.ErrAuth
 		}
 		id := c.Summary.OutputID(parent.Index)
@@ -351,6 +354,7 @@ func VerifyDirectSubmission(payment protocol.DirectSubmission, p DirectPolicy) (
 			return VerifiedDirectPayment{}, protocol.ErrRule
 		}
 		parents[id] = parent
+		verifiedOutputs[id] = outputs
 		frozen = append(frozen, parent)
 	}
 	payment.InputCertificates = frozen
@@ -360,7 +364,9 @@ func VerifyDirectSubmission(payment protocol.DirectSubmission, p DirectPolicy) (
 			continue
 		}
 		parent, ok := parents[in.Output]
-		if !ok || in.Evidence != protocol.Hash(parent.Certificate.QC.Fact) || parent.Certificate.VerifyOutput(p.Organizations[parent.Certificate.Summary.Config], parent.Index, tx.Claims[i].Output) != nil {
+		// The complete parent QC was checked above. The token owns its
+		// authenticated commitments and still verifies the claimed output.
+		if !ok || in.Evidence != protocol.Hash(parent.Certificate.QC.Fact) || verifiedOutputs[in.Output].VerifyOutput(parent.Index, tx.Claims[i].Output) != nil {
 			return VerifiedDirectPayment{}, protocol.ErrAuth
 		}
 		used++

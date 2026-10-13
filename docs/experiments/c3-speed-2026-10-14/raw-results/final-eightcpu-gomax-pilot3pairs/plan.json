@@ -1,0 +1,132 @@
+{
+  "jobs": [
+    {
+      "repeat": 0,
+      "arm": "before"
+    },
+    {
+      "repeat": 0,
+      "arm": "after"
+    },
+    {
+      "repeat": 1,
+      "arm": "after"
+    },
+    {
+      "repeat": 1,
+      "arm": "before"
+    },
+    {
+      "repeat": 2,
+      "arm": "before"
+    },
+    {
+      "repeat": 2,
+      "arm": "after"
+    }
+  ],
+  "created_ns": 1791924228635217133,
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "arguments": {
+    "root": "/home/qyinf/next-c3-speed-20261014/final-eightcpu-gomax-pilot3pairs",
+    "before": "/home/qyinf/next-c3-speed-20261014/final-compact-bin",
+    "after": "/home/qyinf/next-c3-speed-20261014/final-compact-bin",
+    "fastpay": "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release",
+    "repeats": "3",
+    "suite": "chain",
+    "only_next": "True",
+    "trace": "False",
+    "length": "1000",
+    "rate": "100",
+    "duration": "30",
+    "fixture": "/home/qyinf/next-c3-speed-20261014/fixtures/chain1000",
+    "before_gomaxprocs": "1",
+    "after_gomaxprocs": "4",
+    "fastpay_runtime_threads": "None"
+  },
+  "paired_fixture": true,
+  "harness_sha256": "bf24ebd612a965a4ca929ffa2ab17d520ab5cf27aee7943f8eda69b71f12cb09",
+  "binaries": {
+    "before": {
+      "payctl": "0caf46a3bdec9e60b61418459f6feda066d97140b49bce7573b29b1bb37389c8",
+      "member": "f348b9b24ae0bbe04c698ad706e12dfc9648f60df6e037dadbd7f7e9c296ec07",
+      "gateway": "170ecef465a18a898c74de24894ad7ee7d2621907bc2847543928eddc7901ada",
+      "committee": "cce49f2e9afd8ee9ad57cf640d092feae15340174ee88cf3419e5a689b12fdb8"
+    },
+    "after": {
+      "payctl": "0caf46a3bdec9e60b61418459f6feda066d97140b49bce7573b29b1bb37389c8",
+      "member": "f348b9b24ae0bbe04c698ad706e12dfc9648f60df6e037dadbd7f7e9c296ec07",
+      "gateway": "170ecef465a18a898c74de24894ad7ee7d2621907bc2847543928eddc7901ada",
+      "committee": "cce49f2e9afd8ee9ad57cf640d092feae15340174ee88cf3419e5a689b12fdb8"
+    }
+  },
+  "fastpay_binaries": {
+    "examples/baseline_client": "fe73833f34edb72ebaf3247d7d6008b2093e1a835faaae31ef7b74bbd6128750",
+    "server": "7b85a3fc356cdab4bb39975b228efd2c8fde336352d1c6ddd11aa55eb648f8fb"
+  },
+  "service_variants": {
+    "before": {
+      "payctl": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/final-bin/payctl",
+        "sha256": "0caf46a3bdec9e60b61418459f6feda066d97140b49bce7573b29b1bb37389c8",
+        "options": []
+      },
+      "member": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/final-bin/member",
+        "sha256": "f348b9b24ae0bbe04c698ad706e12dfc9648f60df6e037dadbd7f7e9c296ec07",
+        "options": []
+      },
+      "gateway": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/final-bin/gateway",
+        "sha256": "64bb31a2f5b111ee3aa5e66a776e403daa581d566d73f51bbb25fa84c1f00991",
+        "options": [
+          "--compact-direct-approvals"
+        ]
+      },
+      "committee": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/final-bin/committee",
+        "sha256": "cce49f2e9afd8ee9ad57cf640d092feae15340174ee88cf3419e5a689b12fdb8",
+        "options": []
+      }
+    },
+    "after": {
+      "payctl": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/final-bin/payctl",
+        "sha256": "0caf46a3bdec9e60b61418459f6feda066d97140b49bce7573b29b1bb37389c8",
+        "options": []
+      },
+      "member": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/final-bin/member",
+        "sha256": "f348b9b24ae0bbe04c698ad706e12dfc9648f60df6e037dadbd7f7e9c296ec07",
+        "options": []
+      },
+      "gateway": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/final-bin/gateway",
+        "sha256": "64bb31a2f5b111ee3aa5e66a776e403daa581d566d73f51bbb25fa84c1f00991",
+        "options": [
+          "--compact-direct-approvals"
+        ]
+      },
+      "committee": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/final-bin/committee",
+        "sha256": "cce49f2e9afd8ee9ad57cf640d092feae15340174ee88cf3419e5a689b12fdb8",
+        "options": []
+      }
+    }
+  },
+  "gomaxprocs": {
+    "before": 1,
+    "after": 4,
+    "fastpay": "not a Go program"
+  },
+  "fastpay_runtime_threads": null
+}

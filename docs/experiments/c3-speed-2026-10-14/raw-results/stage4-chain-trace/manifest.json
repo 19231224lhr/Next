@@ -1,0 +1,57 @@
+{
+  "variant": "c3",
+  "workload": "chain",
+  "trace": true,
+  "harness_sha256": {
+    "run_c3.py": "523d1cc310d23b93f682ed98eddd385553f967bc42b1b66b370785b986f0c4bb",
+    "run_matrix.py": "ef5a685d2d6511cbbfb0df58def416015704855820ab085011551c6573195a7c",
+    "metrics.py": "791b8aa68fbae451ab578ddbbbb7f6bee9ffee0c8f3df38def18719d5a52fb84"
+  },
+  "storage": "memory",
+  "arguments": {
+    "bin": "/home/qyinf/next-c3-speed-20261014/stage4-compact-bin",
+    "run_dir": "/home/qyinf/next-c3-speed-20261014/stage4-chain-trace",
+    "variant": "c3",
+    "workload": "chain",
+    "storage": "memory",
+    "trace": true,
+    "length": 100,
+    "count": 1,
+    "case": "source-first",
+    "delay_ms": 0,
+    "rate": 100,
+    "duration": 30,
+    "fixture": "/home/qyinf/next-c3-speed-20261014/stage2-paired-chain/fixtures/r0",
+    "save_fixture": null
+  },
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "cpu_affinity": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "environment": {
+    "GOMAXPROCS": "4",
+    "UTXO_CHAIN_BUILD_PROFILE": "1",
+    "UTXO_CHAIN_CPU_PROFILE": "/home/qyinf/next-c3-speed-20261014/stage4-client.pprof",
+    "UTXO_CHAIN_CPU_FOREGROUND_ONLY": "1",
+    "UTXO_EXPERIMENT_MEMBER_MEMORY": "1",
+    "UTXO_EXPERIMENT_GATEWAY_MEMORY": "1",
+    "UTXO_EXPERIMENT_COMMITTEE_MEMORY": "1",
+    "UTXO_EXPERIMENT_MEM_BLOCKSTORE": "1",
+    "UTXO_SETTLEMENT_TRACE": "1"
+  },
+  "services": {
+    "member": 4,
+    "gateway": 1,
+    "committee": 4
+  },
+  "binary_hashes": {
+    "payctl": "834ce79df292b6c61ba4ccd5dce3e7453ed66e36ae9e3a1838e44f6fdbf55906",
+    "member": "95566f91f2037025c5685d180e10dadf5a7a4f3da0964a49bf9b453a452a2162",
+    "gateway": "8376d8281cf51df880b499a17bef6bf022589ef568113df6b7ebba3a0419909c",
+    "committee": "1b77e8780f0fe7107d9dab3e0e893dca23c7831dfce05ee048b2a2366e62e31c"
+  },
+  "started_unix_ns": 1791917538209218365
+}

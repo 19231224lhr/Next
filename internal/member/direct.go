@@ -2,6 +2,7 @@ package member
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 	"utxo/internal/requesttrace"
 	"utxo/internal/rules"
@@ -103,6 +104,16 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 	requesttrace.Mark(ctx, "validation_complete")
 	id := tx.ID()
 	worker := uint32(id[0]) % m.cfg.Workers
+	// Approval material depends only on the authenticated request. Encode it
+	// before taking the store writer; all locks and resource checks stay atomic.
+	a := state.Approval{Fact: fact, Direct: &tx, Admission: vector, DirectParents: req.InputCertificates}
+	for _, allocation := range vector {
+		a.Debits = append(a.Debits, state.Debit{Key: allocation.Key, Cap: allocation.Cap, Worker: worker})
+	}
+	approvalBytes, err := json.Marshal(a)
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
 	requesttrace.Mark(ctx, "commit_requested")
 	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		requesttrace.Mark(ctx, "update_started")
@@ -170,7 +181,6 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 				return nil, err
 			}
 		}
-		a := state.Approval{Fact: fact, Direct: &tx, Admission: vector, DirectParents: req.InputCertificates}
 		for i, allocation := range vector {
 			ref := t.Admission[i]
 			g, found, err := state.Load[state.Grant](o, state.Key(state.KeyGrant, allocation.Key.Encode()))
@@ -197,11 +207,8 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 			if err = state.Put(o, key, slice); err != nil {
 				return nil, err
 			}
-			a.Debits = append(a.Debits, state.Debit{Key: allocation.Key, Cap: allocation.Cap, Worker: worker})
 		}
-		if err := state.Put(o, key, a); err != nil {
-			return nil, err
-		}
+		o.Set(key, approvalBytes)
 		requesttrace.Mark(ctx, "update_evaluated")
 		return o.Changes(), nil
 	})

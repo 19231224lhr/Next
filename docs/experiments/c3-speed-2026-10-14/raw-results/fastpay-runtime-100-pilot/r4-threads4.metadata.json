@@ -1,0 +1,180 @@
+{
+  "trial": 4,
+  "position": 0,
+  "arm": "threads4",
+  "command": [
+    "taskset",
+    "-c",
+    "0-3",
+    "/usr/bin/python3",
+    "/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/docs/experiments/baseline-design-2026-10-13/run_fastpay.py",
+    "--bin",
+    "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release",
+    "--run-dir",
+    "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4",
+    "--workload",
+    "chain",
+    "--length",
+    "100",
+    "--count",
+    "100",
+    "--protocol",
+    "Tcp",
+    "--client-mode",
+    "receiver-confirmed"
+  ],
+  "start_ns": 1791919981592196493,
+  "run_dir": "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4",
+  "environment": {
+    "FASTPAY_RUNTIME_THREADS": "4",
+    "GOMAXPROCS": null,
+    "RUST_LOG": null,
+    "RUSTFLAGS": null,
+    "CARGO_HOME": null,
+    "RUSTUP_HOME": null
+  },
+  "requested_cpus": "0-3",
+  "processes": {
+    "941": {
+      "executable": "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release/examples/baseline_client",
+      "argv": [
+        "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release/examples/baseline_client",
+        "--dir",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4",
+        "--workload",
+        "chain",
+        "--count",
+        "100",
+        "--amount",
+        "100",
+        "--rate",
+        "0",
+        "--client-mode",
+        "receiver-confirmed"
+      ],
+      "thread_min": 5,
+      "thread_max": 5,
+      "samples": 4,
+      "affinities": [
+        [
+          0,
+          1,
+          2,
+          3
+        ]
+      ],
+      "first_ns": 1791919981794141453,
+      "last_ns": 1791919982397578493
+    },
+    "928": {
+      "executable": "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release/server",
+      "argv": [
+        "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release/server",
+        "--server",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/server3.json",
+        "run",
+        "--committee",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/committee.json",
+        "--initial-accounts",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/initial_accounts.txt"
+      ],
+      "thread_min": 5,
+      "thread_max": 5,
+      "samples": 4,
+      "affinities": [
+        [
+          0,
+          1,
+          2,
+          3
+        ]
+      ],
+      "first_ns": 1791919981794293473,
+      "last_ns": 1791919982397747098
+    },
+    "923": {
+      "executable": "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release/server",
+      "argv": [
+        "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release/server",
+        "--server",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/server2.json",
+        "run",
+        "--committee",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/committee.json",
+        "--initial-accounts",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/initial_accounts.txt"
+      ],
+      "thread_min": 5,
+      "thread_max": 5,
+      "samples": 4,
+      "affinities": [
+        [
+          0,
+          1,
+          2,
+          3
+        ]
+      ],
+      "first_ns": 1791919981794418112,
+      "last_ns": 1791919982397823445
+    },
+    "922": {
+      "executable": "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release/server",
+      "argv": [
+        "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release/server",
+        "--server",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/server1.json",
+        "run",
+        "--committee",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/committee.json",
+        "--initial-accounts",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/initial_accounts.txt"
+      ],
+      "thread_min": 5,
+      "thread_max": 5,
+      "samples": 4,
+      "affinities": [
+        [
+          0,
+          1,
+          2,
+          3
+        ]
+      ],
+      "first_ns": 1791919981794479852,
+      "last_ns": 1791919982397890687
+    },
+    "921": {
+      "executable": "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release/server",
+      "argv": [
+        "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release/server",
+        "--server",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/server0.json",
+        "run",
+        "--committee",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/committee.json",
+        "--initial-accounts",
+        "/home/qyinf/next-c3-speed-20261014/fastpay-runtime-100-pilot/r4-threads4/initial_accounts.txt"
+      ],
+      "thread_min": 5,
+      "thread_max": 5,
+      "samples": 4,
+      "affinities": [
+        [
+          0,
+          1,
+          2,
+          3
+        ]
+      ],
+      "first_ns": 1791919981794537669,
+      "last_ns": 1791919982397966731
+    }
+  },
+  "end_ns": 1791919982598885599,
+  "exit": 0,
+  "error": "",
+  "planned": 100,
+  "completed": 100,
+  "verified": true
+}

@@ -1,0 +1,20 @@
+# 1000-dependent-payment chain
+
+Permit non-E5 chain-v4 length 1..1000; keep native CLI default 10 and runner defaults 100. E5 remains 1..100 because its independent owner FUEL fixtures and offsets require separate validation. run_c3.py uses OrgReserve, not E5. No resource authorization, protocol limit, fee, timeout or settlement behavior changes.
+
+The inspected stage4 fixture has 100-CAL principal circulating among three fixed wallet identities. Each genesis grant and sponsor/issuer-pool balance is 10^12. Member grant share is floor(2*grant/3), divided among four workers: at least 166,666,666,666 units per worker. Worst-case reservation without any release, even if all 1000 payments select one worker: CAL 100,000; sponsor FUEL 1,000,000; Execution 100,000,000; Bytes 10,000,000,000; C3 issuer budget 6,000. Each wallet's sponsor policy reserves at most 334,000. All fit this fixture. Confirm copied fixture parameters and balances before launch; no top-up is necessary or authorized by this plan.
+
+Each payment still references only its immediate parent, Depth=1 and Ancestors=1. Progress observer queues grow with chain length, but RPC batches remain bounded at MaxProgressBatch=128. Existing overall timeout is five minutes, non-E5 per-submission retry/HTTP timeout ten seconds, runner deadline at least 420 seconds. No timeout change is proposed.
+
+Use the same newly built payctl binary for frozen-service and optimized-service arms so both support 1000. Preserve frozen member/gateway/committee binaries. Manifests must record the common payctl hash separately from frozen service hashes and explicitly describe the harness-only CLI guard change. FastPay wrapper accepts up to 30,000 and passes chain length as native count; use its receiver-confirmed client mode. Native Rust support must remain verified by successful requested/completed/sample-count checks.
+
+Run alternating paired frozen C3, optimized C3 and FastPay arms at length 1000 with existing CPU affinity, GOMAXPROCS and storage choices. Keep background settlement and receipt endpoint unchanged. Use fresh shared C3 fixtures, retain all samples/failures, and report full-chain plus fixed hop bands 1..100, 101..500, 501..1000. Multi-block activity occurs naturally; do not add wait-final or artificial pauses. Trace only a separate diagnostic run.
+
+Verification evidence and remaining artifact checks:
+
+- The earlier full-suite log `go-final-comet-tests.log` records `utxo/cmd/payctl` PASS (42.058 s). The selected-version final verification now also completed: `final-verification/go-all.log` records this package PASS (17.673 s), and `final-verification/status.json` records exit 0 for the full tagged suite. The package contains `TestValidChainLength`, covering the guard. This is package-level full-suite evidence, not an invented standalone verbose test log.
+- Shared-client 1000-hop pilots and seven-trial confirmations have completed. `stage7-long-confirm` and `stage9b-long-confirm7triples` record all three arms complete, including required Next public/member closure and FastPay principal/continuation probes. Their plans retain the actual common-client and service binary hashes.
+- `verify_harness.py` completed the boundary checks: both run_compare.py and run_c3.py reject lengths 0 and 1001 with exit 2 before creating output. All four cases and script SHA-256 values are recorded as PASS in `final-verification/harness-boundaries.json`.
+- The same verifier parses both runner sources using `ast.parse` before boundary checks. This is successful syntax validation, not an assertion that the previously proposed `py_compile` command was executed.
+
+The old statement that no tests or live validation had run is superseded by the evidence above. No performance gain is attributed to this CLI guard change itself; it merely enables the declared longer workload. Final full/race tests and four Linux builds passed, with metadata in `final-verification/manifest.json`. Fresh-binary confirmations remain root-owned and separately recorded. No additional tests were run while updating this notebook.

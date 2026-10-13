@@ -1,0 +1,154 @@
+{
+  "created_ns": 1791924099257203379,
+  "planned_jobs": 15,
+  "jobs": [
+    {
+      "trial": 0,
+      "position": 0,
+      "arm": "official"
+    },
+    {
+      "trial": 0,
+      "position": 1,
+      "arm": "unset"
+    },
+    {
+      "trial": 0,
+      "position": 2,
+      "arm": "threads1"
+    },
+    {
+      "trial": 0,
+      "position": 3,
+      "arm": "threads2"
+    },
+    {
+      "trial": 0,
+      "position": 4,
+      "arm": "threads4"
+    },
+    {
+      "trial": 1,
+      "position": 0,
+      "arm": "unset"
+    },
+    {
+      "trial": 1,
+      "position": 1,
+      "arm": "threads1"
+    },
+    {
+      "trial": 1,
+      "position": 2,
+      "arm": "threads2"
+    },
+    {
+      "trial": 1,
+      "position": 3,
+      "arm": "threads4"
+    },
+    {
+      "trial": 1,
+      "position": 4,
+      "arm": "official"
+    },
+    {
+      "trial": 2,
+      "position": 0,
+      "arm": "threads1"
+    },
+    {
+      "trial": 2,
+      "position": 1,
+      "arm": "threads2"
+    },
+    {
+      "trial": 2,
+      "position": 2,
+      "arm": "threads4"
+    },
+    {
+      "trial": 2,
+      "position": 3,
+      "arm": "official"
+    },
+    {
+      "trial": 2,
+      "position": 4,
+      "arm": "unset"
+    }
+  ],
+  "arguments": {
+    "root": "/home/qyinf/next-c3-speed-20261014/fastpay-eightcpu-long-runtime3",
+    "official_bin": "/home/qyinf/.local/share/next-baseline-tools/fastpay-target/release",
+    "variant_bin": "/home/qyinf/.local/share/next-baseline-tools/fastpay-runtime-sensitivity-target/release",
+    "official_source": "/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/.scratch/fastpay-upstream",
+    "variant_source": "/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/.scratch/fastpay-runtime-sensitivity",
+    "count": "1000",
+    "repeats": "3",
+    "cpus": "0-7",
+    "thread_sample_ms": "0",
+    "job_timeout": "600"
+  },
+  "inherited_affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "sources": {
+    "official": {
+      "path": "/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/.scratch/fastpay-upstream",
+      "files": {
+        "fastpay/src/server.rs": "28129d7da1453b08d4401996bebc4ec57642a884fedd83266bb76e17c5ed9701",
+        "fastpay/examples/baseline_client.rs": "c4b41d44ab3698c3613493359eab4851d347b177a5d136582e6ba5b8ba4f92f3",
+        "Cargo.lock": "6078f450b7eb9780a1d2bc1d083878549d543d3569827061e41c5e2b58fc580e"
+      },
+      "revision": "db39bb0cddc94b8c34dc235b1cfdae4c1285c6f2"
+    },
+    "variant": {
+      "path": "/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/.scratch/fastpay-runtime-sensitivity",
+      "files": {
+        "fastpay/src/server.rs": "bcd5a012a2571afbcee1f9f3d0792b6e50a447ae0bb847088799a90e82c8e45e",
+        "fastpay/examples/baseline_client.rs": "189315690e38f161d16602fe8131c654df2f341db40cf64efe4ca9af039bcac3",
+        "Cargo.lock": "6078f450b7eb9780a1d2bc1d083878549d543d3569827061e41c5e2b58fc580e"
+      },
+      "runtime_provenance": {
+        "upstream_revision": "db39bb0cddc94b8c34dc235b1cfdae4c1285c6f2",
+        "official_source": "C:\\Users\\Bocchi\\Desktop\\Next\\.e8-worktree\\.scratch\\fastpay-upstream",
+        "adapter_source": "C:\\Users\\Bocchi\\Desktop\\Next\\.e8-worktree\\docs\\experiments\\baseline-design-2026-10-13\\fastpay_client.rs",
+        "cargo_lock_sha256": "6078f450b7eb9780a1d2bc1d083878549d543d3569827061e41c5e2b58fc580e",
+        "archive_sha256": "c64b4a5d6292d2154e299e6d9f6bdb6a974ea31d8fe88928335c72449290d485",
+        "files": {
+          "fastpay/src/server.rs": {
+            "original_sha256": "b7dd842d39fb576a5684d075aba5942b36ca2b2c28c797ee4e2b1fea90b23dd6",
+            "variant_sha256": "bcd5a012a2571afbcee1f9f3d0792b6e50a447ae0bb847088799a90e82c8e45e"
+          },
+          "fastpay/examples/baseline_client.rs": {
+            "original_sha256": "c4b41d44ab3698c3613493359eab4851d347b177a5d136582e6ba5b8ba4f92f3",
+            "variant_sha256": "189315690e38f161d16602fe8131c654df2f341db40cf64efe4ca9af039bcac3"
+          }
+        },
+        "patch_sha256": "780c0a5b13dfad65eb24dca9681afd7eff46d047cd4fb57a1395962e882591d1",
+        "prepare_script_sha256": "9f463464d9f932ecd40839d42e466afb1bb1c83187c1dc121b66fdda7c7614c5"
+      },
+      "runtime_provenance_sha256": "120b380700fd25e842597917f1f1669fc1429802e45f1d74864d77662ab9f2cf"
+    }
+  },
+  "harness_sha256": "70ee6a020bb58337c1e103e1ea5a7f4bb758e4282dbbb8e432ae1240279ef656",
+  "baseline_harness_sha256": "90732c5acafc1b68038e43d56e23efcb19817b26ca44068a1657afc694e2da65",
+  "binaries": {
+    "official": {
+      "server": "c85381756c81ef055c86f93c7e8cf16cdb26fdf46a05fab00b85ad009a5cc869",
+      "examples/baseline_client": "50306e4c512d7ce8870abf4938ab9030aa18bc462f673f8662aa461450198a60"
+    },
+    "variant": {
+      "server": "7b85a3fc356cdab4bb39975b228efd2c8fde336352d1c6ddd11aa55eb648f8fb",
+      "examples/baseline_client": "fe73833f34edb72ebaf3247d7d6008b2093e1a835faaae31ef7b74bbd6128750"
+    }
+  }
+}

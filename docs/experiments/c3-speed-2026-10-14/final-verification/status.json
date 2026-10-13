@@ -1,0 +1,113 @@
+[
+  {
+    "label": "go-version",
+    "command": [
+      "go",
+      "version"
+    ],
+    "start_ns": 1791923395456835000,
+    "end_ns": 1791923395747737600,
+    "exit": 0
+  },
+  {
+    "label": "format-restored-gateway",
+    "command": [
+      "gofmt",
+      "-w",
+      "internal/gateway/direct_relay.go",
+      "internal/gateway/direct_outbox_cache.go",
+      "internal/gateway/direct_install_bytes_test.go",
+      "internal/gateway/direct_outbox_cache_test.go"
+    ],
+    "start_ns": 1791923395748299900,
+    "end_ns": 1791923395795150100,
+    "exit": 0
+  },
+  {
+    "label": "go-all",
+    "command": [
+      "go",
+      "test",
+      "-tags=comet_v3",
+      "-count=1",
+      "./..."
+    ],
+    "start_ns": 1791923395795633800,
+    "end_ns": 1791923426316260400,
+    "exit": 0
+  },
+  {
+    "label": "go-race",
+    "command": [
+      "go",
+      "test",
+      "-tags=comet_v3",
+      "-race",
+      "-count=1",
+      "./protocol",
+      "./internal/rules",
+      "./internal/member",
+      "./internal/gateway",
+      "./internal/transport"
+    ],
+    "start_ns": 1791923426317201500,
+    "end_ns": 1791923463253976000,
+    "exit": 0
+  },
+  {
+    "label": "build-payctl",
+    "command": [
+      "go",
+      "build",
+      "-tags=comet_v3",
+      "-o",
+      "C:\\Users\\Bocchi\\Desktop\\Next\\.e8-worktree\\.scratch\\c3-speed-final-bin\\payctl",
+      "./cmd/payctl"
+    ],
+    "start_ns": 1791923463255679700,
+    "end_ns": 1791923465722417900,
+    "exit": 0
+  },
+  {
+    "label": "build-member",
+    "command": [
+      "go",
+      "build",
+      "-tags=comet_v3",
+      "-o",
+      "C:\\Users\\Bocchi\\Desktop\\Next\\.e8-worktree\\.scratch\\c3-speed-final-bin\\member",
+      "./cmd/member"
+    ],
+    "start_ns": 1791923465788956400,
+    "end_ns": 1791923467260906700,
+    "exit": 0
+  },
+  {
+    "label": "build-gateway",
+    "command": [
+      "go",
+      "build",
+      "-tags=comet_v3",
+      "-o",
+      "C:\\Users\\Bocchi\\Desktop\\Next\\.e8-worktree\\.scratch\\c3-speed-final-bin\\gateway",
+      "./cmd/gateway"
+    ],
+    "start_ns": 1791923467325219700,
+    "end_ns": 1791923468941674500,
+    "exit": 0
+  },
+  {
+    "label": "build-committee",
+    "command": [
+      "go",
+      "build",
+      "-tags=comet_v3",
+      "-o",
+      "C:\\Users\\Bocchi\\Desktop\\Next\\.e8-worktree\\.scratch\\c3-speed-final-bin\\committee",
+      "./cmd/committee"
+    ],
+    "start_ns": 1791923468994940600,
+    "end_ns": 1791923471125417300,
+    "exit": 0
+  }
+]

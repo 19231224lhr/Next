@@ -1,0 +1,98 @@
+{
+  "chain_ms": 837.083761,
+  "spans": {
+    "gateway:http_handler_enter->request_decoded": {
+      "n": 100,
+      "p50_ms": 0.0841565,
+      "p95_ms": 0.9267842499999999,
+      "mean_ms": 0.22418755
+    },
+    "gateway:collect_enter->owner_verified": {
+      "n": 100,
+      "p50_ms": 0.0758635,
+      "p95_ms": 0.6346531499999988,
+      "mean_ms": 0.1712349
+    },
+    "gateway:fanout_ready->quorum_collected": {
+      "n": 100,
+      "p50_ms": 3.934774,
+      "p95_ms": 7.527135849999998,
+      "mean_ms": 4.20564814
+    },
+    "gateway:quorum_collected->certificate_verified": {
+      "n": 100,
+      "p50_ms": 0.10845550000000001,
+      "p95_ms": 0.5582239999999999,
+      "mean_ms": 0.1668238
+    },
+    "gateway:certificate_verified->response_ready": {
+      "n": 100,
+      "p50_ms": 0.011632,
+      "p95_ms": 0.05783569999999997,
+      "mean_ms": 0.03193983
+    },
+    "member:http_handler_enter->request_decoded": {
+      "n": 338,
+      "p50_ms": 0.107188,
+      "p95_ms": 0.7299918999999996,
+      "mean_ms": 0.1986540443786982
+    },
+    "member:request_decoded->vector_prepared": {
+      "n": 338,
+      "p50_ms": 0.205235,
+      "p95_ms": 1.0732133,
+      "mean_ms": 0.3346477426035503
+    },
+    "member:vector_prepared->parents_verified": {
+      "n": 338,
+      "p50_ms": 0.12876949999999998,
+      "p95_ms": 0.6507230999999982,
+      "mean_ms": 0.23533180177514793
+    },
+    "member:parents_verified->validation_complete": {
+      "n": 338,
+      "p50_ms": 0.001531,
+      "p95_ms": 0.003955499999999999,
+      "mean_ms": 0.006728195266272189
+    },
+    "member:commit_requested->update_started": {
+      "n": 338,
+      "p50_ms": 0.0055435,
+      "p95_ms": 0.07842874999999992,
+      "mean_ms": 0.024685192307692307
+    },
+    "member:update_started->update_evaluated": {
+      "n": 338,
+      "p50_ms": 0.165371,
+      "p95_ms": 1.1241803999999995,
+      "mean_ms": 0.2988725266272189
+    },
+    "member:update_evaluated->commit_returned": {
+      "n": 338,
+      "p50_ms": 0.022052,
+      "p95_ms": 0.18745069999999925,
+      "mean_ms": 0.06813802662721893
+    },
+    "member:commit_returned->vote_signed": {
+      "n": 338,
+      "p50_ms": 0.0194415,
+      "p95_ms": 0.050715299999999956,
+      "mean_ms": 0.02859951479289941
+    },
+    "member:vote_signed->response_ready": {
+      "n": 338,
+      "p50_ms": 0.00027,
+      "p95_ms": 0.00057,
+      "mean_ms": 0.0003115562130177515
+    }
+  },
+  "build99_sum_ms": {
+    "assemble_body": 4.824861,
+    "encode_request": 0.040275,
+    "generate_transaction": 28.809076,
+    "read_coin": 11.883107,
+    "record_identifiers": 1.619024,
+    "save_request": 38.330976,
+    "sign_transaction": 4.559062
+  }
+}

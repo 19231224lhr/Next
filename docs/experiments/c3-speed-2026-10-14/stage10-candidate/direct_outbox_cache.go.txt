@@ -1,0 +1,117 @@
+package gateway
+
+import (
+	"bytes"
+	"container/list"
+	"encoding/json"
+	"sync"
+
+	"utxo/internal/state"
+)
+
+// directOutboxCache belongs to one relay event loop. Every lookup still uses
+// the current durable bytes; caching never determines whether a task exists.
+type directOutboxCache struct {
+	entries                     map[string]*list.Element
+	order                       list.List
+	bytes, maxEntries, maxBytes int
+}
+
+type directOutboxEntry struct {
+	key     string
+	raw     []byte
+	pending state.Outbox
+	size    int
+	prepare func() (directPreparedPayment, error)
+}
+
+func newDirectOutboxCache(entries, size int) *directOutboxCache {
+	return &directOutboxCache{entries: make(map[string]*list.Element), maxEntries: entries, maxBytes: size}
+}
+
+func (c *directOutboxCache) remove(e *list.Element) {
+	entry := e.Value.(directOutboxEntry)
+	delete(c.entries, entry.key)
+	c.bytes -= entry.size
+	c.order.Remove(e)
+}
+
+func (c *directOutboxCache) decode(key, raw []byte) (state.Outbox, error) {
+	pending, err := c.snapshot(key, raw)
+	if err != nil {
+		return pending, err
+	}
+	return cloneDirectOutbox(pending), nil
+}
+
+// snapshot returns read-only cache-owned slices. Its sole production caller is
+// relay refill: scheduling reads metadata, and prepareDirectPending owns a clone
+// before verification or transport. Replacement/eviction never mutates snapshots.
+func (c *directOutboxCache) snapshot(key, raw []byte) (state.Outbox, error) {
+	k := string(key)
+	if e := c.entries[k]; e != nil {
+		entry := e.Value.(directOutboxEntry)
+		if bytes.Equal(entry.raw, raw) {
+			c.order.MoveToBack(e)
+			return entry.pending, nil
+		}
+		c.remove(e)
+	}
+	var pending state.Outbox
+	if err := json.Unmarshal(raw, &pending); err != nil {
+		return pending, err
+	}
+	size := len(k) + len(raw) + len(pending.Certificate) + len(pending.Attempt)
+	if c.maxEntries > 0 && size <= c.maxBytes {
+		for len(c.entries) >= c.maxEntries || c.bytes+size > c.maxBytes {
+			c.remove(c.order.Front())
+		}
+		c.entries[k] = c.order.PushBack(directOutboxEntry{key: k, raw: bytes.Clone(raw), pending: pending, size: size})
+		c.bytes += size
+	}
+	return pending, nil
+}
+
+// preparation is called only by the event loop after an action admits work.
+// Retain encoded evidence, never decoded payment objects passed to typed clients.
+func (c *directOutboxCache) preparation(key []byte, p state.Outbox, prepare func(state.Outbox) (directPreparedPayment, error)) func() (directPreparedPayment, error) {
+	once := func(p state.Outbox) func() (directPreparedPayment, error) {
+		return sync.OnceValues(func() (directPreparedPayment, error) { return prepare(p) })
+	}
+	e := c.entries[string(key)]
+	if e == nil {
+		return once(p)
+	}
+	entry := e.Value.(directOutboxEntry)
+	if entry.pending.Fact != p.Fact || !bytes.Equal(entry.pending.Certificate, p.Certificate) {
+		return once(p)
+	}
+	if entry.prepare != nil {
+		c.order.MoveToBack(e)
+		return entry.prepare
+	}
+	// Kind405 INSTALL and kind406 PUBLIC use the same encoder and differ only
+	// in their fixed-width kind. Canonical public bytes cannot exceed the source
+	// INSTALL length. Reserve both owned encodings before workers initialize once.
+	// Divide before multiplying so even oversized input cannot overflow accounting.
+	if len(p.Certificate) > (c.maxBytes-entry.size)/2 {
+		return once(p)
+	}
+	reserved := 2 * len(p.Certificate)
+	c.order.MoveToBack(e)
+	for c.bytes > c.maxBytes-reserved {
+		c.remove(c.order.Front())
+	}
+	entry.size += reserved
+	entry.prepare = once(entry.pending)
+	e.Value = entry
+	c.bytes += reserved
+	return entry.prepare
+}
+
+// Callers own returned slices, so a worker cannot change cached evidence.
+func cloneDirectOutbox(p state.Outbox) state.Outbox {
+	p.Certificate = bytes.Clone(p.Certificate)
+	p.Attempt = bytes.Clone(p.Attempt)
+	return p
+}

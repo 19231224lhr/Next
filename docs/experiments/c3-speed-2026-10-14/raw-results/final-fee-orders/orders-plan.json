@@ -1,0 +1,137 @@
+{
+  "jobs": [
+    {
+      "name": "orders-r1-source-first",
+      "repeat": 1,
+      "variant": "c3",
+      "workload": "fees",
+      "extra": [
+        "--case",
+        "source-first",
+        "--count",
+        "1"
+      ],
+      "fixture_key": "r1",
+      "first": true
+    },
+    {
+      "name": "orders-r1-child-first",
+      "repeat": 1,
+      "variant": "c3",
+      "workload": "fees",
+      "extra": [
+        "--case",
+        "child-first",
+        "--count",
+        "1"
+      ],
+      "fixture_key": "r1",
+      "first": false
+    },
+    {
+      "name": "orders-r1-compensated",
+      "repeat": 1,
+      "variant": "c3",
+      "workload": "fees",
+      "extra": [
+        "--case",
+        "compensated",
+        "--count",
+        "1"
+      ],
+      "fixture_key": "r1",
+      "first": false
+    },
+    {
+      "name": "orders-r2-source-first",
+      "repeat": 2,
+      "variant": "c3",
+      "workload": "fees",
+      "extra": [
+        "--case",
+        "source-first",
+        "--count",
+        "1"
+      ],
+      "fixture_key": "r2",
+      "first": true
+    },
+    {
+      "name": "orders-r2-child-first",
+      "repeat": 2,
+      "variant": "c3",
+      "workload": "fees",
+      "extra": [
+        "--case",
+        "child-first",
+        "--count",
+        "1"
+      ],
+      "fixture_key": "r2",
+      "first": false
+    },
+    {
+      "name": "orders-r2-compensated",
+      "repeat": 2,
+      "variant": "c3",
+      "workload": "fees",
+      "extra": [
+        "--case",
+        "compensated",
+        "--count",
+        "1"
+      ],
+      "fixture_key": "r2",
+      "first": false
+    },
+    {
+      "name": "orders-r3-source-first",
+      "repeat": 3,
+      "variant": "c3",
+      "workload": "fees",
+      "extra": [
+        "--case",
+        "source-first",
+        "--count",
+        "1"
+      ],
+      "fixture_key": "r3",
+      "first": true
+    },
+    {
+      "name": "orders-r3-child-first",
+      "repeat": 3,
+      "variant": "c3",
+      "workload": "fees",
+      "extra": [
+        "--case",
+        "child-first",
+        "--count",
+        "1"
+      ],
+      "fixture_key": "r3",
+      "first": false
+    },
+    {
+      "name": "orders-r3-compensated",
+      "repeat": 3,
+      "variant": "c3",
+      "workload": "fees",
+      "extra": [
+        "--case",
+        "compensated",
+        "--count",
+        "1"
+      ],
+      "fixture_key": "r3",
+      "first": false
+    }
+  ],
+  "created_unix_ns": 1791923500730634498,
+  "affinity": [
+    0,
+    1,
+    2,
+    3
+  ]
+}

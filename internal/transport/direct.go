@@ -192,6 +192,12 @@ func (c *MemberClient) InstallDirect(ctx context.Context, p protocol.DirectPayme
 	if err != nil {
 		return err
 	}
-	_, err = c.post(ctx, "/v3/certificates", raw, 1024)
+	return c.InstallDirectBytes(ctx, raw)
+}
+
+// InstallDirectBytes reads the caller's immutable encoded payment. The receiving
+// member still decodes and verifies the complete payment independently.
+func (c *MemberClient) InstallDirectBytes(ctx context.Context, raw []byte) error {
+	_, err := c.post(ctx, "/v3/certificates", raw, 1024)
 	return err
 }

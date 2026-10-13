@@ -1,0 +1,327 @@
+--- a/internal/gateway/direct_relay.go
++++ b/internal/gateway/direct_relay.go
+@@ -17,11 +17,13 @@
+ 	target int // -1 submits; 0..3 install at one member each.
+ }
+ 
+-// Both representations belong to the same verified scheduling snapshot.
+-// installBytes remains immutable while concurrent HTTP targets read it.
++// Encoded representations belong to the same verified scheduling snapshot.
++// Retained bytes stay private; transports receive their own copies.
+ type directPreparedPayment struct {
+-	payment      protocol.DirectPayment
+-	installBytes []byte
++	installBytes    []byte
++	submissionBytes []byte
++	submissionErr   error
++	issuer          protocol.Hash
+ }
+ 
+ type directLane struct {
+@@ -82,7 +84,7 @@
+ 		// Most scanned rows have no eligible action. Allocate shared preparation
+ 		// only after the first target reserves a slot, then reuse it for siblings.
+ 		if *decode == nil {
+-			*decode = sync.OnceValues(func() (directPreparedPayment, error) { return r.prepareDirectPending(p) })
++			*decode = decoded.preparation(state.Key(state.KeyOutbox, p.Fact[:]), p, r.prepareDirectPending)
+ 		}
+ 		prepare := *decode
+ 		busy[task] = true
+@@ -99,7 +101,7 @@
+ 		}()
+ 	}
+ 	schedule := func(p state.Outbox, index int) {
+-		// Share immutable decoded evidence among this payment's INSTALL targets.
++		// Share immutable preparation among this payment's INSTALL targets.
+ 		var decode func() (directPreparedPayment, error)
+ 		if index == 0 {
+ 			launch(p, -1, &lanes[0], &decode)
+@@ -291,27 +293,28 @@
+ 	if err != nil {
+ 		return err
+ 	}
+-	payment := prepared.payment
+-	c := payment.Certificate
+ 	if task.target < 0 {
+-		raw, err := payment.Submission().MarshalBinary()
+-		if err != nil {
+-			return err
++		if prepared.submissionErr != nil {
++			return prepared.submissionErr
+ 		}
+ 		requesttrace.Payment("relay_enter", task.fact)
+ 		requesttrace.Payment("relay_ready", task.fact)
+ 		requesttrace.Payment("submit_start", task.fact)
+-		err = r.Public.Submit(ctx, raw)
++		err = r.Public.Submit(ctx, bytes.Clone(prepared.submissionBytes))
+ 		requesttrace.Payment("submit_done", task.fact)
+ 		return err
+ 	}
+ 	markDirectAction("relay_install_start", task.fact, task.target)
+-	if client, ok := r.Members[c.Summary.Issuer][task.target].(DirectMemberClient); ok {
++	if client, ok := r.Members[prepared.issuer][task.target].(DirectMemberClient); ok {
+ 		if encoded, ok := client.(interface {
+ 			InstallDirectBytes(context.Context, []byte) error
+ 		}); ok {
+-			err = encoded.InstallDirectBytes(ctx, prepared.installBytes)
++			err = encoded.InstallDirectBytes(ctx, bytes.Clone(prepared.installBytes))
+ 		} else {
++			payment, decodeErr := protocol.DecodeDirectPayment(bytes.Clone(prepared.installBytes))
++			if decodeErr != nil {
++				return decodeErr
++			}
+ 			err = client.InstallDirect(ctx, payment)
+ 		}
+ 		if err == nil {
+@@ -330,7 +333,8 @@
+ 	if err != nil {
+ 		return directPreparedPayment{}, err
+ 	}
+-	return directPreparedPayment{payment: payment, installBytes: p.Certificate}, nil
++	publicBytes, publicErr := payment.Submission().MarshalBinary()
++	return directPreparedPayment{installBytes: p.Certificate, submissionBytes: publicBytes, submissionErr: publicErr, issuer: payment.Certificate.Summary.Issuer}, nil
+ }
+ 
+ func (r *Relay) verifyDirectPending(p state.Outbox) (protocol.DirectPayment, error) {
+--- a/internal/gateway/direct_outbox_cache.go
++++ b/internal/gateway/direct_outbox_cache.go
+@@ -4,6 +4,7 @@
+ 	"bytes"
+ 	"container/list"
+ 	"encoding/json"
++	"sync"
+ 
+ 	"utxo/internal/state"
+ )
+@@ -21,6 +22,7 @@
+ 	raw     []byte
+ 	pending state.Outbox
+ 	size    int
++	prepare func() (directPreparedPayment, error)
+ }
+ 
+ func newDirectOutboxCache(entries, size int) *directOutboxCache {
+@@ -64,10 +66,47 @@
+ 		for len(c.entries) >= c.maxEntries || c.bytes+size > c.maxBytes {
+ 			c.remove(c.order.Front())
+ 		}
+-		c.entries[k] = c.order.PushBack(directOutboxEntry{k, bytes.Clone(raw), pending, size})
++		c.entries[k] = c.order.PushBack(directOutboxEntry{key: k, raw: bytes.Clone(raw), pending: pending, size: size})
+ 		c.bytes += size
+ 	}
+ 	return pending, nil
++}
++
++// preparation is called only by the event loop after an action admits work.
++// Retain encoded evidence, never decoded payment objects passed to typed clients.
++func (c *directOutboxCache) preparation(key []byte, p state.Outbox, prepare func(state.Outbox) (directPreparedPayment, error)) func() (directPreparedPayment, error) {
++	once := func(p state.Outbox) func() (directPreparedPayment, error) {
++		return sync.OnceValues(func() (directPreparedPayment, error) { return prepare(p) })
++	}
++	e := c.entries[string(key)]
++	if e == nil {
++		return once(p)
++	}
++	entry := e.Value.(directOutboxEntry)
++	if entry.pending.Fact != p.Fact || !bytes.Equal(entry.pending.Certificate, p.Certificate) {
++		return once(p)
++	}
++	if entry.prepare != nil {
++		c.order.MoveToBack(e)
++		return entry.prepare
++	}
++	// Kind405 INSTALL and kind406 PUBLIC use the same encoder and differ only
++	// in their fixed-width kind. Canonical public bytes cannot exceed the source
++	// INSTALL length. Reserve both owned encodings before workers initialize once.
++	// Divide before multiplying so even oversized input cannot overflow accounting.
++	if len(p.Certificate) > (c.maxBytes-entry.size)/2 {
++		return once(p)
++	}
++	reserved := 2 * len(p.Certificate)
++	c.order.MoveToBack(e)
++	for c.bytes > c.maxBytes-reserved {
++		c.remove(c.order.Front())
++	}
++	entry.size += reserved
++	entry.prepare = once(entry.pending)
++	e.Value = entry
++	c.bytes += reserved
++	return entry.prepare
+ }
+ 
+ // Callers own returned slices, so a worker cannot change cached evidence.
+--- a/internal/gateway/direct_install_bytes_test.go
++++ b/internal/gateway/direct_install_bytes_test.go
+@@ -74,8 +74,8 @@
+ 		t.Fatalf("got %d installs", len(buffers))
+ 	}
+ 	for _, raw := range buffers {
+-		if !bytes.Equal(raw, expected) || &raw[0] != &buffers[0][0] {
+-			t.Fatal("install did not share owned verified snapshot")
++		if !bytes.Equal(raw, expected) || &raw[0] == &prepared.installBytes[0] {
++			t.Fatal("install did not use an independently owned verified snapshot")
+ 		}
+ 	}
+ }
+@@ -177,7 +177,11 @@
+ 		t.Fatal(err)
+ 	}
+ 	prepared.installBytes[0] ^= 1
+-	prepared.payment.Tx.Auth[0].Signature[0] ^= 1
++	typed, err := protocol.DecodeDirectPayment(bytes.Clone(snapshot.Certificate))
++	if err != nil {
++		t.Fatal(err)
++	}
++	typed.Tx.Auth[0].Signature[0] ^= 1
+ 	again, err := c.snapshot([]byte("a"), raw)
+ 	if err != nil || !bytes.Equal(again.Certificate, p.Certificate) {
+ 		t.Fatal("prepared payment mutated cache", err)
+@@ -204,18 +208,61 @@
+ 	r.Members[p.Origin] = members
+ 	r.Public = relayPublic{submit: func(context.Context, []byte) error { return nil }}
+ 	startDirectRelay(t, r)
+-	var first []byte
+ 	for range members {
+ 		select {
+ 		case raw := <-installed:
+-			if first == nil {
+-				first = raw
+-			}
+-			if !bytes.Equal(raw, p.Certificate) || &raw[0] != &first[0] {
+-				t.Fatal("scheduled siblings did not share verified preparation")
++			if !bytes.Equal(raw, p.Certificate) {
++				t.Fatal("scheduled siblings did not use verified preparation")
+ 			}
+ 		case <-time.After(2 * time.Second):
+ 			t.Fatal("scheduler failed to install every target")
+ 		}
+ 	}
+ }
++
++func TestDirectPreparedEncodingIsolatesMutableConsumers(t *testing.T) {
++	_, r, payments := directRelayFixture(t, 1)
++	fact := payments[0].Certificate.QC.Fact
++	p, _, _ := r.directPending(fact)
++	prepared, err := r.prepareDirectPending(p)
++	if err != nil {
++		t.Fatal(err)
++	}
++	install := bytes.Clone(prepared.installBytes)
++	submit := bytes.Clone(prepared.submissionBytes)
++	r.Public = relayPublic{submit: func(_ context.Context, raw []byte) error { raw[0] ^= 1; return nil }}
++	members := r.Members[p.Origin]
++	members[0] = byteRelayInstaller{relayInstaller: relayInstaller{}, installBytes: func(_ context.Context, raw []byte) error { raw[0] ^= 1; return nil }}
++	members[1] = relayInstaller{install: func(_ context.Context, payment protocol.DirectPayment) error {
++		payment.Tx.Auth[0].Signature[0] ^= 1
++		return nil
++	}}
++	r.Members[p.Origin] = members
++	decode := func() (directPreparedPayment, error) { return prepared, nil }
++	for _, target := range []int{-1, 0, 1, -1, 0, 1} {
++		if err := r.runDirectTask(context.Background(), directTask{fact, target}, decode); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if !bytes.Equal(install, prepared.installBytes) || !bytes.Equal(submit, prepared.submissionBytes) {
++		t.Fatal("consumer mutated retained encoding")
++	}
++}
++
++func TestDirectInstallIgnoresPublicEncodingFailure(t *testing.T) {
++	_, r, payments := directRelayFixture(t, 1)
++	fact := payments[0].Certificate.QC.Fact
++	p, _, _ := r.directPending(fact)
++	prepared, err := r.prepareDirectPending(p)
++	if err != nil {
++		t.Fatal(err)
++	}
++	prepared.submissionErr = protocol.ErrEncoding
++	decode := func() (directPreparedPayment, error) { return prepared, nil }
++	if err := r.runDirectTask(context.Background(), directTask{fact, 0}, decode); err != nil {
++		t.Fatal("INSTALL inherited public encoding failure", err)
++	}
++	if err := r.runDirectTask(context.Background(), directTask{fact, -1}, decode); err != protocol.ErrEncoding {
++		t.Fatal("PUBLIC lost encoding failure", err)
++	}
++}
+--- a/internal/gateway/direct_outbox_cache_test.go
++++ b/internal/gateway/direct_outbox_cache_test.go
+@@ -91,3 +91,78 @@
+ 		t.Fatal("malformed replacement retained snapshot")
+ 	}
+ }
++
++func TestDirectOutboxPreparationReuseBoundAndReplacement(t *testing.T) {
++	_, r, payments := directRelayFixture(t, 1)
++	p, _, _ := r.directPending(payments[0].Certificate.QC.Fact)
++	key := state.Key(state.KeyOutbox, p.Fact[:])
++	raw, _ := json.Marshal(p)
++	baseSize := len(key) + len(raw) + len(p.Certificate) + len(p.Attempt)
++	c := newDirectOutboxCache(2, baseSize+2*len(p.Certificate))
++	snapshot, _ := c.snapshot(key, raw)
++	calls := 0
++	prepare := func(p state.Outbox) (directPreparedPayment, error) { calls++; return r.prepareDirectPending(p) }
++	a := c.preparation(key, snapshot, prepare)
++	b := c.preparation(key, snapshot, prepare)
++	first, err := a()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if first.submissionErr != nil || len(first.submissionBytes) != len(first.installBytes) {
++		t.Fatal("public encoding exceeded reserved INSTALL-sized budget", first.submissionErr)
++	}
++	second, err := b()
++	if err != nil || calls != 1 || &first.installBytes[0] != &second.installBytes[0] {
++		t.Fatal("preparation not reused", calls, err)
++	}
++	if c.bytes != baseSize+2*len(p.Certificate) || c.bytes > c.maxBytes {
++		t.Fatal("encoded preparation budget not reserved", c.bytes)
++	}
++	p.NextSubmitUnixNS = 99
++	changed, _ := json.Marshal(p)
++	snapshot, _ = c.snapshot(key, changed)
++	c.preparation(key, snapshot, prepare)()
++	if calls != 2 {
++		t.Fatal("raw replacement retained preparation")
++	}
++	// Captured preparation survives eviction, and oversized preparation remains
++	// usable without exceeding the cache budget.
++	c.snapshot([]byte("other"), changed)
++	if _, err := a(); err != nil || calls != 2 {
++		t.Fatal("eviction broke captured preparation", err)
++	}
++	c = newDirectOutboxCache(2, baseSize)
++	snapshot, _ = c.snapshot(key, raw)
++	c.preparation(key, snapshot, prepare)()
++	c.preparation(key, snapshot, prepare)()
++	if calls != 4 || c.bytes > c.maxBytes {
++		t.Fatal("oversized preparation retained", calls)
++	}
++}
++
++func TestDirectOutboxPreparationCachesErrorUntilReplacement(t *testing.T) {
++	_, r, payments := directRelayFixture(t, 1)
++	p, _, _ := r.directPending(payments[0].Certificate.QC.Fact)
++	valid := bytes.Clone(p.Certificate)
++	p.Certificate = []byte("invalid encoded payment")
++	key := state.Key(state.KeyOutbox, p.Fact[:])
++	raw, _ := json.Marshal(p)
++	c := newDirectOutboxCache(2, 1<<20)
++	snapshot, _ := c.snapshot(key, raw)
++	calls := 0
++	prepare := func(p state.Outbox) (directPreparedPayment, error) { calls++; return r.prepareDirectPending(p) }
++	for i := 0; i < 2; i++ {
++		if _, err := c.preparation(key, snapshot, prepare)(); err == nil {
++			t.Fatal("invalid certificate accepted")
++		}
++	}
++	if calls != 1 {
++		t.Fatal("identical error reverified", calls)
++	}
++	p.Certificate = valid
++	raw, _ = json.Marshal(p)
++	snapshot, _ = c.snapshot(key, raw)
++	if _, err := c.preparation(key, snapshot, prepare)(); err != nil || calls != 2 {
++		t.Fatal("replacement retained old error", err, calls)
++	}
++}

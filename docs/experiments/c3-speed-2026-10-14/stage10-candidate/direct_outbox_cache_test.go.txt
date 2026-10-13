@@ -1,0 +1,168 @@
+package gateway
+
+import (
+	"bytes"
+	"encoding/json"
+	"testing"
+
+	"utxo/internal/state"
+)
+
+func TestDirectOutboxCache(t *testing.T) {
+	raw, _ := json.Marshal(state.Outbox{Certificate: []byte("evidence"), Attempt: []byte("attempt")})
+	c := newDirectOutboxCache(2, 4096)
+	p, err := c.decode([]byte("a"), raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := c.entries["a"]
+	p.Certificate[0] = 'X'
+	p.Attempt[0] = 'X'
+	again, err := c.decode([]byte("a"), bytes.Clone(raw))
+	if err != nil || string(again.Certificate) != "evidence" || string(again.Attempt) != "attempt" || c.entries["a"] != first {
+		t.Fatal("unchanged bytes not reused safely", err)
+	}
+	raw[0] = '!'
+	if _, err := c.decode([]byte("a"), raw); err == nil {
+		t.Fatal("malformed changed state accepted")
+	}
+	if len(c.entries) != 0 {
+		t.Fatal("malformed replacement retained old entry")
+	}
+	changed, _ := json.Marshal(state.Outbox{PublicComplete: true, NextSubmitUnixNS: 99})
+	p, err = c.decode([]byte("a"), changed)
+	if err != nil || !p.PublicComplete || p.NextSubmitUnixNS != 99 {
+		t.Fatal("changed durable state not decoded", err)
+	}
+	c.decode([]byte("b"), changed)
+	c.decode([]byte("a"), changed) // Recently used entries survive eviction.
+	c.decode([]byte("c"), changed)
+	if len(c.entries) != 2 || c.entries["b"] != nil || c.entries["a"] == nil {
+		t.Fatal("entry limit not enforced")
+	}
+	if _, err := c.decode([]byte("a"), []byte(`{"Certificate":123}`)); err == nil {
+		t.Fatal("invalid field type accepted")
+	}
+}
+
+func TestDirectOutboxCacheByteBoundAndInputOwnership(t *testing.T) {
+	raw, _ := json.Marshal(state.Outbox{Certificate: []byte("evidence")})
+	c := newDirectOutboxCache(10, 2*(len(raw)+len("evidence")+1)-1)
+	key := []byte("a")
+	c.decode(key, raw)
+	key[0] = 'z'
+	original := bytes.Clone(raw)
+	raw[0] = '!'
+	if _, err := c.decode([]byte("a"), original); err != nil {
+		t.Fatal(err)
+	}
+	c.decode([]byte("b"), original)
+	if len(c.entries) != 1 || c.bytes > c.maxBytes {
+		t.Fatal("byte limit not enforced")
+	}
+	c = newDirectOutboxCache(10, 1)
+	if _, err := c.decode([]byte("a"), original); err != nil || len(c.entries) != 0 {
+		t.Fatal("oversized entry should decode without caching", err)
+	}
+}
+
+func TestDirectOutboxSnapshotRetainsOwnedDataAfterReplacementAndEviction(t *testing.T) {
+	raw, _ := json.Marshal(state.Outbox{Certificate: []byte("evidence"), Attempt: []byte("attempt")})
+	c := newDirectOutboxCache(1, 4096)
+	first, err := c.snapshot([]byte("a"), raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := c.snapshot([]byte("a"), bytes.Clone(raw))
+	if err != nil || &first.Certificate[0] != &second.Certificate[0] {
+		t.Fatal("snapshot hit cloned evidence", err)
+	}
+	raw[0] = '!'
+	if string(first.Certificate) != "evidence" {
+		t.Fatal("input mutation changed snapshot")
+	}
+	changed, _ := json.Marshal(state.Outbox{Certificate: []byte("replacement")})
+	c.snapshot([]byte("a"), changed)
+	c.snapshot([]byte("b"), changed)
+	if string(first.Certificate) != "evidence" || string(first.Attempt) != "attempt" {
+		t.Fatal("replacement or eviction mutated captured snapshot")
+	}
+	if _, err := c.snapshot([]byte("b"), []byte(`{"Certificate":123}`)); err == nil || len(c.entries) != 0 {
+		t.Fatal("malformed replacement retained snapshot")
+	}
+}
+
+func TestDirectOutboxPreparationReuseBoundAndReplacement(t *testing.T) {
+	_, r, payments := directRelayFixture(t, 1)
+	p, _, _ := r.directPending(payments[0].Certificate.QC.Fact)
+	key := state.Key(state.KeyOutbox, p.Fact[:])
+	raw, _ := json.Marshal(p)
+	baseSize := len(key) + len(raw) + len(p.Certificate) + len(p.Attempt)
+	c := newDirectOutboxCache(2, baseSize+2*len(p.Certificate))
+	snapshot, _ := c.snapshot(key, raw)
+	calls := 0
+	prepare := func(p state.Outbox) (directPreparedPayment, error) { calls++; return r.prepareDirectPending(p) }
+	a := c.preparation(key, snapshot, prepare)
+	b := c.preparation(key, snapshot, prepare)
+	first, err := a()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.submissionErr != nil || len(first.submissionBytes) != len(first.installBytes) {
+		t.Fatal("public encoding exceeded reserved INSTALL-sized budget", first.submissionErr)
+	}
+	second, err := b()
+	if err != nil || calls != 1 || &first.installBytes[0] != &second.installBytes[0] {
+		t.Fatal("preparation not reused", calls, err)
+	}
+	if c.bytes != baseSize+2*len(p.Certificate) || c.bytes > c.maxBytes {
+		t.Fatal("encoded preparation budget not reserved", c.bytes)
+	}
+	p.NextSubmitUnixNS = 99
+	changed, _ := json.Marshal(p)
+	snapshot, _ = c.snapshot(key, changed)
+	c.preparation(key, snapshot, prepare)()
+	if calls != 2 {
+		t.Fatal("raw replacement retained preparation")
+	}
+	// Captured preparation survives eviction, and oversized preparation remains
+	// usable without exceeding the cache budget.
+	c.snapshot([]byte("other"), changed)
+	if _, err := a(); err != nil || calls != 2 {
+		t.Fatal("eviction broke captured preparation", err)
+	}
+	c = newDirectOutboxCache(2, baseSize)
+	snapshot, _ = c.snapshot(key, raw)
+	c.preparation(key, snapshot, prepare)()
+	c.preparation(key, snapshot, prepare)()
+	if calls != 4 || c.bytes > c.maxBytes {
+		t.Fatal("oversized preparation retained", calls)
+	}
+}
+
+func TestDirectOutboxPreparationCachesErrorUntilReplacement(t *testing.T) {
+	_, r, payments := directRelayFixture(t, 1)
+	p, _, _ := r.directPending(payments[0].Certificate.QC.Fact)
+	valid := bytes.Clone(p.Certificate)
+	p.Certificate = []byte("invalid encoded payment")
+	key := state.Key(state.KeyOutbox, p.Fact[:])
+	raw, _ := json.Marshal(p)
+	c := newDirectOutboxCache(2, 1<<20)
+	snapshot, _ := c.snapshot(key, raw)
+	calls := 0
+	prepare := func(p state.Outbox) (directPreparedPayment, error) { calls++; return r.prepareDirectPending(p) }
+	for i := 0; i < 2; i++ {
+		if _, err := c.preparation(key, snapshot, prepare)(); err == nil {
+			t.Fatal("invalid certificate accepted")
+		}
+	}
+	if calls != 1 {
+		t.Fatal("identical error reverified", calls)
+	}
+	p.Certificate = valid
+	raw, _ = json.Marshal(p)
+	snapshot, _ = c.snapshot(key, raw)
+	if _, err := c.preparation(key, snapshot, prepare)(); err != nil || calls != 2 {
+		t.Fatal("replacement retained old error", err, calls)
+	}
+}

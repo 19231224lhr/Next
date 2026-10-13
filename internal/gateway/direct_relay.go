@@ -1,8 +1,8 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"sync"
 	"time"
 
@@ -17,10 +17,18 @@ type directTask struct {
 	target int // -1 submits; 0..3 install at one member each.
 }
 
+// Both representations belong to the same verified scheduling snapshot.
+// installBytes remains immutable while concurrent HTTP targets read it.
+type directPreparedPayment struct {
+	payment      protocol.DirectPayment
+	installBytes []byte
+}
+
 type directLane struct {
 	cursor            []byte
 	active, limit     int
 	scanning, wrapped bool
+	capacityBlocked   bool
 }
 
 // runDirect keeps public submission independent of member replication. Only
@@ -36,6 +44,7 @@ func (r *Relay) runDirect(ctx context.Context) error {
 	preferEarly := false
 	lanes := [2]directLane{{limit: 8, scanning: true, wrapped: true}, {limit: 4, scanning: true, wrapped: true}}
 	busy := make(map[directTask]bool)
+	decoded := newDirectOutboxCache(512, 16<<20)
 	// Only pacing lives here. Durable outbox and verified block following still
 	// own recovery and completion. Restart may resend the identical command early.
 	nextSubmit := make(map[protocol.SpendFactID]time.Time)
@@ -46,9 +55,13 @@ func (r *Relay) runDirect(ctx context.Context) error {
 	again := make(chan struct{})
 	close(again)
 
-	launch := func(p state.Outbox, target int, lane *directLane, decode func() (protocol.DirectPayment, error)) {
+	launch := func(p state.Outbox, target int, lane *directLane, decode *func() (directPreparedPayment, error)) {
 		task := directTask{p.Fact, target}
-		if lane.active == lane.limit || busy[task] || p.PublicComplete {
+		if busy[task] || p.PublicComplete {
+			return
+		}
+		if lane.active == lane.limit {
+			lane.capacityBlocked = true
 			return
 		}
 		if target < 0 {
@@ -66,6 +79,12 @@ func (r *Relay) runDirect(ctx context.Context) error {
 		} else if !r.reserveDirectInstall(p.Fact, target) {
 			return
 		}
+		// Most scanned rows have no eligible action. Allocate shared preparation
+		// only after the first target reserves a slot, then reuse it for siblings.
+		if *decode == nil {
+			*decode = sync.OnceValues(func() (directPreparedPayment, error) { return r.prepareDirectPending(p) })
+		}
+		prepare := *decode
 		busy[task] = true
 		lane.active++
 		markDirectAction("relay_action_scheduled", p.Fact, target)
@@ -73,7 +92,7 @@ func (r *Relay) runDirect(ctx context.Context) error {
 		go func() {
 			defer workers.Done()
 			operation, stop := context.WithTimeout(ctx, 5*time.Second)
-			_ = r.runDirectTask(operation, task, decode)
+			_ = r.runDirectTask(operation, task, prepare)
 			stop()
 			// Capacity covers every running action; shutdown cannot lose a worker.
 			done <- task
@@ -81,14 +100,14 @@ func (r *Relay) runDirect(ctx context.Context) error {
 	}
 	schedule := func(p state.Outbox, index int) {
 		// Share immutable decoded evidence among this payment's INSTALL targets.
-		decode := sync.OnceValues(func() (protocol.DirectPayment, error) { return r.verifyDirectPending(p) })
+		var decode func() (directPreparedPayment, error)
 		if index == 0 {
-			launch(p, -1, &lanes[0], decode)
+			launch(p, -1, &lanes[0], &decode)
 			return
 		}
 		for target, member := range r.Members[p.Origin] {
 			if _, ok := member.(DirectMemberClient); ok {
-				launch(p, target, &lanes[1], decode)
+				launch(p, target, &lanes[1], &decode)
 			}
 		}
 	}
@@ -114,8 +133,8 @@ func (r *Relay) runDirect(ctx context.Context) error {
 			if index == 0 && lane.active == lane.limit {
 				return nil
 			}
-			var pending state.Outbox
-			if err := json.Unmarshal(entry.Value, &pending); err != nil {
+			pending, err := decoded.snapshot(entry.Key, entry.Value)
+			if err != nil {
 				return err
 			}
 			schedule(pending, index)
@@ -170,8 +189,13 @@ func (r *Relay) runDirect(ctx context.Context) error {
 				nextSubmit[task.fact] = time.Now().Add(2 * time.Second)
 			}
 			lanes[index].active--
-			lanes[index].scanning = true
-			lanes[index].wrapped = false
+			if lanes[index].capacityBlocked {
+				// INSTALL scans can advance past unscheduled targets while full.
+				// Revisit those rows, but leave exhausted cooling/acked scans asleep.
+				lanes[index].capacityBlocked = false
+				lanes[index].scanning = true
+				lanes[index].wrapped = false
+			}
 		case fact, open := <-r.Wake:
 			if !open {
 				r.Wake = nil
@@ -251,7 +275,7 @@ func (r *Relay) directPending(fact protocol.SpendFactID) (p state.Outbox, found 
 	return
 }
 
-func (r *Relay) runDirectTask(ctx context.Context, task directTask, decode func() (protocol.DirectPayment, error)) error {
+func (r *Relay) runDirectTask(ctx context.Context, task directTask, decode func() (directPreparedPayment, error)) error {
 	p, found, err := r.directPending(task.fact)
 	if err != nil {
 		return err
@@ -263,10 +287,11 @@ func (r *Relay) runDirectTask(ctx context.Context, task directTask, decode func(
 	if task.target < 0 && time.Now().UnixNano() < p.NextSubmitUnixNS {
 		return nil
 	}
-	payment, err := decode()
+	prepared, err := decode()
 	if err != nil {
 		return err
 	}
+	payment := prepared.payment
 	c := payment.Certificate
 	if task.target < 0 {
 		raw, err := payment.Submission().MarshalBinary()
@@ -282,13 +307,30 @@ func (r *Relay) runDirectTask(ctx context.Context, task directTask, decode func(
 	}
 	markDirectAction("relay_install_start", task.fact, task.target)
 	if client, ok := r.Members[c.Summary.Issuer][task.target].(DirectMemberClient); ok {
-		err = client.InstallDirect(ctx, payment)
+		if encoded, ok := client.(interface {
+			InstallDirectBytes(context.Context, []byte) error
+		}); ok {
+			err = encoded.InstallDirectBytes(ctx, prepared.installBytes)
+		} else {
+			err = client.InstallDirect(ctx, payment)
+		}
 		if err == nil {
 			r.installAck(task.fact, task.target)
 		}
 	}
 	markDirectAction("relay_install_done", task.fact, task.target)
 	return err
+}
+
+func (r *Relay) prepareDirectPending(p state.Outbox) (directPreparedPayment, error) {
+	// Own the bytes before verifying them. Never combine fresh durable bytes
+	// with evidence decoded from an older scheduling snapshot.
+	p.Certificate = bytes.Clone(p.Certificate)
+	payment, err := r.verifyDirectPending(p)
+	if err != nil {
+		return directPreparedPayment{}, err
+	}
+	return directPreparedPayment{payment: payment, installBytes: p.Certificate}, nil
 }
 
 func (r *Relay) verifyDirectPending(p state.Outbox) (protocol.DirectPayment, error) {

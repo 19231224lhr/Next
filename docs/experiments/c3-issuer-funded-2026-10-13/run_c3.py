@@ -218,7 +218,7 @@ def main():
     p.add_argument('--fixture', type=pathlib.Path, help='reuse an unstarted prepared fixture')
     p.add_argument('--save-fixture', type=pathlib.Path, help='snapshot prepared fixture before services start')
     args = p.parse_args()
-    if not 1 <= args.length <= 100 or args.count < 1 or args.rate <= 0 or args.duration <= 0 or args.delay_ms < 0:
+    if not 1 <= args.length <= 1000 or args.count < 1 or args.rate <= 0 or args.duration <= 0 or args.delay_ms < 0:
         p.error('invalid workload dimensions')
     try:
         result = run(args)

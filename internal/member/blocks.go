@@ -351,10 +351,19 @@ func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, r
 			}
 		}
 	}
+	var ownApproval state.Approval
+	var ownApprovalFound, reuseOwnApproval bool
 	if tx.Body.Fee.C3.Enabled() {
-		if err := m.c3Event(o, pay.Summary(), rules.C3Execute, rules.C3WholeTransaction); err != nil {
+		summary := pay.Summary()
+		var err error
+		var lookupFact protocol.SpendFactID
+		ownApproval, ownApprovalFound, lookupFact, err = m.c3EventWithApproval(o, summary, rules.C3Execute, rules.C3WholeTransaction)
+		if err != nil {
 			return err
 		}
+		// Direct application callers may supply divergent summary/authorization
+		// facts. Preserve the original second-key lookup in that case.
+		reuseOwnApproval = lookupFact == fact
 	}
 	recovered := make(map[uint32]bool, len(result.RecoveredOutputs))
 	var returned uint64
@@ -369,9 +378,13 @@ func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, r
 			return err
 		}
 	}
-	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
-	if err != nil {
-		return err
+	a, found := ownApproval, ownApprovalFound
+	var err error
+	if !reuseOwnApproval {
+		a, found, err = state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+		if err != nil {
+			return err
+		}
 	}
 	if found {
 		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))

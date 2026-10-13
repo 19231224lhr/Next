@@ -178,7 +178,7 @@ func TestC3MultiOutputDifferentQuorumSubsetAndLateRepay(t *testing.T) {
 	}
 }
 
-func c3Fixture(t *testing.T) directFixture {
+func c3Fixture(t testing.TB) directFixture {
 	f := newDirectFixture(t)
 	pool := protocol.Digest("issuer-pool")
 	ref := protocol.AdmissionRef{Key: protocol.ResourceKey{Kind: protocol.ResourceFUEL, Account: pool, Version: 1}, Grant: protocol.Digest("issuer-grant")}
@@ -199,7 +199,7 @@ func c3Fixture(t *testing.T) directFixture {
 	return f
 }
 
-func c3Payment(t *testing.T, f directFixture, parent *protocol.OutputCertificate, n byte) DirectPayment {
+func c3Payment(t testing.TB, f directFixture, parent *protocol.OutputCertificate, n byte) DirectPayment {
 	// Build legacy material with a legacy policy, then bind the explicit C3 plan before signing.
 	legacy := f
 	legacy.policy.C3 = nil

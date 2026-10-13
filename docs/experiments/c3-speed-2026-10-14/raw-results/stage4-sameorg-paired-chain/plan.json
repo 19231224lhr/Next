@@ -1,0 +1,158 @@
+{
+  "jobs": [
+    {
+      "repeat": 0,
+      "arm": "before"
+    },
+    {
+      "repeat": 0,
+      "arm": "after"
+    },
+    {
+      "repeat": 0,
+      "arm": "fastpay"
+    },
+    {
+      "repeat": 1,
+      "arm": "fastpay"
+    },
+    {
+      "repeat": 1,
+      "arm": "after"
+    },
+    {
+      "repeat": 1,
+      "arm": "before"
+    },
+    {
+      "repeat": 2,
+      "arm": "before"
+    },
+    {
+      "repeat": 2,
+      "arm": "fastpay"
+    },
+    {
+      "repeat": 2,
+      "arm": "after"
+    },
+    {
+      "repeat": 3,
+      "arm": "after"
+    },
+    {
+      "repeat": 3,
+      "arm": "before"
+    },
+    {
+      "repeat": 3,
+      "arm": "fastpay"
+    },
+    {
+      "repeat": 4,
+      "arm": "fastpay"
+    },
+    {
+      "repeat": 4,
+      "arm": "before"
+    },
+    {
+      "repeat": 4,
+      "arm": "after"
+    }
+  ],
+  "created_ns": 1791917372954595776,
+  "affinity": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "arguments": {
+    "root": "/home/qyinf/next-c3-speed-20261014/stage4-sameorg-paired-chain",
+    "before": "/home/qyinf/next-c3-speed-20261014/stage4-compact-bin",
+    "after": "/home/qyinf/next-c3-speed-20261014/stage4-sameorg-bin",
+    "fastpay": "/home/qyinf/.local/share/next-baseline-tools/fastpay-target/release",
+    "repeats": "5",
+    "suite": "chain",
+    "only_next": "False",
+    "trace": "False",
+    "length": "100",
+    "rate": "100",
+    "duration": "30",
+    "fixture": "/home/qyinf/next-c3-speed-20261014/stage2-paired-chain/fixtures/r0"
+  },
+  "paired_fixture": true,
+  "harness_sha256": "7133345b4798ad371e053bb3c5d3062a598974a9dd1c5cb0aa36deb75f37f32e",
+  "binaries": {
+    "before": {
+      "payctl": "834ce79df292b6c61ba4ccd5dce3e7453ed66e36ae9e3a1838e44f6fdbf55906",
+      "member": "95566f91f2037025c5685d180e10dadf5a7a4f3da0964a49bf9b453a452a2162",
+      "gateway": "8376d8281cf51df880b499a17bef6bf022589ef568113df6b7ebba3a0419909c",
+      "committee": "1b77e8780f0fe7107d9dab3e0e893dca23c7831dfce05ee048b2a2366e62e31c"
+    },
+    "after": {
+      "payctl": "834ce79df292b6c61ba4ccd5dce3e7453ed66e36ae9e3a1838e44f6fdbf55906",
+      "member": "6c31b118d12941cc1edd13f9a013f922968e206bc8acfe886364fe98f084f751",
+      "gateway": "20735a132a6bb859fc2fd428a6fd2d0457c1ac65a7fed8bfdd56325242f9646b",
+      "committee": "1b77e8780f0fe7107d9dab3e0e893dca23c7831dfce05ee048b2a2366e62e31c"
+    }
+  },
+  "fastpay_binaries": {
+    "examples/baseline_client": "50306e4c512d7ce8870abf4938ab9030aa18bc462f673f8662aa461450198a60",
+    "server": "c85381756c81ef055c86f93c7e8cf16cdb26fdf46a05fab00b85ad009a5cc869"
+  },
+  "service_variants": {
+    "before": {
+      "payctl": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/stage4-bin/payctl",
+        "sha256": "834ce79df292b6c61ba4ccd5dce3e7453ed66e36ae9e3a1838e44f6fdbf55906",
+        "options": []
+      },
+      "member": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/stage4-bin/member",
+        "sha256": "95566f91f2037025c5685d180e10dadf5a7a4f3da0964a49bf9b453a452a2162",
+        "options": []
+      },
+      "gateway": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/stage4-bin/gateway",
+        "sha256": "33ce5eb70677cf54ea6b32e660be26642be70fd1157638fe00fe0bbfbff07657",
+        "options": [
+          "--compact-direct-approvals"
+        ]
+      },
+      "committee": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/stage4-bin/committee",
+        "sha256": "1b77e8780f0fe7107d9dab3e0e893dca23c7831dfce05ee048b2a2366e62e31c",
+        "options": []
+      }
+    },
+    "after": {
+      "payctl": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/stage4-bin/payctl",
+        "sha256": "834ce79df292b6c61ba4ccd5dce3e7453ed66e36ae9e3a1838e44f6fdbf55906",
+        "options": []
+      },
+      "member": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/stage4-bin/member",
+        "sha256": "95566f91f2037025c5685d180e10dadf5a7a4f3da0964a49bf9b453a452a2162",
+        "options": [
+          "--same-org-continuation"
+        ]
+      },
+      "gateway": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/stage4-bin/gateway",
+        "sha256": "33ce5eb70677cf54ea6b32e660be26642be70fd1157638fe00fe0bbfbff07657",
+        "options": [
+          "--compact-direct-approvals",
+          "--same-org-continuation"
+        ]
+      },
+      "committee": {
+        "binary": "/home/qyinf/next-c3-speed-20261014/stage4-bin/committee",
+        "sha256": "1b77e8780f0fe7107d9dab3e0e893dca23c7831dfce05ee048b2a2366e62e31c",
+        "options": []
+      }
+    }
+  }
+}

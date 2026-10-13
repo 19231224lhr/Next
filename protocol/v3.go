@@ -160,6 +160,21 @@ func (t FastTx) MarshalBinary() ([]byte, error) {
 	if err := t.VerifyAuth(); err != nil {
 		return nil, err
 	}
+	return t.marshalBinary()
+}
+
+// MarshalInitial authenticates the transaction and its original funding before
+// encoding it, without repeating owner signature verification. The returned
+// bytes own their storage; no validation is cached on the mutable transaction.
+func (t FastTx) MarshalInitial(key *chameleon.Public) ([]byte, error) {
+	if err := t.VerifyInitial(key); err != nil {
+		return nil, err
+	}
+	return t.marshalBinary()
+}
+
+// marshalBinary is used only after authentication in the public entry points.
+func (t FastTx) marshalBinary() ([]byte, error) {
 	fixed := new(Encoder)
 	fixed.Bytes(t.core())
 	for _, c := range t.Commitments {
