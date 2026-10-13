@@ -24,14 +24,21 @@ func DirectCoinKey(id protocol.OutputID, instance uint8) []byte {
 }
 
 func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
+	_, err := w.SaveDirectRequestBytes(req)
+	return err
+}
+
+// SaveDirectRequestBytes returns the exact signed request only after its request
+// journal and input reservations have been committed by the configured Store.
+func (w *Wallet) SaveDirectRequestBytes(req protocol.DirectRequest) ([]byte, error) {
 	if w.bound == (protocol.Hash{}) || req.Tx.Body.Network != w.network || req.Tx.Body.Subject != w.owner {
-		return protocol.ErrAuth
+		return nil, protocol.ErrAuth
 	}
 	raw, err := req.MarshalBinary()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
+	err = w.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
 		if err := rules.ValidateWalletDescriptors(o, req.Tx); err != nil {
 			return nil, err
@@ -82,6 +89,10 @@ func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
 		o.Set(key, raw)
 		return o.Changes(), nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return raw, nil
 }
 
 // ReceiveDirect is the end of the fast-payment measurement: issuer signature
