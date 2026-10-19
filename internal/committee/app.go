@@ -26,9 +26,10 @@ type MaintenanceFunc func(state.ReadView) (state.Transition, error)
 type CheckFunc func([]byte) error
 type ExecuteFunc func(state.ReadView, []byte) (state.Transition, error)
 type BlockContext struct {
-	Height int64
-	Index  uint32
-	Time   time.Time
+	ProposerAddress []byte
+	Height          int64
+	Index           uint32
+	Time            time.Time
 }
 type TimedExecuteFunc func(state.ReadView, []byte, BlockContext) (state.Transition, error)
 type BeginBlockFunc func(state.ReadView, BlockContext) (state.Transition, error)
@@ -43,6 +44,7 @@ type commitRecord struct {
 // App provides ABCI commit isolation. Business execution is supplied by the
 // deterministic payment rules; no standalone node accepts arbitrary key writes.
 type App struct {
+	selectTxs   func([][]byte, int64) ([][]byte, error)
 	maintenance MaintenanceFunc
 	abci.BaseApplication
 	mu             sync.Mutex
@@ -137,14 +139,23 @@ func (a *App) PrepareProposal(_ context.Context, r *abci.RequestPrepareProposal)
 	requesttrace.Consensus.Mark("prepare_enter", "height", r.Height, "candidates", len(r.Txs))
 	out := &abci.ResponsePrepareProposal{}
 	var size int64
-	for _, tx := range r.Txs {
+	txs := r.Txs
+	if a.selectTxs != nil {
+		var err error
+		txs, err = a.selectTxs(txs, r.MaxTxBytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, tx := range txs {
 		if a.check(tx) != nil {
 			continue
 		}
-		if int64(len(tx)) > r.MaxTxBytes-size {
+		txSize := cmttypes.ComputeProtoSizeForTxs([]cmttypes.Tx{tx})
+		if txSize > r.MaxTxBytes-size {
 			break
 		}
-		size += int64(len(tx))
+		size += txSize
 		out.Txs = append(out.Txs, bytes.Clone(tx))
 		requesttrace.Settlement.Command(tx, "prepared", r.Height)
 	}
@@ -240,7 +251,7 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 			return nil
 		}
 		if a.beginBlock != nil {
-			tr, err := a.beginBlock(v, BlockContext{Height: r.Height, Time: r.Time})
+			tr, err := a.beginBlock(v, BlockContext{Height: r.Height, Time: r.Time, ProposerAddress: bytes.Clone(r.ProposerAddress)})
 			if err != nil {
 				return err
 			}
@@ -261,7 +272,7 @@ func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*a
 			var transition state.Transition
 			var err error
 			if a.executeAt != nil {
-				transition, err = a.executeAt(overlay, tx, BlockContext{Height: r.Height, Index: uint32(i), Time: r.Time})
+				transition, err = a.executeAt(overlay, tx, BlockContext{Height: r.Height, Index: uint32(i), Time: r.Time, ProposerAddress: bytes.Clone(r.ProposerAddress)})
 			} else {
 				transition, err = a.execute(overlay, tx)
 			}

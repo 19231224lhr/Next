@@ -14,6 +14,10 @@ func (r DirectRequest) MarshalBinary() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	return r.marshalWithTx(tx)
+}
+
+func (r DirectRequest) marshalWithTx(tx []byte) ([]byte, error) {
 	if len(r.InputCertificates) > MaxInputs {
 		return nil, ErrEncoding
 	}

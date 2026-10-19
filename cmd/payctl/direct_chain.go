@@ -203,6 +203,7 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 	var descriptors [3]protocol.ReceiveDescriptor
 	var walletOrgs [3]int
 	var wallets [3]*wallet.Wallet
+	var signers [3]*wallet.LocalDirectSigner
 	var dbs [3]*store.Group
 	for i, path := range []string{lab.Owners[0], lab.Owners[1], filepath.Join(dir, "keys", "chain-c.key")} {
 		keys[i], err = cfg.PrivateKey(path)
@@ -239,6 +240,10 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 			walletStore = profileStores[i]
 		}
 		wallets[i], err = wallet.NewWithGenesis(walletStore, n.Genesis.Network, descriptors[i].Owner, n.Organizations, n.Genesis, p)
+		if err != nil {
+			return err
+		}
+		signers[i], err = wallets[i].NewLocalDirectSigner(keys[i])
 		if err != nil {
 			return err
 		}
@@ -281,16 +286,6 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 	}
 	batchCtx, stopBatches := context.WithCancel(ctx)
 	var organizationBatches [2][4]*progressBatcher
-	for j, org := range n.Organizations {
-		if j >= len(organizationBatches) {
-			return protocol.ErrRule
-		}
-		for i, url := range n.Members[org.Org] {
-			organizationBatches[j][i] = newProgressBatcher(batchCtx, length, func(ctx context.Context, facts []protocol.SpendFactID) ([]member.DirectStatus, error) {
-				return loadProgressBatch(ctx, client, url, facts)
-			})
-		}
-	}
 	defer func() {
 		stopBatches()
 		for _, batches := range organizationBatches {
@@ -301,6 +296,16 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 			}
 		}
 	}()
+	for j, org := range n.Organizations {
+		if j >= len(organizationBatches) {
+			return protocol.ErrRule
+		}
+		for i, url := range n.Members[org.Org] {
+			organizationBatches[j][i] = newProgressBatcher(batchCtx, length, func(ctx context.Context, facts []protocol.SpendFactID) ([]member.DirectStatus, error) {
+				return loadProgressBatch(ctx, client, url, facts)
+			})
+		}
+	}
 	var observers sync.WaitGroup
 	observerErrors := make(chan error, length)
 	report := chainReport{Mode: "fast", Requested: length, WalletNoSync: true, WaitMemberInputs: waitMembers, RecordAttempts: recordAttempts, SavedRequestBytesReused: true, CommitNotifications: commitNotifications}
@@ -396,18 +401,11 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		}
 		coin := wallet.DirectCoin{Output: origin.Output, Final: origin.Fact}
 		if i > 0 {
-			err = dbs[h.Sender].View(func(v state.ReadView) error {
-				var found bool
-				var e error
-				coin, found, e = state.Load[wallet.DirectCoin](v, wallet.DirectCoinKey(id, 0))
-				if e != nil {
-					return e
-				}
-				if !found {
-					return state.ErrNotFound
-				}
-				return nil
-			})
+			var found bool
+			coin, found, err = wallets[h.Sender].ReadDirectCoin(id, 0)
+			if err == nil && !found {
+				err = state.ErrNotFound
+			}
 			if err != nil {
 				return err
 			}
@@ -457,11 +455,17 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 				return e
 			}
 			buildTrace.mark("generate_transaction")
-			tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), keys[h.Sender])}
 			request = protocol.DirectRequest{Tx: tx, InputCertificates: proofs}
-			buildTrace.mark("sign_transaction")
 		}
-		raw, e := wallets[h.Sender].SaveDirectRequestBytes(request)
+		var raw []byte
+		var txID protocol.TxID
+		if e5 {
+			raw, e = wallets[h.Sender].SaveDirectRequestBytes(request)
+			txID = tx.ID()
+		} else {
+			tx, txID, raw, e = signers[h.Sender].SignAndSave(request)
+			request.Tx = tx
+		}
 		if e != nil {
 			return e
 		}
@@ -472,7 +476,7 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
 		}
 		buildTrace.mark("encode_request")
 		h.RequestBytes = len(raw)
-		h.Tx = tx.ID()
+		h.Tx = txID
 		h.OutputData = body.Outputs[0]
 		buildTrace.mark("record_identifiers")
 		h.BuildStagesMS = buildTrace.stages

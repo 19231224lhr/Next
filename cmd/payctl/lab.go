@@ -34,12 +34,17 @@ func initialize(args []string) error {
 	outputs := flags.Int("outputs", 1024, "finite initial CAL outputs per owner")
 	direct := flags.Bool("v4", false, "direct-liability laboratory (current protocol), with a 3-of-4 repair key")
 	c3 := flags.Bool("c3", false, "issuer-funded fixed-quote laboratory (implies v5)")
+	c3Final := flags.Bool("c3-final", false, "final C3: CAL service fee, fixed rewards and FUEL redistribution")
+	c3BaseFee := flags.Uint64("c3-base-fee", 0, "final-C3 CAL service fee in smallest units")
 	flags.BoolVar(direct, "v5", false, "current protocol: fixed wallet binding without payment Intent")
 	if e := flags.Parse(args); e != nil {
 		return e
 	}
-	if *c3 {
+	if *c3 || *c3Final {
 		*direct = true
+	}
+	if (*c3 && *c3Final) || (*c3BaseFee != 0 && !*c3Final) {
+		return fmt.Errorf("choose --c3 or --c3-final; --c3-base-fee requires --c3-final")
 	}
 	if *dir == "" || *outputs < 1 || *outputs > 100000 || *base < 1024 || *base > 65000-301 {
 		return fmt.Errorf("invalid laboratory parameters")
@@ -191,6 +196,11 @@ func initialize(args []string) error {
 			return e
 		}
 		lab.Nodes = append(lab.Nodes, nodeSpec{Name: name, Binary: "committee", Config: file, URL: network.CommitteeURLs[i]})
+	}
+	if *c3Final {
+		if e = configureFinalC3Lab(&network, *c3BaseFee); e != nil {
+			return e
+		}
 	}
 	if e = cfg.Write(lab.Network, network); e != nil {
 		return e

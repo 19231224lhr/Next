@@ -31,6 +31,7 @@ import (
 )
 
 type c3FeePayment struct {
+	ServiceFeeCAL, ExpectedReceiveCAL                                     uint64
 	Fact                                                                  protocol.SpendFactID
 	Tx                                                                    protocol.TxID
 	Output                                                                protocol.OutputID
@@ -120,6 +121,8 @@ func c3DecodeExecutions(network protocol.Hash, txs []finality.ExecutedTx) ([]c3F
 				return nil, e
 			}
 			x.HistoryApplied = &r.Applied
+		} else if protocol.IsClockTick(t.Bytes, network) {
+			x.Kind = "clock"
 		} else {
 			p, e := protocol.DecodeDirectSubmission(t.Bytes)
 			if e != nil {
@@ -135,6 +138,8 @@ func c3DecodeExecutions(network protocol.Hash, txs []finality.ExecutedTx) ([]c3F
 }
 
 type c3FeeReport struct {
+	EpochSettlements                                         []c3FeeSample
+	FUELConserved                                            bool
 	Version                                                  int
 	Case                                                     string
 	Count                                                    int
@@ -158,13 +163,16 @@ func c3CheckRecord(r rules.C3Record) error {
 		return e
 	}
 	s := r.Escrow
-	if s.Commitment.Budget != s.Held+s.Rewards+s.Burned+s.Released {
+	if s.Commitment.Budget != s.Held+s.Rewards+s.Burned+s.Reflow+s.Released {
 		return fmt.Errorf("C3 budget conservation failed")
 	}
 	return nil
 }
 
 func c3FeesRequest(n cfg.Network, p rules.DirectPolicy, org protocol.OrgConfig, key ed25519.PrivateKey, in protocol.Input, coin protocol.Output, to protocol.ReceiveDescriptor, proofs []protocol.InputCertificate, fee state.OriginOutput) (protocol.DirectRequest, error) {
+	if finalC3Network(n) {
+		return budgetRequest(n, p, org, key, in, coin, to, proofs)
+	}
 	// Reuse the production builder, but bind the requested quote before creating
 	// the final transaction identity and signatures.
 	r, e := budgetRequest(n, p, org, key, in, coin, to, proofs, fee)
@@ -207,6 +215,9 @@ func c3FeesPrepare(dir string, lab cfg.Lab, n cfg.Network, count int, timeout ti
 	for i := 0; i < count; i++ {
 		for user, d := range ds {
 			assets := []protocol.Asset{protocol.AssetFUEL}
+			if finalC3Network(n) {
+				assets = nil
+			}
 			if user == 0 {
 				assets = append(assets, protocol.AssetCAL)
 			}
@@ -256,7 +267,11 @@ func c3FeesPrepare(dir string, lab cfg.Lab, n cfg.Network, count int, timeout ti
 	for i := range fixture.Requests {
 		q := &fixture.Requests[i]
 		origin := origins[i]
-		q.Source, e = c3FeesRequest(n, policy, n.Organizations[0], keys[0], protocol.Input{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}, origin.Output, ds[1], nil, fees[0][i])
+		var sourceFee, childFee state.OriginOutput
+		if !finalC3Network(n) {
+			sourceFee, childFee = fees[0][i], fees[1][i]
+		}
+		q.Source, e = c3FeesRequest(n, policy, n.Organizations[0], keys[0], protocol.Input{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}, origin.Output, ds[1], nil, sourceFee)
 		if e != nil {
 			return e
 		}
@@ -265,7 +280,7 @@ func c3FeesPrepare(dir string, lab cfg.Lab, n cfg.Network, count int, timeout ti
 			return e
 		}
 		summary := protocol.SummaryFor(q.Source.Tx, vector)
-		q.Child, e = c3FeesRequest(n, policy, n.Organizations[1], keys[1], protocol.Input{Kind: protocol.CertificateInput, Output: summary.OutputID(0), Evidence: protocol.Hash(summary.Fact())}, q.Source.Tx.Body.Outputs[0], ds[0], nil, fees[1][i])
+		q.Child, e = c3FeesRequest(n, policy, n.Organizations[1], keys[1], protocol.Input{Kind: protocol.CertificateInput, Output: summary.OutputID(0), Evidence: protocol.Hash(summary.Fact())}, q.Source.Tx.Body.Outputs[0], ds[0], nil, childFee)
 		if e != nil {
 			return e
 		}
@@ -366,6 +381,10 @@ func (c *c3FeeClient) stage(ctx context.Context, p *c3FeePair, name string) erro
 }
 func (c *c3FeeClient) collect(ctx context.Context, owner int, r protocol.DirectRequest, h *c3FeePayment) (protocol.OutputCertificate, error) {
 	h.Tx = r.Tx.ID()
+	if r.Tx.Body.Fee.C3.Final() {
+		h.ServiceFeeCAL = r.Tx.Body.Fee.C3.Quote
+	}
+	h.ExpectedReceiveCAL = r.Tx.Body.Outputs[0].Amount
 	raw, e := c.wallets[owner].SaveDirectRequestBytes(r)
 	if e != nil {
 		return protocol.OutputCertificate{}, e
@@ -414,6 +433,9 @@ func (c *c3FeeClient) observed(ctx context.Context, h *c3FeePayment, owner int) 
 			return e
 		}
 		if found && (coin.Final != (protocol.Hash{}) || coin.Recovered) {
+			if coin.Output.Asset != protocol.AssetCAL || coin.Output.Amount != h.ExpectedReceiveCAL {
+				return fmt.Errorf("receiver principal mismatch")
+			}
 			h.FinalCoin = coin
 			h.PublicOffsetNS = time.Since(c.start).Nanoseconds()
 			return nil
@@ -425,7 +447,7 @@ func (c *c3FeeClient) observed(ctx context.Context, h *c3FeePayment, owner int) 
 }
 func (c *c3FeeClient) feeAndClosed(ctx context.Context, h *c3FeePayment, owner int) error {
 	id := protocol.OutputIdentity(c.n.Genesis.Network, h.Tx, protocol.FeeChangeIndex)
-	for {
+	for !finalC3Network(c.n) {
 		var found bool
 		e := c.dbs[owner].View(func(v state.ReadView) error {
 			var e error
@@ -492,8 +514,11 @@ func (c *c3FeeClient) feeAndClosed(ctx context.Context, h *c3FeePayment, owner i
 		if e != nil {
 			return e
 		}
-		if !found {
+		if !found && !finalC3Network(c.n) {
 			return state.ErrNotFound
+		}
+		if found && finalC3Network(c.n) {
+			return fmt.Errorf("final C3 unexpectedly created a user FUEL change")
 		}
 		refund, found, e := state.Load[wallet.DirectCoin](v, wallet.DirectCoinKey(refundID, 0))
 		if e != nil {
@@ -512,6 +537,13 @@ func (c *c3FeeClient) feeAndClosed(ctx context.Context, h *c3FeePayment, owner i
 		return fmt.Errorf("invalid verified fee refund")
 	}
 	var e error
+	if finalC3Network(c.n) {
+		if h.FeeRefund != nil || h.FeeInput.Output.Amount != 0 {
+			return fmt.Errorf("final C3 has user FUEL effects")
+		}
+		h.FeeNet = 0
+		return nil
+	}
 	h.FeeNet, e = c3ObservedFeeNet(*h)
 	return e
 }
@@ -743,6 +775,9 @@ func c3FeesCommand(args []string) (err error) {
 	defer cancel()
 	c := c3FeeClient{n: n, lab: lab, policy: p, client: transport.NewHTTPClient(5 * time.Second), public: transport.NewCommitteeClient(n.CommitteeURLs[0], n.CommitteeURLs[1:]...), start: time.Now()}
 	report := c3FeeReport{Version: 1, Case: *mode, Count: *count, SourceDelayNS: int64(*delay), TimeoutSeconds: n.Direct.TimeoutSeconds, StartedUnixNS: c.start.UnixNano(), Pairs: make([]*c3FeePair, *count)}
+	if finalC3Network(n) {
+		report.Version = 2
+	}
 	defer func() {
 		if len(report.FinalPools) == 0 {
 			snapshotCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
@@ -860,6 +895,12 @@ func c3FeesCommand(args []string) (err error) {
 			}
 		}
 	}
+	if finalC3Network(n) {
+		if len(fees[0]) != 0 || len(fees[1]) != 0 {
+			return fmt.Errorf("final C3 user genesis contains FUEL")
+		}
+		fees[0], fees[1] = make([]state.OriginOutput, *count), make([]state.OriginOutput, *count)
+	}
 	if len(origins) != *count || len(fees[0]) != *count || len(fees[1]) != *count {
 		return fmt.Errorf("independent input counts mismatch")
 	}
@@ -904,6 +945,110 @@ func c3FeesCommand(args []string) (err error) {
 			return fmt.Errorf("pair %d committed order differs from requested %s case", pair.Index, *mode)
 		}
 	}
+	if finalC3Network(n) {
+		// Exercise two real public epoch boundaries after economic closure.
+		// Clock ticks pass ordinary committee validation and verified followers.
+		pools, e := c.pools(ctx)
+		if e != nil || len(pools) == 0 {
+			return fmt.Errorf("epoch initial snapshot: %w", e)
+		}
+		targetEpoch := pools[0].Epoch.Epoch + 2
+		for pools[0].Epoch.Epoch < targetEpoch {
+			height, e := blockfollow.Height(c.dbs[0])
+			if e != nil {
+				return e
+			}
+			// Clock commands already have their own wire format; the payment
+			// relay's Submit API would try to wrap them as signed payments.
+			tick, e := c3ReplaySubmit(ctx, c.client, n.CommitteeURLs[0], protocol.ClockTick(n.Genesis.Network, height+1))
+			if e != nil {
+				return e
+			}
+			if tick.HTTPStatus != 202 {
+				return fmt.Errorf("epoch tick HTTP %d: %s", tick.HTTPStatus, tick.ResponseBody)
+			}
+			for {
+				observed, e := blockfollow.Height(c.dbs[0])
+				if e != nil {
+					return e
+				}
+				if observed > height {
+					break
+				}
+				if e = budgetPause(ctx, 25*time.Millisecond); e != nil {
+					return e
+				}
+			}
+			pools, e = c.pools(ctx)
+			if e != nil {
+				return e
+			}
+			report.EpochSettlements = append(report.EpochSettlements, c3FeeSample{OffsetNS: time.Since(c.start).Nanoseconds(), Pools: pools})
+		}
+	}
 	report.FinalPools, err = c.pools(ctx)
+	if err == nil && finalC3Network(n) {
+		err = c3FinalBalances(&report)
+	}
 	return err
+}
+
+func c3FinalBalances(r *c3FeeReport) error {
+	if len(r.InitialPools) != 2 || len(r.FinalPools) != 2 {
+		return fmt.Errorf("expected two issuer snapshots")
+	}
+	var initial, current uint64
+	var e error
+	for i, p := range r.FinalPools {
+		initial, e = protocol.Add(initial, r.InitialPools[i].Free+r.InitialPools[i].Held)
+		if e != nil {
+			return e
+		}
+		current, e = protocol.Add(current, p.Free+p.Held)
+		if e != nil {
+			return e
+		}
+		var quotes uint64
+		for _, pair := range r.Pairs {
+			h := pair.Source
+			if i == 1 {
+				h = pair.Child
+			}
+			quotes, e = protocol.Add(quotes, h.ServiceFeeCAL)
+			if e != nil {
+				return e
+			}
+		}
+		if p.CALRevenue < r.InitialPools[i].CALRevenue || p.CALRevenue-r.InitialPools[i].CALRevenue != quotes {
+			return fmt.Errorf("issuer %d CAL revenue does not match executed signed quotes", i)
+		}
+		if p.Burned != 0 || p.PoolBurned != 0 {
+			return fmt.Errorf("final C3 burned FUEL")
+		}
+	}
+	initial, e = protocol.Add(initial, r.InitialPools[0].Rewards)
+	if e != nil {
+		return e
+	}
+	current, e = protocol.Add(current, r.FinalPools[0].Rewards)
+	if e != nil {
+		return e
+	}
+	for _, part := range r.InitialPools[0].Epoch.Pool {
+		initial, e = protocol.Add(initial, part.Amount)
+		if e != nil {
+			return e
+		}
+	}
+	for _, part := range r.FinalPools[0].Epoch.Pool {
+		current, e = protocol.Add(current, part.Amount)
+		if e != nil {
+			return e
+		}
+	}
+	r.FUELConserved = initial == current
+	if !r.FUELConserved {
+		return fmt.Errorf("FUEL total mismatch: initial=%d current=%d", initial, current)
+	}
+	return nil
 }

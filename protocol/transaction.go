@@ -49,6 +49,7 @@ type FeeSource uint8
 const (
 	OrgReserve     FeeSource = 1
 	OwnerFinalUTXO FeeSource = 2
+	CALService     FeeSource = 3
 )
 
 type FeeTerms struct {
@@ -190,10 +191,14 @@ func (t TxBody) validateVersion(wire, version uint64) error {
 			return ErrRule
 		}
 	}
-	if t.Fee.Maximum == 0 {
+	if t.Fee.Maximum == 0 && !t.Fee.C3.Final() {
 		return ErrRule
 	}
 	switch t.Fee.Source {
+	case CALService:
+		if !t.Fee.C3.Final() || t.Fee.Account != (Hash{}) || t.Fee.Policy != (Hash{}) || t.Fee.Version != 0 || len(t.Fee.Inputs) != 0 || t.Fee.Refund != (ReceiveDescriptor{}) {
+			return ErrRule
+		}
 	case OrgReserve:
 		if t.Kind != FastTransfer || t.Fee.Account == (Hash{}) || t.Fee.Policy == (Hash{}) || t.Fee.Version == 0 || len(t.Fee.Inputs) != 0 || t.Fee.Refund != (ReceiveDescriptor{}) {
 			return ErrRule

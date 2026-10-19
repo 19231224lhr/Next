@@ -4,7 +4,7 @@
 
 **基于担保组织的 UTXO 快速转账实验系统**
 
-[![Go verification](https://github.com/19231224lhr/Next/actions/workflows/ci.yml/badge.svg?branch=re)](https://github.com/19231224lhr/Next/actions/workflows/ci.yml?query=branch%3Are)
+[![Go verification](https://github.com/19231224lhr/Next/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/19231224lhr/Next/actions/workflows/ci.yml?query=branch%3Amain)
 
 **可续花预确认 · 直接担保责任 · 公共结算 · 可复现实验**
 
@@ -18,19 +18,23 @@
 
 > **研究原型 · wire 4 · Go / CometBFT**
 >
-> **E1–E8 共八组实验及安全分析工作已汇总到 `re` 分支**，包含实验代码、报告、图表、原始证据与安全修正。`main` 保留早期性能基线代码，首页同步展示研究进展；复现实验请使用 [`re`](https://github.com/19231224lhr/Next/tree/re)。
+> **`main` 已同步当前协议实现与回归测试。** 当前代码包含 C3 v2 的签发方 FUEL 预留、费用托管、委员会报酬、超时费用回流与优先调度，以及钱包本地签名和请求准备优化。下文 E1–E8 及后续实验结果仍按各自报告的冻结版本复现；历史研究版本保留在 [`re`](https://github.com/19231224lhr/Next/tree/re)。
 
 **历史表示机制：** [授权合批修复与直达物化](docs/design/authorized-repair-batching.md)支持同块合批与跳过中间物理版本。同块 8 项缺口的归档局部对照将修复命令和分片适配各从 8 次降为 1 次；Mac 四项真实合批及随后 1,000 笔正常付款通过。后续版本进一步把公共赔付决定与历史表示分离，见下节。[合批实现与验证 →](docs/experiments/authorized-repair-2026-09-29/README.md) · [审查修复 →](docs/experiments/authorized-repair-2026-09-29/fix-report.md)
 
 ## 本轮评审修订与验证
 
-**第四轮最终补证与复审（2026-10-04）：** 当前冻结节点构建完成600笔连续支付、21,048笔混合P及2,006笔自动来源恢复，全部闭合。100跳认证到账中位数 **4.707s**，逐跳等待对照 **64.479s**；版本、重试与回压口径单列。补齐服务契约、同授权历史消费者、证明—代码入口及轮换签署者回归，英文正文18页。[最新论文与双语交付](docs/paper/review-2026-10-02/fourth-revision-2026-10-04/README.md) · [完整实验报告](docs/experiments/final-evidence-2026-10-04/README.md) · [逐项评审处理](docs/paper/review-2026-10-02/fourth-revision-2026-10-04/revision-closure.md)
+**最新有界补证（2026-10-05）：** 900 笔连续支付完成；新增三成员就绪门控对照消除失败请求后，100 跳中位数仍为 **4.599 s / 64.307 s**。十二轮资本矩阵中，高预算全部完成；低预算出现局部批准占满额度，失败分母与占用证据完整保留。双语论文与四份 PDF 已更新。[结果、论证与论文交付](docs/experiments/review-followup-2026-10-05/README.md)。
+
+**归档：第四轮最终补证与复审（2026-10-04）：** 该轮冻结节点构建完成600笔连续支付、21,048笔混合P及2,006笔自动来源恢复，全部闭合。100跳认证到账中位数 **4.707s**，逐跳等待对照 **64.479s**；版本、重试与回压口径单列。补齐服务契约、同授权历史消费者、证明—代码入口及轮换签署者回归，英文正文18页。[该轮论文与双语交付](docs/paper/review-2026-10-02/fourth-revision-2026-10-04/README.md) · [完整实验报告](docs/experiments/final-evidence-2026-10-04/README.md) · [逐项评审处理](docs/paper/review-2026-10-02/fourth-revision-2026-10-04/revision-closure.md)
 
 **完整大修补证（2026-10-03）：** 在生产快照 `9879f64` 上完成有限容量/Intent 冲突账目、持久重启与原始历史重放、真实历史导出，以及 **12 轮时延与独立故障注入**。全部 **15,840 笔**闭合、四委员状态一致；单委员暂停的公共等待代价与恢复过程单列。既有 `721800c` 性能数据保持原版本归属。[完整报告](docs/experiments/major-revision-2026-10-03/README.md) · [逐项审稿关闭表](docs/experiments/major-revision-2026-10-03/review-closure.md) · [论文与交付状态](docs/paper/review-2026-10-02/build-verification.md)
 
-**局部批准额度回收（`fix/partial-approval-reclamation`，尚未合并）：** 补丁 `bf71c4d` 修复同输入冲突付款成功上链后，旧局部批准仍占成员额度的问题。定点回归验证原 Worker 容量恢复、重新形成三签、重复及重启不二次退款；独立输入同 Intent 的证书责任继续保留。Mac 100 TPS × 10 s 的 1,000 笔付款和 100 跳续花全部闭合、四委员会一致。该短回归不替换以下冻结构建的性能结果。[修复与验证报告 →](docs/experiments/partial-reclaim-2026-10-03/README.md)
+**局部批准额度回收（已合入 `main`）：** 补丁 `bf71c4d` 修复同输入冲突付款成功上链后，旧局部批准仍占成员额度的问题。定点回归验证原 Worker 容量恢复、重新形成三签、重复及重启不二次退款；独立输入同 Intent 的证书责任继续保留。Mac 100 TPS × 10 s 的 1,000 笔付款和 100 跳续花全部闭合、四委员会一致。该短回归不替换以下冻结构建的性能结果。[修复与验证报告 →](docs/experiments/partial-reclaim-2026-10-03/README.md)
 
 **同授权历史读取对照：** 三个独立进程完成 **21,600 次**交错查询。当前热页、无对象缓存布局下，修订历史的已赔槽点读 P50 低 **7.44%–12.32%**；相应增加 **0.28–2.19 MiB／修复块**净逻辑记录及 **43–214 ms** 本地顺序维护工作。两路径经济解释一致，读取收益与维护代价分别报告。[历史读取实验与论文段落 →](docs/experiments/history-reader-2026-10-02/README.md)
+
+**离线历史授权收据：** 新增无需本地副本的验证接口。四配置、三进程对照中，精简普通证明完成历史赔付核对需 **0.18–0.94 ms**；修复证明额外认证精确正文与原完整 BlockID，需 **0.76–4.52 ms**。两方使用相同信任与缓存策略，区分共有经济解释和额外表示能力。[接口、拒绝测试与完整成本 →](docs/experiments/c3-offline-authority-2026-10-05/README.md)
 
 **最终版本混合负载补测（同一 `721800c` 节点二进制）：** 正常、自动补交、到期赔付、适配暂停四组各三轮，共 **84,192 笔**全部完成。24 项来源自动恢复，48 项完成赔付和回款；暂停组的资金先闭合，恢复适配后再完成历史修复。普通到账 P50 约 **53–55 ms**，保留短暂背压与逐窗尾延迟；最后发送后 **0.815–1.356 s** 完成普通任务排空。[完整混合负载报告与证据 →](docs/experiments/final-mixed-2026-10-02/README.md)
 

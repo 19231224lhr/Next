@@ -98,6 +98,12 @@ func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.D
 			return protocol.DirectApproval{}, err
 		}
 	}
+	if t.Fee.C3.Final() {
+		totalOut, err = protocol.Add(totalOut, t.Fee.Maximum)
+		if err != nil {
+			return protocol.DirectApproval{}, err
+		}
+	}
 	if totalIn != totalOut || len(used) != len(parents) {
 		return protocol.DirectApproval{}, protocol.ErrRule
 	}

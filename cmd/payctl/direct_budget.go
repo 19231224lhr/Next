@@ -101,6 +101,12 @@ func budgetRequest(n cfg.Network, p rules.DirectPolicy, org protocol.OrgConfig, 
 	if e := bindC3(&body, n, p); e != nil {
 		return protocol.DirectRequest{}, e
 	}
+	if body.Fee.C3.Final() {
+		if body.Fee.C3.Quote >= coin.Amount {
+			return protocol.DirectRequest{}, protocol.ErrRule
+		}
+		body.Outputs[0].Amount = coin.Amount - body.Fee.C3.Quote
+	}
 	tx, e := protocol.NewFastTx(body, []protocol.InputClaim{{Output: coin}}, p.Key)
 	if e != nil {
 		return protocol.DirectRequest{}, e

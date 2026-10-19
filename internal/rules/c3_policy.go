@@ -10,8 +10,15 @@ import (
 // C3Settings is a genesis-frozen registry. Current selects new quotes only;
 // every accepted historical policy remains independently authenticated.
 type C3Policy struct {
+	Version  uint64
+	BaseFee  uint64
+	Tiers    []C3Tier
 	ID       protocol.Hash
 	Schedule protocol.FeeSchedule
+}
+type C3Tier struct {
+	ID                 protocol.Hash
+	CAL, MinimumReward uint64
 }
 type C3Issuer struct {
 	Config               protocol.Hash
@@ -19,9 +26,17 @@ type C3Issuer struct {
 	Revenue, Beneficiary protocol.Hash
 }
 type C3Settings struct {
-	Current  protocol.Hash
-	Policies []C3Policy
-	Issuers  []C3Issuer
+	Committee   []C3Validator
+	EpochBlocks uint64
+	ReservedBPS uint32
+	Current     protocol.Hash
+	Policies    []C3Policy
+	Issuers     []C3Issuer
+}
+type C3Validator struct {
+	ID      protocol.Hash
+	Address []byte
+	Weight  uint64
 }
 
 func (s *C3Settings) clone() *C3Settings {
@@ -38,11 +53,49 @@ func (s *C3Settings) Validate(orgs map[protocol.Hash]protocol.OrgConfig) error {
 		return nil
 	}
 	policies := map[protocol.Hash]bool{}
+	final := false
 	for _, p := range s.Policies {
 		if p.ID == (protocol.Hash{}) || policies[p.ID] {
 			return protocol.ErrRule
 		}
 		policies[p.ID] = true
+		if p.Version != 0 && p.Version != protocol.C3Version && p.Version != protocol.C3FinalVersion {
+			return protocol.ErrUnsupported
+		}
+		if p.Version == protocol.C3FinalVersion {
+			final = true
+			sc := p.Schedule
+			if sc.Register != 0 || sc.RegisterPerInput != 0 || sc.RegisterPerOutput != 0 || sc.RegisterPerResource != 0 || sc.RegisterPerExecution != 0 || sc.RegisterPerByte != 0 || sc.Open != 0 || sc.Close != 0 {
+				return protocol.ErrRule
+			}
+			seen := map[protocol.Hash]bool{}
+			for _, tier := range p.Tiers {
+				if tier.ID == (protocol.Hash{}) || tier.CAL == 0 || tier.MinimumReward == 0 || seen[tier.ID] {
+					return protocol.ErrRule
+				}
+				seen[tier.ID] = true
+			}
+		}
+	}
+	if final {
+		if s.EpochBlocks == 0 || s.ReservedBPS == 0 || s.ReservedBPS >= 10000 || len(s.Committee) == 0 || len(s.Issuers) > protocol.MaxAdmission {
+			return protocol.ErrRule
+		}
+		ids := map[protocol.Hash]bool{}
+		addresses := map[string]bool{}
+		var total uint64
+		for _, v := range s.Committee {
+			if v.ID == (protocol.Hash{}) || len(v.Address) != 20 || v.Weight == 0 || ids[v.ID] || addresses[string(v.Address)] {
+				return protocol.ErrRule
+			}
+			ids[v.ID] = true
+			addresses[string(v.Address)] = true
+			var err error
+			total, err = protocol.Add(total, v.Weight)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	if !policies[s.Current] || len(s.Issuers) == 0 {
 		return protocol.ErrRule
@@ -54,11 +107,21 @@ func (s *C3Settings) Validate(orgs map[protocol.Hash]protocol.OrgConfig) error {
 			return protocol.ErrRule
 		}
 		configs[i.Config] = true
+		if pools[i.Funding.Key.Account] {
+			return protocol.ErrRule
+		}
 		pools[i.Funding.Key.Account] = true
 	}
 	for _, i := range s.Issuers {
 		if pools[i.Revenue] || pools[i.Beneficiary] || i.Revenue == i.Beneficiary {
 			return protocol.ErrRule
+		}
+		if final {
+			for _, org := range orgs {
+				if i.Revenue == org.Org {
+					return protocol.ErrRule
+				}
+			}
 		}
 	}
 	return nil
@@ -96,6 +159,26 @@ func (p DirectPolicy) ValidateC3(c protocol.FeeCommitment, config protocol.Hash)
 	}
 	for _, policy := range p.C3.Policies {
 		if policy.ID == c.Policy && policy.Schedule == c.Schedule {
+			if c.Final() {
+				if policy.Version != protocol.C3FinalVersion || c.BaseFee != policy.BaseFee {
+					return protocol.ErrAuth
+				}
+				if c.Tier == (protocol.Hash{}) {
+					if c.PriorityFee != 0 || c.PriorityReward != 0 {
+						return protocol.ErrAuth
+					}
+					return nil
+				}
+				for _, tier := range policy.Tiers {
+					if tier.ID == c.Tier && tier.CAL == c.PriorityFee && tier.MinimumReward <= c.PriorityReward {
+						return nil
+					}
+				}
+				return protocol.ErrAuth
+			}
+			if policy.Version != 0 && policy.Version != protocol.C3Version {
+				return protocol.ErrAuth
+			}
 			return nil
 		}
 	}
@@ -180,7 +263,38 @@ func BindC3(b *protocol.TxBody, p DirectPolicy, refs []protocol.AdmissionRef) er
 			c.Schedule = policy.Schedule
 		}
 	}
-	if b.Fee.Source == protocol.OwnerFinalUTXO {
+	if selected, found := func() (C3Policy, bool) {
+		for _, x := range p.C3.Policies {
+			if x.ID == c.Policy {
+				return x, true
+			}
+		}
+		return C3Policy{}, false
+	}(); found && selected.Version == protocol.C3FinalVersion {
+		c.Version = protocol.C3FinalVersion
+		c.BaseFee = selected.BaseFee
+		c.Payer = b.Subject
+		c.Tier = b.Fee.C3.Tier
+		if c.Tier != (protocol.Hash{}) {
+			found := false
+			for _, tier := range selected.Tiers {
+				if tier.ID == c.Tier {
+					c.PriorityFee = tier.CAL
+					c.PriorityReward = tier.MinimumReward
+					found = true
+				}
+			}
+			if !found {
+				return protocol.ErrAuth
+			}
+		}
+		var err error
+		c.Quote, err = protocol.Add(c.BaseFee, c.PriorityFee)
+		if err != nil {
+			return err
+		}
+		b.Fee = protocol.FeeTerms{Source: protocol.CALService, Maximum: c.Quote}
+	} else if b.Fee.Source == protocol.OwnerFinalUTXO {
 		c.Payer = b.Fee.Refund.Owner
 	} else if b.Fee.Source == protocol.OrgReserve {
 		c.Sponsor = b.Fee.Account

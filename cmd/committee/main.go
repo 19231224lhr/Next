@@ -177,7 +177,11 @@ func run() (result error) {
 	if e != nil {
 		return e
 	}
-	genesis := &ct.GenesisDoc{ChainID: network.ChainID, GenesisTime: network.GenesisTime, InitialHeight: 1, ConsensusParams: ct.DefaultConsensusParams()}
+	consensusParams, e := network.ConsensusParams()
+	if e != nil {
+		return e
+	}
+	genesis := &ct.GenesisDoc{ChainID: network.ChainID, GenesisTime: network.GenesisTime, InitialHeight: 1, ConsensusParams: consensusParams}
 	genesisRoot := engine.GenesisHash()
 	genesis.AppHash = genesisRoot[:]
 	for i, p := range network.Committee {
@@ -199,6 +203,22 @@ func run() (result error) {
 	consensus, e := node.NewNode(cc, validator, nk, creator, func() (*ct.GenesisDoc, error) { return genesis, nil }, dbProvider, node.DefaultMetricsProvider(cc.Instrumentation), logger)
 	if e != nil {
 		return e
+	}
+	if network.Direct != nil && network.Direct.C3 != nil {
+		// Comet's first byte-limited reap can omit background requests. Inspect
+		// the finite local mempool here, then enforce the proposal byte bound.
+		// This affects only our proposal selection, never remote validation.
+		app.SetProposalScheduler(func(txs [][]byte, maxBytes int64) ([][]byte, error) {
+			final := false
+			for _, p := range network.Direct.C3.Policies {
+				final = final || p.Version == protocol.C3FinalVersion
+			}
+			if !final {
+				return engine.SelectProposal(txs, maxBytes)
+			}
+			all := consensus.Mempool().ReapMaxBytesMaxGas(-1, -1)
+			return engine.SelectProposal(all.ToSliceOfBytes(), maxBytes)
+		})
 	}
 	if e = consensus.Start(); e != nil {
 		return e

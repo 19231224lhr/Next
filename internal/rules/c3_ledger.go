@@ -11,7 +11,7 @@ type C3Record struct {
 	Escrow         C3Escrow
 	QuoteCollected bool
 }
-type C3PoolTotals struct{ CumulativeFees, Released, Rewards, Burned uint64 }
+type C3PoolTotals struct{ CumulativeFees, Released, Rewards, Burned, Reflow uint64 }
 
 func C3PoolTotalsKey(key protocol.ResourceKey) []byte { return state.Key(173, key.Encode()) }
 
@@ -77,8 +77,21 @@ func (e *directEval) c3Stage(s protocol.OutputSummary, stage C3Stage, index uint
 	if err != nil {
 		return err
 	}
+	reflow := next.Reflow - old.Reflow
 	reward, burn, release := next.Rewards-old.Rewards, next.Burned-old.Burned, next.Released-old.Released
-	if err = changeAmount(e.o, state.Key(state.KeyReward, s.C3.Beneficiary[:]), reward, false); err != nil {
+	if s.C3.Final() {
+		exec := uint64(0)
+		if !old.has(C3Execute) && next.has(C3Execute) {
+			plan, _ := s.C3.Plan()
+			exec = plan.ExecuteReward
+		}
+		if err = e.c3Reward(reward-exec, exec); err != nil {
+			return err
+		}
+		if err = addC3Pool(e.o, s.C3.Issuer, reflow); err != nil {
+			return err
+		}
+	} else if err = changeAmount(e.o, state.Key(state.KeyReward, s.C3.Beneficiary[:]), reward, false); err != nil {
 		return err
 	}
 	if err = changeAmount(e.o, state.Key(state.KeyBurned), burn, false); err != nil {
@@ -94,7 +107,7 @@ func (e *directEval) c3Stage(s protocol.OutputSummary, stage C3Stage, index uint
 	if !ok || g.ID != s.C3.Grant {
 		return protocol.ErrAuth
 	}
-	if err = updateUsage(e.o, g.Key, reward+burn+release, reward+burn, g.Amount, false); err != nil {
+	if err = updateUsage(e.o, g.Key, reward+burn+reflow+release, reward+burn+reflow, g.Amount, false); err != nil {
 		return err
 	}
 	rec.Escrow = next
@@ -105,7 +118,7 @@ func (e *directEval) c3Stage(s protocol.OutputSummary, stage C3Stage, index uint
 	for _, x := range []struct {
 		dst    *uint64
 		amount uint64
-	}{{&totals.Released, release}, {&totals.Rewards, reward}, {&totals.Burned, burn}} {
+	}{{&totals.Released, release}, {&totals.Rewards, reward}, {&totals.Burned, burn}, {&totals.Reflow, reflow}} {
 		*x.dst, err = protocol.Add(*x.dst, x.amount)
 		if err != nil {
 			return err

@@ -199,6 +199,27 @@ func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
 	}
 	var updates []blockfollow.Apply
 	for _, entry := range b.Transactions() {
+		if entry.Code == 0 && len(entry.Data) > 0 && (protocol.NewDecoder(entry.Data).U16() == 414 || protocol.IsClockTick(entry.Bytes, m.cfg.Organization.Network)) {
+			result, err := protocol.DecodeExecution(entry.Data)
+			if err != nil {
+				return nil, err
+			}
+			for _, credit := range result.C3Credits {
+				if m.direct.C3 == nil {
+					return nil, protocol.ErrAuth
+				}
+				issuer, ok := m.direct.C3Issuer(credit.Organization)
+				if !ok || issuer.Funding.Key != credit.Key || issuer.Funding.Grant != credit.Grant {
+					return nil, protocol.ErrAuth
+				}
+				updates = append(updates, func(o *state.Overlay) error {
+					return rules.ApplyC3Credit(o, credit, m.cfg.Organization.Hash(), m.cfg.Workers)
+				})
+			}
+			if protocol.IsClockTick(entry.Bytes, m.cfg.Organization.Network) {
+				continue
+			}
+		}
 		if entry.Code == 0 && protocol.IsPoolCertificate(entry.Bytes) {
 			if !m.cfg.EnableInternalPools {
 				return nil, protocol.ErrUnsupported

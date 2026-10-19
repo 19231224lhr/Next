@@ -18,7 +18,13 @@ type FeeOutput struct {
 // ExecutionResult records only execution choices not derivable from the signed
 // transaction: missing inputs, recovered outputs, and final fee change/refunds.
 // It contains public ledger effects, not private notifications or credit proofs.
+type FuelCredit struct {
+	Key                 ResourceKey
+	Grant, Organization Hash
+	Cumulative          uint64
+}
 type ExecutionResult struct {
+	C3Credits                       []FuelCredit
 	Applied                         bool
 	MissingInputs, RecoveredOutputs []uint32
 	FeeOutputs                      []FeeOutput
@@ -26,7 +32,9 @@ type ExecutionResult struct {
 
 func (r ExecutionResult) MarshalBinary() ([]byte, error) {
 	e := new(Encoder)
-	if len(r.FeeOutputs) == 0 {
+	if len(r.C3Credits) > 0 {
+		e.U16(414)
+	} else if len(r.FeeOutputs) == 0 {
 		e.U16(412)
 	} else {
 		e.U16(413)
@@ -44,8 +52,8 @@ func (r ExecutionResult) MarshalBinary() ([]byte, error) {
 			e.U32(n)
 		}
 	}
-	if len(r.FeeOutputs) > 0 {
-		if !r.Applied || len(r.FeeOutputs) > MaxOutputs+2 {
+	if len(r.FeeOutputs) > 0 || len(r.C3Credits) > 0 {
+		if !r.Applied && len(r.FeeOutputs) > 0 || len(r.FeeOutputs) > MaxOutputs+2 {
 			return nil, ErrEncoding
 		}
 		e.U32(uint32(len(r.FeeOutputs)))
@@ -65,12 +73,27 @@ func (r ExecutionResult) MarshalBinary() ([]byte, error) {
 			encodeOutput(e, f.Output)
 		}
 	}
+	if len(r.C3Credits) > 0 {
+		if len(r.C3Credits) > MaxAdmission {
+			return nil, ErrEncoding
+		}
+		e.U32(uint32(len(r.C3Credits)))
+		for i, c := range r.C3Credits {
+			if c.Key.Kind != ResourceFUEL || c.Key.Version == 0 || c.Key.Account == (Hash{}) || c.Cumulative == 0 || c.Grant == (Hash{}) || c.Organization == (Hash{}) || i > 0 && bytes.Compare(r.C3Credits[i-1].Key.Encode(), c.Key.Encode()) >= 0 {
+				return nil, ErrEncoding
+			}
+			e.Fixed(c.Key.Encode())
+			e.Fixed(c.Grant[:])
+			e.Fixed(c.Organization[:])
+			e.U64(c.Cumulative)
+		}
+	}
 	return e.Data(), nil
 }
 func DecodeExecution(b []byte) (r ExecutionResult, err error) {
 	d := NewDecoder(b)
 	tag := d.U16()
-	if tag != 412 && tag != 413 {
+	if tag != 412 && tag != 413 && tag != 414 {
 		return r, ErrEncoding
 	}
 	r.Applied = d.Optional()
@@ -80,9 +103,9 @@ func DecodeExecution(b []byte) (r ExecutionResult, err error) {
 			(*v)[i] = d.U32()
 		}
 	}
-	if tag == 413 {
+	if tag == 413 || tag == 414 {
 		r.FeeOutputs = make([]FeeOutput, d.Count(MaxOutputs+2))
-		if len(r.FeeOutputs) == 0 {
+		if len(r.FeeOutputs) == 0 && tag != 414 {
 			return r, ErrEncoding
 		}
 		for i := range r.FeeOutputs {
@@ -90,6 +113,19 @@ func DecodeExecution(b []byte) (r ExecutionResult, err error) {
 			copy(f.Transaction[:], d.Fixed(32))
 			f.Index = d.U32()
 			f.Output = decodeOutput(d)
+		}
+	}
+	if tag == 414 {
+		r.C3Credits = make([]FuelCredit, d.Count(MaxAdmission))
+		for i := range r.C3Credits {
+			c := &r.C3Credits[i]
+			c.Key = decodeResource(d)
+			copy(c.Grant[:], d.Fixed(32))
+			copy(c.Organization[:], d.Fixed(32))
+			c.Cumulative = d.U64()
+		}
+		if len(r.C3Credits) == 0 {
+			return r, ErrEncoding
 		}
 	}
 	if err = d.Done(); err != nil {

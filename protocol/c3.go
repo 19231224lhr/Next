@@ -3,6 +3,7 @@ package protocol
 import "math"
 
 const C3Version uint64 = 1
+const C3FinalVersion uint64 = 2
 const C3SummaryVersion uint64 = 6
 const MaxFeeCommitmentBytes uint32 = 1024
 
@@ -38,17 +39,20 @@ type FeeSchedule struct {
 // Payer identifies the owner of the final FUEL inputs. Revenue is an operating
 // account and must differ from the protected Pool.
 type FeeCommitment struct {
-	Version                       uint64
-	Policy, Issuer, Pool, Grant   Hash
-	GrantVersion                  uint64
-	Quote                         uint64
-	Payer                         PublicKey
-	Sponsor, Revenue, Beneficiary Hash
-	Resources                     FeeResources
-	Schedule                      FeeSchedule
-	Budget                        uint64
+	Version                              uint64
+	Policy, Issuer, Pool, Grant          Hash
+	GrantVersion                         uint64
+	Quote                                uint64
+	Payer                                PublicKey
+	Sponsor, Revenue, Beneficiary        Hash
+	Resources                            FeeResources
+	Schedule                             FeeSchedule
+	Budget                               uint64
+	BaseFee, PriorityFee, PriorityReward uint64
+	Tier                                 Hash
 }
 
+func (c FeeCommitment) Final() bool   { return c.Version == C3FinalVersion }
 func (c FeeCommitment) Enabled() bool { return c.Version != 0 }
 func (c FeeCommitment) Funding() AdmissionRef {
 	return AdmissionRef{Key: ResourceKey{Kind: ResourceFUEL, Account: c.Pool, Version: c.GrantVersion}, Grant: c.Grant}
@@ -98,7 +102,15 @@ func (c FeeCommitment) Plan() (C3FeePlan, error) {
 	if e != nil {
 		return C3FeePlan{}, e
 	}
-	p.RewardCeiling, e = c3Sum(s.AttachReward, s.ExecuteReward, resolved)
+	priority := uint64(0)
+	if c.Final() {
+		priority = c.PriorityReward
+		p.ExecuteReward, e = Add(p.ExecuteReward, priority)
+		if e != nil {
+			return C3FeePlan{}, e
+		}
+	}
+	p.RewardCeiling, e = c3Sum(s.AttachReward, s.ExecuteReward, resolved, priority)
 	if e != nil {
 		return C3FeePlan{}, e
 	}
@@ -114,10 +126,18 @@ func (c FeeCommitment) Plan() (C3FeePlan, error) {
 	return p, e
 }
 func (c FeeCommitment) Validate() error {
-	if c.Version != C3Version {
+	if c.Version != C3Version && !c.Final() {
 		return ErrUnsupported
 	}
-	if c.Policy == (Hash{}) || c.Issuer == (Hash{}) || c.Pool == (Hash{}) || c.Grant == (Hash{}) || c.GrantVersion == 0 || c.Quote == 0 || c.Revenue == (Hash{}) || c.Revenue == c.Pool || c.Sponsor == c.Pool || c.Beneficiary == c.Pool || c.Beneficiary == (Hash{}) || (c.Payer == (PublicKey{})) == (c.Sponsor == (Hash{})) {
+	if c.Policy == (Hash{}) || c.Issuer == (Hash{}) || c.Pool == (Hash{}) || c.Grant == (Hash{}) || c.GrantVersion == 0 || (!c.Final() && c.Quote == 0) || c.Revenue == (Hash{}) || c.Revenue == c.Pool || c.Sponsor == c.Pool || c.Beneficiary == c.Pool || c.Beneficiary == (Hash{}) || (c.Payer == (PublicKey{})) == (c.Sponsor == (Hash{})) {
+		return ErrRule
+	}
+	if c.Final() {
+		q, e := Add(c.BaseFee, c.PriorityFee)
+		if e != nil || q != c.Quote || c.Payer == (PublicKey{}) || c.Sponsor != (Hash{}) || c.Schedule.Register != 0 || c.Schedule.RegisterPerInput != 0 || c.Schedule.RegisterPerOutput != 0 || c.Schedule.RegisterPerResource != 0 || c.Schedule.RegisterPerExecution != 0 || c.Schedule.RegisterPerByte != 0 || c.Schedule.Open != 0 || c.Schedule.Close != 0 || (c.Tier == (Hash{})) != (c.PriorityFee == 0) || c.PriorityFee == 0 && c.PriorityReward != 0 {
+			return ErrRule
+		}
+	} else if c.BaseFee != 0 || c.PriorityFee != 0 || c.PriorityReward != 0 || c.Tier != (Hash{}) {
 		return ErrRule
 	}
 	p, e := c.Plan()
@@ -138,6 +158,12 @@ func (c FeeCommitment) validateBody(t TxBody) error {
 	}
 	if t.Wire != DirectWireVersion || t.Version != DirectVersion || t.Kind != FastTransfer || c.Issuer != t.Certifier || c.Quote != t.Fee.Maximum || c.Resources != FeeResourcesFor(t) {
 		return ErrRule
+	}
+	if c.Final() {
+		if t.Fee.Source != CALService || c.Payer != t.Subject {
+			return ErrAuth
+		}
+		return nil
 	}
 	if t.Fee.Source == OwnerFinalUTXO {
 		if c.Payer != t.Fee.Refund.Owner || c.Sponsor != (Hash{}) {
@@ -178,6 +204,12 @@ func (c FeeCommitment) encode(e *Encoder) {
 		e.U64(v)
 	}
 	e.U64(c.Budget)
+	if c.Final() {
+		e.U64(c.BaseFee)
+		e.U64(c.PriorityFee)
+		e.U64(c.PriorityReward)
+		e.Fixed(c.Tier[:])
+	}
 }
 func (c FeeCommitment) MarshalBinary() ([]byte, error) {
 	if e := c.Validate(); e != nil {
@@ -206,6 +238,12 @@ func DecodeFeeCommitment(raw []byte) (c FeeCommitment, err error) {
 	c.Resources = FeeResources{Inputs: d.U32(), FeeInputs: d.U32(), Outputs: d.U32(), Admissions: d.U32(), Work: WorkLimit{ExecUnits(d.U64()), RetainedBytes(d.U64()), d.U32(), d.U32()}}
 	c.Schedule = FeeSchedule{d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64()}
 	c.Budget = d.U64()
+	if c.Final() {
+		c.BaseFee = d.U64()
+		c.PriorityFee = d.U64()
+		c.PriorityReward = d.U64()
+		copy(c.Tier[:], d.Fixed(32))
+	}
 	if e := d.Done(); e != nil {
 		return c, e
 	}

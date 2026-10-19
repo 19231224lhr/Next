@@ -12,15 +12,16 @@ import (
 )
 
 type Wallet struct {
-	poolMu    sync.Mutex
-	poolReady map[protocol.Hash]protocol.Hash
-	origins   map[protocol.OutputID]state.OriginOutput
-	db        store.Store
-	network   protocol.Hash
-	owner     protocol.PublicKey
-	orgs      map[protocol.Hash]protocol.OrgConfig
-	bound     protocol.Hash
-	direct    *rules.DirectPolicy
+	coinStatus directCoinStatusCache
+	poolMu     sync.Mutex
+	poolReady  map[protocol.Hash]protocol.Hash
+	origins    map[protocol.OutputID]state.OriginOutput
+	db         store.Store
+	network    protocol.Hash
+	owner      protocol.PublicKey
+	orgs       map[protocol.Hash]protocol.OrgConfig
+	bound      protocol.Hash
+	direct     *rules.DirectPolicy
 }
 
 func New(db store.Store, network protocol.Hash, owner protocol.PublicKey, orgs []protocol.OrgConfig) (*Wallet, error) {

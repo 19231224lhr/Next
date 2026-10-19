@@ -1,6 +1,7 @@
 package committee
 
 import (
+	"bytes"
 	"time"
 	"utxo/internal/requesttrace"
 	"utxo/internal/rules"
@@ -89,9 +90,29 @@ func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.
 				return state.Transition{}, protocol.ErrAuth
 			}
 		}
-		return rules.EvaluateReserveIncrease(v, c, e.protectedCAL)
+		tr, err := rules.EvaluateReserveIncrease(v, c, e.protectedCAL)
+		if err != nil || !e.direct.FinalC3() {
+			return tr, err
+		}
+		// The command's Previous amount may already include a begin-block
+		// epoch credit. Publish that authenticated cumulative credit on this
+		// result so followers apply it before replaying the strict top-up.
+		epoch, _, err := state.Load[rules.C3EpochState](v, rules.C3EpochKey())
+		if err != nil {
+			return state.Transition{}, err
+		}
+		tr.Data, err = (protocol.ExecutionResult{C3Credits: epoch.Credits}).MarshalBinary()
+		return tr, err
 	}
 	if protocol.IsClockTick(raw, e.cfg.Network) {
+		if e.direct.FinalC3() {
+			epoch, _, err := state.Load[rules.C3EpochState](v, rules.C3EpochKey())
+			if err != nil {
+				return state.Transition{}, err
+			}
+			data, err := (protocol.ExecutionResult{C3Credits: epoch.Credits}).MarshalBinary()
+			return state.Transition{Data: data}, err
+		}
 		return state.Transition{}, nil
 	}
 	if protocol.IsRepairInput(raw) || protocol.IsRepairBatch(raw) || protocol.IsCompensationDecision(raw) {
@@ -104,7 +125,18 @@ func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.
 	if err != nil {
 		return state.Transition{}, err
 	}
-	tr, err := rules.EvaluateDirectPaymentAt(v, verified, *e.direct, b.Time.Unix(), b.Height)
+	p := *e.direct
+	if p.FinalC3() {
+		for _, validator := range p.C3.Committee {
+			if bytes.Equal(validator.Address, b.ProposerAddress) {
+				p.Includer = validator.ID
+			}
+		}
+		if p.Includer == (protocol.Hash{}) {
+			return state.Transition{}, protocol.ErrAuth
+		}
+	}
+	tr, err := rules.EvaluateDirectPaymentAt(v, verified, p, b.Time.Unix(), b.Height)
 	if err != nil || len(tr.Changes) == 0 {
 		return tr, err
 	}
@@ -114,6 +146,21 @@ func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.
 		return state.Transition{}, err
 	}
 	tr.Changes = o.Changes()
+	if p.FinalC3() && len(tr.Data) > 0 {
+		result, err := protocol.DecodeExecution(tr.Data)
+		if err != nil {
+			return state.Transition{}, err
+		}
+		epoch, _, err := state.Load[rules.C3EpochState](o, rules.C3EpochKey())
+		if err != nil {
+			return state.Transition{}, err
+		}
+		result.C3Credits = epoch.Credits
+		tr.Data, err = result.MarshalBinary()
+		if err != nil {
+			return state.Transition{}, err
+		}
+	}
 	return tr, nil
 }
 
@@ -121,7 +168,18 @@ func (e *Engine) BeginBlock(v state.ReadView, b BlockContext) (state.Transition,
 	if e.direct == nil {
 		return state.Transition{}, nil
 	}
-	return rules.AnchorDirectDeadlines(v, *e.direct, b.Height, b.Time.Unix())
+	tr, err := rules.BeginC3Epoch(v, *e.direct, uint64(b.Height))
+	if err != nil {
+		return state.Transition{}, err
+	}
+	o := state.NewOverlay(v)
+	o.Apply(tr.Changes)
+	anchored, err := rules.AnchorDirectDeadlines(v, *e.direct, b.Height, b.Time.Unix())
+	if err != nil {
+		return state.Transition{}, err
+	}
+	o.Apply(anchored.Changes)
+	return state.Transition{Changes: o.Changes()}, nil
 }
 
 func (e *Engine) DirectPayment(id protocol.SpendFactID) (p rules.DirectPaymentState, err error) {

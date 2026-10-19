@@ -96,14 +96,14 @@ func (p *Public) Commit(context, message []byte) (Commitment, Opening, error) {
 	for {
 		x, err := rand.Int(rand.Reader, p.key.N)
 		if err != nil {
-			return Commitment{}, r, err
-		}
-		if !p.unit(x) {
-			continue
+			return Commitment{}, Opening{}, err
 		}
 		x.FillBytes(r[:])
-		c, _ := p.value(context, message, r)
-		return c, r, nil
+		// value performs the unit check before computing the commitment.
+		// Rejection sampling needs that check only once per candidate.
+		if c, ok := p.value(context, message, r); ok {
+			return c, r, nil
+		}
 	}
 }
 

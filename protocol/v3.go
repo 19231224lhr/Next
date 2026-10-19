@@ -59,8 +59,11 @@ func (t FastTx) core() []byte {
 	return e.Data()
 }
 func (t FastTx) ID() TxID {
+	return t.idWithCore(t.core())
+}
+func (t FastTx) idWithCore(core []byte) TxID {
 	e := new(Encoder)
-	e.Bytes(t.core())
+	e.Bytes(core)
 	for _, c := range t.Commitments {
 		e.Fixed(c[:])
 	}
@@ -107,6 +110,21 @@ func NewFastTx(body TxBody, claims []InputClaim, key *chameleon.Public) (FastTx,
 }
 
 func (t FastTx) VerifyAuth() error {
+	if err := t.verifyAuthFields(); err != nil {
+		return err
+	}
+	id := t.ID()
+	for _, a := range t.Auth {
+		if err := VerifyOwner(id, a); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// verifyAuthFields is shared with the local signer, which creates its own
+// signature. Public decoding and marshaling also verify every signature.
+func (t FastTx) verifyAuthFields() error {
 	if err := t.Body.validateVersion(DirectWireVersion, DirectVersion); err != nil {
 		return err
 	}
@@ -114,13 +132,9 @@ func (t FastTx) VerifyAuth() error {
 		return ErrRule
 	}
 	owners := make(map[PublicKey]bool, len(t.Auth))
-	id := t.ID()
 	for i, a := range t.Auth {
 		if i > 0 && bytes.Compare(t.Auth[i-1].Owner[:], a.Owner[:]) >= 0 {
 			return ErrAuth
-		}
-		if err := VerifyOwner(id, a); err != nil {
-			return err
 		}
 		owners[a.Owner] = true
 	}
@@ -175,8 +189,11 @@ func (t FastTx) MarshalInitial(key *chameleon.Public) ([]byte, error) {
 
 // marshalBinary is used only after authentication in the public entry points.
 func (t FastTx) marshalBinary() ([]byte, error) {
+	return t.marshalWithCore(t.core())
+}
+func (t FastTx) marshalWithCore(core []byte) ([]byte, error) {
 	fixed := new(Encoder)
-	fixed.Bytes(t.core())
+	fixed.Bytes(core)
 	for _, c := range t.Commitments {
 		fixed.Fixed(c[:])
 	}

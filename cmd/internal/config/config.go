@@ -25,7 +25,9 @@ import (
 )
 
 type Network struct {
-	EnableInternalPools bool `json:",omitempty"`
+	// Zero retains Comet's default. All validators use this shared genesis limit.
+	ConsensusBlockBytes int64 `json:",omitempty"`
+	EnableInternalPools bool  `json:",omitempty"`
 	Members             map[protocol.Hash][4]string
 	CommitteeURLs       [4]string
 	ChainID             string
@@ -36,6 +38,21 @@ type Network struct {
 	Genesis             state.Genesis
 	Accounts            []committee.GenesisAccount
 	Direct              *rules.DirectSettings `json:",omitempty"`
+}
+
+func (n Network) ConsensusParams() (*ct.ConsensusParams, error) {
+	p := ct.DefaultConsensusParams()
+	if n.ConsensusBlockBytes != 0 {
+		p.Block.MaxBytes = n.ConsensusBlockBytes
+		// Keep an evidence allowance when explicitly using small blocks.
+		if p.Evidence.MaxBytes > p.Block.MaxBytes/10 {
+			p.Evidence.MaxBytes = p.Block.MaxBytes / 10
+		}
+	}
+	if err := p.ValidateBasic(); err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
 func (n Network) Trust() (finality.Trust, error) {
@@ -52,6 +69,19 @@ func (n Network) Trust() (finality.Trust, error) {
 	}
 	if trust.Network != n.Genesis.Network {
 		return trust, protocol.ErrRule
+	}
+	if n.Direct != nil && n.Direct.C3 != nil && len(n.Direct.C3.Committee) != 0 {
+		if len(n.Direct.C3.Committee) != len(trust.Validators.Validators) {
+			return trust, protocol.ErrAuth
+		}
+		seen := map[string]bool{}
+		for _, v := range n.Direct.C3.Committee {
+			_, actual := trust.Validators.GetByAddress(v.Address)
+			if actual == nil || seen[string(v.Address)] || v.Weight != uint64(actual.VotingPower) || v.ID != protocol.Digest("C3_VALIDATOR", v.Address) {
+				return trust, protocol.ErrAuth
+			}
+			seen[string(v.Address)] = true
+		}
 	}
 	return trust, nil
 }

@@ -30,6 +30,7 @@ type C3Escrow struct {
 	Fact                            protocol.SpendFactID
 	Commitment                      protocol.FeeCommitment
 	Held, Rewards, Burned, Released uint64
+	Reflow                          uint64
 	Completed                       uint8
 	Outputs                         [protocol.MaxOutputs]uint8
 }
@@ -107,6 +108,14 @@ func (s C3Escrow) Validate() error {
 	r, b, u, h, e := s.totals()
 	if e != nil {
 		return e
+	}
+	if s.Commitment.Final() {
+		if s.Reflow != b || s.Burned != 0 {
+			return ErrAccounting
+		}
+		b = 0
+	} else if s.Reflow != 0 {
+		return ErrAccounting
 	}
 	if s.Rewards != r || s.Burned != b || s.Released != u || s.Held != h {
 		return ErrAccounting
@@ -190,6 +199,10 @@ func (s C3Escrow) Apply(c protocol.FeeCommitment, stage C3Stage, index uint32) (
 	n.Rewards, n.Burned, n.Released, n.Held, e = n.totals()
 	if e != nil {
 		return s, e
+	}
+	if c.Final() {
+		n.Reflow = n.Burned
+		n.Burned = 0
 	}
 	return n, nil
 }

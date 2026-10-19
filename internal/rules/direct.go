@@ -12,7 +12,8 @@ import (
 
 // DirectPolicy belongs to a fixed genesis. Timeouts use committed block time.
 type DirectPolicy struct {
-	C3             *C3Settings `json:",omitempty"`
+	Includer       protocol.Hash `json:"-"`
+	C3             *C3Settings   `json:",omitempty"`
 	Base           Schedule
 	TimeoutSeconds int64
 	RepairCost     uint64
@@ -113,7 +114,7 @@ type DirectPaymentState = directPayment
 
 func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.AdmissionVector, error) {
 	t := tx.Body
-	if p.Key == nil || p.TimeoutSeconds <= 0 || p.RepairCost == 0 || p.Base.Validate() != nil || t.Rules != p.Rules() || t.Kind != protocol.FastTransfer || (t.Fee.Source != protocol.OrgReserve && t.Fee.Source != protocol.OwnerFinalUTXO) {
+	if p.Key == nil || p.TimeoutSeconds <= 0 || p.RepairCost == 0 || p.Base.Validate() != nil || t.Rules != p.Rules() || t.Kind != protocol.FastTransfer || (t.Fee.Source != protocol.OrgReserve && t.Fee.Source != protocol.OwnerFinalUTXO && t.Fee.Source != protocol.CALService) {
 		return nil, protocol.ErrRule
 	}
 	// Authenticate once and retain those exact bytes for the work-size check.
@@ -721,11 +722,18 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 		if err = e.feeOutput(&p, protocol.FeeChangeIndex, total-t.Fee.Maximum); err != nil {
 			return state.Transition{}, err
 		}
-	} else if err = changeAmount(e.o, AccountKey(t.Fee.Account, protocol.AssetFUEL), t.Fee.Maximum, true); err != nil {
-		return state.Transition{}, err
+	} else if t.Fee.Source != protocol.CALService {
+		if err = changeAmount(e.o, AccountKey(t.Fee.Account, protocol.AssetFUEL), t.Fee.Maximum, true); err != nil {
+			return state.Transition{}, err
+		}
 	}
 	if t.Fee.C3.Enabled() {
-		if err = changeAmount(e.o, AccountKey(t.Fee.C3.Revenue, protocol.AssetFUEL), t.Fee.Maximum, false); err != nil {
+		if err = changeAmount(e.o, AccountKey(t.Fee.C3.Revenue, func() protocol.Asset {
+			if t.Fee.C3.Final() {
+				return protocol.AssetCAL
+			}
+			return protocol.AssetFUEL
+		}()), t.Fee.Maximum, false); err != nil {
 			return state.Transition{}, err
 		}
 	} else {
@@ -802,6 +810,12 @@ func EvaluateDirectPaymentAt(v state.ReadView, verified VerifiedDirectPayment, p
 	}
 	for _, out := range t.Outputs {
 		outgoing, err = protocol.Add(outgoing, out.Amount)
+		if err != nil {
+			return state.Transition{}, err
+		}
+	}
+	if t.Fee.C3.Final() {
+		outgoing, err = protocol.Add(outgoing, t.Fee.Maximum)
 		if err != nil {
 			return state.Transition{}, err
 		}

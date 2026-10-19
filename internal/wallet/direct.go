@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"utxo/internal/rules"
 	"utxo/internal/state"
@@ -31,26 +32,37 @@ func (w *Wallet) SaveDirectRequest(req protocol.DirectRequest) error {
 // SaveDirectRequestBytes returns the exact signed request only after its request
 // journal and input reservations have been committed by the configured Store.
 func (w *Wallet) SaveDirectRequestBytes(req protocol.DirectRequest) ([]byte, error) {
-	if w.direct != nil {
-		if err := w.direct.ValidateC3(req.Tx.Body.Fee.C3, req.Tx.Body.Config); err != nil {
-			return nil, err
-		}
-	} else if req.Tx.Body.Fee.C3.Enabled() {
-		return nil, protocol.ErrAuth
-	}
-	if w.bound == (protocol.Hash{}) || req.Tx.Body.Network != w.network || req.Tx.Body.Subject != w.owner {
-		return nil, protocol.ErrAuth
+	if err := w.validateDirectWallet(req.Tx); err != nil {
+		return nil, err
 	}
 	raw, err := req.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
-	err = w.db.Update(func(v state.ReadView) ([]state.Change, error) {
+	return w.saveDirectBytes(req.Tx, req.Tx.ID(), raw)
+}
+
+func (w *Wallet) validateDirectWallet(tx protocol.FastTx) error {
+	if w.direct != nil {
+		if err := w.direct.ValidateC3(tx.Body.Fee.C3, tx.Body.Config); err != nil {
+			return err
+		}
+	} else if tx.Body.Fee.C3.Enabled() {
+		return protocol.ErrAuth
+	}
+	if w.bound == (protocol.Hash{}) || tx.Body.Network != w.network || tx.Body.Subject != w.owner {
+		return protocol.ErrAuth
+	}
+	return nil
+}
+
+// Only authenticated/locally signed bytes enter this private persistence path.
+func (w *Wallet) saveDirectBytes(tx protocol.FastTx, id protocol.TxID, raw []byte) ([]byte, error) {
+	err := w.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
-		if err := rules.ValidateWalletDescriptors(o, req.Tx); err != nil {
+		if err := rules.ValidateWalletDescriptors(o, tx); err != nil {
 			return nil, err
 		}
-		id := req.Tx.ID()
 		key := state.Key(state.KeyWalletRequest, id[:])
 		if old, err := v.Get(key); err == nil {
 			if !bytes.Equal(old, raw) {
@@ -60,15 +72,15 @@ func (w *Wallet) SaveDirectRequestBytes(req protocol.DirectRequest) ([]byte, err
 		} else if !errors.Is(err, state.ErrNotFound) {
 			return nil, err
 		}
-		for i, in := range req.Tx.Body.Inputs {
-			coin, found, err := state.Load[DirectCoin](o, DirectCoinKey(in.Output, req.Tx.Claims[i].Instance))
+		for i, in := range tx.Body.Inputs {
+			coin, found, err := w.loadDirectCoinStatus(o, DirectCoinKey(in.Output, tx.Claims[i].Instance))
 			if err != nil {
 				return nil, err
 			}
 			if found && coin.Recovered {
 				return nil, protocol.ErrAuth
 			}
-			key := state.Key(state.KeyWalletSpend, in.Output[:], []byte{req.Tx.Claims[i].Instance})
+			key := state.Key(state.KeyWalletSpend, in.Output[:], []byte{tx.Claims[i].Instance})
 			prior, found, err := state.Load[protocol.TxID](o, key)
 			if err != nil {
 				return nil, err
@@ -80,7 +92,7 @@ func (w *Wallet) SaveDirectRequestBytes(req protocol.DirectRequest) ([]byte, err
 				return nil, err
 			}
 		}
-		for _, in := range req.Tx.Body.Fee.Inputs {
+		for _, in := range tx.Body.Fee.Inputs {
 			k := state.Key(state.KeyWalletSpend, in.Output[:], []byte{0})
 			prior, found, err := state.Load[protocol.TxID](o, k)
 			if err != nil {
@@ -120,9 +132,11 @@ func (w *Wallet) ReceiveDirect(output protocol.Output, c protocol.OutputCertific
 	if output.Recipient.Route.Kind != protocol.OrgRoute || output.Recipient.Route.Org != w.bound {
 		return protocol.ErrAuth
 	}
-	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
+	key := DirectCoinKey(c.Summary.OutputID(index), 0)
+	coin := DirectCoin{Output: output, Certificate: &c, Index: index}
+	var saved []byte
+	err := w.db.Update(func(v state.ReadView) ([]state.Change, error) {
 		o := state.NewOverlay(v)
-		key := DirectCoinKey(c.Summary.OutputID(index), 0)
 		old, found, err := state.Load[DirectCoin](v, key)
 		if err != nil {
 			return nil, err
@@ -133,9 +147,15 @@ func (w *Wallet) ReceiveDirect(output protocol.Output, c protocol.OutputCertific
 			}
 			return nil, nil
 		}
-		if err = state.Put(o, key, DirectCoin{Output: output, Certificate: &c, Index: index}); err != nil {
+		saved, err = json.Marshal(coin)
+		if err != nil {
 			return nil, err
 		}
+		o.Set(key, saved)
 		return o.Changes(), nil
 	})
+	if err == nil && saved != nil {
+		w.coinStatus.rememberCoin(key, saved, coin)
+	}
+	return err
 }

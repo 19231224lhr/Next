@@ -118,7 +118,7 @@ func applyBlockCoins(o *state.Overlay, coins []blockCoin) error {
 func (w *Wallet) DirectFinal(id protocol.OutputID, instance uint8) (bool, error) {
 	var final bool
 	err := w.db.View(func(v state.ReadView) error {
-		coin, found, err := state.Load[DirectCoin](v, DirectCoinKey(id, instance))
+		coin, found, err := w.loadDirectCoinStatus(v, DirectCoinKey(id, instance))
 		final = found && !coin.Recovered && coin.Final != (protocol.Hash{})
 		return err
 	})

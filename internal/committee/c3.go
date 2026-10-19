@@ -6,7 +6,14 @@ import (
 	"utxo/protocol"
 )
 
+type C3RewardBalance struct {
+	Validator protocol.Hash
+	Amount    uint64
+}
 type C3PoolSnapshot struct {
+	RewardAccounts                                                        []C3RewardBalance
+	PoolReflow, CALRevenue                                                uint64
+	Epoch                                                                 rules.C3EpochState
 	CumulativeFees, Released, PoolRewards, PoolBurned                     uint64
 	Grant                                                                 state.Grant
 	OriginalFunding, Funding, Free, Held, Spent, Revenue, Rewards, Burned uint64
@@ -54,6 +61,15 @@ func (e *Engine) c3Pool(v state.ReadView, key protocol.ResourceKey) (s C3PoolSna
 	if err != nil {
 		return s, err
 	}
+	s.PoolReflow = totals.Reflow
+	s.Epoch, _, err = state.Load[rules.C3EpochState](v, rules.C3EpochKey())
+	if err != nil {
+		return s, err
+	}
+	s.CALRevenue, _, err = state.Load[uint64](v, rules.AccountKey(issuer.Revenue, protocol.AssetCAL))
+	if err != nil {
+		return s, err
+	}
 	s.CumulativeFees, s.Released, s.PoolRewards, s.PoolBurned = totals.CumulativeFees, totals.Released, totals.Rewards, totals.Burned
 	for _, x := range []struct {
 		k   []byte
@@ -62,6 +78,20 @@ func (e *Engine) c3Pool(v state.ReadView, key protocol.ResourceKey) (s C3PoolSna
 		*x.dst, _, err = state.Load[uint64](v, x.k)
 		if err != nil {
 			return s, err
+		}
+	}
+	if e.direct.FinalC3() {
+		s.Rewards = 0
+		for _, validator := range e.direct.C3.Committee {
+			amount, _, err := state.Load[uint64](v, state.Key(state.KeyReward, validator.ID[:]))
+			if err != nil {
+				return s, err
+			}
+			s.Rewards, err = protocol.Add(s.Rewards, amount)
+			if err != nil {
+				return s, err
+			}
+			s.RewardAccounts = append(s.RewardAccounts, C3RewardBalance{validator.ID, amount})
 		}
 	}
 	return s, nil
