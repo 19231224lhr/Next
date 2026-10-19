@@ -1,0 +1,1902 @@
+ M README.md
+ M cmd/payctl/direct_chain.go
+ M crypto/chameleon/chameleon.go
+ D docs/archive/development/implementation-v1.2.md
+ M docs/design/historical-reader-contract.md
+ M docs/experiments/README.md
+ D docs/paper/review-2026-10-02/Next-review-2026-10-03-LaTeX.zip
+ M docs/paper/review-2026-10-02/README.md
+ D docs/paper/review-2026-10-02/SHA256.json
+ M docs/paper/review-2026-10-02/abstract.tex
+ M docs/paper/review-2026-10-02/acknowledgments.tex
+ M docs/paper/review-2026-10-02/architecture.tex
+ D docs/paper/review-2026-10-02/bilingual-checks.json
+ D docs/paper/review-2026-10-02/build-verification.md
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/Next-C3-revision-LaTeX.zip
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/SHA256.json
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/abstract.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/conclusion.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/evaluation.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/introduction.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/protocol.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/references.bib
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/related.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/zh-abstract.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/zh-conclusion.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/zh-evaluation.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/zh-introduction.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/zh-protocol.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/before/zh-related.tex
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/build-en.json
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/build-main-zh.json
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/build-main.json
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/build-zh.json
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/check_delivery.py
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/decision-and-evidence.txt
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/main-contact.png
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/main-zh-contact.png
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/overleaf-c3-preview.png
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/pdf-checks.json
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/pdf/main-zh.pdf
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/pdf/main.pdf
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/pdf/overleaf-main.pdf
+ D docs/paper/review-2026-10-02/c3-demand-2026-10-04/revise.py
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/Next-C3-Chinese.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/Next-C3-English.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/Next-C3-overleaf-Chinese.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/Next-C3-overleaf-English.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/Next-C3-overleaf-supplement-Chinese.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/Next-C3-overleaf-supplement-English.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/Next-C3-supplement-Chinese.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/Next-C3-supplement-English.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/Next-C3-usecase-LaTeX.zip
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/Overleaf-C3-source.zip
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/README.md
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/bilingual-checks.json
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/main-zh.blg
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/main-zh.log
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/main-zh.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/main.blg
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/main.log
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/main.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/supplement-main-zh.blg
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/supplement-main-zh.log
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/supplement-main-zh.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/supplement-main.blg
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/supplement-main.log
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/build/supplement-main.pdf
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/claude-final-snippets.json
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/claude-round1.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/claude-round2-request.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/claude-round2.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/claude-round3-request.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/claude-round3.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/consumer-test.log
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/delivery.json
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/functional-summary.json
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/gpt-final-review.png
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/gpt-round1.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/gpt-round2-request.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/gpt-round2.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/history-consumer.json
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/joint-request.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/layout-checks.json
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/main-page-9.png
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/main-table-page-17.png
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/main-zh-page-18.png
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/main-zh-page-9.png
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/overleaf-complete.png
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/overleaf-main-diagnostics.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/overleaf-main-zh-diagnostics.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/overleaf-source-check.json
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/overleaf-supplement-diagnostics.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/overleaf-supplement-zh-diagnostics.txt
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/regression.log
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/source-checks.json
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/source-sha256.json
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/supplement-main-page-5.png
+ D docs/paper/review-2026-10-02/c3-usecase-2026-10-04/supplement-main-zh-page-5.png
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/README.md
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/claude-cross-review-dom.txt
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/claude-cross-review.md
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/claude-cross-review.png
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/claude-independent-review.md
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/claude-prompt.txt
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/cross-to-claude.txt
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/cross-to-gpt.txt
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/README.md
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/claude-confirmation.md
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/claude-confirmation.png
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/claude-final-confirmation.md
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/claude-final-plan.md
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/claude-final-plan.png
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/closure-confirmation-prompt.txt
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/gpt-confirmation.md
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/gpt-confirmation.png
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/gpt-final-plan.md
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/to-claude.txt
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/final-plan/to-gpt.txt
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/gpt-cross-review-dom.txt
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/gpt-cross-review.md
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/gpt-cross-review.png
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/gpt-independent-review.md
+ D docs/paper/review-2026-10-02/claude-gpt-review-2026-10-03/submission.json
+ D docs/paper/review-2026-10-02/claude-handoff-2026-10-05/Next-review-materials.zip
+ D docs/paper/review-2026-10-02/claude-handoff-2026-10-05/manifest.json
+ D docs/paper/review-2026-10-02/claude-handoff-2026-10-05/manuscript.pdf
+ D docs/paper/review-2026-10-02/claude-handoff-2026-10-05/prompt.txt
+ D docs/paper/review-2026-10-02/claude-handoff-2026-10-05/supplement.pdf
+ M docs/paper/review-2026-10-02/conclusion.tex
+ M docs/paper/review-2026-10-02/data/check-manuscripts.py
+ D docs/paper/review-2026-10-02/editorial-review.md
+ M docs/paper/review-2026-10-02/evaluation.tex
+ D docs/paper/review-2026-10-02/figures/c3-resolution-zh.pdf
+ D docs/paper/review-2026-10-02/figures/c3-resolution-zh.png
+ D docs/paper/review-2026-10-02/figures/c3-resolution.pdf
+ D docs/paper/review-2026-10-02/figures/c3-resolution.png
+ M docs/paper/review-2026-10-02/figures/continuation-current-zh.pdf
+ D docs/paper/review-2026-10-02/figures/continuation-current-zh.png
+ M docs/paper/review-2026-10-02/figures/continuation-current.pdf
+ D docs/paper/review-2026-10-02/figures/continuation-current.png
+ D docs/paper/review-2026-10-02/figures/continuation-final-zh.pdf
+ D docs/paper/review-2026-10-02/figures/continuation-final-zh.png
+ D docs/paper/review-2026-10-02/figures/continuation-final.pdf
+ D docs/paper/review-2026-10-02/figures/continuation-final.png
+ D docs/paper/review-2026-10-02/figures/delivery-gate-zh.pdf
+ D docs/paper/review-2026-10-02/figures/delivery-gate-zh.png
+ D docs/paper/review-2026-10-02/figures/delivery-gate.pdf
+ D docs/paper/review-2026-10-02/figures/delivery-gate.png
+ D docs/paper/review-2026-10-02/figures/mixed-load-zh.pdf
+ D docs/paper/review-2026-10-02/figures/mixed-load.pdf
+ D docs/paper/review-2026-10-02/figures/network.pdf
+ D docs/paper/review-2026-10-02/figures/operating-point-zh.pdf
+ D docs/paper/review-2026-10-02/figures/operating-point-zh.png
+ D docs/paper/review-2026-10-02/figures/operating-point.pdf
+ D docs/paper/review-2026-10-02/figures/operating-point.png
+ D docs/paper/review-2026-10-02/figures/reader-cost.pdf
+ D docs/paper/review-2026-10-02/figures/recovery-reserve-zh.pdf
+ D docs/paper/review-2026-10-02/figures/recovery-reserve-zh.png
+ D docs/paper/review-2026-10-02/figures/recovery-reserve.pdf
+ D docs/paper/review-2026-10-02/figures/recovery-reserve.png
+ D docs/paper/review-2026-10-02/figures/repair-cost.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/.gitignore
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/Next-fourth-revision-Chinese.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/Next-fourth-revision-English.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/Next-fourth-revision-supplement-Chinese.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/Next-fourth-revision-supplement-English.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/Overleaf-Chinese.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/Overleaf-English.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/Overleaf-sources.zip
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/Overleaf-supplement-Chinese.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/Overleaf-supplement-English.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/README.md
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/additional-code-sha256.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/apply_evaluation.py
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/assemble_review_code.py
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/build-identity-check.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/build_supplement.py
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/check_build_identity.py
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/claude-independent-submission.png
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/claude-platform-limit.png
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/Next-fourth-revision-Chinese.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/Next-fourth-revision-English.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/Next-fourth-revision-LaTeX.zip
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/Next-fourth-revision-supplement-Chinese.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/Next-fourth-revision-supplement-English.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/Overleaf-Chinese.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/Overleaf-English.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/Overleaf-sources.zip
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/Overleaf-supplement-Chinese.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/Overleaf-supplement-English.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/README.md
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/overleaf-final.png
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/overleaf-pdf-checks.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/overleaf-source-checks.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/pdf-checks.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/final/source-sha256.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-archive-editorial.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-bilingual-mapping-review.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-condensed-0.tex
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-condensed-1.tex
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-condensed-2.tex
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-condensed-3.tex
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-condensed-draft.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-en-proof-additions.tex
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-evaluation-draft.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-evaluation.tex
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-final-mapping.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-intro-condensed.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-p-table.tex
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-proof-table.tex
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-scope-review.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-submission.png
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-zh-evaluation.tex
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/gpt-zh-proof-table.tex
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/Next-fourth-revision-English.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/Next-fourth-revision-supplement-English.pdf
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/claude-code-followup.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/claude-final-writing.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/claude-review.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/claude-revision-snippets.tex
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/code-packet-sha256.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/final-edited-sections.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/final-small-checks.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/gpt-code-followup.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/gpt-final-closure.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/gpt-final-code-review.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/gpt-review.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/implementation-boundary-tests.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/implementation-comet-overlay.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/implementation-final-interfaces.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/implementation-payment.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/implementation-representation.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/reviewer-materials.md
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/independent-review/submitted-sha256.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/integrate_final_review.py
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/integrate_mapping.py
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/measurement-checks.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/overleaf-four-root-sync.png
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/overleaf-source-checks.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/pdf-checks.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/refine_terms.py
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/reviewer-materials.md
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/revision-closure.md
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/tdsc-author-guidelines.txt
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/version-bridge.json
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/version-bridge.md
+ D docs/paper/review-2026-10-02/fourth-revision-2026-10-04/version_bridge.py
+ D docs/paper/review-2026-10-02/fresh-review-2026-10-03/README.md
+ D docs/paper/review-2026-10-02/fresh-review-2026-10-03/gpt-review-dom.txt
+ D docs/paper/review-2026-10-02/fresh-review-2026-10-03/gpt-review.md
+ D docs/paper/review-2026-10-02/fresh-review-2026-10-03/prompt.txt
+ D docs/paper/review-2026-10-02/fresh-review-2026-10-03/review-screenshot.png
+ D docs/paper/review-2026-10-02/fresh-review-2026-10-03/submission.json
+ M docs/paper/review-2026-10-02/history.tex
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/claude-code-response.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/claude-cross-review.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/claude-factual-response.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/claude-final-precision.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/claude-initial.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/claude-review-and-corrections.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/claude-review-complete.png
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/claude-submitted.png
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/code-evidence.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/code-fee-close.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/code-helpers.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/code-member-resource.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/gpt-cross-review.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/gpt-initial-page.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/gpt-initial.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/gpt-review-complete.png
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/gpt-submitted.png
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/initial-prompt.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/input-sha256.json
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/material-guide.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/paper-text.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/review-summary.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/sessions.json
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/supplement-text.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/to-claude-code-followup.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/to-claude-exchange.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/to-claude-factual-check.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/to-claude-final-precision.txt
+ D docs/paper/review-2026-10-02/independent-review-2026-10-04/to-gpt-exchange.txt
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/Next-interface-service-capital-LaTeX.zip
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/SHA256.json
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/audit_capital.py
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/before/evaluation.tex
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/before/model.tex
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/before/related.tex
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/before/security.tex
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/before/supplement-security.tex
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/before/zh-evaluation.tex
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/before/zh-model.tex
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/before/zh-related.tex
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/before/zh-security.tex
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/before/zh-supplement-security.tex
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/build-main-zh.json
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/build-main.json
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/build-supplement-main-zh.json
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/build-supplement-main.json
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/capital-audit.json
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/check_delivery.py
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/claude-review-transcript.json
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/comet-regression.log
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/completion-report.txt
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/consensus-evidence.txt
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/consensus-order-final.log
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/consensus-order.log
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/evidence-summary.txt
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/fee-evidence.txt
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/fee-order-final.log
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/final-source-manifest.json
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/followup-code-evidence.txt
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/main-contact.png
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/main-zh-contact.png
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/manuscript-checks.log
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/member-fee-final.log
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/new-assertions.log
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/overleaf-check.json
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/overleaf-synced.jpg
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/pdf-checks.json
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/pdf/main-zh.pdf
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/pdf/main.pdf
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/pdf/overleaf-main.pdf
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/pdf/supplement-main-zh.pdf
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/pdf/supplement-main.pdf
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/regression-final.log
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/regression.log
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/revise.py
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/revised-sections.txt
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/source-fingerprints.json
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/supp-page-2.png
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/supp-page-3.png
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/supplement-main-contact.png
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/supplement-main-zh-contact.png
+ D docs/paper/review-2026-10-02/interface-service-capital-2026-10-04/version-check.json
+ M docs/paper/review-2026-10-02/introduction.tex
+ M docs/paper/review-2026-10-02/main-zh.tex
+ M docs/paper/review-2026-10-02/main.tex
+ D docs/paper/review-2026-10-02/measurement-checks.json
+ M docs/paper/review-2026-10-02/model.tex
+ M docs/paper/review-2026-10-02/network-current.tex
+ D docs/paper/review-2026-10-02/overleaf-checks.json
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/Next-overleaf-Chinese-pages.jpg
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/Next-overleaf-Chinese.pdf
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/Next-overleaf-English-pages.jpg
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/Next-overleaf-English.pdf
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/Next-overleaf-supplement-Chinese-pages.jpg
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/Next-overleaf-supplement-Chinese.pdf
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/Next-overleaf-supplement-English-pages.jpg
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/Next-overleaf-supplement-English.pdf
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/README.md
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/compile-main-en-ui.txt
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/compile-main-zh-ui.txt
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/compile-supplement-en-ui.txt
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/compile-supplement-zh-ui.txt
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/overleaf-final.jpg
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/pdf-checks.json
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/source-after-sync.zip
+ D docs/paper/review-2026-10-02/overleaf-sync-2026-10-03/source-before-sync.zip
+ D docs/paper/review-2026-10-02/pdf-checks.json
+ D docs/paper/review-2026-10-02/pdf/Next-review-Chinese.pdf
+ D docs/paper/review-2026-10-02/pdf/Next-review-English.pdf
+ D docs/paper/review-2026-10-02/pdf/Next-review-supplement-Chinese.pdf
+ D docs/paper/review-2026-10-02/pdf/Next-review-supplement-English.pdf
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/build-correspondence.json
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/clarification-source.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/clarification-to-claude.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/clarification-to-gpt.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/clarification-verification.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/claude-clarified-review.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/claude-clarified.jpg
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/claude-cross-review.jpg
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/claude-cross-review.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/claude-final-review.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/claude-final.jpg
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/claude-independent-review.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/claude-scope-challenge.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/claude-scope-corrected-review.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/claude-submitted.jpg
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/cross-review-to-claude.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/deadline-wiring-to-gpt.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/experiment-builds.json
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/experiment-source-manifest.json
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/final-cross-review-to-claude.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/follower-and-history-evidence.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/gpt-clarified-conversation.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/gpt-final-review.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/gpt-final.jpg
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/gpt-independent-review.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/gpt-submitted.jpg
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/gpt-wiring-confirmation.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/implementation-evidence.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/initial-prompt.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/interim-audit-notes.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/manuscript.pdf
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/material-guide.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/material-sha256.json
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/review-session.json
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/review-summary.txt
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/reviewer-regression.log
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/reviewer-wal-tests.log
+ D docs/paper/review-2026-10-02/post-evidence-review-2026-10-04/supplement.pdf
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/README.md
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/claude-clarification-prompt.md
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/claude-clarification.md
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/claude-cross-review-complete.jpg
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/claude-cross-review-sent.jpg
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/claude-cross-review.md
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/claude-restored.jpg
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/claude-review.md
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/claude-submitted.jpg
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/cross-review-to-claude.txt
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/cross-review-to-gpt.txt
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/gpt-cross-review-complete.jpg
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/gpt-cross-review-sent.jpg
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/gpt-cross-review.md
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/gpt-review.md
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/gpt-submitted.jpg
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/main-sidebar-verified.jpg
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/materials.json
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/review-synthesis.md
+ D docs/paper/review-2026-10-02/post-revision-review-2026-10-03/submission.json
+ M docs/paper/review-2026-10-02/protocol.tex
+ M docs/paper/review-2026-10-02/references.bib
+ M docs/paper/review-2026-10-02/related.tex
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/.gitignore
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/Next-review-Chinese-lemma.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/Next-review-Chinese-sheet-1.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/Next-review-Chinese-sheet-2.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/Next-review-English-lemma.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/Next-review-English-sheet-1.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/Next-review-English-sheet-2.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/Next-review-supplement-Chinese-sheet-1.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/Next-review-supplement-Chinese-sheet-2.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/Next-review-supplement-English-sheet-1.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/Next-review-supplement-English-sheet-2.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/README.md
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/check_artifacts.py
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/claude-cross-review.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/claude-implementation-discussion.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/claude-plan-round1-ax.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/claude-review-confirmation.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/claude-review.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/claude-text-submission.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/claude-usage.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/compile-main-zh.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/compile-main.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/compile-supplement-zh.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/compile-supplement.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/cross-review-prompts.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/gpt-clarification.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/gpt-cross-review.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/gpt-draft-blocks.json
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/gpt-implementation-discussion.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/gpt-plan-final-ax.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/gpt-plan-round1-ax.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/gpt-review-page.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/gpt-review.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/implementation-final-gpt-review.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/implementation-final-prompt.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/implementation-gpt-review.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/implementation-plan-code-prompt.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/implementation-review-prompt.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/overleaf-final.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/plan-consensus.png
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/review-evidence.txt
+ D docs/paper/review-2026-10-02/rereview-2026-10-03/review-prompt.txt
+ D docs/paper/review-2026-10-02/revision-2026-10-03/.gitignore
+ D docs/paper/review-2026-10-02/revision-2026-10-03/before-evaluation.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/before-model.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/before-protocol.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/before-security.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/before-zh-evaluation.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/before-zh-model.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/before-zh-protocol.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/before-zh-security.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-abstract.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-code-blocks.json
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-conclusion.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-final-abstract.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-final-conclusion.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-final-introduction.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-final-zh-abstract.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-final-zh-conclusion.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-final-zh-introduction.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-handoff-prompt.txt
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-handoff.png
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-introduction.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-response-final.txt
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-response.txt
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-resumed.png
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-zh-abstract.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-zh-conclusion.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/claude-zh-introduction.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/compile-en.txt
+ D docs/paper/review-2026-10-02/revision-2026-10-03/compile-supp-en.txt
+ D docs/paper/review-2026-10-02/revision-2026-10-03/compile-supp-zh.txt
+ D docs/paper/review-2026-10-02/revision-2026-10-03/compile-zh.txt
+ D docs/paper/review-2026-10-02/revision-2026-10-03/decisions.md
+ D docs/paper/review-2026-10-02/revision-2026-10-03/gpt-abstract-alt.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/gpt-contributions-alt.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/gpt-evaluation.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/gpt-response.txt
+ D docs/paper/review-2026-10-02/revision-2026-10-03/gpt-zh-evaluation.tex
+ D docs/paper/review-2026-10-02/revision-2026-10-03/overleaf-final.png
+ D docs/paper/review-2026-10-02/revision-2026-10-03/plan.md
+ D docs/paper/review-2026-10-02/revision-2026-10-03/writing-evidence.txt
+ M docs/paper/review-2026-10-02/security.tex
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/Next-service-contract-Chinese.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/Next-service-contract-English.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/Next-service-contract-LaTeX.zip
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/Next-service-contract-overleaf-Chinese.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/Next-service-contract-overleaf-English.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/Next-service-contract-overleaf-supplement-Chinese.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/Next-service-contract-overleaf-supplement-English.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/Next-service-contract-supplement-Chinese.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/Next-service-contract-supplement-English.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/Overleaf-service-contract-source.zip
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/README.md
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/main-zh.blg
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/main-zh.log
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/main-zh.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/main.blg
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/main.log
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/main.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/supplement-main-zh.blg
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/supplement-main-zh.log
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/supplement-main-zh.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/supplement-main.blg
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/supplement-main.log
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/build/supplement-main.pdf
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/claude-confirmation.png
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/claude-draft.txt
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/claude-followup-response.txt
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/claude-followup.txt
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/claude-request.txt
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/compile-main-zh.tex.txt
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/compile-main-zh.txt
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/compile-main.tex.txt
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/compile-main.txt
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/compile-supplement-zh.txt
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/compile-supplement.txt
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/contract-page-5.png
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/intent-regression.log
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/ledger-checked.json
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/main-page-5.png
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/main-zh-page-1.png
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/main-zh-page-5.png
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/overleaf-checks.json
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/overleaf-final.png
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/pdf-checks.json
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/regression-summary.json
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/source-manifest.json
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/supplement-main-page-4.png
+ D docs/paper/review-2026-10-02/service-contract-2026-10-03/supplement-main-zh-page-4.png
+ D docs/paper/review-2026-10-02/source-checks.json
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/Next-standalone-readability-LaTeX.zip
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/abstract.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/acknowledgments.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/architecture.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/conclusion.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/evaluation.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/introduction.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/main-zh.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/main.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/model.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/network-current.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/protocol.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/related.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/security.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/supplement-archived.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/supplement-current.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/supplement-final-evidence.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/supplement-main-zh.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/supplement-main.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/supplement-methods.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/supplement-revision.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/supplement-security.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/supplement-tables.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-abstract.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-acknowledgments.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-architecture.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-conclusion.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-evaluation.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-introduction.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-model.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-network-current.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-protocol.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-related.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-security.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-supplement-archived.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-supplement-current.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-supplement-final-evidence.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-supplement-methods.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-supplement-revision.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-supplement-security.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/before/zh-supplement-tables.tex
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/bilingual-checks.json
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/changed-tex.json
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/compile-main-zh.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/compile-main.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/compile-supplement-main-zh.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/compile-supplement-main.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/completion-report.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/content-preservation.json
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/gpt-diagnosis.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/gpt-local-fixes-prompt.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/gpt-local-fixes-review.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/gpt-local-fixes-review.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/gpt-main-only-review.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/gpt-main-only-review.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/gpt-main-only-sent.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/gpt-writing-draft.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/main-only-review-context.json
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/main-only-review-prompt.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/main-only-reviewed.pdf
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/main-text.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/main-zh-text.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/manifest.json
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/overleaf-check.json
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/overleaf-main.pdf
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/overleaf-synced.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/package.py
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/pdf/main-zh.pdf
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/pdf/main.pdf
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/pdf/supplement-main-zh.pdf
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/pdf/supplement-main.pdf
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/preserve-content.py
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/reading-and-revision-notes.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/reading-sources.json
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/render/history-opening.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/render/main-figure.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/render/main-final-p4.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/render/main-p1.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/render/main-p2.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/render/main-p3.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/render/main-p4.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/render/main-zh-figure.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/render/main-zh-final-p4.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/render/main-zh-p1.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/render/main-zh-p4.png
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/revision-plan.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/source-checks.json
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/supplement-main-text.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/supplement-main-zh-text.txt
+ D docs/paper/review-2026-10-02/standalone-readability-2026-10-05/threshold-holder-evidence.txt
+ D docs/paper/review-2026-10-02/supplement-archived.tex
+ D docs/paper/review-2026-10-02/supplement-current.tex
+ D docs/paper/review-2026-10-02/supplement-final-evidence.tex
+ D docs/paper/review-2026-10-02/supplement-main-zh.tex
+ D docs/paper/review-2026-10-02/supplement-main.tex
+ D docs/paper/review-2026-10-02/supplement-methods.tex
+ D docs/paper/review-2026-10-02/supplement-revision.tex
+ D docs/paper/review-2026-10-02/supplement-security.tex
+ D docs/paper/review-2026-10-02/supplement-tables.tex
+ D docs/paper/review-2026-10-02/writing-comprehension-2026-10-04/apply_revision.py
+ D docs/paper/review-2026-10-02/writing-comprehension-2026-10-04/clarification-to-claude.txt
+ D docs/paper/review-2026-10-02/writing-comprehension-2026-10-04/claude-drafting-blocks.json
+ D docs/paper/review-2026-10-02/writing-comprehension-2026-10-04/claude-drafting-response.txt
+ D docs/paper/review-2026-10-02/writing-comprehension-2026-10-04/claude-prompt.txt
+ D docs/paper/review-2026-10-02/writing-comprehension-2026-10-04/claude-writing-followup.txt
+ D docs/paper/review-2026-10-02/writing-comprehension-2026-10-04/claude-writing-review.jpg
+ D docs/paper/review-2026-10-02/writing-comprehension-2026-10-04/claude-writing-review.txt
+ D docs/paper/review-2026-10-02/writing-comprehension-2026-10-04/finish_revision.py
+ D docs/paper/review-2026-10-02/writing-comprehension-2026-10-04/implementation-drafting-prompt.txt
+ D docs/paper/review-2026-10-02/writing-comprehension-2026-10-04/writing-audit.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/Next-writing-revision-LaTeX.zip
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/abstract.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/acknowledgments.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/architecture.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/conclusion.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/evaluation.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/introduction.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/main-zh.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/main.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/model.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/network-current.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/protocol.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/related.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/security.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/supplement-archived.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/supplement-current.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/supplement-final-evidence.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/supplement-main-zh.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/supplement-main.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/supplement-methods.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/supplement-revision.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/supplement-security.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/supplement-tables.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-abstract.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-acknowledgments.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-architecture.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-conclusion.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-evaluation.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-introduction.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-model.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-network-current.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-protocol.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-related.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-security.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-supplement-archived.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-supplement-current.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-supplement-final-evidence.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-supplement-methods.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-supplement-revision.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-supplement-security.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/before/zh-supplement-tables.tex
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/bilingual-checks.json
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/changed-files.json
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/compile-main-zh.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/compile-main.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/compile-supplement-main-zh.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/compile-supplement-main.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/completion-report.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/gpt-final-writing-review.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/gpt-minor-revision-closure-2026-10-05.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/gpt-minor-revision-closure-2026-10-05.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/main-text.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/main-zh-text.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/manifest.json
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/minor-revision-closure-2026-10-05.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/minor-revision-verification-2026-10-05.json
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/overleaf-check.json
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/overleaf-main.pdf
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/overleaf-synced.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/pdf/main-zh.pdf
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/pdf/main.pdf
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/pdf/supplement-main-zh.pdf
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/pdf/supplement-main.pdf
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/proof-preservation.json
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/main-1.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/main-4.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/main-final-1.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/main-final-4.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/main-final-5.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/main-zh-1.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/main-zh-final-1.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/main-zh-final-4.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/main-zh-final-5.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/supplement-main-1.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/supplement-main-3.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/render/supplement-main-zh-1.png
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/source-checks.json
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/supplement-main-text.txt
+ D docs/paper/review-2026-10-02/writing-revision-2026-10-04/supplement-main-zh-text.txt
+ M docs/paper/review-2026-10-02/zh-abstract.tex
+ M docs/paper/review-2026-10-02/zh-acknowledgments.tex
+ M docs/paper/review-2026-10-02/zh-architecture.tex
+ M docs/paper/review-2026-10-02/zh-conclusion.tex
+ M docs/paper/review-2026-10-02/zh-evaluation.tex
+ M docs/paper/review-2026-10-02/zh-history.tex
+ M docs/paper/review-2026-10-02/zh-introduction.tex
+ M docs/paper/review-2026-10-02/zh-model.tex
+ M docs/paper/review-2026-10-02/zh-network-current.tex
+ M docs/paper/review-2026-10-02/zh-protocol.tex
+ M docs/paper/review-2026-10-02/zh-related.tex
+ M docs/paper/review-2026-10-02/zh-security.tex
+ D docs/paper/review-2026-10-02/zh-supplement-archived.tex
+ D docs/paper/review-2026-10-02/zh-supplement-current.tex
+ D docs/paper/review-2026-10-02/zh-supplement-final-evidence.tex
+ D docs/paper/review-2026-10-02/zh-supplement-methods.tex
+ D docs/paper/review-2026-10-02/zh-supplement-revision.tex
+ D docs/paper/review-2026-10-02/zh-supplement-security.tex
+ D docs/paper/review-2026-10-02/zh-supplement-tables.tex
+ M internal/wallet/blocks.go
+ M internal/wallet/direct.go
+ M internal/wallet/wallet.go
+ M protocol/direct_request.go
+ M protocol/v3.go
+?? .superpowers/
+?? crypto/chameleon/commit_equivalence_test.go
+?? docs/experiments/baseline-design-2026-10-13/DESIGN-SPEED-DISCUSSION.md
+?? docs/experiments/baseline-design-2026-10-13/RESULTS.md
+?? docs/experiments/baseline-design-2026-10-13/chain-construction.jsonl
+?? docs/experiments/baseline-design-2026-10-13/comet-reproduction.json
+?? docs/experiments/baseline-design-2026-10-13/comet-reproduction.log
+?? docs/experiments/baseline-design-2026-10-13/cpu.json
+?? docs/experiments/baseline-design-2026-10-13/default-client-results/
+?? docs/experiments/baseline-design-2026-10-13/design-speed-discussion-prompts.txt
+?? docs/experiments/baseline-design-2026-10-13/design-speed-gpt-response.ax.txt
+?? docs/experiments/baseline-design-2026-10-13/design-speed-gpt.png
+?? docs/experiments/baseline-design-2026-10-13/failed-readiness-results/
+?? docs/experiments/baseline-design-2026-10-13/final-review.md
+?? docs/experiments/baseline-design-2026-10-13/formal.log
+?? docs/experiments/baseline-design-2026-10-13/go-tests.log
+?? docs/experiments/baseline-design-2026-10-13/gpt-discussion.png
+?? docs/experiments/baseline-design-2026-10-13/load-results/
+?? docs/experiments/baseline-design-2026-10-13/load.log
+?? docs/experiments/baseline-design-2026-10-13/manifest.json
+?? docs/experiments/baseline-design-2026-10-13/measured-fastpay-binaries.sha256
+?? docs/experiments/baseline-design-2026-10-13/next-adapter-brief.md
+?? docs/experiments/baseline-design-2026-10-13/next-adapter-report.md
+?? docs/experiments/baseline-design-2026-10-13/next-adapter-review.md
+?? docs/experiments/baseline-design-2026-10-13/next-adapter.diff
+?? docs/experiments/baseline-design-2026-10-13/next-build-info.txt
+?? docs/experiments/baseline-design-2026-10-13/next-code.patch
+?? docs/experiments/baseline-design-2026-10-13/os-release.txt
+?? docs/experiments/baseline-design-2026-10-13/preflight.log
+?? docs/experiments/baseline-design-2026-10-13/process-cleanup.json
+?? docs/experiments/baseline-design-2026-10-13/python-tests.log
+?? docs/experiments/baseline-design-2026-10-13/readiness-failure.stderr
+?? docs/experiments/baseline-design-2026-10-13/rebuilt-fastpay-binaries.sha256
+?? docs/experiments/baseline-design-2026-10-13/receiver-confirmed.log
+?? docs/experiments/baseline-design-2026-10-13/replay-failed-config.log
+?? docs/experiments/baseline-design-2026-10-13/repro-build-tests.log
+?? docs/experiments/baseline-design-2026-10-13/review-scoped.diff
+?? docs/experiments/baseline-design-2026-10-13/tool-versions.txt
+?? docs/experiments/baseline-design-2026-10-13/validated-results/
+?? docs/experiments/baseline-design-2026-10-13/validated.log
+?? docs/experiments/baseline-design-2026-10-13/verification.json
+?? docs/experiments/c3-final-2026-10-16/
+?? docs/experiments/c3-offline-authority-2026-10-05/
+?? docs/experiments/c3-speed-2026-10-14/final-code-delivery/
+?? docs/experiments/c3-speed-2026-10-14/go-final-comet-tests.log
+?? docs/experiments/c3-speed-2026-10-14/go-final-race-tests.log
+?? docs/experiments/c3-speed-2026-10-14/go-stage3-tests.log
+?? docs/experiments/c3-speed-2026-10-14/go-stage6-tests.log
+?? docs/experiments/c3-speed-2026-10-14/gpt-final-delivery.jpg
+?? docs/experiments/c3-speed-2026-10-14/gpt-round1-visible.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round10.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round11.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round12.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round13.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round14.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round15.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round2-visible.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round3-visible.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round4-visible.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round5-visible.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round6.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round7.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round8.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-round9.txt
+?? docs/experiments/c3-speed-2026-10-14/gpt-speed-review.jpg
+?? docs/experiments/c3-speed-2026-10-14/gpt-stage10-review.zip
+?? docs/experiments/c3-speed-2026-10-14/gpt-stage5-review.zip
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-official.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-official.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-official/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-threads1.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-threads1.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-threads1/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-threads2.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-threads2.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-threads2/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-threads4.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-threads4.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-threads4/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-unset.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-unset.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r0-unset/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-official.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-official.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-official/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-threads1.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-threads1.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-threads1/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-threads2.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-threads2.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-threads2/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-threads4.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-threads4.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-threads4/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-unset.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-unset.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r1-unset/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-official.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-official.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-official/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-threads1.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-threads1.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-threads1/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-threads2.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-threads2.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-threads2/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-threads4.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-threads4.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-threads4/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-unset.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-unset.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-eightcpu-long-runtime3/r2-unset/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-official.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-official.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-official/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-threads1.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-threads1.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-threads1/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-threads2.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-threads2.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-threads2/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-threads4.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-threads4.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-threads4/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-unset.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-unset.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r0-unset/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-official.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-official.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-official/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-threads1.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-threads1.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-threads1/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-threads2.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-threads2.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-threads2/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-threads4.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-threads4.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-threads4/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-unset.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-unset.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r1-unset/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-official.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-official.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-official/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-threads1.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-threads1.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-threads1/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-threads2.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-threads2.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-threads2/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-threads4.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-threads4.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-threads4/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-unset.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-unset.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r2-unset/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-official.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-official.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-official/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-threads1.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-threads1.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-threads1/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-threads2.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-threads2.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-threads2/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-threads4.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-threads4.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-threads4/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-unset.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-unset.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r3-unset/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-official.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-official.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-official/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-threads1.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-threads1.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-threads1/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-threads2.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-threads2.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-threads2/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-threads4.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-threads4.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-threads4/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-unset.stderr
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-unset.stdout
+?? docs/experiments/c3-speed-2026-10-14/raw-results/fastpay-runtime-100-pilot/r4-unset/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-analysis-0.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-analysis-1.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-analysis-2.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-analysis-3.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-analysis-4.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-analysis-5.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-analysis-6.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r5-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r5-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r5-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r5-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r5-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r5-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r6-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r6-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r6-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r6-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r6-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r6-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r7-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r7-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r7-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r7-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r7-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r7-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r8-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r8-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r8-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r8-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r8-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/r8-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain100-9triples/summary-output.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r5-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r5-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r5-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r5-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r5-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r5-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r6-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r6-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r6-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r6-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r6-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/r6-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-chain1000-7triples/summary-output.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-build-mixed5pairs/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r5-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r5-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r5-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r5-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r5-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r5-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r6-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r6-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r6-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r6-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r6-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-chain1000-7triples/r6-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-eightcpu-gomax-pilot3pairs/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r1-child-first-runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r1-child-first/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r1-compensated-runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r1-compensated/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r1-source-first-runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r1-source-first/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r2-child-first-runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r2-child-first/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r2-compensated-runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r2-compensated/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r2-source-first-runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r2-source-first/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r3-child-first-runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r3-child-first/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r3-compensated-runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r3-compensated/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r3-source-first-runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-fee-orders/orders-r3-source-first/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r5-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r5-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r5-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r5-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r5-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r5-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r6-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r6-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r6-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r6-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r6-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r6-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r7-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r7-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r7-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r7-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r7-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r7-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r8-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r8-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r8-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r8-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r8-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-chain100-9triples/r8-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/final-stage9b-mixed5pairs/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/profile-baseline.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/profile-baseline/adapter-logs/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/profile-baseline/logs/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/profile-baseline/reports/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/services-baseline/mixed/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/services-baseline/runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/services-stage1/mixed/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/services-stage1/runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/services-stage4-trace/mixed/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/services-stage4-trace/runner.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-chain/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage1-compact-chain/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage10-long-pilot3triples/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage2-paired-chain/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage3-compact-paired-chain/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-chain-trace/adapter-logs/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-chain-trace/logs/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-chain-trace/reports/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-paired-mixed/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage4-sameorg-paired-chain/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r5-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r5-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r5-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r5-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r5-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r5-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r6-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r6-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r6-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r6-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r6-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-frozen-paired-chain/r6-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage5-paired-mixed-v1/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r5-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r5-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r5-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r5-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r5-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r5-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r6-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r6-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r6-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r6-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r6-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-eight-logical-chain/r6-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r5-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r5-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r5-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r5-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r5-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r5-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r6-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r6-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r6-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r6-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r6-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r6-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r7-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r7-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r7-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r7-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r7-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r7-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r8-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r8-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r8-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r8-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r8-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-confirm/r8-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-mixed-pilot/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax1-pilot/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-gomax2-pilot/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r5-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r5-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r5-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r5-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r5-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r5-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r6-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r6-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r6-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r6-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r6-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r6-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r7-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r7-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r7-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r7-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r7-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r7-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r8-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r8-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r8-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r8-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r8-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage6-tuned-fastpay-100/r8-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r5-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r5-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r5-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r5-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r5-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r5-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r6-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r6-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r6-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r6-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r6-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-confirm/r6-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-diagnostic/chain/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-gomax2-pilot/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-pilot/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-pilot/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-pilot/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-pilot/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-pilot/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage7-long-pilot/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r5-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r5-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r5-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r5-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r5-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r5-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r6-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r6-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r6-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r6-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r6-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-confirm7triples/r6-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-diagnostic/chain/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage8-long-pilot3triples/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-diagnostic/chain/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9-long-pilot3triples/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r0-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r0-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r0-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r0-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r0-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r0-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r1-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r1-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r1-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r1-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r1-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r1-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r2-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r2-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r2-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r2-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r2-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r2-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r3-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r3-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r3-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r3-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r3-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r3-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r4-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r4-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r4-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r4-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r4-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r4-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r5-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r5-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r5-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r5-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r5-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r5-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r6-after.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r6-after/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r6-before.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r6-before/
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r6-fastpay.log
+?? docs/experiments/c3-speed-2026-10-14/raw-results/stage9b-long-confirm7triples/r6-fastpay/
+?? docs/experiments/c3-speed-2026-10-14/stage10-gateway-focused-race.log
+?? docs/experiments/c3-speed-2026-10-14/stage10-gateway-transport.log
+?? docs/experiments/c3-speed-2026-10-14/stage8-gateway-transport.log
+?? docs/experiments/c3-speed-2026-10-14/stage8-scheduler-focused.log
+?? docs/experiments/c3-speed-2026-10-14/stage8-scheduler-race.log
+?? docs/experiments/c3-speed-2026-10-14/stage8-scheduler-red.log
+?? docs/experiments/c3-speed-2026-10-14/stage9-approval-micro/
+?? docs/experiments/c3-speed-2026-10-14/stage9-source-snapshot/
+?? docs/experiments/c3-speed-2026-10-14/stage9b-approval-micro/
+?? docs/experiments/current-capital-2026-10-05/
+?? docs/experiments/delivery-pool-2026-10-12/gpt-review.png
+?? docs/experiments/delivery-pool-2026-10-12/gpt-speed-discussion.png
+?? docs/experiments/delivery-pool-2026-10-12/pool-discussion-cpu.pprof
+?? docs/experiments/fastpay-runtime-sensitivity-2026-10-14/build.log
+?? docs/experiments/fastpay-runtime-sensitivity-2026-10-14/verification/
+?? docs/experiments/intent-free-2026-10-09/
+?? docs/experiments/preparation-profile-2026-10-13/
+?? docs/experiments/review-followup-2026-10-05/
+?? docs/experiments/same-org-2026-10-12/
+?? docs/experiments/same-org-design-2026-10-12/NEXT-DIRECTIONS.zh-CN.md
+?? docs/experiments/same-org-design-2026-10-12/current-code-for-gpt.txt
+?? docs/experiments/same-org-design-2026-10-12/four-arms-pilot.json
+?? docs/experiments/same-org-design-2026-10-12/gpt-final-review.png
+?? docs/experiments/same-org-design-2026-10-12/gpt-next-directions.png
+?? docs/experiments/same-org-design-2026-10-12/gpt-visible-discussion.txt
+?? docs/experiments/same-org-design-2026-10-12/paced-1000kbps-pilot.json
+?? docs/experiments/same-org-design-2026-10-12/pilot.json
+?? docs/experiments/same-org-design-2026-10-12/summary-output.txt
+?? docs/experiments/same-org-profile-2026-10-12/
+?? docs/experiments/sameorg-speed-2026-10-12/gpt-final-review.png
+?? docs/experiments/sameorg-speed-2026-10-12/gpt-final-review.txt
+?? docs/experiments/sameorg-speed-2026-10-12/gpt-review.png
+?? docs/experiments/sameorg-speed-2026-10-12/pool-lab-after.exe
+?? docs/experiments/sameorg-speed-2026-10-12/pool-lab-before.exe
+?? docs/experiments/sameorg-speed-2026-10-12/pool-lab-fastpath.exe
+?? docs/experiments/sameorg-speed-2026-10-12/task2-brief.md
+?? docs/experiments/sameorg-speed-2026-10-12/task3-brief.md
+?? docs/experiments/sameorg-speed-2026-10-12/task4-brief.md
+?? docs/experiments/sameorg-speed-2026-10-12/task4.diff
+?? docs/experiments/wait-baseline-2026-10-05/
+?? docs/experiments/wallet-local-signing-2026-10-14/
+?? docs/experiments/wallet-preparation-2026-10-14/
+?? docs/paper/review-2026-10-02/Next-LaTeX.zip
+?? docs/paper/review-2026-10-02/capital-current-zh.pdf
+?? docs/paper/review-2026-10-02/capital-current.pdf
+?? docs/paper/review-2026-10-02/ch-cost.tex
+?? docs/paper/review-2026-10-02/continuation-current-zh.pdf
+?? docs/paper/review-2026-10-02/continuation-current.pdf
+?? docs/paper/review-2026-10-02/data/export-supplement-labels.py
+?? docs/paper/review-2026-10-02/data/generate-archived-continuation.py
+?? docs/paper/review-2026-10-02/data/generate-format-figures.py
+?? docs/paper/review-2026-10-02/evidence/
+?? docs/paper/review-2026-10-02/experimental-source-index.md
+?? docs/paper/review-2026-10-02/figures/mixed-load-resolution-zh.pdf
+?? docs/paper/review-2026-10-02/figures/mixed-load-resolution.pdf
+?? docs/paper/review-2026-10-02/pdf/Next-Chinese-current.pdf
+?? docs/paper/review-2026-10-02/pdf/Next-Chinese.pdf
+?? docs/paper/review-2026-10-02/pdf/Next-English.pdf
+?? docs/paper/review-2026-10-02/receipt-table.tex
+?? docs/paper/review-2026-10-02/reference-audit-2026-10-06/
+?? docs/paper/review-2026-10-02/tools/
+?? docs/paper/review-2026-10-02/zh-ch-cost.tex
+?? docs/paper/review-2026-10-02/zh-receipt-table.tex
+?? docs/superpowers/plans/2026-10-12-same-org-experiment.md
+?? docs/superpowers/plans/2026-10-13-fastpay-single-host.md
+?? docs/superpowers/plans/2026-10-14-wallet-local-signing.md
+?? docs/superpowers/plans/2026-10-14-wallet-preparation.md
+?? internal/wallet/direct_coin_cache.go
+?? internal/wallet/direct_coin_cache_test.go
+?? internal/wallet/direct_coin_full_test.go
+?? internal/wallet/local_signer.go
+?? internal/wallet/local_signer_test.go
+?? protocol/direct_signer.go
+?? protocol/direct_signer_test.go

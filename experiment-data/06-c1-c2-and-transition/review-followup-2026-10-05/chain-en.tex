@@ -1,0 +1,54 @@
+\subsection{Continuous Spending Without Per-Hop Settlement}
+\label{sec:eval-continuation}
+
+Three NoSync wallets rotate 100~CAL through a 100-hop chain supported by
+nine services. Each hop uses a distinct prefunded final FUEL output;
+neither fee change nor refund from the preceding payment delays the next
+payment. We compare three clients. F continues after certified receipt.
+W also waits for the wallet to verify public execution. M adds a member
+gate after W's wait: it polls the four members every 5\,ms and proceeds
+once any three report the exact parent fact as observed. The gate does
+not wait for the fourth member or permit a timed-out request to proceed.
+Genesis fee inputs are loaded before the run. Each mode runs three times
+in rotated F/W/M, W/M/F, and M/F/W order after a three-second warm-up.
+All modes record actual requests and attempts.
+
+The endpoint is $\mathsf{Sent}_1\rightarrow\mathsf{Ready}_{100}$:
+first actual HTTP send to the hundredth verified, atomically recorded
+receipt. It includes subsequent construction and retries, and W/M's 99
+intermediate waits, but excludes the last payment's public confirmation.
+All modes start with a final principal input. Thereafter F carries the
+immediate parent's TXCer as a certificate input; W/M use final inputs.
+Thus the comparison measures complete client modes, including their
+different evidence paths.
+
+Median chain times are 4.599\,s (F), 64.216\,s (W), and 64.307\,s (M),
+with respective run ranges 4.595--4.695, 64.137--64.394, and
+64.284--64.339\,s (Fig.~\ref{fig:continuation}). Each F and M run uses
+exactly 100 HTTP attempts. W uses 123, 112, and 125: the 60 failed attempts
+and their retry sleeps together account for 1.124--2.434\,s per run.
+Removing these retries therefore leaves the main timing gap intact.
+The 99 public waits total 57.981--58.323\,s in W and
+58.981--59.315\,s in M; M's additional gates total 1.544--1.694\,s.
+These gates measure client-visible readiness, including polling.
+The median M/F ratio is 13.98 when computed from the two mode medians;
+it is a continuation-mode result, not a consensus speedup.
+
+All 900 payments close and pass accounting, input, fee, replica, and
+outbox checks. The three F runs create 2, 3, and 5 actual
+child-before-source obligations, all fulfilled by their sources;
+none requires compensation. These chains measure certified continuation,
+while the mixed-load experiment below exercises compensation and repayment.
+Supplement~S4 reports every run, disjoint client-stage totals, and
+application-commit and wallet-following checkpoints.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{continuation-current.pdf}
+  \caption{Three client modes on the same frozen source. Dots are the
+    three run totals; bars show medians. Members commit synchronously;
+    wallets use NoSync. W waits for wallet-verified public execution;
+    M additionally checks three members' observation of the parent.}
+  \label{fig:continuation}
+\end{figure}
+

@@ -1,0 +1,84 @@
+C3 offline historical authorization receipt: independent binding audit
+Date: 2026-10-05
+Scope: read-only source audit of the existing execution/signature bindings; no browser, no test runs, no production edits. Receipt implementation was being developed concurrently and is not certified by this report.
+
+Inputs read:
+- docs/paper/review-2026-10-02/c3-value-resolution-2026-10-05/DECISION.txt
+- docs/paper/review-2026-10-02/c3-value-resolution-2026-10-05/verified-evidence-notes.txt
+Code discovery used codebase-memory-mcp project next, with direct reads of located files and the actual patched dependency (.scratch/comet-src). go.mod replaces CometBFT with that directory.
+
+Conclusion
+
+An original execution block, complete result vector and successor signed header under locally pinned fixed Trust can authenticate the exact REPAIR5/RPBATCH5 command at a transaction index and its Applied:true result. The authenticated command's Next digest can then authenticate the exact supplied revised body. No new signing key or per-key state tree is necessary for this narrow historical claim. This relies on the pinned committee executing the pinned application semantics; it is not a proof of latest revision, current repayment state, absence of later events or an arbitrary Direct database key.
+
+VerifyBlock alone is deliberately insufficient to authenticate the exact mutable funding bytes of a payment or complete original BlockID. Receipt callers must preserve that distinction. A common T2 verifier must be used for both the ordinary authenticated overlay N* and the CH-compatible body B. N* validating only a payload digest or a compensation result would not meet the same exact-revision authorization task.
+
+1. Signature, chain, height and execution roots
+
+finality/block.go:37-74 VerifyBlock checks:
+- valid locally supplied Trust; execution block ChainID; positive execution height;
+- successor height == execution height + 1;
+- equal transaction/result vector lengths and nonnil results;
+- successor SignedHeader.ValidateBasic(t.ChainID);
+- successor ValidatorsHash and NextValidatorsHash equal the pinned committee hash;
+- successor LastBlockID.Hash == execution block hash;
+- freshly computed transaction root == supplied execution header DataHash;
+- NewResults(results).Hash() == successor LastResultsHash;
+- pinned committee VerifyCommitLight(chainID, successor commit BlockID, successor height, commit).
+The returned immutable ExecutedTx pairs supplied tx bytes and result Code/Data at the SAME vector index. Reordering or splicing results fails the ordered result root; reordering immutable repair commands fails the ordered tx root. Logs/events are not authority evidence.
+
+.scratch/comet-src/types/light.go:134-166 SignedHeader.ValidateBasic compares the supplied header hash with Commit.BlockID.Hash, compares commit/header heights, and checks ChainID. Thus VerifyCommitLight passing h.Commit.BlockID is not an unchecked-header bug. A genuine commit plus a forged successor header cannot pass this check. .scratch/comet-src/types/block.go:445-483 Header.Hash includes LastBlockID (including its part-set header), DataHash and LastResultsHash. .scratch/comet-src/types/validation.go:61-123 VerifyCommitLight uses >2/3 voting power and signs the chain-specific commit. In the four equal-weight committee this requires three votes.
+
+.scratch/comet-src/types/results.go:11-18,46-54 NewResults retains Code, Data, GasWanted and GasUsed. Both the status and binary RepairResult are committed. Result Code==0 alone is insufficient; Applied:false is a successful noop.
+
+2. Repair raw bytes versus normalized payment identity
+
+.scratch/comet-src/types/tx.go:28-30 calls redactionTxHash. third_party/cometbft/types/redaction.go:52-65 (same extension in .scratch/comet-src) hashes only the envelope header and fixed section for a syntactically sized UTXO4CH payment envelope. It hashes ALL bytes for other formats.
+
+protocol/repair.go:8,35-65 uses REPAIR5 magic. RepairInput.ID is Digest("REPAIR_INPUT_V5", canonical raw bytes), covering Network, Output, target Height, Transaction, Input, Base, Previous, Next, exact TransactionBytes and Parts. protocol/repair_batch.go:10,26-70 uses RPBATCH5 magic and Digest("REPAIR_BATCH_V5", raw), covering Network, target Height, Base, Previous, Next, all ordered Output/Transaction/Input/Opening items and Parts. These do not enter UTXO4CH normalization. Their inclusion therefore authenticates precise command bytes, including openings and the body digest.
+
+protocol/v3.go:71-80 FundingContext binds payment core, network, input index and CH key ID. protocol/direct_payment.go:34-75 places funding in the mutable envelope section and organization authorization/certificates in the fixed section. A payment byte string with altered mutable funding can have the same consensus tx hash. This is intentional projection behavior, not proof of public repair authority. Reading an arbitrary supplied payment after VerifyBlock must not label its mutable funding as original executed bytes.
+
+3. Successful execution semantics and noop distinction
+
+internal/committee/app.go:245-278 FinalizeBlock checks each command; check failure sets Code=1, execution failure sets Code=2, and only successful applied transitions copy transition.Data into that index's result. internal/committee/direct.go:54-95 routes repair commands through the configured repair executor. internal/committee/repair.go:19-46 repairCheck decodes the command and enforces configured Network before execution.
+
+internal/redaction/repair.go:106-119 InputTarget requires a previously executed immutable compensation decision and checks its exact target coordinates. repair.go:121-155 targetSlot checks payment identity, consumer fact, input/output/amount, initial funding, CH opening and current revision. repair.go:188-234 nextBody checks Network, Height, Transaction, Input, Base and Previous against that target, verifies reserve funding/opening, requires an exact serialization differing only in the allowed funding input, and constructs the complete next block body.
+
+repair.go:324-376 Execute verifies target height precedes execution height; Next == digest(constructed body); reconstructs part set using Parts at target height/Base+1; compares block hash AND PartSetHeader with original stored BlockID. Only first successful application emits RepairResult{Command:c.ID(), Applied:true}. Exact replay of an existing command succeeds with Applied:false; a different command for the same repair identity is rejected.
+
+internal/redaction/batch.go:112-166 batchBody checks current Base/Previous, each exact decision target and allowed funding opening, preserving other payment bytes. batch.go:201-255 ExecuteBatch applies the same Next/full BlockID checks. Existing immutable BatchTask ID returns Applied:false; first success emits Applied:true. protocol/compensation.go:58-85 encodes/decodes RepairResult tag 416, Command ID and Applied flag.
+
+Receipt must require successful Code, successfully decoded RepairResult, Command equal to the verified raw command's ID, and Applied:true. It must select the declared command transaction index, not search for any convenient success result. A projected single-item Task from LoadTask is not a substituted raw batch authority: batch.go:30-64 creates a legacy projection whose ID is not the actual executed RPBATCH5 command ID.
+
+4. Body, target identity and ordinary overlay requirements
+
+Both layouts must verify authority before deriving display rows:
+- decode only recognized exact repair formats, verify canonical raw representation/ID, enforce command Network == pinned Trust.Network, pin the expected CH public key and supported application/wire semantics locally;
+- enforce target height matches the consumer's requested original coordinate and precedes the repair execution height; enforce declared command tx index within the execution vector;
+- require SHA256(supplied authorized body) == verified command Next using the existing plain SHA256 body digest (repair.go:85);
+- decode target body and check target ChainID/Height, declared transaction/input positions, payment input Output and expected reserve reference/opening against the exact command; validate the original-body-to-authorized-body relation when original facts/unchanged semantics are claimed;
+- use verified Base/Previous/Next, not exporter-supplied labels. If the receipt supplies a base body, require its digest == Previous and reconstruction of the allowed diff == authorized body. A later base revision cannot simply be called original; initial-original validation requires Base==0 or separate authority for the base representation;
+- derive amounts/organizations/economic decision rows from authenticated original facts/decision execution, rather than accepting exporter-provided rows. Compensation evidence proves T1; exact repair evidence proves T2. Do not infer the former's precise economic values from RepairResult, which carries only Command and Applied.
+
+For original mutable funding/full-identity claims, authenticate the target-original body using the signed successor's LastBlockID.PartSetHeader and a canonical initial part set (nil openings, revision zero, opening 1), or an equivalently authenticated original witness. VerifyBlock currently binds only LastBlockID.Hash, not the supplied block body's part set. For B additionally reconstruct the authorized-body part set using authenticated command Parts at Base+1 and compare the COMPLETE BlockID to the same signed original identity. Merely matching b.Hash(), or finding compatible CH openings, does not prove revision authorization.
+
+For N*, the normal stored/published overlay may preserve original bytes and ordinary layout; its payload must still resolve to the body/version named by the SAME authenticated repair command and result. A standalone exporter-chosen payload digest provides integrity relative to itself, not public command authority. N* and B can share exactly this authority evidence and differ only in representation/full-original-identity compatibility checks.
+
+5. Prefix and trust boundaries
+
+finality.Trust (proof.go:32-59) pins ChainID, Network and validators but contains no H/checkpoint or application-version field and does not itself check Network == Digest("NETWORK", ChainID). The consumer must supply consistent trusted configuration; receipt Network checks cannot be left to arbitrary package metadata. The package must not choose its own trust keys/key ID/rules.
+
+For an "authorized by H" request, enforce the requested prefix externally: the successor header exposing execution results must be available within that prefix (successor height <= H when H denotes finalized available headers). Reject proof packages newer than H. Clarify if an API instead names an executed-state prefix; result availability still requires its successor proof. Fixed committee trust authenticates a height independently under the assumed BFT safety; it does not establish arbitrary checkpoint ancestry, a most recent version, a current outstanding balance or the completeness of later history. If checkpoint ancestry is explicitly promised, supply and verify that linkage.
+
+6. Minimal API hardening finding (no remote exploit demonstrated)
+
+.scratch/comet-src/types/block.go:124-140 Block.Hash caches private verifiedHash. BlockFromProto at block.go:248-278 constructs a fresh block, so a newly decoded untrusted file does not inherit this cache. But VerifyBlock accepts *Block and relies on b.Hash() for successor linkage/output; an in-process caller can compute Hash(), then mutate Header/DataHash and transactions coherently while keeping the cached hash. The fresh ct.Data recomputation closes a stale Data.hash issue, but does not refresh Block.verifiedHash.
+
+Recommended small hardening: compute b.Header.Hash() fresh for the successor-linkage comparison and returned VerifiedBlock hash, or normalize the supplied block through serialization/fresh decode before validation. Any receipt verifier that accepts direct BlockData should also use fresh Header.Hash/full body reconstruction rather than inheriting cached identity. This is a mutable-object API correctness gap; this audit did not execute a forgery test or claim arbitrary remote exact-command forgery (matching RepairResult.Command still independently constrains repair bytes).
+
+7. Required rejection cases for implementation review
+
+Same signed successor with altered header/results/chain; wrong execution height or command index; unrelated success result; Code!=0; empty/malformed result; Applied:false replay; result Command != exact raw command ID; altered repair raw Network/target/base/Previous/Next/item/input/opening/Parts; revised body with wrong Next; changed output/amount/signature/organization/funding slot; original funding byte substitution that exploits payment projection; unsigned original full BlockID metadata; merely compatible unauthorized body; ordinary overlay payload without same repair authority; projected single Task presented as executed batch; proof newer than fixed requested H; historical receipt presented as latest/current-state evidence.
+
+Audit delivered evidence and constraints only. Tests and final prototype acceptance belong to the implementation validation, and were not rerun here.

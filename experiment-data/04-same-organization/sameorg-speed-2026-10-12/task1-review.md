@@ -1,0 +1,14 @@
+# Task 1 delivery scheduler review
+
+Final scoped verdict: **approved; no outstanding material findings**. The four-slot cap, cancellation join, durable pending-to-done transition, restart/idempotence path, and per-recipient fairness look sound on the reviewed diff. This review is scoped to `task1.diff` against the saved dirty baseline and the Task 1 plan.
+
+## Resolved findings
+
+- **P2 — Initial finding, partly addressed.** A permanently failing first record could monopolize one recipient's slot and starve later independent payments. `wallet.ReceiveDirect` stores each certified output by its own ID (`internal/wallet/direct.go:90-113`), so no wallet FIFO requirement justifies this. The new per-owner `lastKey` and two-record regression (`internal/delivery/delivery.go:148,239-242`; `internal/delivery/scheduler_test.go:114-168`) address the simple case.
+- **P2 — Premature cursor reset after a fast attempted send, resolved.** An eligible pass sets `eligiblePass` at its start (`internal/delivery/delivery.go:192-195`). Dispatch now clears that flag when it advances `lastKey` (`:239-245`), so completion before scan exhaustion cannot trigger a wrap at `:201-209`. If an eligible full pass finds no later record, the flag remains set and the cursor wraps; during backoff it remains unset. The same-recipient regression now has two rejected records before an accepted third (`internal/delivery/scheduler_test.go:114-168`).
+
+## Verification and scope
+
+- The new blocked-recipient test shows seven other recipients can enter the handler before the blocked recipient is released, and checks one active request for that owner (`internal/delivery/scheduler_test.go:19-111`). The existing bound test now uses distinct owners and retains the four-send cap (`internal/delivery/delivery_test.go:251-333`). Existing restart/idempotence coverage is in `TestOfflineRestartAndDuplicate` (`internal/delivery/delivery_test.go:51-145`).
+- The implementation cancels and joins workers before `Run` returns (`internal/delivery/delivery.go:140-143`); at most four workers can each submit one result into a four-buffer channel (`:155`, `:224-240`), so return on cancellation or a fatal result does not strand workers on that send. A successful acknowledgment still commits pending deletion and a done tombstone atomically (`:230-237`).
+- Reported checks: `go test ./internal/delivery -count=1` passed after the final change in 2.445 s; the parent also reported a race pass after the first fairness fix in 3.497 s. The earlier fairness regression was RED at 1 s before its fix. I did not rerun tests. The blocked-recipient regression signals receipt at handler entry, before acknowledgment (`internal/delivery/scheduler_test.go:41-44`, `:101-107`); its log's word “completed” is stronger than its assertion, but this does not affect the scheduler assertion.

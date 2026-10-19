@@ -1,0 +1,248 @@
+{
+  "output": "docs\\experiments\\wait-baseline-2026-10-05\\stage-analysis.json",
+  "modes": {
+    "fast": {
+      "chain_ms": {
+        "n": 3,
+        "mean": 4629.944861,
+        "p50": 4599.457458,
+        "p95": 4695.347125,
+        "min": 4595.03,
+        "max": 4695.347125
+      },
+      "median_stage_total_ms": {
+        "http_success_service_ms": 4249.183083,
+        "http_failed_service_ms": 0.0,
+        "retry_sleep_ms": 0.0,
+        "public_wait_99_ms": 0.0,
+        "member_gate_99_ms": 0.0,
+        "build_2_to_100_ms": 241.77383399999994,
+        "client_receipt_processing_and_dispatch_overhead_ms": 152.8495439999997,
+        "other_driver_bookkeeping_and_scheduling_ms": 0.6869189999997616
+      },
+      "median_remaining_construction_recording_and_scheduling_ms": 408.19191799999953,
+      "attempts_total": 300,
+      "failed_attempts_total": 0,
+      "median_public_last_observation_ms": 5230.5585,
+      "median_all_member_closure_ms": 5288.706083,
+      "actual_fulfilled_obligations_by_run": [
+        2,
+        3,
+        5
+      ],
+      "median_run_fast_ms_quantiles": {
+        "mean": 43.52578044,
+        "p50": 42.6984375,
+        "p95": 61.63925,
+        "min": 15.699458,
+        "max": 72.924709
+      },
+      "median_run_build_ms_all_100_quantiles": {
+        "mean": 2.42206542,
+        "p50": 0.269354,
+        "p95": 11.798167,
+        "min": 0.223209,
+        "max": 26.098458
+      },
+      "median_run_build_ms_measured_99_quantiles": {
+        "mean": 2.4421599393939393,
+        "p50": 0.268958,
+        "p95": 14.866292,
+        "min": 0.223209,
+        "max": 26.098458
+      },
+      "median_run_follow_quantiles": {
+        "callback_to_driver_observation_ms": {
+          "mean": 2.4321,
+          "p50": 2.3754999999999997,
+          "p95": 4.494,
+          "min": 0.028,
+          "max": 4.983
+        },
+        "committee0_commit_to_complete_fetch_ms": {
+          "mean": 375.26769,
+          "p50": 396.651,
+          "p95": 458.803,
+          "min": 249.552,
+          "max": 459.2
+        },
+        "complete_fetch_to_verified_ms": {
+          "mean": 0.15417,
+          "p50": 0.116,
+          "p95": 0.35,
+          "min": 0.087,
+          "max": 0.437
+        },
+        "verified_to_local_record_callback_ms": {
+          "mean": 8.28381,
+          "p50": 0.998,
+          "p95": 28.372,
+          "min": 0.12,
+          "max": 35.852
+        }
+      }
+    },
+    "wallet-wait": {
+      "chain_ms": {
+        "n": 3,
+        "mean": 64248.60513933333,
+        "p50": 64215.573459,
+        "p95": 64393.566125,
+        "min": 64136.675834,
+        "max": 64393.566125
+      },
+      "median_stage_total_ms": {
+        "http_success_service_ms": 3840.1404570000013,
+        "http_failed_service_ms": 826.327874,
+        "retry_sleep_ms": 1153.4187089999998,
+        "public_wait_99_ms": 58193.222408999995,
+        "member_gate_99_ms": 0.0,
+        "build_2_to_100_ms": 130.578462,
+        "client_receipt_processing_and_dispatch_overhead_ms": 69.41450199999872,
+        "other_driver_bookkeeping_and_scheduling_ms": 0.37862299998960225
+      },
+      "median_remaining_construction_recording_and_scheduling_ms": 202.46400999999904,
+      "attempts_total": 360,
+      "failed_attempts_total": 60,
+      "median_public_last_observation_ms": 64805.657959,
+      "median_all_member_closure_ms": 64825.77125,
+      "actual_fulfilled_obligations_by_run": [
+        0,
+        0,
+        0
+      ],
+      "median_run_fast_ms_quantiles": {
+        "mean": 58.91521795,
+        "p50": 49.331063,
+        "p95": 114.315333,
+        "min": 15.607375,
+        "max": 126.659041
+      },
+      "median_run_build_ms_all_100_quantiles": {
+        "mean": 1.31230462,
+        "p50": 0.24295850000000002,
+        "p95": 8.495625,
+        "min": 0.21175,
+        "max": 19.58625
+      },
+      "median_run_build_ms_measured_99_quantiles": {
+        "mean": 1.3189743636363636,
+        "p50": 0.242375,
+        "p95": 9.20725,
+        "min": 0.21175,
+        "max": 19.58625
+      },
+      "median_run_follow_quantiles": {
+        "callback_to_driver_observation_ms": {
+          "mean": 2.77607,
+          "p50": 2.9355,
+          "p95": 4.952,
+          "min": 0.008,
+          "max": 5.35
+        },
+        "committee0_commit_to_complete_fetch_ms": {
+          "mean": 284.34608000000003,
+          "p50": 283.38,
+          "p95": 308.785,
+          "min": 250.473,
+          "max": 333.525
+        },
+        "complete_fetch_to_verified_ms": {
+          "mean": 0.10087,
+          "p50": 0.0825,
+          "p95": 0.229,
+          "min": 0.071,
+          "max": 0.28
+        },
+        "verified_to_local_record_callback_ms": {
+          "mean": 0.82653,
+          "p50": 0.127,
+          "p95": 6.123,
+          "min": 0.1,
+          "max": 15.569
+        }
+      }
+    },
+    "member-wait": {
+      "chain_ms": {
+        "n": 3,
+        "mean": 64310.11245833334,
+        "p50": 64307.250333,
+        "p95": 64339.242125,
+        "min": 64283.844917,
+        "max": 64339.242125
+      },
+      "median_stage_total_ms": {
+        "http_success_service_ms": 3313.217381,
+        "http_failed_service_ms": 0.0,
+        "retry_sleep_ms": 0.0,
+        "public_wait_99_ms": 59209.662252999995,
+        "member_gate_99_ms": 1647.0907969999994,
+        "build_2_to_100_ms": 121.91833300000005,
+        "client_receipt_processing_and_dispatch_overhead_ms": 57.807454999998754,
+        "other_driver_bookkeeping_and_scheduling_ms": 0.7827850000030594
+      },
+      "median_remaining_construction_recording_and_scheduling_ms": 169.9562029999936,
+      "attempts_total": 300,
+      "failed_attempts_total": 0,
+      "median_public_last_observation_ms": 64922.840667,
+      "median_all_member_closure_ms": 64974.530583,
+      "actual_fulfilled_obligations_by_run": [
+        0,
+        0,
+        0
+      ],
+      "median_run_fast_ms_quantiles": {
+        "mean": 33.597879569999996,
+        "p50": 33.878188,
+        "p95": 40.930125,
+        "min": 16.663583,
+        "max": 45.883833
+      },
+      "median_run_build_ms_all_100_quantiles": {
+        "mean": 1.22463167,
+        "p50": 0.23710399999999998,
+        "p95": 8.327666,
+        "min": 0.203792,
+        "max": 13.810916
+      },
+      "median_run_build_ms_measured_99_quantiles": {
+        "mean": 1.231498313131313,
+        "p50": 0.236959,
+        "p95": 8.395083,
+        "min": 0.203792,
+        "max": 13.810916
+      },
+      "median_run_follow_quantiles": {
+        "callback_to_driver_observation_ms": {
+          "mean": 2.82683,
+          "p50": 3.0075000000000003,
+          "p95": 5.051,
+          "min": 0.014,
+          "max": 5.422
+        },
+        "committee0_commit_to_complete_fetch_ms": {
+          "mean": 285.58453000000003,
+          "p50": 285.01099999999997,
+          "p95": 308.528,
+          "min": 252.221,
+          "max": 315.399
+        },
+        "complete_fetch_to_verified_ms": {
+          "mean": 0.09625,
+          "p50": 0.083,
+          "p95": 0.208,
+          "min": 0.071,
+          "max": 0.275
+        },
+        "verified_to_local_record_callback_ms": {
+          "mean": 0.9940599999999999,
+          "p50": 0.127,
+          "p95": 5.217,
+          "min": 0.104,
+          "max": 18.641
+        }
+      }
+    }
+  }
+}

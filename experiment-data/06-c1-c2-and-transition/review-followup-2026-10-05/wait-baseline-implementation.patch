@@ -1,0 +1,902 @@
+diff --git a/cmd/payctl/direct_chain.go b/cmd/payctl/direct_chain.go
+index c284f6e..204a585 100644
+--- a/cmd/payctl/direct_chain.go
++++ b/cmd/payctl/direct_chain.go
+@@ -28,6 +28,11 @@ import (
+ )
+ 
+ type chainHop struct {
++	MemberInputGate                                                             *chainMemberGate   `json:",omitempty"`
++	RequestRaw                                                                  []byte             `json:",omitempty"`
++	HTTPAttempts                                                                []chainHTTPAttempt `json:",omitempty"`
++	PublicWaitDoneUnixNS                                                        int64              `json:",omitempty"`
++	PublicWaitMS                                                                float64            `json:",omitempty"`
+ 	Hop, Sender, Receiver                                                       int
+ 	Tx                                                                          protocol.TxID
+ 	Input, Output                                                               protocol.OutputID
+@@ -43,6 +48,7 @@ type chainHop struct {
+ }
+ 
+ type chainReport struct {
++	WaitMemberInputs, RecordAttempts          bool
+ 	Mode                                      string
+ 	Requested                                 int
+ 	WalletNoSync                              bool
+@@ -103,6 +109,8 @@ func chainDirect(args []string) error {
+ 	dir := f.String("dir", "", "fresh laboratory directory")
+ 	length := f.Int("length", 10, "number of dependent payments, 1..100")
+ 	waitFinal := f.Bool("wait-final", false, "wait for verified wallet finality before the next payment")
++	waitMembers := f.Bool("wait-member-inputs", false, "experiment: require three routed members to observe the parent; requires wait-final and e5-owner-fuel")
++	recordAttempts := f.Bool("record-chain-attempts", false, "experiment: archive exact signed request and HTTP attempt timings; requires e5-owner-fuel")
+ 	trace := f.Bool("trace", false, "foreground diagnostic trace")
+ 	prepare := f.Bool("prepare", false, "authorize three wallets before starting the laboratory")
+ 	auditOnly := f.Bool("audit", false, "audit the completed chain against stopped committee stores")
+@@ -116,6 +124,9 @@ func chainDirect(args []string) error {
+ 	if *dir == "" || *length < 1 || *length > 100 || *originIndex < -1 || *fuelOffset < 0 || *payerFuelOffset < 0 {
+ 		return protocol.ErrRule
+ 	}
++	if (*waitMembers && (!*waitFinal || !*e5)) || (*recordAttempts && !*e5) {
++		return fmt.Errorf("member input gate requires wait-final and e5-owner-fuel; attempt recording requires e5-owner-fuel")
++	}
+ 	var lab cfg.Lab
+ 	if err := cfg.Read(filepath.Join(*dir, "lab.json"), &lab); err != nil {
+ 		return err
+@@ -139,10 +150,10 @@ func chainDirect(args []string) error {
+ 	if *auditOnly {
+ 		return auditChain(*dir, lab)
+ 	}
+-	return runChain(*dir, lab, n, *length, *waitFinal, *trace, *e5, *originIndex, *fuelOffset, *payerFuelOffset)
++	return runChain(*dir, lab, n, *length, *waitFinal, *trace, *e5, *originIndex, *fuelOffset, *payerFuelOffset, *waitMembers, *recordAttempts)
+ }
+ 
+-func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, trace, e5 bool, originIndex, fuelOffset, payerFuelOffset int) (err error) {
++func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, trace, e5 bool, originIndex, fuelOffset, payerFuelOffset int, waitMembers, recordAttempts bool) (err error) {
+ 	var e5Samples []faultSample
+ 	if e5 {
+ 		defer func() {
+@@ -245,10 +256,13 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
+ 	}()
+ 	var observers sync.WaitGroup
+ 	observerErrors := make(chan error, length)
+-	report := chainReport{Mode: "fast", Requested: length, WalletNoSync: true}
++	report := chainReport{Mode: "fast", Requested: length, WalletNoSync: true, WaitMemberInputs: waitMembers, RecordAttempts: recordAttempts}
+ 	if waitFinal {
+ 		report.Mode = "wait_final"
+ 	}
++	if waitMembers {
++		report.Mode = "wait_member_inputs"
++	}
+ 	var start time.Time
+ 	defer func() {
+ 		cancel()
+@@ -305,6 +319,7 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
+ 			}
+ 		}
+ 	}
++	usedFees := make(map[protocol.OutputID]bool)
+ 	for i := 0; i < length; i++ {
+ 		h := &chainHop{Hop: i + 1, Sender: i % 3, Receiver: (i + 1) % 3, Input: id, BuildStartUnixNS: time.Now().UnixNano()}
+ 		buildStart := time.Now()
+@@ -381,13 +396,43 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
+ 		h.OutputData = body.Outputs[0]
+ 		h.BuildDoneUnixNS = time.Now().UnixNano()
+ 		h.BuildMS = float64(time.Since(buildStart)) / 1e6
++		if recordAttempts {
++			h.RequestRaw = raw
++		}
++		if waitMembers {
++			var parent *chainHop
++			var parentFact protocol.SpendFactID
++			if i > 0 {
++				parent = report.Hops[i-1]
++				parentFact = parent.Fact
++			}
++			if e = validateChainWaitInputs(request, parent, n.Genesis.Outputs, usedFees); e != nil {
++				return fmt.Errorf("hop %d input gate: %w", i+1, e)
++			}
++			gate, gateErr := waitChainMembers(ctx, parentFact, i > 0, func(call context.Context, index int, fact protocol.SpendFactID) (member.DirectStatus, error) {
++				return batches[index].Check(call, fact)
++			})
++			gate.GenesisFeeValidated = true
++			h.MemberInputGate = &gate
++			if gateErr != nil {
++				report.Hops = append(report.Hops, h)
++				return fmt.Errorf("hop %d member input gate: %w", i+1, gateErr)
++			}
++			usedFees[body.Fee.Inputs[0].Output] = true
++		}
+ 		sent := time.Now()
+-		if start.IsZero() {
+-			start = sent
+-			report.StartedUnixNS = sent.UnixNano()
++		markSent := func(actual time.Time) {
++			sent = actual
++			if start.IsZero() {
++				start = actual
++				report.StartedUnixNS = actual.UnixNano()
++			}
++			h.SentUnixNS = actual.UnixNano()
++			h.SentOffsetMS = float64(actual.Sub(start)) / 1e6
++		}
++		if !recordAttempts {
++			markSent(sent)
+ 		}
+-		h.SentUnixNS = sent.UnixNano()
+-		h.SentOffsetMS = float64(sent.Sub(start)) / 1e6
+ 		report.Hops = append(report.Hops, h)
+ 		var b []byte
+ 		var header http.Header
+@@ -395,9 +440,22 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
+ 		if e5 {
+ 			call, stop := context.WithTimeout(ctx, 30*time.Second)
+ 			var c *protocol.OutputCertificate
+-			c, attempts, e = faultSend(call, client, lab.Gateways[0]+"/v3/transactions", raw, true)
++			if recordAttempts {
++				b, h.HTTPAttempts, e = measuredFaultSend(call, client, lab.Gateways[0]+"/v3/transactions", raw, markSent)
++				attempts = len(h.HTTPAttempts)
++				if e == nil {
++					// Keep faultSend's decode/re-encode path identical in all arms.
++					decoded, decodeErr := protocol.DecodeOutputCertificate(b)
++					e = decodeErr
++					if e == nil {
++						b, e = decoded.MarshalBinary()
++					}
++				}
++			} else {
++				c, attempts, e = faultSend(call, client, lab.Gateways[0]+"/v3/transactions", raw, true)
++			}
+ 			stop()
+-			if e == nil {
++			if e == nil && !recordAttempts {
+ 				b, e = c.MarshalBinary()
+ 			}
+ 		} else {
+@@ -442,6 +500,11 @@ func runChain(dir string, lab cfg.Lab, n cfg.Network, length int, waitFinal, tra
+ 		if waitFinal {
+ 			select {
+ 			case <-finalReady:
++				if recordAttempts {
++					waitDone := time.Now()
++					h.PublicWaitDoneUnixNS = waitDone.UnixNano()
++					h.PublicWaitMS = float64(waitDone.Sub(ready)) / 1e6
++				}
+ 			case <-ctx.Done():
+ 				return ctx.Err()
+ 			}
+--- /dev/null
++++ b/cmd/payctl/chain_wait.go
+@@ -0,0 +1,196 @@
++package main
++
++// This is a fixture-specific experiment observation, never an authorization
++// decision. Members still run the complete approval path on every request.
++import (
++	"bytes"
++	"context"
++	"crypto/sha256"
++	"encoding/hex"
++	"fmt"
++	"io"
++	"net/http"
++	"time"
++	"utxo/internal/member"
++	"utxo/internal/state"
++	"utxo/internal/transport"
++	"utxo/protocol"
++)
++
++type chainGateSample struct {
++	Member, Poll              int
++	StartedUnixNS, DoneUnixNS int64
++	Status                    member.DirectStatus
++	Error                     string `json:",omitempty"`
++}
++type chainMemberGate struct {
++	Parent                    protocol.SpendFactID
++	RequiresParentObservation bool
++	GenesisFeeValidated       bool
++	StartedUnixNS, DoneUnixNS int64
++	MS                        float64
++	Polls, MaxMemberPolls     int
++	Quorum                    []int
++	Samples                   []chainGateSample
++}
++
++func waitChainMembers(ctx context.Context, parent protocol.SpendFactID, requireParent bool, load func(context.Context, int, protocol.SpendFactID) (member.DirectStatus, error)) (gate chainMemberGate, err error) {
++	started := time.Now()
++	gate.Parent, gate.RequiresParentObservation = parent, requireParent
++	gate.StartedUnixNS = started.UnixNano()
++	defer func() { gate.DoneUnixNS = time.Now().UnixNano(); gate.MS = float64(time.Since(started)) / 1e6 }()
++	if err = ctx.Err(); err != nil {
++		return gate, err
++	}
++	watch, cancel := context.WithCancel(ctx)
++	defer cancel()
++	replies := make(chan chainGateSample, 4)
++	for i := 0; i < 4; i++ {
++		go func(i int) {
++			for poll := 1; ; poll++ {
++				s := chainGateSample{Member: i, Poll: poll, StartedUnixNS: time.Now().UnixNano()}
++				var e error
++				s.Status, e = load(watch, i, parent)
++				s.DoneUnixNS = time.Now().UnixNano()
++				if e != nil {
++					s.Error = e.Error()
++				}
++				select {
++				case <-watch.Done():
++					return
++				case replies <- s:
++				}
++				if e == nil && (!requireParent || s.Status.Observed) {
++					return
++				}
++				if budgetPause(watch, 5*time.Millisecond) != nil {
++					return
++				}
++			}
++		}(i)
++	}
++	for {
++		select {
++		case <-ctx.Done():
++			return gate, ctx.Err()
++		case s := <-replies:
++			gate.Samples = append(gate.Samples, s)
++			gate.Polls++
++			gate.MaxMemberPolls = max(gate.MaxMemberPolls, s.Poll)
++			if s.Error == "" && (!requireParent || s.Status.Observed) {
++				gate.Quorum = append(gate.Quorum, s.Member)
++				if len(gate.Quorum) == 3 {
++					if err = ctx.Err(); err != nil {
++						return gate, err
++					}
++					return gate, nil
++				}
++			}
++		}
++	}
++}
++
++func validateChainWaitInputs(req protocol.DirectRequest, parent *chainHop, genesis []state.OriginOutput, usedFees map[protocol.OutputID]bool) error {
++	tx := req.Tx
++	if len(tx.Body.Inputs) != 1 || len(tx.Claims) != 1 || tx.Body.Inputs[0].Kind != protocol.FinalInput || tx.Claims[0].Instance != 0 || len(req.InputCertificates) != 0 {
++		return fmt.Errorf("member wait requires one unrecovered final principal")
++	}
++	in, claim := tx.Body.Inputs[0], tx.Claims[0].Output
++	if parent != nil {
++		if in.Output != parent.Output || in.Evidence != protocol.CreationIdentity(tx.Body.Network, parent.Tx, 0, 0) || claim != parent.OutputData {
++			return fmt.Errorf("principal does not match immediate parent output")
++		}
++	} else {
++		found := false
++		for _, g := range genesis {
++			if g.ID == in.Output && g.Fact == in.Evidence && g.Output == claim {
++				found = true
++				break
++			}
++		}
++		if !found {
++			return fmt.Errorf("initial principal does not match genesis")
++		}
++	}
++	if tx.Body.Fee.Source != protocol.OwnerFinalUTXO || len(tx.Body.Fee.Inputs) != 1 {
++		return fmt.Errorf("member wait requires independent genesis FUEL")
++	}
++	fee := tx.Body.Fee.Inputs[0]
++	if fee.Kind != protocol.FinalInput || usedFees[fee.Output] {
++		return fmt.Errorf("fee input is nonfinal or reused")
++	}
++	for _, g := range genesis {
++		if g.ID != fee.Output {
++			continue
++		}
++		if g.Fact != fee.Evidence || g.Output.Asset != protocol.AssetFUEL || g.Output.Amount < tx.Body.Fee.Maximum || g.Output.Recipient.Route.Kind != protocol.OrgRoute || g.Output.Recipient.Route.Org != tx.Body.Certifier {
++			return fmt.Errorf("fee input does not match funded genesis FUEL")
++		}
++		for _, a := range tx.Auth {
++			if a.Owner == g.Output.Recipient.Owner {
++				return nil
++			}
++		}
++		return fmt.Errorf("genesis fee owner not included in authorization")
++	}
++	return fmt.Errorf("fee input absent from genesis")
++}
++
++type chainHTTPAttempt struct {
++	Attempt                   int
++	RequestSHA256             string
++	StartedUnixNS, DoneUnixNS int64
++	ServiceMS                 float64
++	HTTPStatus                int
++	ResponseBody              string `json:",omitempty"`
++	Error                     string `json:",omitempty"`
++	RetrySleepMS              float64
++}
++
++// Match faultSend's existing retry policy and 50ms pause; record literal
++// gateway responses without inferring which member check failed.
++func measuredFaultSend(ctx context.Context, client *http.Client, url string, raw []byte, beforeFirstSend func(time.Time)) (b []byte, attempts []chainHTTPAttempt, err error) {
++	sum := sha256.Sum256(raw)
++	digest := hex.EncodeToString(sum[:])
++	for number := 1; ; number++ {
++		a := chainHTTPAttempt{Attempt: number, RequestSHA256: digest}
++		req, e := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(raw))
++		if e != nil {
++			return nil, attempts, e
++		}
++		req.Header.Set("Content-Type", transport.MediaType)
++		sent := time.Now()
++		if number == 1 {
++			beforeFirstSend(sent)
++		}
++		a.StartedUnixNS = sent.UnixNano()
++		resp, e := client.Do(req)
++		if e == nil {
++			a.HTTPStatus = resp.StatusCode
++			b, e = io.ReadAll(io.LimitReader(resp.Body, protocol.MaxCertificateBytes))
++			resp.Body.Close()
++			if e == nil && resp.StatusCode != http.StatusOK {
++				a.ResponseBody = string(b)
++				e = fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
++			}
++		}
++		a.DoneUnixNS = time.Now().UnixNano()
++		a.ServiceMS = float64(time.Since(sent)) / 1e6
++		if e == nil {
++			attempts = append(attempts, a)
++			return b, attempts, nil
++		}
++		a.Error = e.Error()
++		if ctx.Err() != nil {
++			attempts = append(attempts, a)
++			return nil, attempts, e
++		}
++		pause := time.Now()
++		err = budgetPause(ctx, 50*time.Millisecond)
++		a.RetrySleepMS = float64(time.Since(pause)) / 1e6
++		attempts = append(attempts, a)
++		if err != nil {
++			return nil, attempts, err
++		}
++	}
++}
+--- /dev/null
++++ b/cmd/payctl/chain_wait_test.go
+@@ -0,0 +1,148 @@
++package main
++
++import (
++	"context"
++	"crypto/sha256"
++	"encoding/hex"
++	"errors"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"strings"
++	"testing"
++	"time"
++	"utxo/internal/member"
++	"utxo/internal/state"
++	"utxo/protocol"
++)
++
++func TestMeasuredChainRetryRetainsExactRequestAndFailureCost(t *testing.T) {
++	var bodies []string
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		raw, _ := io.ReadAll(r.Body)
++		bodies = append(bodies, string(raw))
++		time.Sleep(2 * time.Millisecond)
++		if len(bodies) == 1 {
++			http.Error(w, "QUORUM_UNAVAILABLE", 503)
++			return
++		}
++		w.Write([]byte("certificate"))
++	}))
++	defer server.Close()
++	sends := 0
++	raw := []byte("exact signed request")
++	response, rows, err := measuredFaultSend(context.Background(), server.Client(), server.URL, raw, func(time.Time) { sends++ })
++	sum := sha256.Sum256(raw)
++	if err != nil || string(response) != "certificate" || sends != 1 || len(rows) != 2 || len(bodies) != 2 || bodies[0] != bodies[1] {
++		t.Fatalf("%s %+v %v", response, rows, err)
++	}
++	if rows[0].HTTPStatus != 503 || rows[0].ResponseBody != "QUORUM_UNAVAILABLE\n" || rows[0].ServiceMS < 2 || rows[0].RetrySleepMS < 49 || rows[1].RetrySleepMS != 0 || rows[0].RequestSHA256 != hex.EncodeToString(sum[:]) || rows[0].RequestSHA256 != rows[1].RequestSHA256 {
++		t.Fatalf("lost failure timing or identity: %+v", rows)
++	}
++}
++
++func TestChainWaitRequiresObservedQuorumWithoutWaitingForFourth(t *testing.T) {
++	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
++	defer cancel()
++	gate, err := waitChainMembers(ctx, protocol.SpendFactID{1}, true, func(ctx context.Context, i int, _ protocol.SpendFactID) (member.DirectStatus, error) {
++		if i == 3 {
++			<-ctx.Done()
++			return member.DirectStatus{}, ctx.Err()
++		}
++		return member.DirectStatus{Observed: true}, nil
++	})
++	if err != nil || len(gate.Quorum) != 3 || gate.MS >= 500 {
++		t.Fatalf("waited for fourth: %+v %v", gate, err)
++	}
++	ctx2, cancel2 := context.WithTimeout(context.Background(), 25*time.Millisecond)
++	defer cancel2()
++	_, err = waitChainMembers(ctx2, protocol.SpendFactID{1}, true, func(context.Context, int, protocol.SpendFactID) (member.DirectStatus, error) {
++		return member.DirectStatus{Signed: true, Height: 10}, nil
++	})
++	if !errors.Is(err, context.DeadlineExceeded) {
++		t.Fatalf("signed/height substituted for observation: %v", err)
++	}
++}
++
++func TestChainWaitBootstrapOnlyRequiresThreeHealthyMembers(t *testing.T) {
++	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
++	defer cancel()
++	gate, err := waitChainMembers(ctx, protocol.SpendFactID{}, false, func(context.Context, int, protocol.SpendFactID) (member.DirectStatus, error) {
++		return member.DirectStatus{}, nil
++	})
++	if err != nil || len(gate.Quorum) != 3 || gate.RequiresParentObservation {
++		t.Fatalf("bootstrap gate: %+v %v", gate, err)
++	}
++}
++
++func TestChainWaitCanceledContextCannotOpenReadyGate(t *testing.T) {
++	ctx, cancel := context.WithCancel(context.Background())
++	cancel()
++	_, err := waitChainMembers(ctx, protocol.SpendFactID{1}, true, func(context.Context, int, protocol.SpendFactID) (member.DirectStatus, error) {
++		return member.DirectStatus{Observed: true}, nil
++	})
++	if !errors.Is(err, context.Canceled) {
++		t.Fatalf("cancellation opened gate: %v", err)
++	}
++}
++
++func TestChainWaitRepollsThirdWithoutWaitingForFourth(t *testing.T) {
++	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
++	defer cancel()
++	thirdPolls := 0
++	gate, err := waitChainMembers(ctx, protocol.SpendFactID{1}, true, func(ctx context.Context, index int, _ protocol.SpendFactID) (member.DirectStatus, error) {
++		if index == 3 {
++			<-ctx.Done()
++			return member.DirectStatus{}, ctx.Err()
++		}
++		if index == 2 {
++			thirdPolls++
++			return member.DirectStatus{Observed: thirdPolls >= 2}, nil
++		}
++		return member.DirectStatus{Observed: true}, nil
++	})
++	if err != nil || len(gate.Quorum) != 3 || thirdPolls < 2 {
++		t.Fatalf("slow fourth delayed third polling: %+v %v", gate, err)
++	}
++}
++
++func TestChainWaitFlagsRequireFixtureModesBeforeReadingLab(t *testing.T) {
++	for _, args := range [][]string{
++		{"-dir", "absent", "-wait-member-inputs"},
++		{"-dir", "absent", "-wait-member-inputs", "-wait-final"},
++		{"-dir", "absent", "-wait-member-inputs", "-e5-owner-fuel"},
++		{"-dir", "absent", "-record-chain-attempts"},
++	} {
++		err := chainDirect(args)
++		if err == nil || !strings.Contains(err.Error(), "requires") {
++			t.Fatalf("fixture guard: %v %v", args, err)
++		}
++	}
++}
++
++func TestChainWaitValidatesExactPrincipalAndGenesisFee(t *testing.T) {
++	org := protocol.Digest("org")
++	parent := &chainHop{Tx: protocol.TxID{1}, Output: protocol.OutputID{2}, OutputData: protocol.Output{Asset: protocol.AssetCAL, Amount: 100}}
++	fee := state.OriginOutput{ID: protocol.OutputID{3}, Fact: protocol.Digest("fee"), Output: protocol.Output{Asset: protocol.AssetFUEL, Amount: 1000}}
++	fee.Output.Recipient.Route = protocol.Route{Kind: protocol.OrgRoute, Org: org}
++	req := protocol.DirectRequest{Tx: protocol.FastTx{Body: protocol.TxBody{Network: protocol.Digest("net"), Certifier: org, Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: parent.Output}}, Fee: protocol.FeeTerms{Source: protocol.OwnerFinalUTXO, Maximum: 1000, Inputs: []protocol.Input{{Kind: protocol.FinalInput, Output: fee.ID, Evidence: fee.Fact}}}}, Claims: []protocol.InputClaim{{Output: parent.OutputData}}, Auth: []protocol.OwnerAuth{{Owner: fee.Output.Recipient.Owner}}}}
++	req.Tx.Body.Inputs[0].Evidence = protocol.CreationIdentity(req.Tx.Body.Network, parent.Tx, 0, 0)
++	used := map[protocol.OutputID]bool{}
++	if err := validateChainWaitInputs(req, parent, []state.OriginOutput{fee}, used); err != nil {
++		t.Fatal(err)
++	}
++	req.Tx.Body.Inputs[0].Evidence[0] ^= 1
++	if err := validateChainWaitInputs(req, parent, []state.OriginOutput{fee}, used); err == nil {
++		t.Fatal("wrong principal evidence accepted")
++	}
++	req.Tx.Body.Inputs[0].Evidence[0] ^= 1
++	req.Tx.Body.Fee.Inputs[0].Evidence[0] ^= 1
++	if err := validateChainWaitInputs(req, parent, []state.OriginOutput{fee}, used); err == nil {
++		t.Fatal("wrong fee evidence accepted")
++	}
++	req.Tx.Body.Fee.Inputs[0].Evidence[0] ^= 1
++	used[fee.ID] = true
++	if err := validateChainWaitInputs(req, parent, []state.OriginOutput{fee}, used); err == nil {
++		t.Fatal("reused genesis fee accepted")
++	}
++}
+--- /dev/null
++++ b/docs/experiments/wait-baseline-2026-10-05/run_chain.py
+@@ -0,0 +1,178 @@
++"""Matched fast/wallet-wait/member-ready chains on a fresh source copy.
++
++Waiting adds a client observation gate, not a different payment protocol.
++Three routed members must observe the exact parent; fee inputs are distinct
++genesis outputs installed before member HTTP startup. The client validates
++the immediate principal and genesis fee fixture before opening each gate.
++"""
++import argparse
++from datetime import datetime, timezone, timedelta
++import hashlib
++import json
++import os
++import platform
++from pathlib import Path
++import shutil
++import signal
++import subprocess
++import time
++import urllib.request
++
++
++def write(path, data):
++    path.write_text(json.dumps(data, indent=2) + '\n')
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument('--root', type=Path, required=True)
++    parser.add_argument('--commit', required=True)
++    parser.add_argument('--source-manifest', type=Path,
++                        help='combined source freeze manifest; SHA-256 recorded in build.json')
++    args = parser.parse_args()
++    root = args.root.resolve()
++    (root / '.run').mkdir(exist_ok=True)
++    out = root / 'results'
++    out.mkdir()  # Never replace an existing experiment.
++    shutil.copy2(Path(__file__), out / 'executed-run.py')
++    write(out / 'host.json', {'platform': platform.platform(),
++          'machine': platform.machine(), 'logical_cpu_count': os.cpu_count(),
++          'macos': subprocess.check_output(['sw_vers'], text=True),
++          'cpu': subprocess.check_output(['sysctl', '-n', 'machdep.cpu.brand_string'], text=True).strip(),
++          'memory_bytes': subprocess.check_output(['sysctl', '-n', 'hw.memsize'], text=True).strip()})
++    binary = root / 'bin-final'
++    binary.mkdir()
++    env = {k: v for k, v in os.environ.items()
++           if not k.startswith('UTXO_') and k not in ('GODEBUG', 'GOGC', 'GOMAXPROCS')}
++    env['PATH'] = '/usr/local/go/bin:/opt/homebrew/bin:' + env['PATH']
++    env.update(UTXO_EXPERIMENT_COMMIT='250ms', UTXO_EXPERIMENT_FLUSH='10ms',
++               UTXO_EXPERIMENT_GOSSIP='10ms', UTXO_EXPERIMENT_BUDGET='1',
++               UTXO_EXPERIMENT_MEMBER_SYNC='1', UTXO_SETTLEMENT_TRACE='1')
++    for key in ['COMMITTEE_MEMORY', 'MEMBER_MEMORY', 'GATEWAY_MEMORY', 'MEM_BLOCKSTORE']:
++        env['UTXO_EXPERIMENT_' + key] = '0'
++
++    def cmd(argv, log, timeout=300):
++        with log.open('w') as f:
++            subprocess.run(list(map(str, argv)), cwd=root, env=env, stdout=f,
++                           stderr=subprocess.STDOUT, check=True, timeout=timeout)
++
++    cmd(['python3', 'third_party/cometbft/overlay.py'], out / 'overlay.log')
++    for role in ['payctl', 'committee', 'gateway', 'member']:
++        target = binary / ('member-real' if role == 'member' else role)
++        cmd(['go', 'build', '-tags=comet_v3', '-o', target, './cmd/' + role], out / (role + '-build.log'))
++    wrapper = binary / 'member'
++    wrapper.write_text('#!/bin/sh\nexec env GOMAXPROCS=16 GOGC=200 "' + str(binary / 'member-real') + '" "$@"\n')
++    wrapper.chmod(0o755)
++    hashes = lambda paths: {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
++    source = [p for name in ['cmd', 'internal', 'crypto', 'protocol', 'finality', 'third_party']
++              for p in (root / name).rglob('*') if p.is_file()]
++    source += [root / 'go.mod', root / 'go.sum']
++    manifest = args.source_manifest or root / 'source-bundle-manifest.json'
++    if args.source_manifest and not manifest.is_file():
++        raise FileNotFoundError(manifest)
++    source_manifest = ({'path': str(manifest.resolve()),
++                        'sha256': hashlib.sha256(manifest.read_bytes()).hexdigest()}
++                       if manifest.is_file() else None)
++    write(out / 'build.json', {'commit': args.commit, 'source': hashes(source),
++          'experiment': 'client-only-member-input-gate',
++          'commit_label_is_not_source_identity': True,
++          'source_manifest': source_manifest,
++          'binaries': hashes(binary.iterdir()), 'comet_go': hashes((root / '.scratch/comet-src').rglob('*.go')),
++          'go': subprocess.check_output(['go', 'version'], env=env, text=True).strip(),
++          'env': {k: v for k, v in env.items() if k.startswith('UTXO_')},
++          'runner_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest()})
++    cmd(['go', 'test', '-tags=comet_v3', './cmd/payctl', './internal/member', './internal/wallet', './internal/committee'], out / 'tests.log')
++    print('BUILD AND TARGETED TESTS PASS', flush=True)
++
++    ctl = lambda argv, log: cmd([binary / 'payctl'] + list(argv), log)
++    template = root / '.run/template'
++    ctl(['init-lab', '-dir', template, '-port', 31000, '-outputs', 110, '-v4'], out / 'init.log')
++    ctl(['chain-v4', '-dir', template, '-length', 100, '-prepare', '-e5-owner-fuel'], out / 'prepare.log')
++    cfg = json.loads((template / 'lab.json').read_text())
++    cfg['Nodes'] = [n for n in cfg['Nodes'] if n['Binary'] == 'committee'
++                    or n['Name'] == 'gateway0' or n['Name'].startswith('org0-member')]
++    assert len(cfg['Nodes']) == 9
++    write(template / 'lab.json', cfg)
++    # Public configuration only; never archive the generated private keys.
++    pristine = json.loads(Path(cfg['Network']).read_text())
++    write(out / 'genesis-template.json', pristine)
++    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
++
++    def get(url):
++        with opener.open(url, timeout=5) as r:
++            return json.load(r)
++
++    modes = ['fast', 'wallet-wait', 'member-wait']
++    for repeat in range(1, 4):
++        order = modes[repeat-1:] + modes[:repeat-1]
++        for mode in order:
++            wait = mode != 'fast'
++            member_wait = mode == 'member-wait'
++            name = f'r{repeat}-' + mode
++            target = out / name
++            target.mkdir()
++            lab = root / '.run' / name
++            shutil.copytree(template, lab)
++            for p in [lab / 'lab.json', *(lab / 'config').glob('*.json')]:
++                p.write_text(p.read_text().replace(str(template), str(lab)))
++            cfg = json.loads((lab / 'lab.json').read_text())
++            network = json.loads(Path(cfg['Network']).read_text())
++            network['GenesisTime'] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
++            write(Path(cfg['Network']), network)
++            write(target / 'network.json', network)
++            write(target / 'configuration.json', {'wait_final': wait, 'hops': 100,
++                  'wait_member_inputs': member_wait, 'record_chain_attempts': True,
++                  'arm': mode, 'repeat_order': order,
++                  'wait_gate': 'three routed members observe parent; unused genesis FUEL validated',
++                  'initial_gate_excluded_from_chain_timer': member_wait,
++                  'intermediate_gates_included_in_chain_timer': 99 if member_wait else 0,
++                  'nodes': 9, 'owner_fuel': True, 'member_sync': True, 'wallet_no_sync': True,
++                  'env': {k: v for k, v in env.items() if k.startswith('UTXO_')},
++                  'member_GOMAXPROCS': 16, 'member_GOGC': 200})
++            print('START', name, flush=True)
++            with (target / 'lab.log').open('w') as log:
++                proc = subprocess.Popen([str(binary / 'payctl'), 'lab-run', '-dir', str(lab), '-bin', str(binary)],
++                                        cwd=root, env=env, stdout=log, stderr=log)
++                try:
++                    deadline = time.monotonic() + 90
++                    while 'Laboratory running:' not in (target / 'lab.log').read_text():
++                        if proc.poll() is not None:
++                            raise RuntimeError('lab exited')
++                        if time.monotonic() > deadline:
++                            raise TimeoutError('lab ready')
++                        time.sleep(.2)
++                    time.sleep(3)
++                    command = ['chain-v4', '-dir', lab, '-length', 100, '-e5-owner-fuel',
++                               '-record-chain-attempts']
++                    if wait:
++                        command += ['-wait-final']
++                    if member_wait:
++                        command += ['-wait-member-inputs']
++                    ctl(command, target / 'chain.log')
++                    report = json.loads((lab / 'reports/chain-v4.json').read_text())
++                    events = {str(i): {bytes(h['Fact']).hex(): get(url + '/debug/settlement/' + bytes(h['Fact']).hex())
++                                     for h in report['Hops']} for i, url in enumerate(network['CommitteeURLs'])}
++                    write(target / 'settlements.json', events)
++                    time.sleep(2)
++                finally:
++                    if proc.poll() is None:
++                        proc.send_signal(signal.SIGINT)
++                        proc.wait(timeout=60)
++            ctl(['audit', '-dir', lab], target / 'audit.log')
++            ctl(['chain-v4', '-dir', lab, '-audit'], target / 'chain-audit.log')
++            for p in (lab / 'reports').glob('*.json'):
++                # Preserve typed requests as well as the exact HTTP bytes.
++                shutil.copy2(p, target / p.name)
++            rows = json.loads((target / 'audit.json').read_text())
++            committees = [n for n in rows if n['Name'].startswith('committee')]
++            assert len(committees) == 4 and len({n['StateHash'] for n in committees}) == 1
++            assert all(n['Gap'] == '0' and n['Payments'] == n['Closed'] == 100 for n in committees)
++            assert all(n.get('Pending', 0) == 0 for n in rows)
++            assert not report.get('Error') and len(report['Hops']) == 100
++            print('PASS', name, {k: report[k] for k in ['FastChainMS', 'PublicChainMS', 'ClosedChainMS']}, flush=True)
++    print('ALL NINE THREE-ARM CONTINUATION RUNS PASS', flush=True)
++    write(out / 'manifest.json', hashes(p for p in out.rglob('*') if p.is_file()))
++
++
++if __name__ == '__main__':
++    main()
+--- /dev/null
++++ b/docs/experiments/wait-baseline-2026-10-05/analyze.py
+@@ -0,0 +1,123 @@
++"""Audit actual request/attempt/gate records; keep failure reasons literal."""
++import argparse
++import base64
++import gzip
++import hashlib
++import json
++from pathlib import Path
++from statistics import mean, median
++
++
++def read(path):
++    if path.exists():
++        return json.loads(path.read_text())
++    with gzip.open(str(path) + '.gz', 'rt') as source:
++        return json.load(source)
++
++
++def audit_run(folder):
++    report = read(folder / 'chain-v4.json')
++    assert not report.get('Error') and len(report['Hops']) == 100
++    assert report['RecordAttempts']
++    wait = not folder.name.endswith('-fast')
++    member_wait = folder.name.endswith('-member-wait')
++    assert report['WaitMemberInputs'] == member_wait
++    requests = read(folder / 'fault-v4.json')['Samples']
++    assert len(requests) == 100
++    genesis = read(folder / 'network.json')['Genesis']['Outputs']
++    origins = {tuple(row['ID']): row for row in genesis}
++    fees = set()
++    row = {'case': folder.name, 'mode': report['Mode'],
++           'chain_ms': report['FastChainMS'], 'attempts': 0, 'failed_attempts': 0,
++           'failed_service_ms': 0., 'retry_sleep_ms': 0.,
++           'intermediate_gate_ms': 0., 'gate_samples': 0,
++           'intermediate_wallet_wait_ms': 0.,
++           'diagnostic_scope': 'HTTP responses and member observations; no inferred approval-failure reason'}
++    for index, hop in enumerate(report['Hops']):
++        body = requests[index]['Request']['Tx']['Body']
++        assert body['Inputs'][0]['Output'] == hop['Input']
++        for fee in body['Fee']['Inputs']:
++            identity = tuple(fee['Output'])
++            assert identity not in fees and identity in origins
++            assert fee['Evidence'] == origins[identity]['Fact']
++            fees.add(identity)
++        raw = base64.b64decode(hop['RequestRaw'], validate=True)
++        assert len(raw) == hop['RequestBytes']
++        digest = hashlib.sha256(raw).hexdigest()
++        attempts = hop['HTTPAttempts']
++        assert len(attempts) == hop['Attempts'] and attempts
++        assert attempts[0]['StartedUnixNS'] == hop['SentUnixNS']
++        assert attempts[-1]['HTTPStatus'] == 200 and not attempts[-1].get('Error')
++        for number, attempt in enumerate(attempts, 1):
++            assert attempt['Attempt'] == number and attempt['RequestSHA256'] == digest
++            assert attempt['ServiceMS'] >= 0 and attempt['RetrySleepMS'] >= 0
++            row['attempts'] += 1
++            row['retry_sleep_ms'] += attempt['RetrySleepMS']
++            if attempt.get('Error'):
++                row['failed_attempts'] += 1
++                row['failed_service_ms'] += attempt['ServiceMS']
++        assert attempts[-1]['RetrySleepMS'] == 0
++        if wait:
++            assert hop['PublicWaitDoneUnixNS'] >= hop['FinalUnixNS']
++            if index < 99:
++                row['intermediate_wallet_wait_ms'] += hop['PublicWaitMS']
++        if member_wait:
++            gate = hop['MemberInputGate']
++            assert gate['GenesisFeeValidated']
++            assert len(gate['Quorum']) == len(set(gate['Quorum'])) == 3
++            assert gate['DoneUnixNS'] <= hop['SentUnixNS']
++            assert gate['RequiresParentObservation'] == (index > 0)
++            if index:
++                assert gate['Parent'] == report['Hops'][index - 1]['Fact']
++                # Successful observations of the same exact parent, not height
++                # or signing, are required for each selected routed member.
++                for member in gate['Quorum']:
++                    samples = [s for s in gate['Samples'] if s['Member'] == member]
++                    assert samples and not samples[-1].get('Error')
++                    assert samples[-1]['Status']['Observed']
++                row['intermediate_gate_ms'] += gate['MS']
++            else:
++                assert gate['DoneUnixNS'] <= report['StartedUnixNS']
++                row['initial_bootstrap_gate_ms_excluded'] = gate['MS']
++            row['gate_samples'] += len(gate['Samples'])
++        else:
++            assert not hop.get('MemberInputGate')
++    return row, report
++
++
++def main(root):
++    rows, reports = [], {}
++    modes = ('fast', 'wallet-wait', 'member-wait')
++    pairs = []
++    for repeat in range(1, 4):
++        for mode in modes:
++            case = f'r{repeat}-{mode}'
++            row, report = audit_run(root / case)
++            rows.append(row)
++            reports[case] = report
++        fast = reports[f'r{repeat}-fast']
++        for mode in modes[1:]:
++            wait = reports[f'r{repeat}-{mode}']
++            assert fast['Hops'][0]['Input'] == wait['Hops'][0]['Input']
++            for left, right in zip(fast['Hops'], wait['Hops']):
++                assert left['Sender'] == right['Sender'] and left['Receiver'] == right['Receiver']
++                assert left['OutputData'] == right['OutputData']
++        pairs.append({'repeat': repeat,
++                      'wallet_wait_over_fast': reports[f'r{repeat}-wallet-wait']['FastChainMS']/fast['FastChainMS'],
++                      'member_wait_over_fast': reports[f'r{repeat}-member-wait']['FastChainMS']/fast['FastChainMS'],
++                      'member_wait_over_wallet_wait': reports[f'r{repeat}-member-wait']['FastChainMS']/reports[f'r{repeat}-wallet-wait']['FastChainMS']})
++    aggregates = {}
++    for mode in modes:
++        values = [r['chain_ms'] for r in rows if r['case'].endswith('-' + mode)]
++        aggregates[mode] = {'mean_ms': mean(values), 'median_ms': median(values),
++                            'min_ms': min(values), 'max_ms': max(values)}
++    summary = {'runs': rows, 'aggregates': aggregates, 'paired_ratios': pairs,
++               'note': 'Different input evidence paths remain; gate timings include client polling.'}
++    (root / 'member-gate-analysis.json').write_text(json.dumps(summary, indent=2) + '\n')
++    print(json.dumps(summary, indent=2))
++
++
++if __name__ == '__main__':
++    parser = argparse.ArgumentParser()
++    parser.add_argument('results', type=Path)
++    main(parser.parse_args().results)
+--- /dev/null
++++ b/docs/experiments/wait-baseline-2026-10-05/test_analyze.py
+@@ -0,0 +1,77 @@
++"""Offline tests of the evidence auditor; these are not network measurements."""
++import base64
++import hashlib
++import json
++from pathlib import Path
++import tempfile
++import unittest
++from analyze import audit_run
++
++
++class EvidenceAuditTests(unittest.TestCase):
++    def fixture(self, root, member_wait):
++        folder = root / ('r1-member-wait' if member_wait else 'r1-wallet-wait')
++        folder.mkdir()
++        origins, samples, hops = [], [], []
++        raw = b'signed request bytes'
++        digest = hashlib.sha256(raw).hexdigest()
++        for index in range(100):
++            fee = [index + 1]
++            origins.append({'ID': fee, 'Fact': 'fee-fact'})
++            samples.append({'Request': {'Tx': {'Body': {'Inputs': [{'Output': [1]}],
++                'Fee': {'Inputs': [{'Output': fee, 'Evidence': 'fee-fact'}]}}}}})
++            hop = {'Input': [1], 'Fact': [index], 'RequestRaw': base64.b64encode(raw).decode(),
++                   'RequestBytes': len(raw), 'Attempts': 1, 'SentUnixNS': index * 100 + 20,
++                   'FinalUnixNS': index * 100 + 30, 'PublicWaitDoneUnixNS': index * 100 + 40,
++                   'PublicWaitMS': 20, 'HTTPAttempts': [{'Attempt': 1,
++                   'RequestSHA256': digest, 'StartedUnixNS': index * 100 + 20,
++                   'HTTPStatus': 200, 'ServiceMS': 5, 'RetrySleepMS': 0}]}
++            if member_wait:
++                hop['MemberInputGate'] = {'GenesisFeeValidated': True, 'Quorum': [0, 1, 2],
++                    'DoneUnixNS': index * 100 + 10, 'RequiresParentObservation': index > 0,
++                    'Parent': [index - 1], 'MS': 5, 'Samples': [
++                        {'Member': i, 'Status': {'Observed': index > 0}} for i in range(3)]}
++            hops.append(hop)
++        documents = {'chain-v4.json': {'Hops': hops, 'RecordAttempts': True,
++            'WaitMemberInputs': member_wait, 'Mode': 'wait_member_inputs' if member_wait else 'wait_final',
++            'FastChainMS': 123, 'StartedUnixNS': 20}, 'fault-v4.json': {'Samples': samples},
++            'network.json': {'Genesis': {'Outputs': origins}}}
++        for name, document in documents.items():
++            (folder / name).write_text(json.dumps(document))
++        return folder, documents
++
++    def test_both_wait_arms_and_ninety_nine_intermediate_segments(self):
++        with tempfile.TemporaryDirectory() as temp:
++            for member_wait in (False, True):
++                folder, _ = self.fixture(Path(temp), member_wait)
++                row, _ = audit_run(folder)
++                self.assertEqual(row['intermediate_wallet_wait_ms'], 99 * 20)
++                self.assertEqual(row['intermediate_gate_ms'], 99 * 5 if member_wait else 0)
++                self.assertEqual(row['attempts'], 100)
++
++    def test_unobserved_selected_member_fails_audit(self):
++        with tempfile.TemporaryDirectory() as temp:
++            folder, documents = self.fixture(Path(temp), True)
++            documents['chain-v4.json']['Hops'][1]['MemberInputGate']['Samples'][0]['Status']['Observed'] = False
++            (folder / 'chain-v4.json').write_text(json.dumps(documents['chain-v4.json']))
++            with self.assertRaises(AssertionError):
++                audit_run(folder)
++
++    def test_http_200_read_failure_is_still_a_failed_attempt(self):
++        with tempfile.TemporaryDirectory() as temp:
++            folder, documents = self.fixture(Path(temp), False)
++            hop = documents['chain-v4.json']['Hops'][0]
++            failed = dict(hop['HTTPAttempts'][0], Error='unexpected EOF',
++                          ServiceMS=3, RetrySleepMS=50)
++            succeeded = dict(hop['HTTPAttempts'][0], Attempt=2, StartedUnixNS=100)
++            hop['HTTPAttempts'] = [failed, succeeded]
++            hop['Attempts'] = 2
++            (folder / 'chain-v4.json').write_text(json.dumps(documents['chain-v4.json']))
++            row, _ = audit_run(folder)
++            self.assertEqual(row['failed_attempts'], 1)
++            self.assertEqual(row['failed_service_ms'], 3)
++            self.assertEqual(row['retry_sleep_ms'], 50)
++
++
++if __name__ == '__main__':
++    unittest.main()

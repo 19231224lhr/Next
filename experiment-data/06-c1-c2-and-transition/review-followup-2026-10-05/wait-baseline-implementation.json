@@ -1,0 +1,72 @@
+{
+  "base_head": "594d237136325fecdea003a4cfe0638fca307514",
+  "scope": "Client-only continuation experiment. No member/committee/gateway/wallet/protocol authorization or state transition changed. No remote run, commit, or push.",
+  "source_files": {
+    "cmd/payctl/direct_chain.go": "9b7394c1c32ecb739eb15c32427ec6388f8896778c1483c7dea419843f0e3170",
+    "cmd/payctl/chain_wait.go": "9fb8cd8969903f009b94aa42ff9f19e7ab35047c4147467b10362fde799f5c59",
+    "cmd/payctl/chain_wait_test.go": "4c159c590ee5af1e524b7af498850e49ae4feae2662314fc7a672d3b4ff2b193",
+    "docs/experiments/wait-baseline-2026-10-05/run_chain.py": "1ef9d6102572d87e82b113b6a3979e3961b45fa81402fadbe7bedbb898dd8165",
+    "docs/experiments/wait-baseline-2026-10-05/analyze.py": "290fcfeed70b21f56bb809f029f206810a3ec19813d7f481f796502086085e68",
+    "docs/experiments/wait-baseline-2026-10-05/test_analyze.py": "d2fb585420bf99da7149e91363cef9e01cc5e500ce10e401add59a58567fdef5"
+  },
+  "current_prior_runner": "docs/experiments/final-evidence-2026-10-04/run_chain.py, f856c7b-plus-client-timing; older final-continuation runner is 721800c historical evidence.",
+  "matrix": {
+    "hops": 100,
+    "repeats": 3,
+    "arms": [
+      "fast",
+      "wallet-wait",
+      "member-wait"
+    ],
+    "rotated_order": [
+      [
+        "fast",
+        "wallet-wait",
+        "member-wait"
+      ],
+      [
+        "wallet-wait",
+        "member-wait",
+        "fast"
+      ],
+      [
+        "member-wait",
+        "fast",
+        "wallet-wait"
+      ]
+    ],
+    "services": 9,
+    "member_sync": true,
+    "wallet_no_sync": true,
+    "warmup_seconds": 3,
+    "commit": "250ms",
+    "flush": "10ms",
+    "gossip": "10ms",
+    "member_GOMAXPROCS": 16,
+    "member_GOGC": 200
+  },
+  "gate": "Member wait retains wallet-final wait. Child final principal must exactly match immediately preceding parent creation and output; fee must be distinct funded authorized genesis FUEL. Independent routed-member 5ms observation watchers open at three parent Observed results, never Signed or Height alone. Initial three healthy reads occur before first send; 99 successor gates count inside Sent1-to-Ready100. Context cancellation/timeouts fail. These are client observations, not exact member-lag or authorization measurements.",
+  "source_basis": [
+    "member.bootstrap installs every genesis creation as final before HTTP startup",
+    "member.applyPayment writes parent Observed and final principal creation in same atomic block-follow update",
+    "Collector.CollectDirect fans out all four routed members and returns first valid three votes"
+  ],
+  "recording": "Exact request bytes plus per-attempt SHA256, actual first HTTP.Do checkpoint, HTTP start/end and monotonic service duration, literal status/body/error, observed retry sleep. Public wait driver resume marker and monotonic receipt-to-resume duration. No inferred specific DEFERRED failed check.",
+  "commands": [
+    "python3 docs/experiments/wait-baseline-2026-10-05/run_chain.py --root /absolute/fresh-source --commit 594d237-plus-client-wait-observation --source-manifest /absolute/fresh-source/source-bundle-manifest.json",
+    "python3 docs/experiments/wait-baseline-2026-10-05/analyze.py /absolute/fresh-source/results"
+  ],
+  "verification": {
+    "go_test_comet_v3_payctl": "PASS (1.181s)",
+    "go_targeted_race": "PASS (1.382s)",
+    "python_evidence_auditor": "PASS (3 tests, 0.170s)",
+    "python_compile": "PASS",
+    "scoped_git_diff_check": "PASS; whole worktree has unrelated pre-existing JSON trailing whitespace"
+  },
+  "limitations": [
+    "Fixture assumes no other workload competes for its distinct genesis FUEL or principal. Root freezes this chain separately from mixed capital workload.",
+    "Gate adds client polling after wallet finality and request construction; measured gate MS must not be relabeled exact third-member catch-up.",
+    "Actual member ErrMissing object/check is not available through progress; HTTP error and observation records remain literal.",
+    "No performance result claimed; three-arm Mac runs await root coordination."
+  ]
+}

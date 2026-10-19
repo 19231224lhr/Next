@@ -1,0 +1,1324 @@
+diff --git a/cmd/internal/config/config.go b/cmd/internal/config/config.go
+index eb3eba6..fd1b91e 100644
+--- a/cmd/internal/config/config.go
++++ b/cmd/internal/config/config.go
+@@ -25,6 +25,7 @@ import (
+ )
+ 
+ type Network struct {
++	EnableInternalPools bool `json:",omitempty"`
+ 	Members       map[protocol.Hash][4]string
+ 	CommitteeURLs [4]string
+ 	ChainID       string
+@@ -55,7 +56,7 @@ func (n Network) Trust() (finality.Trust, error) {
+ 	return trust, nil
+ }
+ func (n Network) Engine() committee.EngineConfig {
+-	return committee.EngineConfig{Network: n.Genesis.Network, Organizations: n.Organizations, Schedule: n.Schedule, Genesis: n.Genesis, Accounts: n.Accounts, Direct: n.Direct}
++	return committee.EngineConfig{EnableInternalPools:n.EnableInternalPools, Network: n.Genesis.Network, Organizations: n.Organizations, Schedule: n.Schedule, Genesis: n.Genesis, Accounts: n.Accounts, Direct: n.Direct}
+ }
+ 
+ func (n Network) Schema() uint64 {
+diff --git a/cmd/member/main.go b/cmd/member/main.go
+index 51a4e24..31d9bd9 100644
+--- a/cmd/member/main.go
++++ b/cmd/member/main.go
+@@ -67,7 +67,7 @@ func run() (result error) {
+ 	}
+ 	if memory {
+ 		db, e = store.OpenEphemeral(filepath.Join(c.DataDir, "member.db"), id)
+-	} else if syncWrites {
++	} else if syncWrites || n.EnableInternalPools {
+ 		db, e = store.Open(filepath.Join(c.DataDir, "member.db"), id)
+ 	} else {
+ 		db, e = store.OpenNoSync(filepath.Join(c.DataDir, "member.db"), id)
+@@ -85,7 +85,7 @@ func run() (result error) {
+ 	if *continuation {
+ 		continuationEntries = 256
+ 	}
+-	m, e := member.New(member.Config{DirectContinuationEntries: continuationEntries, DisableSourceRecovery: os.Getenv("UTXO_EXPERIMENT_DISABLE_SOURCE_RECOVERY") == "1", Organization: org, Index: c.Index, Key: key, Peers: n.Organizations, Committee: trust, Schedule: n.Schedule, Workers: c.Workers, Direct: n.Direct}, group, n.Genesis)
++	m, e := member.New(member.Config{EnableInternalPools:n.EnableInternalPools, DirectContinuationEntries: continuationEntries, DisableSourceRecovery: os.Getenv("UTXO_EXPERIMENT_DISABLE_SOURCE_RECOVERY") == "1", Organization: org, Index: c.Index, Key: key, Peers: n.Organizations, Committee: trust, Schedule: n.Schedule, Workers: c.Workers, Direct: n.Direct}, group, n.Genesis)
+ 	if e != nil {
+ 		return e
+ 	}
+diff --git a/internal/committee/direct.go b/internal/committee/direct.go
+index 9370a53..e888344 100644
+--- a/internal/committee/direct.go
++++ b/internal/committee/direct.go
+@@ -58,6 +58,12 @@ func (e *Engine) ExecuteAt(v state.ReadView, raw []byte, b BlockContext) (state.
+ 	if b.Height <= 0 || b.Time.IsZero() {
+ 		return state.Transition{}, protocol.ErrRule
+ 	}
++	if protocol.IsPoolCertificate(raw) {
++		if !e.cfg.EnableInternalPools { return state.Transition{}, protocol.ErrUnsupported }
++		c, err := protocol.DecodePoolCertificate(raw)
++		if err != nil { return state.Transition{}, err }
++		return rules.EvaluatePool(v, c, e.cfg.Network, e.direct.Organizations)
++	}
+ 	if protocol.IsReserveIncrease(raw) {
+ 		c, err := protocol.DecodeReserveIncrease(raw)
+ 		if err != nil {
+diff --git a/internal/committee/engine.go b/internal/committee/engine.go
+index 5574101..d9961e7 100644
+--- a/internal/committee/engine.go
++++ b/internal/committee/engine.go
+@@ -16,6 +16,7 @@ type GenesisAccount struct {
+ 	Balance uint64
+ }
+ type EngineConfig struct {
++	EnableInternalPools bool `json:",omitempty"`
+ 	Network       protocol.Hash
+ 	Organizations []protocol.OrgConfig
+ 	Schedule      rules.Schedule
+@@ -37,6 +38,7 @@ type Engine struct {
+ }
+ 
+ func NewEngine(c EngineConfig, db store.Store) (*Engine, error) {
++	if c.EnableInternalPools && c.Direct == nil { return nil, protocol.ErrRule }
+ 	if c.Network == (protocol.Hash{}) || c.Genesis.Network != c.Network || c.Schedule.Validate() != nil || db == nil {
+ 		return nil, protocol.ErrRule
+ 	}
+@@ -233,6 +235,12 @@ func (e *Engine) unwrap(raw []byte) ([]byte, error) {
+ }
+ func (e *Engine) Check(raw []byte) error {
+ 	if e.direct != nil {
++		if protocol.IsPoolCertificate(raw) {
++			if !e.cfg.EnableInternalPools { return protocol.ErrUnsupported }
++			c, err := protocol.DecodePoolCertificate(raw)
++			if err != nil { return err }
++			return rules.VerifyPoolPublic(c, e.cfg.Network, e.direct.Organizations)
++		}
+ 		if protocol.IsReserveIncrease(raw) {
+ 			c, err := protocol.DecodeReserveIncrease(raw)
+ 			if err != nil {
+diff --git a/internal/member/blocks.go b/internal/member/blocks.go
+index b3bf5ff..8070f75 100644
+--- a/internal/member/blocks.go
++++ b/internal/member/blocks.go
+@@ -179,6 +179,14 @@ func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, erro
+ 	}
+ 	var updates []blockfollow.Apply
+ 	for _, entry := range b.Transactions() {
++		if entry.Code == 0 && protocol.IsPoolCertificate(entry.Bytes) {
++			if !m.cfg.EnableInternalPools { return nil, protocol.ErrUnsupported }
++			c, err := protocol.DecodePoolCertificate(entry.Bytes)
++			if err != nil { return nil, err }
++			if err = rules.VerifyPoolPublic(c, m.cfg.Organization.Network, m.peers); err != nil { return nil, err }
++			updates = append(updates, func(o *state.Overlay) error { return rules.ObservePool(o, c, m.cfg.Organization.Network, m.peers) })
++			continue
++		}
+ 		if entry.Code == 0 && protocol.IsReserveIncrease(entry.Bytes) {
+ 			c, err := protocol.DecodeReserveIncrease(entry.Bytes)
+ 			if err != nil {
+diff --git a/internal/member/member.go b/internal/member/member.go
+index 6e3f0b8..1d7ae6d 100644
+--- a/internal/member/member.go
++++ b/internal/member/member.go
+@@ -15,6 +15,7 @@ import (
+ )
+ 
+ type Config struct {
++	EnableInternalPools bool
+ 	// Optional bounded copies of committed approval summaries; zero disables caching.
+ 	DirectContinuationEntries int
+ 	// Optional same-configuration certificate reuse; zero entries disables it.
+@@ -52,6 +53,7 @@ func (m *Member) BudgetLimits() (counts [6]uint64) {
+ }
+ 
+ func New(cfg Config, db store.Store, gen state.Genesis) (*Member, error) {
++	if cfg.EnableInternalPools && cfg.Direct == nil { return nil, protocol.ErrRule }
+ 	if cfg.Organization.Validate() != nil || cfg.Index >= 4 || len(cfg.Key) != ed25519.PrivateKeySize || cfg.Workers == 0 || cfg.Workers > 256 || cfg.Schedule.Validate() != nil || gen.Network != cfg.Organization.Network {
+ 		return nil, protocol.ErrRule
+ 	}
+@@ -135,6 +137,7 @@ func (m *Member) bootstrap(gen state.Genesis) error {
+ 			key := m.direct.Key.KeyID()
+ 			hash = protocol.Digest("MEMBER_INITIAL_STATE_V5", hash[:], key[:])
+ 		}
++		if m.cfg.EnableInternalPools { hash = protocol.Digest("MEMBER_INTERNAL_POOLS_V1", hash[:]) }
+ 		if old, found, e := state.Load[protocol.Hash](v, key); e != nil {
+ 			return nil, e
+ 		} else if found {
+diff --git a/internal/transport/committee.go b/internal/transport/committee.go
+index 252af02..c1810d9 100644
+--- a/internal/transport/committee.go
++++ b/internal/transport/committee.go
+@@ -46,7 +46,7 @@ func NewCommitteeClient(url string, extra ...string) *CommitteeClient {
+ func (c *CommitteeClient) Submit(ctx context.Context, raw []byte) error {
+ 	_, directErr := protocol.DecodeDirectSubmission(raw)
+ 	// A relay already persisted its envelope. Network retries must preserve it.
+-	if _, err := protocol.DecodeSubmission(raw); err != nil && directErr != nil && !protocol.IsRepairInput(raw) && !protocol.IsRepairBatch(raw) && !protocol.IsCompensationDecision(raw) && !protocol.IsReserveIncrease(raw) {
++	if _, err := protocol.DecodeSubmission(raw); err != nil && directErr != nil && !protocol.IsRepairInput(raw) && !protocol.IsRepairBatch(raw) && !protocol.IsCompensationDecision(raw) && !protocol.IsReserveIncrease(raw) && !protocol.IsPoolCertificate(raw) {
+ 		var network protocol.Hash
+ 		cert, e := protocol.DecodeCertificate(raw)
+ 		if e == nil {
+diff --git a/internal/transport/member.go b/internal/transport/member.go
+index bce73ef..10bf652 100644
+--- a/internal/transport/member.go
++++ b/internal/transport/member.go
+@@ -72,6 +72,7 @@ func MemberHandler(m *member.Member, foreground, background int) http.Handler {
+ 		}
+ 	}
+ 	addDirectHandlers(mux, m, fg, bg, wrap)
++	addPoolHandlers(mux,m,fg,wrap)
+ 	mux.HandleFunc("GET /v4/progress/{spend}", wrap(bg, func(w http.ResponseWriter, r *http.Request) {
+ 		var id protocol.Hash
+ 		if err := id.UnmarshalText([]byte(r.PathValue("spend"))); err != nil {
+diff --git a/internal/wallet/blocks.go b/internal/wallet/blocks.go
+index 7858abd..9695562 100644
+--- a/internal/wallet/blocks.go
++++ b/internal/wallet/blocks.go
+@@ -32,6 +32,17 @@ type blockCoin struct {
+ func collectBlockCoins(network protocol.Hash, owners map[protocol.PublicKey]bool, entries []finality.ExecutedTx) ([]blockCoin, error) {
+ 	var coins []blockCoin
+ 	for _, entry := range entries {
++		if entry.Code == 0 && protocol.IsPoolCertificate(entry.Bytes) {
++			// This function consumes a verified public block, never a bare QC.
++			c, err := protocol.DecodePoolCertificate(entry.Bytes)
++			if err != nil { return nil, err }
++			a := c.Action
++			if a.Network != network { return nil, protocol.ErrAuth }
++			if a.Kind == protocol.PoolExit && owners[a.To.Owner] {
++				coins = append(coins, blockCoin{DirectCoinKey(a.OutputID(),0), DirectCoin{Output:protocol.Output{Asset:protocol.AssetCAL,Amount:a.Amount,Recipient:a.To},Final:a.CreationFact()}})
++			}
++			continue
++		}
+ 		if entry.Code != 0 || len(entry.Data) == 0 {
+ 			continue
+ 		}
+
+diff --git a/protocol/pool.go b/protocol/pool.go
+new file mode 100644
+index 0000000..8a12f90
+--- /dev/null
++++ b/protocol/pool.go
+@@ -0,0 +1,151 @@
++package protocol
++
++import (
++	"bytes"
++	"crypto/ed25519"
++	"encoding/binary"
++	"encoding/json"
++	"io"
++	"math"
++)
++
++// Pool actions form a separate, opt-in protocol. Transfer receipts are not
++// DirectPayment certificates and have no independent public redemption right.
++const (
++	PoolDeposit  uint8 = 1
++	PoolTransfer uint8 = 2
++	PoolExit     uint8 = 3
++)
++const poolWire uint16 = 430
++
++type PoolAction struct {
++	Kind                  uint8
++	Network, Config, Pool Hash
++	Sequence              uint64
++	Previous              Hash
++	Input                 OutputID
++	Evidence              Hash
++	Amount                uint64
++	From                  PublicKey
++	To                    ReceiveDescriptor
++	Signature             Signature
++}
++type PoolVote struct {
++	Member    uint16
++	Signature Signature
++}
++type PoolCertificate struct {
++	Action PoolAction
++	Votes  []PoolVote
++}
++type PoolRequest struct {
++	Action PoolAction
++	Parent *PoolCertificate
++}
++
++func PoolIdentity(network, config Hash, input OutputID) Hash {
++	return Digest("INTERNAL_POOL_ID_V1", network[:], config[:], input[:])
++}
++func (a PoolAction) ID() Hash {
++	a.Signature = Signature{}
++	b, _ := json.Marshal(a)
++	return Digest("INTERNAL_POOL_ACTION_V1", b)
++}
++func (a *PoolAction) Sign(key ed25519.PrivateKey) {
++	copy(a.From[:], key.Public().(ed25519.PublicKey))
++	h := a.ID()
++	copy(a.Signature[:], ed25519.Sign(key, h[:]))
++}
++func (a PoolAction) Verify(c OrgConfig) error {
++	if c.Validate() != nil || a.Network != c.Network || a.Config != c.Hash() || a.Pool == (Hash{}) || a.Amount == 0 || a.To.Verify(a.Network) != nil {
++		return ErrAuth
++	}
++	switch a.Kind {
++	case PoolDeposit:
++		if a.Sequence != 0 || a.Previous != (Hash{}) || a.Input == (OutputID{}) || a.Evidence == (Hash{}) || a.Pool != PoolIdentity(a.Network, a.Config, a.Input) || a.From != a.To.Owner {
++			return ErrRule
++		}
++	case PoolTransfer, PoolExit:
++		if a.Sequence == 0 || a.Sequence == math.MaxUint64 || a.Previous == (Hash{}) || a.Input != (OutputID{}) || a.Evidence != (Hash{}) {
++			return ErrRule
++		}
++	default:
++		return ErrRule
++	}
++	if a.Kind != PoolExit && (a.To.Route.Kind != OrgRoute || a.To.Route.Org != c.Org) {
++		return ErrAuth
++	}
++	h := a.ID()
++	if !ed25519.Verify(a.From[:], h[:], a.Signature[:]) {
++		return ErrAuth
++	}
++	return nil
++}
++func SignPool(a PoolAction, member uint16, key ed25519.PrivateKey) PoolVote {
++	id := a.ID()
++	h := Digest("INTERNAL_POOL_VOTE_V1", id[:])
++	v := PoolVote{Member: member}
++	copy(v.Signature[:], ed25519.Sign(key, h[:]))
++	return v
++}
++func (c PoolCertificate) Verify(org OrgConfig) error {
++	if err := c.Action.Verify(org); err != nil {
++		return err
++	}
++	if len(c.Votes) < 3 || len(c.Votes) > 4 {
++		return ErrAuth
++	}
++	seen := uint8(0)
++	id := c.Action.ID()
++	h := Digest("INTERNAL_POOL_VOTE_V1", id[:])
++	for _, v := range c.Votes {
++		if v.Member >= 4 || seen&(1<<v.Member) != 0 || !ed25519.Verify(org.Members[v.Member][:], h[:], v.Signature[:]) {
++			return ErrAuth
++		}
++		seen |= 1 << v.Member
++	}
++	return nil
++}
++func (a PoolAction) OutputID() OutputID {
++	return OutputID(Digest("INTERNAL_POOL_EXIT_OUTPUT_V1", a.Network[:], a.Pool[:]))
++}
++func (a PoolAction) CreationFact() Hash {
++	id := a.ID()
++	return Digest("INTERNAL_POOL_EXIT_CREATION_V1", id[:])
++}
++func IsPoolCertificate(raw []byte) bool {
++	return len(raw) >= 2 && binary.BigEndian.Uint16(raw[:2]) == poolWire
++}
++func (c PoolCertificate) MarshalBinary() ([]byte, error) {
++	b, e := json.Marshal(c)
++	if e != nil {
++		return nil, e
++	}
++	return append([]byte{byte(poolWire >> 8), byte(poolWire & 255)}, b...), nil
++}
++func DecodePoolCertificate(raw []byte) (c PoolCertificate, err error) {
++	if !IsPoolCertificate(raw) || len(raw) > 64<<10 {
++		return c, ErrEncoding
++	}
++	err = decodePoolJSON(raw[2:], &c)
++	return
++}
++func (r PoolRequest) MarshalBinary() ([]byte, error) { return json.Marshal(r) }
++func DecodePoolRequest(raw []byte) (r PoolRequest, err error) {
++	if len(raw) > 128<<10 {
++		return r, ErrEncoding
++	}
++	err = decodePoolJSON(raw, &r)
++	return
++}
++func decodePoolJSON(raw []byte, v any) error {
++	d := json.NewDecoder(bytes.NewReader(raw))
++	d.DisallowUnknownFields()
++	if e := d.Decode(v); e != nil {
++		return ErrEncoding
++	}
++	if d.Decode(new(any)) != io.EOF {
++		return ErrEncoding
++	}
++	return nil
++}
+
+diff --git a/protocol/pool_test.go b/protocol/pool_test.go
+new file mode 100644
+index 0000000..503ce5a
+--- /dev/null
++++ b/protocol/pool_test.go
+@@ -0,0 +1,66 @@
++package protocol
++
++import (
++	"crypto/ed25519"
++	"testing"
++)
++
++func TestPoolCertificateDomainsAndQuorum(t *testing.T) {
++	org := OrgConfig{Network: Digest("net"), Org: Digest("org"), Epoch: 1}
++	var keys [4]ed25519.PrivateKey
++	for i := range keys {
++		s := Digest("key", []byte{byte(i)})
++		keys[i] = ed25519.NewKeyFromSeed(s[:])
++		copy(org.Members[i][:], keys[i].Public().(ed25519.PublicKey))
++	}
++	owner := keys[0]
++	input := OutputID(Digest("input"))
++	a := PoolAction{Kind: PoolDeposit, Network: org.Network, Config: org.Hash(), Pool: PoolIdentity(org.Network, org.Hash(), input), Input: input, Evidence: Digest("evidence"), Amount: 100, To: NewDescriptor(org.Network, Route{Kind: OrgRoute, Org: org.Org}, owner)}
++	a.Sign(owner)
++	c := PoolCertificate{Action: a}
++	for i := 0; i < 3; i++ {
++		c.Votes = append(c.Votes, SignPool(a, uint16(i), keys[i]))
++	}
++	if e := c.Verify(org); e != nil {
++		t.Fatal(e)
++	}
++	b, e := c.MarshalBinary()
++	if e != nil {
++		t.Fatal(e)
++	}
++	round, e := DecodePoolCertificate(b)
++	if e != nil || round.Verify(org) != nil {
++		t.Fatal("roundtrip", e)
++	}
++	if _, e = DecodeDirectSubmission(b); e == nil {
++		t.Fatal("pool is a direct submission")
++	}
++	bad := c
++	bad.Votes = append([]PoolVote{}, c.Votes...)
++	bad.Votes[2] = bad.Votes[1]
++	if bad.Verify(org) == nil {
++		t.Fatal("duplicate signer")
++	}
++	bad = c
++	bad.Action.Amount++
++	if bad.Verify(org) == nil {
++		t.Fatal("amount tamper")
++	}
++	bad = c
++	bad.Votes = append([]PoolVote{}, c.Votes...)
++	for i := range bad.Votes {
++		v := SignSpend(SpendFactID(a.ID()), uint16(i), keys[i])
++		bad.Votes[i] = PoolVote{Member: v.Member, Signature: v.Signature}
++	}
++	if bad.Verify(org) == nil {
++		t.Fatal("ordinary signatures crossed protocol domain")
++	}
++	foreign := org
++	foreign.Epoch++
++	if c.Verify(foreign) == nil {
++		t.Fatal("foreign configuration")
++	}
++	if _, e = DecodePoolCertificate(append(b, []byte("{}")...)); e == nil {
++		t.Fatal("trailing JSON")
++	}
++}
+
+diff --git a/internal/rules/pool.go b/internal/rules/pool.go
+new file mode 100644
+index 0000000..34321e6
+--- /dev/null
++++ b/internal/rules/pool.go
+@@ -0,0 +1,175 @@
++package rules
++
++import (
++	"utxo/internal/state"
++	"utxo/protocol"
++)
++
++// PoolRecord is public escrow, not a chain of independently redeemable promises.
++type PoolRecord struct {
++	Deposit protocol.PoolAction
++	Exit    protocol.Hash
++}
++
++func PoolKey(id protocol.Hash) []byte { return state.Key(180, id[:]) }
++func PoolEscrowKey(id protocol.Hash) []byte {
++	account := protocol.Digest("INTERNAL_POOL_ESCROW_V1", id[:])
++	return AccountKey(account, protocol.AssetCAL)
++}
++
++func ValidatePoolRecipient(v state.ReadView, a protocol.PoolAction, c protocol.OrgConfig) error {
++	org, e := validateWalletDescriptor(v, a.Network, a.To)
++	if e != nil {
++		return e
++	}
++	if a.Kind != protocol.PoolExit && org != c.Org {
++		return protocol.ErrAuth
++	}
++	return nil
++}
++func ValidatePoolDeposit(v state.ReadView, a protocol.PoolAction, c protocol.OrgConfig) error {
++	if a.Kind != protocol.PoolDeposit {
++		return protocol.ErrRule
++	}
++	if e := a.Verify(c); e != nil {
++		return e
++	}
++	if e := ValidatePoolRecipient(v, a, c); e != nil {
++		return e
++	}
++	creation, found, e := state.Load[state.Creation](v, DirectCreationKey(a.Input, 0))
++	if e != nil {
++		return e
++	}
++	if !found || !creation.Final || creation.Fact != a.Evidence || creation.Output.Asset != protocol.AssetCAL || creation.Output.Amount != a.Amount || creation.Output.Recipient != a.To {
++		return protocol.ErrAuth
++	}
++	spent, _, e := state.Load[state.Spend](v, DirectSpendKey(a.Input, 0))
++	if e != nil {
++		return e
++	}
++	if spent.Consumed != (protocol.SpendFactID{}) {
++		return ErrConflict
++	}
++	return nil
++}
++func VerifyPoolPublic(c protocol.PoolCertificate, network protocol.Hash, orgs map[protocol.Hash]protocol.OrgConfig) error {
++	org, ok := orgs[c.Action.Config]
++	if !ok || c.Action.Network != network {
++		return protocol.ErrAuth
++	}
++	if c.Action.Kind != protocol.PoolDeposit && c.Action.Kind != protocol.PoolExit {
++		return protocol.ErrUnsupported
++	}
++	return c.Verify(org)
++}
++func EvaluatePool(v state.ReadView, c protocol.PoolCertificate, network protocol.Hash, orgs map[protocol.Hash]protocol.OrgConfig) (state.Transition, error) {
++	var tr state.Transition
++	if e := VerifyPoolPublic(c, network, orgs); e != nil {
++		return tr, e
++	}
++	a := c.Action
++	org := orgs[a.Config]
++	o := state.NewOverlay(v)
++	record, found, e := state.Load[PoolRecord](o, PoolKey(a.Pool))
++	if e != nil {
++		return tr, e
++	}
++	if a.Kind == protocol.PoolDeposit {
++		if found {
++			if record.Deposit.ID() == a.ID() {
++				return tr, nil
++			}
++			return tr, ErrConflict
++		}
++		if e = ValidatePoolDeposit(o, a, org); e != nil {
++			return tr, e
++		}
++		if e = state.Put(o, DirectSpendKey(a.Input, 0), state.Spend{Consumed: protocol.SpendFactID(a.ID())}); e != nil {
++			return tr, e
++		}
++		if e = state.Put(o, PoolEscrowKey(a.Pool), a.Amount); e != nil {
++			return tr, e
++		}
++		record = PoolRecord{Deposit: a}
++	} else {
++		if !found {
++			return tr, ErrMissing
++		}
++		if record.Deposit.Config != a.Config || record.Deposit.Network != a.Network || record.Deposit.Amount != a.Amount {
++			return tr, protocol.ErrAuth
++		}
++		if record.Exit != (protocol.Hash{}) {
++			if record.Exit == a.ID() {
++				return tr, nil
++			}
++			return tr, ErrConflict
++		}
++		if e = ValidatePoolRecipient(o, a, org); e != nil {
++			return tr, e
++		}
++		balance, _, err := state.Load[uint64](o, PoolEscrowKey(a.Pool))
++		if err != nil {
++			return tr, err
++		}
++		if balance != a.Amount {
++			return tr, ErrAccounting
++		}
++		if e = state.Put(o, PoolEscrowKey(a.Pool), uint64(0)); e != nil {
++			return tr, e
++		}
++		if _, exists, err := state.Load[state.Creation](o, DirectCreationKey(a.OutputID(), 0)); err != nil {
++			return tr, err
++		} else if exists {
++			return tr, ErrConflict
++		}
++		created := state.Creation{Output: protocol.Output{Asset: protocol.AssetCAL, Amount: a.Amount, Recipient: a.To}, Fact: a.CreationFact(), Final: true}
++		if e = state.Put(o, DirectCreationKey(a.OutputID(), 0), created); e != nil {
++			return tr, e
++		}
++		record.Exit = a.ID()
++	}
++	if e = state.Put(o, PoolKey(a.Pool), record); e != nil {
++		return tr, e
++	}
++	tr.Changes = o.Changes()
++	return tr, nil
++}
++
++// ObservePool applies an already authenticated successful public block entry.
++// Followers may not possess another organization's funding UTXO. The block's
++// finality, verified by PrepareBlock's caller, supplies the public execution proof.
++func ObservePool(o *state.Overlay, c protocol.PoolCertificate, network protocol.Hash, orgs map[protocol.Hash]protocol.OrgConfig) error {
++	if e := VerifyPoolPublic(c, network, orgs); e != nil {
++		return e
++	}
++	a := c.Action
++	record, found, e := state.Load[PoolRecord](o, PoolKey(a.Pool))
++	if e != nil {
++		return e
++	}
++	if a.Kind == protocol.PoolDeposit {
++		if found {
++			if record.Deposit.ID() != a.ID() {
++				return ErrConflict
++			}
++			return nil
++		}
++		record = PoolRecord{Deposit: a}
++		if e = state.Put(o, DirectSpendKey(a.Input, 0), state.Spend{Consumed: protocol.SpendFactID(a.ID())}); e != nil {
++			return e
++		}
++	} else {
++		if !found || record.Deposit.Config != a.Config || record.Deposit.Amount != a.Amount {
++			return ErrMissing
++		}
++		if record.Exit != (protocol.Hash{}) && record.Exit != a.ID() {
++			return ErrConflict
++		}
++		record.Exit = a.ID()
++		if e = state.Put(o, DirectCreationKey(a.OutputID(), 0), state.Creation{Output: protocol.Output{Asset: protocol.AssetCAL, Amount: a.Amount, Recipient: a.To}, Fact: a.CreationFact(), Final: true}); e != nil {
++			return e
++		}
++	}
++	return state.Put(o, PoolKey(a.Pool), record)
++}
+
+diff --git a/internal/rules/pool_test.go b/internal/rules/pool_test.go
+new file mode 100644
+index 0000000..9ef9fc4
+--- /dev/null
++++ b/internal/rules/pool_test.go
+@@ -0,0 +1,108 @@
++package rules
++
++import (
++	"testing"
++	"utxo/internal/state"
++	"utxo/protocol"
++)
++
++func poolDeposit(t *testing.T, f directFixture) protocol.PoolCertificate {
++	t.Helper()
++	a := protocol.PoolAction{Kind: protocol.PoolDeposit, Network: f.org.Network, Config: f.org.Hash(), Input: f.genesis, Evidence: protocol.Digest("genesis-fact"), Amount: 100, To: f.output.Recipient}
++	a.Pool = protocol.PoolIdentity(a.Network, a.Config, a.Input)
++	a.Sign(f.owner)
++	return poolCert(f, a)
++}
++func poolCert(f directFixture, a protocol.PoolAction) protocol.PoolCertificate {
++	c := protocol.PoolCertificate{Action: a}
++	for i := 0; i < 3; i++ {
++		c.Votes = append(c.Votes, protocol.SignPool(a, uint16(i), f.members[i]))
++	}
++	return c
++}
++func applyPool(t *testing.T, f directFixture, c protocol.PoolCertificate) error {
++	t.Helper()
++	return f.db.Update(func(v state.ReadView) ([]state.Change, error) {
++		tr, e := EvaluatePool(v, c, f.org.Network, f.policy.Organizations)
++		return tr.Changes, e
++	})
++}
++func TestPoolDepositExitConservesAndRejectsInternalReceipt(t *testing.T) {
++	f := newDirectFixture(t)
++	d := poolDeposit(t, f)
++	if err := applyPool(t, f, d); err != nil {
++		t.Fatal(err)
++	}
++	// The original UTXO can no longer fund ordinary payments.
++	pay := f.payment(t, f.genesis, nil, 1)
++	if err := f.db.View(func(v state.ReadView) error {
++		verified, e := VerifyDirectPayment(pay, f.policy)
++		if e != nil {
++			return e
++		}
++		_, e = EvaluateDirectPayment(v, verified, f.policy, 1)
++		return e
++	}); err == nil {
++		t.Fatal("locked UTXO spent")
++	}
++	move := protocol.PoolAction{Kind: protocol.PoolTransfer, Network: d.Action.Network, Config: d.Action.Config, Pool: d.Action.Pool, Sequence: 1, Previous: d.Action.ID(), Amount: 100, To: f.output.Recipient}
++	move.Sign(f.owner)
++	if err := applyPool(t, f, poolCert(f, move)); err == nil {
++		t.Fatal("internal receipt publicly redeemable")
++	}
++	exit := move
++	exit.Kind = protocol.PoolExit
++	exit.Sign(f.owner)
++	qc := poolCert(f, exit)
++	if err := applyPool(t, f, qc); err != nil {
++		t.Fatal(err)
++	}
++	if err := applyPool(t, f, qc); err != nil {
++		t.Fatal("exact replay", err)
++	}
++	exit.Sequence++
++	exit.Sign(f.owner)
++	if err := applyPool(t, f, poolCert(f, exit)); err == nil {
++		t.Fatal("double exit")
++	}
++	if err := f.db.View(func(v state.ReadView) error {
++		c, found, e := state.Load[state.Creation](v, DirectCreationKey(qc.Action.OutputID(), 0))
++		if e != nil {
++			return e
++		}
++		if !found || !c.Final || c.Output.Amount != 100 {
++			t.Fatal("missing final exit UTXO")
++		}
++		balance, _, e := state.Load[uint64](v, PoolEscrowKey(d.Action.Pool))
++		if balance != 0 {
++			t.Fatal("escrow not consumed")
++		}
++		return e
++	}); err != nil {
++		t.Fatal(err)
++	}
++}
++func TestPoolRejectsUnbackedOrUnauthenticatedEntry(t *testing.T) {
++	f := newDirectFixture(t)
++	d := poolDeposit(t, f)
++	bad := d
++	bad.Votes = bad.Votes[:2]
++	if applyPool(t, f, bad) == nil {
++		t.Fatal("two votes")
++	}
++	bad = d
++	bad.Action.Amount++
++	bad.Action.Sign(f.owner)
++	bad = poolCert(f, bad.Action)
++	if applyPool(t, f, bad) == nil {
++		t.Fatal("inflated deposit")
++	}
++	bad = d
++	bad.Action.Input = protocol.OutputID(protocol.Digest("unknown"))
++	bad.Action.Pool = protocol.PoolIdentity(bad.Action.Network, bad.Action.Config, bad.Action.Input)
++	bad.Action.Sign(f.owner)
++	bad = poolCert(f, bad.Action)
++	if applyPool(t, f, bad) == nil {
++		t.Fatal("unbacked deposit")
++	}
++}
+
+diff --git a/internal/member/pool.go b/internal/member/pool.go
+new file mode 100644
+index 0000000..baf8cbb
+--- /dev/null
++++ b/internal/member/pool.go
+@@ -0,0 +1,136 @@
++package member
++
++import (
++	"context"
++	"utxo/internal/rules"
++	"utxo/internal/state"
++	"utxo/protocol"
++)
++
++type poolLocal struct {
++	Head    protocol.PoolAction
++	Pending *protocol.PoolAction
++}
++
++func poolLocalKey(id protocol.Hash) []byte    { return state.Key(161, id[:]) }
++func poolApprovalKey(id protocol.Hash) []byte { return state.Key(181, id[:]) }
++
++// ApprovePool persists the candidate before signing. Transfer and exit compete
++// for the very same predecessor, so two quorums cannot certify both.
++func (m *Member) ApprovePool(ctx context.Context, r protocol.PoolRequest) (protocol.PoolVote, error) {
++	var vote protocol.PoolVote
++	if !m.cfg.EnableInternalPools {
++		return vote, protocol.ErrUnsupported
++	}
++	if err := ctx.Err(); err != nil {
++		return vote, err
++	}
++	a := r.Action
++	c := m.cfg.Organization
++	if err := a.Verify(c); err != nil {
++		return vote, err
++	}
++	if a.Kind == protocol.PoolDeposit {
++		if r.Parent != nil {
++			return vote, protocol.ErrRule
++		}
++	} else {
++		if r.Parent == nil || r.Parent.Verify(c) != nil {
++			return vote, protocol.ErrAuth
++		}
++		p := r.Parent.Action
++		if p.Kind == protocol.PoolExit || p.Pool != a.Pool || p.Amount != a.Amount || p.Sequence+1 != a.Sequence || p.ID() != a.Previous || p.To.Owner != a.From {
++			return vote, protocol.ErrAuth
++		}
++	}
++	err := m.db.Update(func(v state.ReadView) ([]state.Change, error) {
++		o := state.NewOverlay(v)
++		// Keep signed proposals even after a newer QC supersedes a minority
++		// vote. Retrying the original authorized request reconstructs that vote.
++		if _, found, e := state.Load[protocol.PoolAction](o, poolApprovalKey(a.ID())); e != nil {
++			return nil, e
++		} else if found {
++			return nil, nil
++		}
++		finish := func() ([]state.Change, error) {
++			if e := state.Put(o, poolApprovalKey(a.ID()), a); e != nil {
++				return nil, e
++			}
++			return o.Changes(), nil
++		}
++		if e := rules.ValidatePoolRecipient(o, a, c); e != nil {
++			return nil, e
++		}
++		if a.Kind == protocol.PoolDeposit {
++			// Use exactly the lock read by ApproveDirect: entering a pool and issuing
++			// an ordinary payment certificate cannot both obtain three honest votes.
++			if rec, found, e := state.Load[rules.PoolRecord](o, rules.PoolKey(a.Pool)); e != nil {
++				return nil, e
++			} else if found {
++				if rec.Deposit.ID() != a.ID() || rec.Exit != (protocol.Hash{}) {
++					return nil, rules.ErrConflict
++				}
++				return finish()
++			}
++			if e := rules.ValidatePoolDeposit(o, a, c); e != nil {
++				return nil, e
++			}
++			key := rules.DirectSpendKey(a.Input, 0)
++			s, _, e := state.Load[state.Spend](o, key)
++			if e != nil {
++				return nil, e
++			}
++			fact := protocol.SpendFactID(a.ID())
++			if s.Candidate != (protocol.SpendFactID{}) && s.Candidate != fact {
++				return nil, rules.ErrConflict
++			}
++			s.Candidate = fact
++			if e = state.Put(o, key, s); e != nil {
++				return nil, e
++			}
++			return finish()
++		}
++		rec, found, e := state.Load[rules.PoolRecord](o, rules.PoolKey(a.Pool))
++		if e != nil {
++			return nil, e
++		}
++		if !found {
++			return nil, rules.ErrMissing
++		}
++		if rec.Exit != (protocol.Hash{}) || rec.Deposit.Config != a.Config || rec.Deposit.Amount != a.Amount {
++			return nil, rules.ErrConflict
++		}
++		p := r.Parent.Action
++		if p.Kind == protocol.PoolDeposit && p.ID() != rec.Deposit.ID() {
++			return nil, protocol.ErrAuth
++		}
++		local, found, e := state.Load[poolLocal](o, poolLocalKey(a.Pool))
++		if e != nil {
++			return nil, e
++		}
++		if !found {
++			local.Head = rec.Deposit
++		}
++		if p.Sequence < local.Head.Sequence || p.Sequence == local.Head.Sequence && p.ID() != local.Head.ID() {
++			return nil, rules.ErrConflict
++		}
++		if p.Sequence > local.Head.Sequence {
++			local.Head = p
++			if local.Pending != nil && local.Pending.Sequence <= p.Sequence {
++				local.Pending = nil
++			}
++		}
++		if local.Pending != nil && local.Pending.ID() != a.ID() {
++			return nil, rules.ErrConflict
++		}
++		local.Pending = &a
++		if e = state.Put(o, poolLocalKey(a.Pool), local); e != nil {
++			return nil, e
++		}
++		return finish()
++	})
++	if err != nil {
++		return vote, err
++	}
++	return protocol.SignPool(a, m.cfg.Index, m.cfg.Key), nil
++}
+
+diff --git a/internal/member/pool_test.go b/internal/member/pool_test.go
+new file mode 100644
+index 0000000..6ac6539
+--- /dev/null
++++ b/internal/member/pool_test.go
+@@ -0,0 +1,90 @@
++package member
++
++import (
++	"context"
++	"crypto/ed25519"
++	"testing"
++	"utxo/internal/rules"
++	"utxo/internal/state"
++	"utxo/internal/store"
++	"utxo/protocol"
++)
++
++func TestPoolVoteLockSurvivesRestartAndExitCompetes(t *testing.T) {
++	net := protocol.Digest("pool-member-test")
++	org := protocol.OrgConfig{Network: net, Org: protocol.Digest("pool-org"), Epoch: 1}
++	var keys [4]ed25519.PrivateKey
++	for i := range keys {
++		s := protocol.Digest("member", []byte{byte(i)})
++		keys[i] = ed25519.NewKeyFromSeed(s[:])
++		copy(org.Members[i][:], keys[i].Public().(ed25519.PublicKey))
++	}
++	seed := protocol.Digest("owner")
++	owner := ed25519.NewKeyFromSeed(seed[:])
++	desc := protocol.NewDescriptor(net, protocol.Route{Kind: protocol.OrgRoute, Org: org.Org}, owner)
++	origin := state.OriginOutput{ID: protocol.OutputID(protocol.Digest("input")), Fact: protocol.Digest("creation"), Output: protocol.Output{Asset: protocol.AssetCAL, Amount: 100, Recipient: desc}}
++	db := store.NewMemory()
++	defer db.Close()
++	// Exercise the real member method against persisted state; re-create the
++	// process object against the same store without discarding pending votes.
++	m := &Member{cfg: Config{Organization: org, Index: 0, Key: keys[0], EnableInternalPools: true}, db: db}
++	if err := db.Update(func(v state.ReadView) ([]state.Change, error) {
++		o := state.NewOverlay(v)
++		if e := rules.InitializeWalletBindings(o, state.Genesis{Network: net, Outputs: []state.OriginOutput{origin}}); e != nil {
++			return nil, e
++		}
++		if e := state.Put(o, rules.DirectCreationKey(origin.ID, 0), state.Creation{Output: origin.Output, Fact: origin.Fact, Final: true}); e != nil {
++			return nil, e
++		}
++		return o.Changes(), nil
++	}); err != nil {
++		t.Fatal(err)
++	}
++	deposit := protocol.PoolAction{Kind: protocol.PoolDeposit, Network: net, Config: org.Hash(), Pool: protocol.PoolIdentity(net, org.Hash(), origin.ID), Input: origin.ID, Evidence: origin.Fact, Amount: 100, To: desc}
++	deposit.Sign(owner)
++	req := protocol.PoolRequest{Action: deposit}
++	if _, err := m.ApprovePool(context.Background(), req); err != nil {
++		t.Fatal(err)
++	}
++	cert := func(a protocol.PoolAction) protocol.PoolCertificate {
++		c := protocol.PoolCertificate{Action: a}
++		for i := 0; i < 3; i++ {
++			c.Votes = append(c.Votes, protocol.SignPool(a, uint16(i), keys[i]))
++		}
++		return c
++	}
++	dc := cert(deposit)
++	if err := db.Update(func(v state.ReadView) ([]state.Change, error) {
++		o := state.NewOverlay(v)
++		e := rules.ObservePool(o, dc, net, map[protocol.Hash]protocol.OrgConfig{org.Hash(): org})
++		return o.Changes(), e
++	}); err != nil {
++		t.Fatal(err)
++	}
++	next := protocol.PoolAction{Kind: protocol.PoolTransfer, Network: net, Config: org.Hash(), Pool: deposit.Pool, Sequence: 1, Previous: deposit.ID(), Amount: 100, To: desc}
++	next.Sign(owner)
++	if _, err := m.ApprovePool(context.Background(), protocol.PoolRequest{Action: next, Parent: &dc}); err != nil {
++		t.Fatal(err)
++	}
++	restarted := &Member{cfg: m.cfg, db: db}
++	exit := next
++	exit.Kind = protocol.PoolExit
++	exit.Sign(owner)
++	if _, err := restarted.ApprovePool(context.Background(), protocol.PoolRequest{Action: exit, Parent: &dc}); err == nil {
++		t.Fatal("conflicting exit after restart")
++	}
++	// Next request carries the QC that this member never received separately.
++	nc := cert(next)
++	exit.Sequence = 2
++	exit.Previous = next.ID()
++	exit.Sign(owner)
++	if _, err := restarted.ApprovePool(context.Background(), protocol.PoolRequest{Action: exit, Parent: &nc}); err != nil {
++		t.Fatal("QC catchup", err)
++	}
++	move := exit
++	move.Kind = protocol.PoolTransfer
++	move.Sign(owner)
++	if _, err := restarted.ApprovePool(context.Background(), protocol.PoolRequest{Action: move, Parent: &nc}); err == nil {
++		t.Fatal("transfer after exit vote")
++	}
++}
+
+diff --git a/internal/wallet/pool.go b/internal/wallet/pool.go
+new file mode 100644
+index 0000000..8d8f8e6
+--- /dev/null
++++ b/internal/wallet/pool.go
+@@ -0,0 +1,95 @@
++package wallet
++
++import (
++	"utxo/internal/state"
++	"utxo/protocol"
++)
++
++func PoolReceiptKey(pool protocol.Hash) []byte { return state.Key(162, pool[:]) }
++func poolRequestKey(pool protocol.Hash, previous protocol.Hash) []byte {
++	return state.Key(163, pool[:], previous[:])
++}
++
++// ReceivePool checks the full organization QC and saves an internal receipt.
++// This does not create an ordinary publicly spendable DirectCoin.
++func (w *Wallet) ReceivePool(c protocol.PoolCertificate) error {
++	a := c.Action
++	org, ok := w.orgs[a.Config]
++	if !ok || c.Verify(org) != nil || a.Kind != protocol.PoolTransfer || a.Network != w.network || a.To.Owner != w.owner || org.Org != w.bound {
++		return protocol.ErrAuth
++	}
++	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
++		old, found, e := state.Load[protocol.PoolCertificate](v, PoolReceiptKey(a.Pool))
++		if e != nil {
++			return nil, e
++		}
++		if found {
++			if old.Action.Sequence > a.Sequence {
++				return nil, nil
++			}
++			if old.Action.Sequence == a.Sequence {
++				if old.Action.ID() != a.ID() {
++					return nil, protocol.ErrAuth
++				}
++				return nil, nil
++			}
++		}
++		o := state.NewOverlay(v)
++		if e = state.Put(o, PoolReceiptKey(a.Pool), c); e != nil {
++			return nil, e
++		}
++		return o.Changes(), nil
++	})
++}
++
++// SavePoolRequest fixes one authorized action per predecessor before any RPC.
++func (w *Wallet) SavePoolRequest(r protocol.PoolRequest) error {
++	a := r.Action
++	org, ok := w.orgs[a.Config]
++	if !ok || a.Verify(org) != nil || a.From != w.owner || a.Network != w.network || org.Org != w.bound {
++		return protocol.ErrAuth
++	}
++	if a.Kind != protocol.PoolDeposit {
++		if r.Parent == nil || r.Parent.Verify(org) != nil {
++			return protocol.ErrAuth
++		}
++		p := r.Parent.Action
++		if p.Kind == protocol.PoolExit || p.Pool != a.Pool || p.To.Owner != w.owner || p.Amount != a.Amount || p.Sequence+1 != a.Sequence || p.ID() != a.Previous {
++			return protocol.ErrAuth
++		}
++	} else if r.Parent != nil {
++		return protocol.ErrRule
++	}
++	return w.db.Update(func(v state.ReadView) ([]state.Change, error) {
++		o := state.NewOverlay(v)
++		key := poolRequestKey(a.Pool, a.Previous)
++		old, found, e := state.Load[protocol.PoolRequest](o, key)
++		if e != nil {
++			return nil, e
++		}
++		if found {
++			if old.Action.ID() != a.ID() {
++				return nil, protocol.ErrAuth
++			}
++			return nil, nil
++		}
++		if a.Kind == protocol.PoolDeposit {
++			k := state.Key(state.KeyWalletSpend, a.Input[:], []byte{0})
++			prior, exists, e := state.Load[protocol.TxID](o, k)
++			if e != nil {
++				return nil, e
++			}
++			id := protocol.TxID(a.ID())
++			if exists && prior != id {
++				return nil, protocol.ErrAuth
++			}
++			if e = state.Put(o, k, id); e != nil {
++				return nil, e
++			}
++		}
++		if e = state.Put(o, key, r); e != nil {
++			return nil, e
++		}
++		return o.Changes(), nil
++	})
++}
+
+diff --git a/internal/gateway/pool.go b/internal/gateway/pool.go
+new file mode 100644
+index 0000000..3d75122
+--- /dev/null
++++ b/internal/gateway/pool.go
+@@ -0,0 +1,63 @@
++package gateway
++
++import (
++	"context"
++	"crypto/ed25519"
++	"errors"
++	"utxo/protocol"
++)
++
++type PoolApprover interface {
++	ApprovePool(context.Context, protocol.PoolRequest) (protocol.PoolVote, error)
++}
++
++// CollectPool only transports approvals; it creates no public redemption right
++// for transfer receipts. Each member independently enforces its persisted lock.
++func CollectPool(ctx context.Context, org protocol.OrgConfig, members [4]PoolApprover, r protocol.PoolRequest) (protocol.PoolCertificate, error) {
++	c := protocol.PoolCertificate{Action: r.Action}
++	if e := r.Action.Verify(org); e != nil {
++		return c, e
++	}
++	ctx, cancel := context.WithCancel(ctx)
++	defer cancel()
++	type result struct {
++		vote  protocol.PoolVote
++		err   error
++		index uint16
++	}
++	ch := make(chan result, 4)
++	for i, m := range members {
++		go func(i int, m PoolApprover) {
++			if m == nil {
++				ch <- result{err: protocol.ErrAuth}
++				return
++			}
++			v, e := m.ApprovePool(ctx, r)
++			ch <- result{v, e, uint16(i)}
++		}(i, m)
++	}
++	id := r.Action.ID()
++	h := protocol.Digest("INTERNAL_POOL_VOTE_V1", id[:])
++	var failures []error
++	for range members {
++		select {
++		case <-ctx.Done():
++			return c, ctx.Err()
++		case res := <-ch:
++			if res.err != nil {
++				failures = append(failures, res.err)
++				continue
++			}
++			v := res.vote
++			if v.Member != res.index || v.Member >= 4 || !ed25519.Verify(org.Members[v.Member][:], h[:], v.Signature[:]) {
++				failures = append(failures, protocol.ErrAuth)
++				continue
++			}
++			c.Votes = append(c.Votes, v)
++			if len(c.Votes) == 3 {
++				return c, c.Verify(org)
++			}
++		}
++	}
++	return c, errors.Join(append([]error{errors.New("pool quorum unavailable; retry the same signed request")}, failures...)...)
++}
+
+diff --git a/internal/transport/pool.go b/internal/transport/pool.go
+new file mode 100644
+index 0000000..fad298c
+--- /dev/null
++++ b/internal/transport/pool.go
+@@ -0,0 +1,43 @@
++package transport
++
++import (
++	"context"
++	"encoding/json"
++	"net/http"
++	"utxo/internal/member"
++	"utxo/protocol"
++)
++
++func addPoolHandlers(mux *http.ServeMux, m *member.Member, fg chan struct{}, wrap func(chan struct{}, http.HandlerFunc) http.HandlerFunc) {
++	mux.HandleFunc("POST /v1/internal-pools/approve", wrap(fg, func(w http.ResponseWriter, r *http.Request) {
++		raw, e := binaryBody(w, r, 128<<10)
++		if e != nil {
++			fail(w, e)
++			return
++		}
++		request, e := protocol.DecodePoolRequest(raw)
++		if e != nil {
++			fail(w, e)
++			return
++		}
++		vote, e := m.ApprovePool(r.Context(), request)
++		if e != nil {
++			fail(w, e)
++			return
++		}
++		w.Header().Set("Content-Type", "application/json")
++		_ = json.NewEncoder(w).Encode(vote)
++	}))
++}
++func (c *MemberClient) ApprovePool(ctx context.Context, r protocol.PoolRequest) (v protocol.PoolVote, err error) {
++	raw, err := r.MarshalBinary()
++	if err != nil {
++		return v, err
++	}
++	b, err := c.post(ctx, "/v1/internal-pools/approve", raw, 4096)
++	if err != nil {
++		return v, err
++	}
++	err = json.Unmarshal(b, &v)
++	return
++}
+
+diff --git a/cmd/poolctl/main.go b/cmd/poolctl/main.go
+new file mode 100644
+index 0000000..9e030c4
+--- /dev/null
++++ b/cmd/poolctl/main.go
+@@ -0,0 +1,140 @@
++// poolctl exercises the opt-in, indivisible internal-funds protocol.
++package main
++
++import (
++	"context"
++	"flag"
++	"fmt"
++	"os"
++	"path/filepath"
++	"time"
++	cfg "utxo/cmd/internal/config"
++	"utxo/internal/gateway"
++	"utxo/internal/store"
++	"utxo/internal/transport"
++	"utxo/internal/wallet"
++	"utxo/protocol"
++)
++
++func run() error {
++	network := flag.String("network", "", "network JSON with EnableInternalPools=true")
++	keyfile := flag.String("key", "", "owner private key file")
++	dir := flag.String("wallet-dir", "", "durable wallet directory (reuse on retry)")
++	action := flag.String("action", "", "PoolAction JSON; From/Signature are set locally")
++	parent := flag.String("parent", "", "previous certificate binary, required for transfer/exit")
++	output := flag.String("out", "", "certificate binary output")
++	submit := flag.Bool("submit", false, "submit deposit/exit to public committee (acceptance is not finality)")
++	receive := flag.String("receive", "", "verify and save internal transfer certificate instead of sending")
++	flag.Parse()
++	if *dir == "" || *network == "" || *keyfile == "" {
++		return fmt.Errorf("network, key and wallet-dir are required")
++	}
++	var n cfg.Network
++	if e := cfg.Read(*network, &n); e != nil {
++		return e
++	}
++	if !n.EnableInternalPools {
++		return protocol.ErrUnsupported
++	}
++	key, e := cfg.PrivateKey(*keyfile)
++	if e != nil {
++		return e
++	}
++	var owner protocol.PublicKey
++	copy(owner[:], key[32:])
++	if e = os.MkdirAll(*dir, 0700); e != nil {
++		return e
++	}
++	db, e := store.Open(filepath.Join(*dir, "wallet.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "pool-wallet", Node: fmt.Sprintf("%x", owner), Schema: 1})
++	if e != nil {
++		return e
++	}
++	defer db.Close()
++	w, e := wallet.NewWithGenesis(db, n.Genesis.Network, owner, n.Organizations, n.Genesis)
++	if e != nil {
++		return e
++	}
++	if *receive != "" {
++		b, e := os.ReadFile(*receive)
++		if e != nil {
++			return e
++		}
++		c, e := protocol.DecodePoolCertificate(b)
++		if e != nil {
++			return e
++		}
++		return w.ReceivePool(c)
++	}
++	if *action == "" || *output == "" {
++		return fmt.Errorf("action and out are required")
++	}
++	var r protocol.PoolRequest
++	if e = cfg.Read(*action, &r.Action); e != nil {
++		return e
++	}
++	r.Action.Sign(key)
++	if *parent != "" {
++		b, e := os.ReadFile(*parent)
++		if e != nil {
++			return e
++		}
++		p, e := protocol.DecodePoolCertificate(b)
++		if e != nil {
++			return e
++		}
++		r.Parent = &p
++	}
++	var org protocol.OrgConfig
++	for _, o := range n.Organizations {
++		if o.Hash() == r.Action.Config {
++			org = o
++		}
++	}
++	if *submit && r.Action.Kind == protocol.PoolTransfer {
++		return fmt.Errorf("internal transfer receipts cannot be submitted publicly")
++	}
++	if e = w.SavePoolRequest(r); e != nil {
++		return e
++	}
++	var members [4]gateway.PoolApprover
++	for i, u := range n.Members[org.Org] {
++		members[i] = transport.NewMemberClient(u)
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
++	defer cancel()
++	cert, e := gateway.CollectPool(ctx, org, members, r)
++	if e != nil {
++		return e
++	}
++	b, e := cert.MarshalBinary()
++	if e != nil {
++		return e
++	}
++	f, e := os.OpenFile(*output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
++	if e != nil {
++		return e
++	}
++	if _, e = f.Write(b); e == nil {
++		e = f.Sync()
++	}
++	ce := f.Close()
++	if e != nil {
++		return e
++	}
++	if ce != nil {
++		return ce
++	}
++	if *submit {
++		if e = transport.NewCommitteeClient(n.CommitteeURLs[0], n.CommitteeURLs[1:]...).Submit(ctx, b); e != nil {
++			return e
++		}
++	}
++	fmt.Printf("certificate %s sequence %d saved to %s\n", cert.Action.ID(), cert.Action.Sequence, *output)
++	return nil
++}
++func main() {
++	if e := run(); e != nil {
++		fmt.Fprintln(os.Stderr, e)
++		os.Exit(1)
++	}
++}

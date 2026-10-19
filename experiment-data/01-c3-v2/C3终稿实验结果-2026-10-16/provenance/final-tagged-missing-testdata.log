@@ -1,0 +1,1311 @@
+# utxo/third_party/cometbft/libs/autofile [utxo/third_party/cometbft/libs/autofile.test]
+third_party\cometbft\libs\autofile\sync_test.go:30:13: undefined: OpenAutoFile
+third_party\cometbft\libs\autofile\sync_test.go:59:12: undefined: OpenGroup
+third_party\cometbft\libs\autofile\sync_test.go:89:12: undefined: OpenGroup
+# utxo/third_party/cometbft/types
+third_party\cometbft\types\redaction.go:42:48: undefined: Tx
+third_party\cometbft\types\redaction.go:49:9: undefined: Tx
+third_party\cometbft\types\redaction.go:52:25: undefined: Tx
+third_party\cometbft\types\redaction.go:74:10: undefined: Part
+third_party\cometbft\types\redaction.go:102:24: undefined: Part
+third_party\cometbft\types\redaction.go:120:29: undefined: Part
+third_party\cometbft\types\redaction.go:133:29: undefined: Part
+third_party\cometbft\types\redaction.go:148:11: undefined: PartSet
+third_party\cometbft\types\redaction.go:148:39: undefined: Part
+third_party\cometbft\types\redaction.go:162:120: undefined: PartSet
+third_party\cometbft\types\redaction.go:49:9: too many errors
+# utxo/third_party/cometbft/state [utxo/third_party/cometbft/state.test]
+third_party\cometbft\state\results_batch_test.go:69:9: undefined: NewStore
+third_party\cometbft\state\results_batch_test.go:69:28: undefined: StoreOptions
+third_party\cometbft\state\results_batch_test.go:74:33: undefined: calcABCIResponsesKey
+third_party\cometbft\state\results_batch_test.go:88:7: undefined: NewStore
+third_party\cometbft\state\results_batch_test.go:88:26: undefined: StoreOptions
+third_party\cometbft\state\results_batch_test.go:107:7: undefined: NewStore
+third_party\cometbft\state\results_batch_test.go:107:26: undefined: StoreOptions
+third_party\cometbft\state\results_batch_test.go:116:6: undefined: NewStore
+third_party\cometbft\state\results_batch_test.go:116:25: undefined: StoreOptions
+third_party\cometbft\state\results_batch_test.go:125:13: undefined: NewStore
+third_party\cometbft\state\results_batch_test.go:125:13: too many errors
+# utxo/third_party/cometbft/store [utxo/third_party/cometbft/store.test]
+third_party\cometbft\store\redaction.go:20:11: undefined: BlockStore
+third_party\cometbft\store\redaction.go:29:11: undefined: BlockStore
+third_party\cometbft\store\redaction.go:33:11: undefined: BlockStore
+third_party\cometbft\store\redaction.go:134:22: undefined: calcBlockPartKey
+third_party\cometbft\store\redaction.go:149:11: undefined: BlockStore
+third_party\cometbft\store\redaction.go:168:11: undefined: BlockStore
+third_party\cometbft\store\catchup_test.go:28:37: undefined: BlockStore
+third_party\cometbft\store\catchup_test.go:30:23: undefined: makeStateAndBlockStore
+third_party\cometbft\store\catchup_test.go:34:8: undefined: NewBlockStore
+third_party\cometbft\store\catchup_test.go:40:47: undefined: makeTestExtCommit
+third_party\cometbft\store\catchup_test.go:40:47: too many errors
+# utxo/third_party/cometbft/consensus [utxo/third_party/cometbft/consensus.test]
+third_party\cometbft\consensus\proposal_batch_test.go:21:2: undefined: WAL
+third_party\cometbft\consensus\proposal_batch_test.go:22:15: undefined: WALMessage
+third_party\cometbft\consensus\block_identity.go:11:11: undefined: State
+third_party\cometbft\consensus\proposal_batch.go:15:11: undefined: State
+third_party\cometbft\consensus\proposal_batch.go:15:43: undefined: msgInfo
+third_party\cometbft\consensus\proposal_batch.go:49:11: undefined: State
+third_party\cometbft\consensus\proposal_batch.go:49:45: undefined: msgInfo
+third_party\cometbft\consensus\proposal_batch.go:105:11: undefined: State
+third_party\cometbft\consensus\proposal_batch.go:105:42: undefined: msgInfo
+third_party\cometbft\consensus\block_identity_test.go:32:85: undefined: State
+third_party\cometbft\consensus\block_identity_test.go:32:85: too many errors
+ok  	utxo/cmd/bench	3.832s
+--- FAIL: TestRepairHTTPHonestQuorum (0.00s)
+    repair_collect_test.go:24: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/cmd/committee	4.045s
+--- FAIL: TestDirectDeliveryCommitsBeforeResponseAndDoesNotWaitForRecipient (0.00s)
+    direct_test.go:32: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCollectOnlyReturnsCertificateWithoutPublicDelivery (0.00s)
+    direct_test.go:126: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectHTTPResponseAndEarlyOfferBeforePersistence (0.00s)
+    direct_test.go:164: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectPersistenceBoundAndDrain (0.00s)
+    direct_test.go:236: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectPersistenceFailureIsLoggedBeforeDrainReturns (0.00s)
+    direct_test.go:328: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3RecipientGatewayCollectRetryAndPrepare (0.00s)
+    recipient_c3_test.go:28: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/cmd/gateway	2.852s
+ok  	utxo/cmd/internal/config	2.983s
+?   	utxo/cmd/member	[no test files]
+--- FAIL: TestC3CLIPreparationPreservesFundedIssuer (0.00s)
+    --- FAIL: TestC3CLIPreparationPreservesFundedIssuer/fault (0.00s)
+        c3_cli_test.go:59: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestC3CLIPreparationPreservesFundedIssuer/liability (0.00s)
+        c3_cli_test.go:59: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3FaultLoadSavesRequestAndReceivesCertificate (0.00s)
+    c3_cli_test.go:110: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3CongestionPriorityUsesSignedPublishedTier (0.00s)
+    c3_congestion_test.go:35: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+Created finite two-organization laboratory: C:\Users\Bocchi\AppData\Local\Temp\TestC3FeesFixtureAndSignedQuote1196615695\001\lab
+--- FAIL: TestFinalC3LabAndRequestUseCALOnly (0.00s)
+    c3_final_test.go:10: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3LabBuilderRetainsIssuerPool (0.00s)
+    c3_test.go:31: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestE5ProxyReadsUpstreamBeforeWaitingAndIgnoresObservedNoop (0.00s)
+    e5_proxy_test.go:24: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestE7ReceiverVerifiesAndQueuesBeforeACK (0.00s)
+    e7_delivery_test.go:25: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestE7DirectReceiveTriggersContinuationWithoutSenderForward (0.00s)
+    e7_direct_delivery_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/cmd/payctl	43.951s
+?   	utxo/cmd/pool-lab	[no test files]
+?   	utxo/cmd/poolctl	[no test files]
+--- FAIL: TestPublishedAdaptationReuse (0.00s)
+    chameleon_test.go:38: open testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestEveryQuorumAndRepeatedPublicRepair (0.00s)
+    chameleon_test.go:101: open testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestBadOrInsufficientShares (0.00s)
+    chameleon_test.go:145: open testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCommitMatchesPublicFormula (0.00s)
+    commit_equivalence_test.go:31: open testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/crypto/chameleon	0.365s
+ok  	utxo/finality	0.957s
+ok  	utxo/internal/blockfollow	1.052s
+ok  	utxo/internal/budgetprobe	1.039s
+--- FAIL: TestDirectApplicationStorageEquivalence (0.00s)
+    app_storage_test.go:18: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestConnSyncDirectChecksDuringFinalizeAndCommit (0.00s)
+    connsync_test.go:43: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectVerificationCacheConcurrentAndFrozen (0.00s)
+    direct_cache_test.go:60: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectVerificationCacheStillChecksLedger (0.00s)
+    direct_cache_test.go:125: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectCacheFixedBlockEquivalence (0.00s)
+    direct_cache_test.go:197: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectVerificationCacheReusesOnlyIdenticalBytes (0.00s)
+    direct_cache_test.go:278: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectModeRejectsAlternatePaymentEnvelopes (0.00s)
+    direct_entry_test.go:13: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestEngineRejectsAmbiguousOrganization (0.00s)
+    organization_test.go:12: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDatabasePageSizePreservesCommittedLedger (0.00s)
+    page_size_test.go:19: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestParallelCheckBoundCallbacksFlushAndLedger (0.00s)
+    parallel_check_test.go:24: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestReserveSharedExternalFunding (0.00s)
+    reserve_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestReserveFundingRejectsProtectedAccounts (0.00s)
+    --- FAIL: TestReserveFundingRejectsProtectedAccounts/same_account/reopen=false (0.00s)
+        reserve_test.go:114: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestReserveFundingRejectsProtectedAccounts/same_account/reopen=true (0.00s)
+        reserve_test.go:114: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestReserveFundingRejectsProtectedAccounts/other_org/reopen=false (0.00s)
+        reserve_test.go:114: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestReserveFundingRejectsProtectedAccounts/other_org/reopen=true (0.00s)
+        reserve_test.go:114: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestReserveFundingRejectsProtectedAccounts/other_grant/reopen=false (0.00s)
+        reserve_test.go:114: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestReserveFundingRejectsProtectedAccounts/other_grant/reopen=true (0.00s)
+        reserve_test.go:114: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestReserveCommandThroughVerifiedBlock (0.00s)
+    reserve_test.go:166: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestReserveLetsIdenticalWaitingRequestProceed (0.00s)
+    reserve_test.go:226: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPublicAuthorizationAtABCIEntry (0.00s)
+    submission_boundary_test.go:18: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3EpochCreditBeforeFirstTopupReplay (0.00s)
+    c3_credit_replay_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3MembersLedgerAndReservedSource (0.00s)
+    c3_final_test.go:25: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3ConcurrentHiddenApprovals (0.00s)
+    c3_final_test.go:233: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3MembersEngineDurableHiddenReservations (0.00s)
+    --- FAIL: TestC3MembersEngineDurableHiddenReservations/fulfilled (0.00s)
+        c3_test.go:61: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestC3MembersEngineDurableHiddenReservations/compensated-late (0.00s)
+        c3_test.go:61: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3FundedPoolSnapshotAndTopup (0.00s)
+    c3_test.go:283: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3GenesisRejectsUnboundIssuerGrant (0.00s)
+    c3_test.go:330: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3GenesisRejectsUnbackedOrAliasedPool (0.00s)
+    --- FAIL: TestC3GenesisRejectsUnbackedOrAliasedPool/underfunded (0.00s)
+        c3_test.go:342: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestC3GenesisRejectsUnbackedOrAliasedPool/double-count (0.00s)
+        c3_test.go:342: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestC3GenesisRejectsUnbackedOrAliasedPool/revenue-alias (0.00s)
+        c3_test.go:342: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestC3GenesisRejectsUnbackedOrAliasedPool/funding-alias (0.00s)
+        c3_test.go:342: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3CrossOrgChargesDirectSourceAndBoundsGrandchild (0.00s)
+    c3_test.go:371: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3ConcurrentHiddenApprovalsAndAtomicPolicyFailure (0.00s)
+    c3_test.go:453: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectABCIChildBeforeParentReplay (0.00s)
+    v3_test.go:25: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/internal/committee	1.332s
+--- FAIL: TestOfflineRestartAndDuplicate (0.00s)
+    delivery_test.go:52: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRecipientRejectsWrongOwnerAndBadQC (0.00s)
+    delivery_test.go:148: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestEnqueueDoesNotWaitForRecipientAndRejectsUnknownRoutes (0.00s)
+    delivery_test.go:179: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestInvalidCertificatesAndMetadataDoNotEnterOutbox (0.00s)
+    delivery_test.go:231: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDispatcherIsBoundedAndDoesNotFollowRedirects (0.00s)
+    delivery_test.go:252: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSlowRecipientDoesNotHoldHealthyQueue (0.00s)
+    scheduler_test.go:20: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRejectedRecordDoesNotStarveSameRecipient (0.00s)
+    scheduler_test.go:115: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRecipientTLSClientTransport (0.00s)
+    tls_test.go:16: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/internal/delivery	1.297s
+--- FAIL: TestCollectDirectSharesEncodedRequest (0.00s)
+    direct_encode_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCollectDirectInvalidAuthNeverFansOut (0.00s)
+    direct_encode_test.go:67: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSerialDirectKeepsFailedHeadUntilValidQuorum (0.00s)
+    direct_gate_test.go:17: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSerialDirectCompletedResultBypassesAnotherHead (0.00s)
+    direct_gate_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSerialDirectInvalidOwnerDoesNotPinHead (0.00s)
+    direct_gate_test.go:91: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectSavedResultAndOutboxAreIndependent (0.00s)
+    --- FAIL: TestDirectSavedResultAndOutboxAreIndependent/pending (0.00s)
+        direct_gate_test.go:109: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectSavedResultAndOutboxAreIndependent/observed (0.00s)
+        direct_gate_test.go:109: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestGroupedDirectOutboxDoesNotReviveAfterBlock (0.00s)
+    direct_group_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectInboxSubmitsAndInstallsWhilePersistenceBlocked (0.00s)
+    direct_inbox_test.go:49: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectInboxCompletedPaymentDoesNotRevive (0.00s)
+    direct_inbox_test.go:100: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectInboxFullFallsBackToDurableScan (0.00s)
+    direct_inbox_test.go:137: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectInboxOwnsBytesAndRejectsAfterClose (0.00s)
+    direct_inbox_test.go:174: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectInboxProcessExitBeforePersistAndFullPayloadResubmit (0.00s)
+    direct_inbox_test.go:234: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectInstallSharesVerifiedSnapshotBytes (0.00s)
+    direct_install_bytes_test.go:25: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectInstallTypedFallbackAndCompletion (0.00s)
+    direct_install_bytes_test.go:84: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectInstallRejectsInvalidSnapshot (0.00s)
+    direct_install_bytes_test.go:130: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectPreparedPaymentDoesNotExposeCacheSnapshot (0.00s)
+    direct_install_bytes_test.go:167: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRelaySchedulerSharesPreparedInstall (0.00s)
+    direct_install_bytes_test.go:191: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestGatewayRelayRetriesWithoutWritingPacingState (0.00s)
+    direct_relay_test.go:33: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRelayDoesNotSubmitNewOutputCertificate (0.00s)
+    direct_relay_test.go:70: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRelaySubmitDoesNotWaitForInstall (0.00s)
+    direct_relay_test.go:172: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRelayFillsVacanciesWithoutJoiningGroup (0.00s)
+    direct_relay_test.go:197: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRelaySkipsNotDueBeforeDecoding (0.00s)
+    direct_relay_test.go:222: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestMemberRelayEventuallySubmitsWithoutGateway (0.00s)
+    direct_relay_test.go:246: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestMemberRelayRetriesAcceptedButUncommitted (0.00s)
+    direct_relay_test.go:277: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRelayWakeAfterPersistenceAndLostHints (0.00s)
+    direct_relay_test.go:302: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRelayCompletionWinsOverInflightWork (0.00s)
+    direct_relay_test.go:354: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRelayRetainsFirstUnscheduledSubmit (0.00s)
+    direct_relay_test.go:412: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRelayBoundedSlotsDrainOnShutdown (0.00s)
+    direct_relay_test.go:457: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRelayExhaustedScanDoesNotRestartOnCompletion (0.00s)
+    direct_scan_completion_test.go:37: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRelayCapacityBlockedInstallTargetsAreRevisited (0.00s)
+    direct_scan_completion_test.go:85: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCollectDirectInvalidVoteUsesValidFourth (0.00s)
+    direct_summary_reuse_test.go:12: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCollectDirectRejectsSignedMismatchedSummary (0.00s)
+    --- FAIL: TestCollectDirectRejectsSignedMismatchedSummary/transaction (0.00s)
+        direct_summary_reuse_test.go:45: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCollectDirectRejectsSignedMismatchedSummary/output (0.00s)
+        direct_summary_reuse_test.go:45: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCollectDirectRejectsSignedMismatchedSummary/grant (0.00s)
+        direct_summary_reuse_test.go:45: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCollectDirectRejectsSignedMismatchedSummary/rules (0.00s)
+        direct_summary_reuse_test.go:45: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCollectDirectRejectsSignedMismatchedSummary/invalid_admission (0.00s)
+        direct_summary_reuse_test.go:45: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCollectDirectKeepsDifferentAdmissionsSeparate (0.00s)
+    direct_summary_reuse_test.go:64: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/internal/gateway	4.323s
+--- FAIL: TestC3ApplyPaymentReadsSelfApprovalOnce (0.00s)
+    --- FAIL: TestC3ApplyPaymentReadsSelfApprovalOnce/source_first (0.00s)
+        blocks_approval_reuse_test.go:139: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestC3ApplyPaymentReadsSelfApprovalOnce/opened_source (0.00s)
+        blocks_approval_reuse_test.go:139: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestC3ApplyPaymentReadsSelfApprovalOnce/compensated_late (0.00s)
+        blocks_approval_reuse_test.go:139: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestApplyPaymentApprovalReuseMissingAndLegacy (0.00s)
+    blocks_approval_reuse_test.go:201: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3MalformedApprovalRollbackAndErrorOrder (0.00s)
+    blocks_approval_reuse_test.go:220: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3ApprovalReuseKeepsAuthorizationFactLookup (0.00s)
+    blocks_approval_reuse_test.go:242: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3ApprovalReuseReturnsActualLookupFact (0.00s)
+    blocks_approval_reuse_test.go:297: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestApprovalCommittedBeforeSignatureReturn (0.00s)
+    approval_boundary_test.go:39: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRepairBatchMaximumFollowerResult (0.00s)
+    blocks_test.go:31: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestInvalidPaymentRejectedBeforeMemberWrite (0.00s)
+    blocks_test.go:126: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate (0.00s)
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/source_arrives (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/repair_then_late (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/partial_repair_then_late (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/child_parent_same_block (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/owner_source (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/owner_repair (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/batch_owner_repair (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/batch_late_signer (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/owner_same_block (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/owner_multiple_refunds (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/projection_source (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/projection_repair (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestBlockFollowerMissingRepairLateAndDuplicate/late_extra_signer (0.00s)
+        blocks_test.go:180: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectStoredApprovalEncodingAndReplay (0.00s)
+    direct_approval_encoding_test.go:18: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectConcurrentApprovalReservationRemainsAtomic (0.00s)
+    --- FAIL: TestDirectConcurrentApprovalReservationRemainsAtomic/CAL (0.00s)
+        direct_approval_encoding_test.go:68: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectConcurrentApprovalReservationRemainsAtomic/FUEL (0.00s)
+        direct_approval_encoding_test.go:68: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectDurableApprovalAndBackgroundInstall (0.00s)
+    direct_test.go:26: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPartialReclaimMultipleInputs (0.00s)
+    --- FAIL: TestPartialReclaimMultipleInputs/one_winner (0.00s)
+        partial_reclaim_test.go:43: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimMultipleInputs/two_winners_same_block (0.00s)
+        partial_reclaim_test.go:43: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPartialReclaimRejectsContradictionAtomically (0.00s)
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/observed (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/installed (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/outbox (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/settled (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/paid (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/pending (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/recovered (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/fee (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/missing_approval (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/wrong_input (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/same_tx (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/underflow (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/cross_config (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimRejectsContradictionAtomically/other_consumed (0.00s)
+        partial_reclaim_test.go:90: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPartialReclaimRequiresSuccessfulExecution (0.00s)
+    partial_reclaim_test.go:169: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPartialReclaimPublicConflict (0.00s)
+    --- FAIL: TestPartialReclaimPublicConflict/sponsor (0.00s)
+        partial_reclaim_test.go:326: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimPublicConflict/owner (0.00s)
+        partial_reclaim_test.go:326: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimPublicConflict/fee_only (0.00s)
+        partial_reclaim_test.go:326: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPartialReclaimPublicConflict/installed_winner (0.00s)
+        partial_reclaim_test.go:326: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRetryChecksCurrentWalletBinding (0.00s)
+    payment_identity_test.go:17: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestMemberReopenRequiresAllGenesisOrganizations (0.00s)
+    payment_identity_test.go:43: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRejectsRecipientWrongOrganizationAtomically (0.00s)
+    payment_identity_test.go:64: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectIndependentInputsReuseSubjectNonce (0.00s)
+    payment_identity_test.go:88: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestWalletIndependentInputsReuseSubjectNonce (0.00s)
+    payment_identity_test.go:128: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestWalletDirectRequiresGenesisBinding (0.00s)
+    payment_identity_test.go:160: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestWalletRetryRequiresExactRequest (0.00s)
+    payment_identity_test.go:181: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestWalletRejectsWrongOrganization (0.00s)
+    payment_identity_test.go:212: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSecurityComposition (0.00s)
+    --- FAIL: TestSecurityComposition/workers1/extrafalse/repairfalse (0.00s)
+        security_composition_test.go:48: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityComposition/workers1/extrafalse/repairtrue (0.00s)
+        security_composition_test.go:48: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityComposition/workers1/extratrue/repairfalse (0.00s)
+        security_composition_test.go:48: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityComposition/workers1/extratrue/repairtrue (0.00s)
+        security_composition_test.go:48: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityComposition/workers1/late_extra_signer (0.00s)
+        security_composition_test.go:48: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityComposition/workers3/extrafalse/repairfalse (0.00s)
+        security_composition_test.go:48: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityComposition/workers3/extrafalse/repairtrue (0.00s)
+        security_composition_test.go:48: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityComposition/workers3/extratrue/repairfalse (0.00s)
+        security_composition_test.go:48: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityComposition/workers3/extratrue/repairtrue (0.00s)
+        security_composition_test.go:48: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityComposition/workers3/late_extra_signer (0.00s)
+        security_composition_test.go:48: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestExposedSourceReconstructionAcrossOrganizationsAndDepth (0.00s)
+    source_recovery_test.go:30: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectWalletBindingsAcrossOrganizations (0.00s)
+    wallet_binding_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/internal/member	1.227s
+--- FAIL: TestPoolClosedFundsLifecycle (0.00s)
+    lab_test.go:58: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolSerialLifecycleUsesSameReadyBoundary (0.00s)
+    lab_test.go:71: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestOrdinaryCapitalBaseline (0.00s)
+    lab_test.go:81: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolDirectDepositShareSpendLock (0.00s)
+    --- FAIL: TestPoolDirectDepositShareSpendLock/pool-first (0.00s)
+        lab_test.go:106: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPoolDirectDepositShareSpendLock/ordinary-first (0.00s)
+        lab_test.go:106: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolMustObservePublicDeposit (0.00s)
+    lab_test.go:150: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolPersistentVoteAndPendingLock (0.00s)
+    lab_test.go:163: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolStaleOwnerAndReceiptsCannotRedeem (0.00s)
+    lab_test.go:184: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolMinorityDepositFollowsOrdinaryWinner (0.00s)
+    lab_test.go:249: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolMinorityOrdinaryFollowsDepositAndReleasesDebits (0.00s)
+    lab_test.go:285: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolTransferExitConcurrentQuorumExclusion (0.00s)
+    lab_test.go:337: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolMinorityConflictCatchesUpFromFullQC (0.00s)
+    lab_test.go:357: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolUnavailableMembers (0.00s)
+    --- FAIL: TestPoolUnavailableMembers/1-unavailable (0.00s)
+        lab_test.go:380: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPoolUnavailableMembers/2-unavailable (0.00s)
+        lab_test.go:380: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolRequiresTwoCertificateInstallAcknowledgments (0.00s)
+    lab_test.go:415: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolFullCertificateRecoveryAfterRecipientCrash (0.00s)
+    lab_test.go:431: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolAuthenticityAndDuplicateVotes (0.00s)
+    lab_test.go:492: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/internal/poollab	2.859s
+--- FAIL: TestReceiverCollectsAndRetainsFullPayment (0.00s)
+    collector_test.go:78: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestReceiverRejectsWrongOwnerAndBadQuorums (0.00s)
+    --- FAIL: TestReceiverRejectsWrongOwnerAndBadQuorums/wrong-owner (0.00s)
+        collector_test.go:188: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestReceiverRejectsWrongOwnerAndBadQuorums/bad-signature (0.00s)
+        collector_test.go:188: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestReceiverRejectsWrongOwnerAndBadQuorums/mixed-fact (0.00s)
+        collector_test.go:188: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestReceiverRejectsWrongOwnerAndBadQuorums/duplicate (0.00s)
+        collector_test.go:188: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestReceiverRejectsWrongOwnerAndBadQuorums/disk-failure (0.00s)
+        collector_test.go:188: open C:\Users\Bocchi\Desktop\Next\.e8-worktree\.scratch\c3-final-frozen-2026-10-16\crypto\chameleon\testdata\rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/internal/recipient	2.692s
+--- FAIL: TestAtomicRepairBatchTwoInputs (0.00s)
+    batch_test.go:44: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRepairBatchCost (0.00s)
+    --- FAIL: TestRepairBatchCost/same_block_1 (0.00s)
+        batch_test.go:44: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestRepairBatchCost/same_block_4 (0.00s)
+        batch_test.go:44: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestRepairBatchCost/same_block_8 (0.00s)
+        batch_test.go:44: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestRepairBatchCost/separate_blocks_8 (0.00s)
+        batch_test.go:44: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRepairBatchAcrossParts (0.00s)
+    batch_test.go:44: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestConsensusRejectsRelabelledOpening (0.00s)
+    comet_test.go:62: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestConsensusRejectsUncertifiedPartRevision (0.00s)
+    comet_test.go:119: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRealBlockStoreRewriteAndOriginalReplay (0.00s)
+    comet_test.go:251: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCompensationBeforeAdaptation (0.00s)
+    decision_test.go:30: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestHistoricalExportConsumer (0.00s)
+    history_export_test.go:23: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestMaterializationRevisionOrderAndCursorReplay (0.00s)
+    --- FAIL: TestMaterializationRevisionOrderAndCursorReplay/delayed=false (0.00s)
+        materialize_test.go:29: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestMaterializationRevisionOrderAndCursorReplay/delayed=true (0.00s)
+        materialize_test.go:29: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestMaterializationInterleavedQueue (0.00s)
+    materialize_test.go:184: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPaymentRepairMonetaryReplay (0.00s)
+    --- FAIL: TestPaymentRepairMonetaryReplay/representation-before-repayment (0.00s)
+        payment_test.go:41: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestPaymentRepairMonetaryReplay/repayment-before-representation (0.00s)
+        payment_test.go:41: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestHistoricalReaderEquivalence (0.00s)
+    reader_cost_test.go:767: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestOfflineReceiptMatchedRows (0.00s)
+    receipt_experiment_test.go:46: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestOfflineReceiptRejectsInvalidAndCachesOnlyVerified (0.00s)
+    receipt_experiment_test.go:63: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestOfflineReceiptIndependentReceiver (0.00s)
+    receipt_experiment_test.go:550: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestOfflineReceiptTransportAndCacheIdentity (0.00s)
+    receipt_experiment_test.go:559: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestHistoricalReceiptRealExecution (0.00s)
+    --- FAIL: TestHistoricalReceiptRealExecution/single (0.00s)
+        receipt_test.go:251: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestHistoricalReceiptRealExecution/batch (0.00s)
+        receipt_test.go:251: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCompensationReceiptPrecedesRepresentation (0.00s)
+    receipt_test.go:278: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCompensationReceiptsShareBlockAuthentication (0.00s)
+    receipt_test.go:287: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestLeanHistoricalAuthorization (0.00s)
+    --- FAIL: TestLeanHistoricalAuthorization/single (0.00s)
+        receipt_test.go:308: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestLeanHistoricalAuthorization/batch (0.00s)
+        receipt_test.go:308: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestHistoricalReceiptRejectsAdversarialEvidence (0.00s)
+    receipt_test.go:360: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestHistoricalReceiptRejectsRealNoopAndFailure (0.00s)
+    receipt_test.go:441: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCompensationReceiptRejectsInvalidEconomicEvidence (0.00s)
+    receipt_test.go:476: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRevisionCapacityFragmentationAndFunding (0.00s)
+    revision_boundaries_test.go:478: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRevisionSplitInputNotUnlockedByFunding (0.00s)
+    revision_boundaries_test.go:545: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRevisionDelayedSourcesTwoRoundCompensationAndRepayment (0.00s)
+    --- FAIL: TestRevisionDelayedSourcesTwoRoundCompensationAndRepayment/owner_fee_true (0.00s)
+        revision_boundaries_test.go:585: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestRevisionDelayedSourcesTwoRoundCompensationAndRepayment/owner_fee_false (0.00s)
+        revision_boundaries_test.go:585: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRevisionUnauthorizedSponsorAndLegacyEntry (0.00s)
+    revision_boundaries_test.go:702: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRotatingQuorumsDelayedSourcesRestoreCoverage (0.00s)
+    rotating_quorum_test.go:20: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/internal/redaction	1.077s
+--- FAIL: TestSettlementRecordsV4DirectCommand (0.00s)
+    direct_test.go:19: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/internal/requesttrace	1.060s
+ok  	utxo/internal/reservecontrol	0.338s
+--- FAIL: TestBlockSettlementProducesNoPrivateReceipts (0.00s)
+    block_mode_test.go:9: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3OrderAndTimeout (0.00s)
+    --- FAIL: TestFinalC3OrderAndTimeout/ordered (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFinalC3OrderAndTimeout/reverse (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFinalC3OrderAndTimeout/timeout (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3EpochPayerExclusionAndDust (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3SolePayerRetainsFees (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3CALFeeIsAtomicAndSigned (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3MemberCreditOnlyAddsObservedDelta (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3MultiOutputQuorumDedupAndLateSource (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3FailureLeavesNoEscrowOrFee (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3EpochWeightsIgnoreLastBlockTopup (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3WeightedRewardsConserveAtUint64Limit (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFinalC3PriorityHeldThroughCompensation (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3OwnerQuoteIndependentOfResolution (0.00s)
+    --- FAIL: TestC3OwnerQuoteIndependentOfResolution/fulfilled (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestC3OwnerQuoteIndependentOfResolution/compensated (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3PolicyAuthenticationAndHistoricalTerms (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3FeeInputMustMatchExplicitPayer (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3MultiOutputDifferentQuorumSubsetAndLateRepay (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3PublicLifecycle (0.00s)
+    --- FAIL: TestC3PublicLifecycle/source-first (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestC3PublicLifecycle/child-first (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestC3PublicLifecycle/compensated-late (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectPaymentRequiresCurrentOrganizationApproval (0.00s)
+    direct_authorization_test.go:14: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestRemovingCurrentQCAllowsForcedCompensation (0.00s)
+    direct_authorization_test.go:38: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCloneDirectTxOwnsEverySlice (0.00s)
+    direct_clone_test.go:12: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectSubmissionFrozenAfterCallerMutation (0.00s)
+    direct_clone_test.go:47: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectSubmissionCloneStillRejectsTampering (0.00s)
+    direct_clone_test.go:88: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectSubmissionCopyMatchesCanonicalFreeze (0.00s)
+    direct_clone_test.go:112: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectIdleBlockCannotExpireNewPayment (0.00s)
+    direct_deadline_test.go:9: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectTwoOrganizationsGrandchildFirst (0.00s)
+    --- FAIL: TestDirectTwoOrganizationsGrandchildFirst/parent-before-repair (0.00s)
+        direct_liability_test.go:18: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectTwoOrganizationsGrandchildFirst/parent-after-repair (0.00s)
+        direct_liability_test.go:18: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectOwnerFeeAtomicAccounting (0.00s)
+    direct_owner_fee_test.go:48: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectOwnerFeeRejectsInvalidFundingAtomically (0.00s)
+    --- FAIL: TestDirectOwnerFeeRejectsInvalidFundingAtomically/insufficient (0.00s)
+        direct_owner_fee_test.go:98: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectOwnerFeeRejectsInvalidFundingAtomically/not-final (0.00s)
+        direct_owner_fee_test.go:98: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectOwnerFeeRejectsInvalidFundingAtomically/wrong-asset (0.00s)
+        direct_owner_fee_test.go:98: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectOwnerFeeRejectsInvalidFundingAtomically/wrong-owner (0.00s)
+        direct_owner_fee_test.go:98: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectOwnerFeeRejectsInvalidFundingAtomically/wrong-route (0.00s)
+        direct_owner_fee_test.go:98: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectOwnerFeeRejectsInvalidFundingAtomically/already-spent (0.00s)
+        direct_owner_fee_test.go:98: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectOwnerFeeRefundAfterParentArrives (0.00s)
+    direct_owner_fee_test.go:150: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectOwnerFeeRefundCanPayNextTransaction (0.00s)
+    direct_owner_fee_test.go:201: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectParentVerificationPreservesAuthentication (0.00s)
+    --- FAIL: TestDirectParentVerificationPreservesAuthentication/short_qc (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectParentVerificationPreservesAuthentication/long_qc (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectParentVerificationPreservesAuthentication/output (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectParentVerificationPreservesAuthentication/grants (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectParentVerificationPreservesAuthentication/index (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectParentVerificationPreservesAuthentication/fact (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectParentVerificationPreservesAuthentication/epoch (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectParentVerificationPreservesAuthentication/signature (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectParentVerificationPreservesAuthentication/member (0.00s)
+        c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestC3VerifiedParentOwnsEverySlice (0.00s)
+    c3_integration_test.go:182: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectPolicyRejectsAmbiguousOrganization (0.00s)
+    direct_settings_test.go:9: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPublicSubmissionRetainsSpendAuthorizationWithoutNewTXCer (0.00s)
+    direct_submission_test.go:13: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPublicSubmissionRejectsUnusedInputCertificates (0.00s)
+    direct_submission_test.go:54: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestInputGuaranteeRegistrationHandlesSplitOutputsAndLateConsumer (0.00s)
+    --- FAIL: TestInputGuaranteeRegistrationHandlesSplitOutputsAndLateConsumer/source_arrives (0.00s)
+        direct_submission_test.go:86: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestInputGuaranteeRegistrationHandlesSplitOutputsAndLateConsumer/partial_repair_then_source (0.00s)
+        direct_submission_test.go:86: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPublicSubmissionRejectsMissingOrUnrelatedOrganizationApproval (0.00s)
+    direct_submission_test.go:147: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPublicSubmissionStillRequiresOwnerAuthorization (0.00s)
+    direct_submission_test.go:162: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectFinalPaymentDoesNotRegisterNewGuarantees (0.00s)
+    direct_test.go:162: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectChildBeforeParentAndImmediateSuccessor (0.00s)
+    direct_test.go:186: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectRepairThenLateParent (0.00s)
+    direct_test.go:215: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFeeClosureMultipleObligations (0.00s)
+    --- FAIL: TestFeeClosureMultipleObligations/owner=false/paid=0/surplus=0 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureMultipleObligations/owner=false/paid=0/surplus=17 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureMultipleObligations/owner=false/paid=1/surplus=0 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureMultipleObligations/owner=false/paid=1/surplus=17 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureMultipleObligations/owner=false/paid=2/surplus=0 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureMultipleObligations/owner=false/paid=2/surplus=17 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureMultipleObligations/owner=true/paid=0/surplus=0 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureMultipleObligations/owner=true/paid=0/surplus=17 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureMultipleObligations/owner=true/paid=1/surplus=0 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureMultipleObligations/owner=true/paid=1/surplus=17 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureMultipleObligations/owner=true/paid=2/surplus=0 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureMultipleObligations/owner=true/paid=2/surplus=17 (0.00s)
+        fee_closure_evidence_test.go:21: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestFeeClosureFulfillmentBeforeCompensation (0.00s)
+    --- FAIL: TestFeeClosureFulfillmentBeforeCompensation/owner=false (0.00s)
+        fee_closure_evidence_test.go:144: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestFeeClosureFulfillmentBeforeCompensation/owner=true (0.00s)
+        fee_closure_evidence_test.go:144: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestIndependentInputsWithSameSubjectNonceExecuteAndReplay (0.00s)
+    independent_payments_test.go:11: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolDepositExitConservesAndRejectsInternalReceipt (0.00s)
+    pool_test.go:31: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestPoolRejectsUnbackedOrUnauthenticatedEntry (0.00s)
+    pool_test.go:86: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestReserveMemberKeepsDebitsAndCumulativeRounding (0.00s)
+    reserve_member_test.go:10: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestReserveIncreaseRejectsProtectedSource (0.00s)
+    --- FAIL: TestReserveIncreaseRejectsProtectedSource/same=false (0.00s)
+        reserve_test.go:13: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestReserveIncreaseRejectsProtectedSource/same=true (0.00s)
+        reserve_test.go:13: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestReserveIncreaseConservesFundsAndReplays (0.00s)
+    reserve_test.go:68: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSecurityPartialOutputRepairAndLateSource (0.00s)
+    security_projection_test.go:13: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings (0.00s)
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownerfalse/PCG (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownerfalse/PGC (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownerfalse/CPG (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownerfalse/CGP (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownerfalse/GPC (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownerfalse/GCP (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownerfalse/GTYCXP (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownerfalse/GCXPT (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownerfalse/TGYCXP (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownertrue/PCG (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownertrue/PGC (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownertrue/CPG (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownertrue/CGP (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownertrue/GPC (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownertrue/GCP (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownertrue/GTYCXP (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownertrue/GCXPT (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSecurityMonetaryProjectionAcrossInterleavings/ownertrue/TGYCXP (0.00s)
+        security_projection_test.go:249: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSourceRecoverySplitMergeOrders (0.01s)
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_1_2_3]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_1_2_3]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_1_3_2]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_1_3_2]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_2_1_3]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_2_1_3]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_2_3_1]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_2_3_1]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_3_1_2]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_3_1_2]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_3_2_1]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[0_3_2_1]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_0_2_3]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_0_2_3]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_0_3_2]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_0_3_2]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_2_0_3]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_2_0_3]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_2_3_0]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_2_3_0]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_3_0_2]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_3_0_2]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_3_2_0]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[1_3_2_0]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_0_1_3]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_0_1_3]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_0_3_1]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_0_3_1]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_1_0_3]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_1_0_3]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_1_3_0]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_1_3_0]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_3_0_1]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_3_0_1]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_3_1_0]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[2_3_1_0]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_0_1_2]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_0_1_2]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_0_2_1]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_0_2_1]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_1_0_2]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_1_0_2]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_1_2_0]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_1_2_0]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_2_0_1]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_2_0_1]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_2_1_0]/compensatefalse (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoverySplitMergeOrders/[3_2_1_0]/compensatetrue (0.00s)
+        source_recovery_dag_test.go:27: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestLateSourceRepaysReserveWithoutSecondUserOutput (0.00s)
+    source_recovery_test.go:14: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSourceRecoveryAllFourHopOrders (0.04s)
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_2_3]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_2_3]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_2_3]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_2_3]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_2_3]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_2_3]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_3_2]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_3_2]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_3_2]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_3_2]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_3_2]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_1_3_2]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_1_3]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_1_3]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_1_3]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_1_3]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_1_3]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_1_3]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_3_1]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_3_1]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_3_1]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_3_1]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_3_1]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_2_3_1]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_1_2]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_1_2]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_1_2]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_1_2]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_1_2]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_1_2]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_2_1]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_2_1]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_2_1]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_2_1]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_2_1]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[0_3_2_1]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_2_3]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_2_3]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_2_3]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_2_3]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_2_3]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_2_3]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_3_2]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_3_2]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_3_2]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_3_2]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_3_2]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_0_3_2]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_0_3]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_0_3]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_0_3]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_0_3]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_0_3]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_0_3]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_3_0]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_3_0]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_3_0]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_3_0]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_3_0]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_2_3_0]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_0_2]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_0_2]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_0_2]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_0_2]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_0_2]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_0_2]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_2_0]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_2_0]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_2_0]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_2_0]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_2_0]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[1_3_2_0]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_1_3]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_1_3]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_1_3]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_1_3]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_1_3]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_1_3]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_3_1]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_3_1]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_3_1]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_3_1]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_3_1]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_0_3_1]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_0_3]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_0_3]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_0_3]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_0_3]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_0_3]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_0_3]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_3_0]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_3_0]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_3_0]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_3_0]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_3_0]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_1_3_0]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_0_1]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_0_1]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_0_1]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_0_1]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_0_1]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_0_1]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_1_0]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_1_0]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_1_0]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_1_0]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_1_0]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[2_3_1_0]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_1_2]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_1_2]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_1_2]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_1_2]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_1_2]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_1_2]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_2_1]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_2_1]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_2_1]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_2_1]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_2_1]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_0_2_1]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_0_2]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_0_2]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_0_2]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_0_2]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_0_2]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_0_2]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_2_0]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_2_0]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_2_0]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_2_0]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_2_0]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_1_2_0]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_0_1]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_0_1]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_0_1]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_0_1]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_0_1]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_0_1]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_1_0]/routes[0_0_0_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_1_0]/routes[0_0_0_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_1_0]/routes[0_1_0_1]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_1_0]/routes[0_1_0_1]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_1_0]/routes[0_1_2_0]/compensatefalse (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSourceRecoveryAllFourHopOrders/[3_2_1_0]/routes[0_1_2_0]/compensatetrue (0.00s)
+        source_recovery_test.go:69: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestGenesisWalletBindingsMergeAndRemainImmutable (0.00s)
+    wallet_bindings_test.go:14: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestGenesisWalletBindingsRejectContradictionsAndInvalidValues (0.00s)
+    wallet_bindings_test.go:41: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectReplayRechecksWalletBindings (0.00s)
+    wallet_bindings_test.go:89: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectPaymentRejectsWalletRouteViolationsAtomically (0.00s)
+    --- FAIL: TestDirectPaymentRejectsWalletRouteViolationsAtomically/unknown-principal (0.00s)
+        wallet_routes_test.go:17: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectPaymentRejectsWalletRouteViolationsAtomically/principal-other-org (0.00s)
+        wallet_routes_test.go:17: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectPaymentRejectsWalletRouteViolationsAtomically/output-other-org (0.00s)
+        wallet_routes_test.go:17: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectPaymentRejectsWalletRouteViolationsAtomically/output-committee (0.00s)
+        wallet_routes_test.go:17: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectPaymentRejectsWalletRouteViolationsAtomically/unknown-output (0.00s)
+        wallet_routes_test.go:17: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectPaymentRejectsWalletRouteViolationsAtomically/refund-other-org (0.00s)
+        wallet_routes_test.go:17: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectPaymentRejectsWalletRouteViolationsAtomically/refund-committee (0.00s)
+        wallet_routes_test.go:17: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCommitteeTransferChecksWalletRoutes (0.00s)
+    --- FAIL: TestCommitteeTransferChecksWalletRoutes/valid (0.00s)
+        wallet_routes_test.go:79: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCommitteeTransferChecksWalletRoutes/unknown-principal (0.00s)
+        wallet_routes_test.go:79: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCommitteeTransferChecksWalletRoutes/output-other-org (0.00s)
+        wallet_routes_test.go:79: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCommitteeTransferChecksWalletRoutes/output-committee (0.00s)
+        wallet_routes_test.go:79: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCommitteeTransferChecksWalletRoutes/unknown-output (0.00s)
+        wallet_routes_test.go:79: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCommitteeTransferChecksWalletRoutes/refund-other-org (0.00s)
+        wallet_routes_test.go:79: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCommitteeTransferChecksWalletRoutes/refund-committee (0.00s)
+        wallet_routes_test.go:79: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectMultipleOwnersRequireSameOrganization (0.00s)
+    --- FAIL: TestDirectMultipleOwnersRequireSameOrganization/same-org (0.00s)
+        wallet_routes_test.go:147: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestDirectMultipleOwnersRequireSameOrganization/different-org (0.00s)
+        wallet_routes_test.go:147: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestValidateWalletRoutesRejectsUnsignedFeeOwner (0.00s)
+    wallet_routes_test.go:224: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestValidateDirectFeeRejectsContradictoryOwnerBinding (0.00s)
+    wallet_routes_test.go:255: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/internal/rules	0.629s
+--- FAIL: TestCompactResponseDoesNotTrustReconstructedFields (0.00s)
+    --- FAIL: TestCompactResponseDoesNotTrustReconstructedFields/signature (0.00s)
+        experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCompactResponseDoesNotTrustReconstructedFields/allocation (0.00s)
+        experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCompactResponseDoesNotTrustReconstructedFields/member (0.00s)
+        experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestCompactResponseDoesNotTrustReconstructedFields/trailing (0.00s)
+        experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestContinuationDoesNotPinParentQuorum (0.00s)
+    experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestContinuationMultipleOutputsOfSameParent (0.00s)
+    experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestContinuationHTTPFallbackAndPublicCompatibility (0.00s)
+    experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestContinuationRejectsInvalidEvidence (0.00s)
+    experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestContinuationWithoutInstall (0.00s)
+    experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCrossOrganizationUsesFullParentsWithCompactResponses (0.00s)
+    cross_continuation_test.go:31: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestContinuationEligibilityFollowsSourceNotRecipient (0.00s)
+    cross_continuation_test.go:31: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSameOrgWarmColdAndOrdering (0.00s)
+    --- FAIL: TestSameOrgWarmColdAndOrdering/warm (0.00s)
+        experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSameOrgWarmColdAndOrdering/cold (0.00s)
+        experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestCachedParentStillRejectsForgeryAndDoubleSpend (0.00s)
+    experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestReferenceHTTPFallbackOnlyOnMissOrUnsupported (0.00s)
+    experiment_test.go:72: experiment_test.go:96: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/internal/sameorglab	2.646s
+?   	utxo/internal/state	[no test files]
+ok  	utxo/internal/store	0.811s
+?   	utxo/internal/testkit	[no test files]
+ok  	utxo/internal/transport	2.021s
+--- FAIL: TestSaveDirectRequestBytesPersistsExactBytes (0.01s)
+    --- FAIL: TestSaveDirectRequestBytesPersistsExactBytes/memory (0.00s)
+        direct_bytes_test.go:78: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestSaveDirectRequestBytesPersistsExactBytes/bolt (0.00s)
+        direct_bytes_test.go:78: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSaveDirectRequestBytesRejectsChangedOpening (0.00s)
+    direct_bytes_test.go:116: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSaveDirectRequestBytesRejectsBadAuthorization (0.00s)
+    direct_bytes_test.go:142: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSaveDirectRequestBytesStoreFailureReturnsNil (0.00s)
+    direct_bytes_test.go:174: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestSaveDirectRequestBytesWaitsForUpdate (0.00s)
+    direct_bytes_test.go:218: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestDirectCoinCacheReadsCurrentCompleteRecord (0.00s)
+    direct_coin_cache_test.go:74: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestReceiveDirectPrimesOwnedFullCoin (0.00s)
+    direct_coin_full_test.go:17: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestLocalSignAndSaveEquivalent (0.00s)
+    local_signer_test.go:24: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestLocalSignAndSaveRejects (0.00s)
+    --- FAIL: TestLocalSignAndSaveRejects/signed (0.00s)
+        local_signer_test.go:67: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestLocalSignAndSaveRejects/owner (0.00s)
+        local_signer_test.go:67: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestLocalSignAndSaveRejects/claim (0.00s)
+        local_signer_test.go:67: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestLocalSignAndSaveRejects/funding (0.00s)
+        local_signer_test.go:67: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestLocalSignAndSaveRejects/length (0.00s)
+        local_signer_test.go:67: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestLocalSignAndSaveRejects/version (0.00s)
+        local_signer_test.go:67: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestLocalSignAndSaveRejects/invalid-c3 (0.00s)
+        local_signer_test.go:67: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestLocalSignAndSaveRejects/store (0.00s)
+        local_signer_test.go:67: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestLocalSignerRejectsMalformedKeys (0.00s)
+    local_signer_test.go:105: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestLocalSignAndSaveWaitsAndOwnsSnapshot (0.00s)
+    local_signer_test.go:125: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestLocalSignAndSaveChecksCurrentState (0.00s)
+    --- FAIL: TestLocalSignAndSaveChecksCurrentState/binding (0.00s)
+        local_signer_test.go:172: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestLocalSignAndSaveChecksCurrentState/recovered (0.00s)
+        local_signer_test.go:172: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+    --- FAIL: TestLocalSignAndSaveChecksCurrentState/spent (0.00s)
+        local_signer_test.go:172: open ../../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/internal/wallet	1.053s
+--- FAIL: TestMarshalInitialMatchesAuthenticatedEncoding (0.00s)
+    v3_initial_test.go:43: open ../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestMarshalInitialRejectsMutatedInputs (0.00s)
+    v3_initial_test.go:84: open ../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+--- FAIL: TestV3TransactionStableIdentity (0.00s)
+    v3_test.go:70: open ../crypto/chameleon/testdata/rsa2048.pem: The system cannot find the path specified.
+FAIL
+FAIL	utxo/protocol	0.658s
+FAIL	utxo/third_party/cometbft/consensus [build failed]
+FAIL	utxo/third_party/cometbft/libs/autofile [build failed]
+?   	utxo/third_party/cometbft/libs/operationtrace	[no test files]
+?   	utxo/third_party/cometbft/node	[no test files]
+FAIL	utxo/third_party/cometbft/state [build failed]
+FAIL	utxo/third_party/cometbft/store [build failed]
+FAIL	utxo/third_party/cometbft/types [build failed]
+FAIL

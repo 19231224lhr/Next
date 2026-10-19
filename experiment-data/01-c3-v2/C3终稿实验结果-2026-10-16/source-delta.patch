@@ -1,0 +1,4590 @@
+--- a/cmd/committee/main.go
++++ b/cmd/committee/main.go
+@@ -177,7 +177,11 @@
+ 	if e != nil {
+ 		return e
+ 	}
+-	genesis := &ct.GenesisDoc{ChainID: network.ChainID, GenesisTime: network.GenesisTime, InitialHeight: 1, ConsensusParams: ct.DefaultConsensusParams()}
++	consensusParams, e := network.ConsensusParams()
++	if e != nil {
++		return e
++	}
++	genesis := &ct.GenesisDoc{ChainID: network.ChainID, GenesisTime: network.GenesisTime, InitialHeight: 1, ConsensusParams: consensusParams}
+ 	genesisRoot := engine.GenesisHash()
+ 	genesis.AppHash = genesisRoot[:]
+ 	for i, p := range network.Committee {
+@@ -199,6 +203,22 @@
+ 	consensus, e := node.NewNode(cc, validator, nk, creator, func() (*ct.GenesisDoc, error) { return genesis, nil }, dbProvider, node.DefaultMetricsProvider(cc.Instrumentation), logger)
+ 	if e != nil {
+ 		return e
++	}
++	if network.Direct != nil && network.Direct.C3 != nil {
++		// Comet's first byte-limited reap can omit background requests. Inspect
++		// the finite local mempool here, then enforce the proposal byte bound.
++		// This affects only our proposal selection, never remote validation.
++		app.SetProposalScheduler(func(txs [][]byte, maxBytes int64) ([][]byte, error) {
++			final := false
++			for _, p := range network.Direct.C3.Policies {
++				final = final || p.Version == protocol.C3FinalVersion
++			}
++			if !final {
++				return engine.SelectProposal(txs, maxBytes)
++			}
++			all := consensus.Mempool().ReapMaxBytesMaxGas(-1, -1)
++			return engine.SelectProposal(all.ToSliceOfBytes(), maxBytes)
++		})
+ 	}
+ 	if e = consensus.Start(); e != nil {
+ 		return e
+--- a/cmd/internal/config/config.go
++++ b/cmd/internal/config/config.go
+@@ -25,7 +25,9 @@
+ )
+ 
+ type Network struct {
+-	EnableInternalPools bool `json:",omitempty"`
++	// Zero retains Comet's default. All validators use this shared genesis limit.
++	ConsensusBlockBytes int64 `json:",omitempty"`
++	EnableInternalPools bool  `json:",omitempty"`
+ 	Members             map[protocol.Hash][4]string
+ 	CommitteeURLs       [4]string
+ 	ChainID             string
+@@ -38,6 +40,21 @@
+ 	Direct              *rules.DirectSettings `json:",omitempty"`
+ }
+ 
++func (n Network) ConsensusParams() (*ct.ConsensusParams, error) {
++	p := ct.DefaultConsensusParams()
++	if n.ConsensusBlockBytes != 0 {
++		p.Block.MaxBytes = n.ConsensusBlockBytes
++		// Keep an evidence allowance when explicitly using small blocks.
++		if p.Evidence.MaxBytes > p.Block.MaxBytes/10 {
++			p.Evidence.MaxBytes = p.Block.MaxBytes / 10
++		}
++	}
++	if err := p.ValidateBasic(); err != nil {
++		return nil, err
++	}
++	return p, nil
++}
++
+ func (n Network) Trust() (finality.Trust, error) {
+ 	if err := protocol.ValidateOrganizations(n.Genesis.Network, n.Organizations); err != nil {
+ 		return finality.Trust{}, err
+@@ -52,6 +69,19 @@
+ 	}
+ 	if trust.Network != n.Genesis.Network {
+ 		return trust, protocol.ErrRule
++	}
++	if n.Direct != nil && n.Direct.C3 != nil && len(n.Direct.C3.Committee) != 0 {
++		if len(n.Direct.C3.Committee) != len(trust.Validators.Validators) {
++			return trust, protocol.ErrAuth
++		}
++		seen := map[string]bool{}
++		for _, v := range n.Direct.C3.Committee {
++			_, actual := trust.Validators.GetByAddress(v.Address)
++			if actual == nil || seen[string(v.Address)] || v.Weight != uint64(actual.VotingPower) || v.ID != protocol.Digest("C3_VALIDATOR", v.Address) {
++				return trust, protocol.ErrAuth
++			}
++			seen[string(v.Address)] = true
++		}
+ 	}
+ 	return trust, nil
+ }
+--- /dev/null
++++ b/cmd/internal/config/consensus_test.go
+@@ -0,0 +1,28 @@
++package config
++
++import (
++	ct "github.com/cometbft/cometbft/types"
++	"testing"
++)
++
++func TestSharedGenesisBlockCapacity(t *testing.T) {
++	for _, limit := range []int64{0, 32768, -2} {
++		p, err := (Network{ConsensusBlockBytes: limit}).ConsensusParams()
++		if limit < 0 {
++			if err == nil {
++				t.Fatal("invalid block limit accepted")
++			}
++			continue
++		}
++		if err != nil {
++			t.Fatal(err)
++		}
++		want := limit
++		if want == 0 {
++			want = ct.DefaultConsensusParams().Block.MaxBytes
++		}
++		if p.Block.MaxBytes != want {
++			t.Fatalf("got %d want %d", p.Block.MaxBytes, want)
++		}
++	}
++}
+--- a/cmd/payctl/c3.go
++++ b/cmd/payctl/c3.go
+@@ -14,6 +14,17 @@
+ 			if i.Funding.Key.Account == account {
+ 				return true
+ 			}
++		}
++	}
++	return false
++}
++func finalC3Network(n cfg.Network) bool {
++	if n.Direct == nil || n.Direct.C3 == nil {
++		return false
++	}
++	for _, p := range n.Direct.C3.Policies {
++		if p.ID == n.Direct.C3.Current {
++			return p.Version == protocol.C3FinalVersion
+ 		}
+ 	}
+ 	return false
+@@ -57,3 +68,27 @@
+ 	}
+ 	return nil
+ }
++
++// Final C3 is an explicit genesis choice; --c3 continues to create legacy labs.
++func configureFinalC3Lab(n *cfg.Network, baseFee uint64) error {
++	if err := configureC3Lab(n); err != nil {
++		return err
++	}
++	id := protocol.Digest("LAB_C3_POLICY_V2")
++	n.Direct.C3.Current = id
++	n.Direct.C3.Policies = []rules.C3Policy{{
++		ID: id, Version: protocol.C3FinalVersion, BaseFee: baseFee,
++		Schedule: protocol.FeeSchedule{AttachReward: 1, ResolveReward: 2, ExecuteReward: 1, Compensate: 1, Repay: 1},
++		Tiers:    []rules.C3Tier{{ID: protocol.Digest("LAB_C3_PRIORITY"), CAL: 10, MinimumReward: 2}},
++	}}
++	trust, err := n.Trust()
++	if err != nil {
++		return err
++	}
++	for _, v := range trust.Validators.Validators {
++		n.Direct.C3.Committee = append(n.Direct.C3.Committee, rules.C3Validator{ID: protocol.Digest("C3_VALIDATOR", v.Address), Address: append([]byte(nil), v.Address...), Weight: uint64(v.VotingPower)})
++	}
++	n.Direct.C3.EpochBlocks = 20
++	n.Direct.C3.ReservedBPS = 2500
++	return nil
++}
+--- /dev/null
++++ b/cmd/payctl/c3_congestion.go
+@@ -0,0 +1,478 @@
++package main
++
++// This opt-in client controls publication only. Certification, ownership,
++// quorum checks, public execution, and verified observation remain real.
++import (
++	"bytes"
++	"context"
++	"crypto/ed25519"
++	"encoding/csv"
++	"errors"
++	"flag"
++	"fmt"
++	"io"
++	"net/http"
++	"os"
++	"path/filepath"
++	"strconv"
++	"sync"
++	"time"
++	cfg "utxo/cmd/internal/config"
++	"utxo/finality"
++	"utxo/internal/blockfollow"
++	"utxo/internal/committee"
++	"utxo/internal/requesttrace"
++	"utxo/internal/rules"
++	"utxo/internal/store"
++	"utxo/internal/transport"
++	"utxo/internal/wallet"
++	"utxo/protocol"
++)
++
++type c3CongestionFixture struct {
++	Ordinary, Sources int
++	TimeoutSeconds    int64
++}
++type c3CongestionRow struct {
++	HTTPAttempts                                     []c3CongestionHTTPAttempt
++	Index, Owner                                     int
++	Class                                            string
++	PlannedSubmissionOrder, ActualSubmissionOrder    int
++	BaseFeeCAL, PriorityFeeCAL, PriorityRewardFUEL   uint64
++	PlannedSubmitOffsetNS, VerifiedBlockSeenOffsetNS int64
++	Payment                                          c3FeePayment
++	FinalEscrow                                      *committee.C3Snapshot
++	InitialObligation                                *rules.DirectObligation `json:",omitempty"`
++	Error                                            string                  `json:",omitempty"`
++}
++type c3CongestionHTTPAttempt struct {
++	URL                        string
++	StartOffsetNS, EndOffsetNS int64
++	HTTPStatus                 int
++	ResponseBody, Error        string `json:",omitempty"`
++}
++
++func c3CongestionHTTP(ctx context.Context, client *http.Client, url string, raw []byte, start time.Time) (a c3CongestionHTTPAttempt, err error) {
++	a.URL = url + "/v1/commands"
++	defer func() {
++		if err != nil {
++			a.Error = err.Error()
++		}
++	}()
++	req, e := http.NewRequestWithContext(ctx, http.MethodPost, a.URL, bytes.NewReader(raw))
++	if e != nil {
++		return a, e
++	}
++	req.Header.Set("Content-Type", transport.MediaType)
++	req.Header.Set(requesttrace.DeliverySourceHeader, "c3-congestion")
++	req.Header.Set(requesttrace.DeliveryTimeHeader, strconv.FormatInt(time.Now().UnixNano(), 10))
++	a.StartOffsetNS = time.Since(start).Nanoseconds()
++	resp, e := client.Do(req)
++	if e != nil {
++		a.EndOffsetNS = time.Since(start).Nanoseconds()
++		return a, e
++	}
++	defer resp.Body.Close()
++	a.HTTPStatus = resp.StatusCode
++	body, e := io.ReadAll(io.LimitReader(resp.Body, 4096))
++	a.EndOffsetNS = time.Since(start).Nanoseconds()
++	a.ResponseBody = string(body)
++	if e != nil {
++		return a, e
++	}
++	if resp.StatusCode != http.StatusAccepted {
++		return a, fmt.Errorf("HTTP %d: %s", resp.StatusCode, a.ResponseBody)
++	}
++	return a, nil
++}
++
++type c3CongestionBlock struct {
++	SeenOffsetNS int64
++	Block        c3FeeBlock
++}
++type c3CongestionReport struct {
++	ConsensusBlockBytes                                          int64
++	Version                                                      int
++	StartedUnixNS, DurationNS, WaveStartOffsetNS, TimeoutSeconds int64
++	OrdinaryCount, SourceCount, SourceAfter                      int
++	SubmissionIntervalNS                                         int64
++	ReservedBPS                                                  uint32
++	EpochBlocks                                                  uint64
++	Rows                                                         []*c3CongestionRow
++	Blocks                                                       []c3CongestionBlock
++	InitialPools, FinalPools                                     []committee.C3PoolSnapshot
++	FUELConserved                                                bool
++	Error, FinalSnapshotError                                    string `json:",omitempty"`
++}
++
++func c3CongestionPriority(r protocol.DirectRequest, n cfg.Network, p rules.DirectPolicy, key ed25519.PrivateKey) (protocol.DirectRequest, error) {
++	if !finalC3Network(n) || len(r.Tx.Claims) != 1 || len(r.Tx.Body.Outputs) != 1 {
++		return r, protocol.ErrRule
++	}
++	var tier protocol.Hash
++	for _, policy := range n.Direct.C3.Policies {
++		if policy.ID == n.Direct.C3.Current {
++			for _, candidate := range policy.Tiers {
++				if candidate.CAL == 10 && candidate.MinimumReward == 2 {
++					tier = candidate.ID
++				}
++			}
++		}
++	}
++	if tier == (protocol.Hash{}) {
++		return r, fmt.Errorf("requires published CAL10 / FUEL2 priority tier")
++	}
++	b := r.Tx.Body
++	b.Outputs = append([]protocol.Output(nil), b.Outputs...)
++	b.Fee.C3.Tier = tier
++	if e := bindC3(&b, n, p); e != nil {
++		return r, e
++	}
++	if r.Tx.Claims[0].Output.Amount <= b.Fee.Maximum {
++		return r, fmt.Errorf("priority quote consumes principal")
++	}
++	b.Outputs[0].Amount = r.Tx.Claims[0].Output.Amount - b.Fee.Maximum
++	tx, e := protocol.NewFastTx(b, r.Tx.Claims, p.Key)
++	if e != nil {
++		return r, e
++	}
++	tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), key)}
++	r.Tx = tx
++	return r, nil
++}
++
++func c3CongestionCommand(args []string) (err error) {
++	f := flag.NewFlagSet("c3-congestion", flag.ContinueOnError)
++	dir := f.String("dir", "", "fresh final-C3 lab")
++	prepare := f.Bool("prepare", false, "prepare genesis and independent requests before services start")
++	count := f.Int("count", 60, "ordinary independent payments (recommended 40–80)")
++	sources := f.Int("sources", 4, "pre-opened source obligations to close during the wave")
++	sourceAfter := f.Int("source-after", -1, "insert recovery sources after this many ordinary submissions; -1 means halfway")
++	interval := f.Duration("submit-interval", 0, "planned interval between publication calls; zero is a burst")
++	timeout := f.Duration("timeout", 5*time.Minute, "genesis obligation timeout; preparation only")
++	drain := f.Duration("drain", 2*time.Minute, "whole client deadline")
++	if e := f.Parse(args); e != nil {
++		return e
++	}
++	if *dir == "" || *count < 1 || *count > 90 || *sources < 1 || *sources > 10 || *count+*sources > 100 || *interval < 0 || *drain <= 0 || *timeout < time.Minute || *timeout%time.Second != 0 {
++		return protocol.ErrRule
++	}
++	if *sourceAfter < 0 {
++		*sourceAfter = *count / 2
++	}
++	if *sourceAfter > *count {
++		return protocol.ErrRule
++	}
++	var lab cfg.Lab
++	var n cfg.Network
++	if e := cfg.Read(filepath.Join(*dir, "lab.json"), &lab); e != nil {
++		return e
++	}
++	if e := cfg.Read(lab.Network, &n); e != nil {
++		return e
++	}
++	if !finalC3Network(n) {
++		return fmt.Errorf("requires init-lab --c3-final")
++	}
++	manifest := filepath.Join(*dir, "c3-congestion-fixture.json")
++	if *prepare {
++		if e := c3FeesPrepare(*dir, lab, n, *count+*sources, *timeout); e != nil {
++			return e
++		}
++		return cfg.Write(manifest, c3CongestionFixture{*count, *sources, int64(*timeout / time.Second)})
++	}
++	var setup c3CongestionFixture
++	var fixture c3FeesFixture
++	if e := cfg.Read(manifest, &setup); e != nil {
++		return e
++	}
++	if e := cfg.Read(filepath.Join(*dir, "c3-fees-fixture.json"), &fixture); e != nil {
++		return e
++	}
++	if setup.Ordinary != *count || setup.Sources != *sources || len(fixture.Requests) != *count+*sources {
++		return fmt.Errorf("prepared congestion count mismatch")
++	}
++	if time.Duration(n.Direct.TimeoutSeconds)*time.Second < *drain+30*time.Second {
++		return fmt.Errorf("prepared timeout must exceed drain by at least 30s")
++	}
++	if os.Getenv("UTXO_EXPERIMENT_BUDGET") != "1" || os.Getenv("UTXO_EXPERIMENT_DISABLE_SOURCE_RECOVERY") != "1" {
++		return fmt.Errorf("all services and client require UTXO_EXPERIMENT_BUDGET=1 and UTXO_EXPERIMENT_DISABLE_SOURCE_RECOVERY=1")
++	}
++	path := filepath.Join(*dir, "reports", "c3-congestion.json")
++	if _, e := os.Stat(path); !errors.Is(e, os.ErrNotExist) {
++		return fmt.Errorf("report already exists: %s", path)
++	}
++	p, e := n.Direct.Policy(n.Schedule, n.Organizations)
++	if e != nil {
++		return e
++	}
++	trust, e := n.Trust()
++	if e != nil {
++		return e
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), *drain)
++	defer cancel()
++	c := c3FeeClient{n: n, lab: lab, policy: p, client: transport.NewHTTPClient(5 * time.Second), public: transport.NewCommitteeClient(n.CommitteeURLs[0]), start: time.Now()}
++	report := c3CongestionReport{Version: 2, ConsensusBlockBytes: n.ConsensusBlockBytes, StartedUnixNS: c.start.UnixNano(), TimeoutSeconds: n.Direct.TimeoutSeconds, OrdinaryCount: *count, SourceCount: *sources, SourceAfter: *sourceAfter, SubmissionIntervalNS: int64(*interval), ReservedBPS: n.Direct.C3.ReservedBPS, EpochBlocks: n.Direct.C3.EpochBlocks}
++	var blocksMu sync.Mutex
++	defer func() {
++		if len(report.FinalPools) == 0 {
++			snapshotCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
++			pools, e := c.pools(snapshotCtx)
++			stop()
++			if e != nil {
++				report.FinalSnapshotError = e.Error()
++			} else {
++				report.FinalPools = pools
++			}
++		}
++		report.DurationNS = time.Since(c.start).Nanoseconds()
++		if err != nil {
++			report.Error = err.Error()
++		}
++		if e := cfg.Write(path, report); err == nil {
++			err = e
++		}
++		if e := c3CongestionCSV(filepath.Join(*dir, "reports", "c3-congestion.csv"), report.Rows); err == nil {
++			err = e
++		}
++	}()
++	for i := range c.wallets {
++		c.keys[i], err = cfg.PrivateKey(lab.Owners[i])
++		if err != nil {
++			return err
++		}
++		c.ds[i] = protocol.NewDescriptor(n.Genesis.Network, protocol.Route{Kind: protocol.OrgRoute, Org: n.Organizations[i].Org}, c.keys[i])
++		db, e := store.OpenNoSync(filepath.Join(*dir, fmt.Sprintf("c3-congestion-wallet-%d.db", i)), store.Identity{Network: n.ChainID, Role: "c3-congestion-wallet", Node: fmt.Sprint(i), Schema: 4})
++		if e != nil {
++			return e
++		}
++		group, e := store.NewGroup(db, 256, 64)
++		if e != nil {
++			db.Close()
++			return e
++		}
++		c.dbs[i] = group
++		defer group.Close()
++		c.wallets[i], e = wallet.NewWithGenesis(group, n.Genesis.Network, c.ds[i].Owner, n.Organizations, n.Genesis, p)
++		if e != nil {
++			return e
++		}
++		original := c.wallets[i].PrepareBlock
++		prepareBlock := original
++		if i == 0 {
++			prepareBlock = func(b finality.VerifiedBlock) (blockfollow.Apply, error) {
++				apply, e := original(b)
++				if e != nil {
++					return nil, e
++				}
++				txs := b.Transactions()
++				executions, e := c3DecodeExecutions(n.Genesis.Network, txs)
++				if e != nil {
++					return nil, e
++				}
++				blocksMu.Lock()
++				report.Blocks = append(report.Blocks, c3CongestionBlock{time.Since(c.start).Nanoseconds(), c3FeeBlock{Height: b.Height(), Hash: b.Hash(), Transactions: txs, Executions: executions}})
++				blocksMu.Unlock()
++				return apply, nil
++			}
++		}
++		defer blockfollow.Start(ctx, cancel, group, transport.NewCommitteeClient(n.CommitteeURLs[0]), trust, prepareBlock)()
++	}
++	if report.InitialPools, err = c.pools(ctx); err != nil {
++		return err
++	}
++	add := func(class string, owner int) *c3CongestionRow {
++		row := &c3CongestionRow{Index: len(report.Rows), Owner: owner, Class: class, PlannedSubmissionOrder: -1, ActualSubmissionOrder: -1}
++		report.Rows = append(report.Rows, row)
++		return row
++	}
++	collect := func(row *c3CongestionRow, r protocol.DirectRequest) (protocol.OutputCertificate, error) {
++		row.BaseFeeCAL = r.Tx.Body.Fee.C3.BaseFee
++		row.PriorityFeeCAL = r.Tx.Body.Fee.C3.PriorityFee
++		row.PriorityRewardFUEL = r.Tx.Body.Fee.C3.PriorityReward
++		cert, e := c.collect(ctx, row.Owner, r, &row.Payment)
++		if e != nil {
++			row.Error = e.Error()
++		}
++		return cert, e
++	}
++	submit := func(row *c3CongestionRow) error {
++		return budgetRelease(ctx, time.Now(), func(ctx context.Context) error {
++			a, e := c3CongestionHTTP(ctx, c.client, n.CommitteeURLs[0], row.Payment.SubmissionRaw, c.start)
++			row.HTTPAttempts = append(row.HTTPAttempts, a)
++			row.Payment.SubmitAttemptLog = append(row.Payment.SubmitAttemptLog, c3SubmitAttempt{StartOffsetNS: a.StartOffsetNS, EndOffsetNS: a.EndOffsetNS, Accepted: e == nil, Error: a.Error})
++			if row.Payment.SubmitOffsetNS == 0 {
++				row.Payment.SubmitOffsetNS = a.StartOffsetNS
++			}
++			return e
++		}, func() { row.Payment.SubmitAttempts++ })
++	}
++	var recovery []*c3CongestionRow
++	// Sources remain unpublished. Their children genuinely execute first and
++	// create public DirectOpen obligations before the congestion wave begins.
++	for i := 0; i < *sources; i++ {
++		requests := fixture.Requests[*count+i]
++		source := add("source-recovery", 0)
++		cert, e := collect(source, requests.Source)
++		if e != nil {
++			return e
++		}
++		requests.Child.InputCertificates = []protocol.InputCertificate{{Certificate: cert, Index: 0}}
++		child := add("setup-child", 1)
++		if _, e = collect(child, requests.Child); e != nil {
++			return e
++		}
++		if e = submit(child); e != nil {
++			return e
++		}
++		if e = c.observed(ctx, &child.Payment, 1); e != nil {
++			return e
++		}
++		ob, e := c.obligation(ctx, source.Payment.Output)
++		if e != nil {
++			return e
++		}
++		if ob == nil || ob.Status != rules.DirectOpen {
++			return fmt.Errorf("source %d lacks an executed child obligation", i)
++		}
++		source.InitialObligation = ob
++		recovery = append(recovery, source)
++	}
++	var ordinary []*c3CongestionRow
++	for i := 0; i < *count; i++ {
++		r := fixture.Requests[i].Source
++		class := "ordinary-base"
++		build := time.Now()
++		if i%2 == 1 {
++			r, e = c3CongestionPriority(r, n, p, c.keys[0])
++			if e != nil {
++				return e
++			}
++			class = "ordinary-priority"
++		}
++		row := add(class, 0)
++		row.Payment.BuildNS = time.Since(build).Nanoseconds()
++		if _, e = collect(row, r); e != nil {
++			return e
++		}
++		ordinary = append(ordinary, row)
++	}
++	var wave []*c3CongestionRow
++	for i := 0; i <= len(ordinary); i++ {
++		if i == *sourceAfter {
++			wave = append(wave, recovery...)
++		}
++		if i < len(ordinary) {
++			wave = append(wave, ordinary[i])
++		}
++	}
++	report.WaveStartOffsetNS = time.Since(c.start).Nanoseconds()
++	waveStart := time.Now()
++	for i, row := range wave {
++		row.PlannedSubmissionOrder = i
++		row.PlannedSubmitOffsetNS = report.WaveStartOffsetNS + int64(time.Duration(i)**interval)
++		if e = budgetPauseUntil(ctx, waveStart.Add(time.Duration(i)**interval)); e != nil {
++			return e
++		}
++		row.ActualSubmissionOrder = i
++		if e = submit(row); e != nil {
++			row.Error = e.Error()
++			return e
++		}
++	}
++	for _, row := range report.Rows {
++		if e = c.observed(ctx, &row.Payment, row.Owner); e != nil {
++			row.Error = e.Error()
++			return e
++		}
++		if e = c.feeAndClosed(ctx, &row.Payment, row.Owner); e != nil {
++			row.Error = e.Error()
++			return e
++		}
++		row.FinalEscrow, e = c.escrow(ctx, row.Payment.Fact)
++		if e != nil {
++			return e
++		}
++		if row.FinalEscrow == nil || !row.FinalEscrow.Record.QuoteCollected || row.FinalEscrow.Record.Escrow.Held != 0 || row.FinalEscrow.Record.Escrow.Reflow != 0 {
++			return fmt.Errorf("row %d did not close normally", row.Index)
++		}
++	}
++	blocksMu.Lock()
++	for _, block := range report.Blocks {
++		for _, x := range block.Block.Executions {
++			if x.Kind != "payment" || !x.Result.Applied {
++				continue
++			}
++			for _, row := range report.Rows {
++				if row.Payment.Tx == x.Tx {
++					row.Payment.ExecutionHeight = block.Block.Height
++					row.Payment.ExecutionIndex = x.Index
++					row.Payment.MissingInputs = x.Result.MissingInputs
++					row.Payment.RecoveredOutputs = x.Result.RecoveredOutputs
++					row.VerifiedBlockSeenOffsetNS = block.SeenOffsetNS
++				}
++			}
++		}
++	}
++	blocksMu.Unlock()
++	for _, row := range report.Rows {
++		if row.Payment.ExecutionHeight <= 0 {
++			return fmt.Errorf("row %d lacks verified inclusion", row.Index)
++		}
++	}
++	if report.FinalPools, e = c.pools(ctx); e != nil {
++		return e
++	}
++	// Reuse the existing exact two-issuer CAL/FUEL reconciliation, placing each
++	// executed payment under its actual issuer. No absent fixture is charged.
++	fees := c3FeeReport{InitialPools: report.InitialPools, FinalPools: report.FinalPools}
++	for _, row := range report.Rows {
++		pair := &c3FeePair{}
++		if row.Owner == 0 {
++			pair.Source = row.Payment
++		} else {
++			pair.Child = row.Payment
++		}
++		fees.Pairs = append(fees.Pairs, pair)
++	}
++	if e = c3FinalBalances(&fees); e != nil {
++		return e
++	}
++	report.FUELConserved = fees.FUELConserved
++	return nil
++}
++
++func budgetPauseUntil(ctx context.Context, at time.Time) error {
++	if wait := time.Until(at); wait > 0 {
++		return budgetPause(ctx, wait)
++	}
++	return nil
++}
++
++func c3CongestionCSV(path string, rows []*c3CongestionRow) error {
++	file, e := os.Create(path)
++	if e != nil {
++		return e
++	}
++	defer file.Close()
++	w := csv.NewWriter(file)
++	defer w.Flush()
++	if e = w.Write([]string{"index", "class", "issuer", "tx", "base_fee_cal", "priority_fee_cal", "priority_reward_fuel", "receipt_ns", "planned_order", "actual_order", "planned_submit_offset_ns", "http_start_offset_ns", "http_end_offset_ns", "execution_height", "execution_index", "verified_seen_offset_ns", "closed", "error"}); e != nil {
++		return e
++	}
++	integer := func(n int64) string { return strconv.FormatInt(n, 10) }
++	for _, r := range rows {
++		start, end := int64(0), int64(0)
++		if len(r.Payment.SubmitAttemptLog) > 0 {
++			start = r.Payment.SubmitAttemptLog[0].StartOffsetNS
++			end = r.Payment.SubmitAttemptLog[len(r.Payment.SubmitAttemptLog)-1].EndOffsetNS
++		}
++		closed := r.FinalEscrow != nil && r.FinalEscrow.Record.Escrow.Held == 0
++		if e = w.Write([]string{strconv.Itoa(r.Index), r.Class, strconv.Itoa(r.Owner), protocol.Hash(r.Payment.Tx).String(), strconv.FormatUint(r.BaseFeeCAL, 10), strconv.FormatUint(r.PriorityFeeCAL, 10), strconv.FormatUint(r.PriorityRewardFUEL, 10), integer(r.Payment.ReceiptNS), strconv.Itoa(r.PlannedSubmissionOrder), strconv.Itoa(r.ActualSubmissionOrder), integer(r.PlannedSubmitOffsetNS), integer(start), integer(end), integer(r.Payment.ExecutionHeight), strconv.Itoa(r.Payment.ExecutionIndex), integer(r.VerifiedBlockSeenOffsetNS), strconv.FormatBool(closed), r.Error}); e != nil {
++			return e
++		}
++	}
++	w.Flush()
++	return w.Error()
++}
+--- /dev/null
++++ b/cmd/payctl/c3_congestion_test.go
+@@ -0,0 +1,69 @@
++package main
++
++import (
++	"context"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"testing"
++	"time"
++	"utxo/internal/rules"
++	"utxo/protocol"
++)
++
++func TestC3CongestionHTTPRecordsActualAttemptAndRejection(t *testing.T) {
++	for _, status := range []int{http.StatusAccepted, http.StatusTooManyRequests} {
++		t.Run(http.StatusText(status), func(t *testing.T) {
++			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++				body, _ := io.ReadAll(r.Body)
++				if string(body) != "signed-raw" || r.URL.Path != "/v1/commands" {
++					t.Error("changed public bytes or endpoint")
++				}
++				w.WriteHeader(status)
++				_, _ = w.Write([]byte("actual response"))
++			}))
++			defer server.Close()
++			a, e := c3CongestionHTTP(context.Background(), server.Client(), server.URL, []byte("signed-raw"), time.Now())
++			if a.HTTPStatus != status || a.ResponseBody != "actual response" || a.EndOffsetNS < a.StartOffsetNS || (e == nil) != (status == http.StatusAccepted) {
++				t.Fatalf("attempt %+v %v", a, e)
++			}
++		})
++	}
++}
++
++func TestC3CongestionPriorityUsesSignedPublishedTier(t *testing.T) {
++	_, _, n, f := c3CLIFixture(t)
++	n.Direct.C3 = nil
++	n.Genesis.Grants = f.Genesis.Grants
++	n.Accounts = n.Accounts[:2]
++	if e := configureFinalC3Lab(&n, 2); e != nil {
++		t.Fatal(e)
++	}
++	p, e := n.Direct.Policy(n.Schedule, n.Organizations)
++	if e != nil {
++		t.Fatal(e)
++	}
++	o := f.Genesis.Outputs[0]
++	base, e := budgetRequest(n, p, f.Org, f.Owner, protocol.Input{Kind: protocol.FinalInput, Output: o.ID, Evidence: o.Fact}, o.Output, o.Output.Recipient, nil)
++	if e != nil {
++		t.Fatal(e)
++	}
++	originalID := base.Tx.ID()
++	paid, e := c3CongestionPriority(base, n, p, f.Owner)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if base.Tx.ID() != originalID || paid.Tx.ID() == originalID {
++		t.Fatal("priority builder mutated base identity")
++	}
++	c := paid.Tx.Body.Fee.C3
++	if c.PriorityFee != 10 || c.PriorityReward != 2 || c.Quote != 12 || paid.Tx.Body.Outputs[0].Amount+12 != o.Output.Amount || len(paid.Tx.Body.Fee.Inputs) != 0 {
++		t.Fatalf("invalid signed tier %+v", c)
++	}
++	if paid.Tx.VerifyAuth() != nil {
++		t.Fatal("priority owner signature")
++	}
++	if _, e = rules.PrepareDirectVector(paid.Tx, p); e != nil {
++		t.Fatal(e)
++	}
++}
+--- a/cmd/payctl/c3_fees.go
++++ b/cmd/payctl/c3_fees.go
+@@ -31,6 +31,7 @@
+ )
+ 
+ type c3FeePayment struct {
++	ServiceFeeCAL, ExpectedReceiveCAL                                     uint64
+ 	Fact                                                                  protocol.SpendFactID
+ 	Tx                                                                    protocol.TxID
+ 	Output                                                                protocol.OutputID
+@@ -120,6 +121,8 @@
+ 				return nil, e
+ 			}
+ 			x.HistoryApplied = &r.Applied
++		} else if protocol.IsClockTick(t.Bytes, network) {
++			x.Kind = "clock"
+ 		} else {
+ 			p, e := protocol.DecodeDirectSubmission(t.Bytes)
+ 			if e != nil {
+@@ -135,6 +138,8 @@
+ }
+ 
+ type c3FeeReport struct {
++	EpochSettlements                                         []c3FeeSample
++	FUELConserved                                            bool
+ 	Version                                                  int
+ 	Case                                                     string
+ 	Count                                                    int
+@@ -158,13 +163,16 @@
+ 		return e
+ 	}
+ 	s := r.Escrow
+-	if s.Commitment.Budget != s.Held+s.Rewards+s.Burned+s.Released {
++	if s.Commitment.Budget != s.Held+s.Rewards+s.Burned+s.Reflow+s.Released {
+ 		return fmt.Errorf("C3 budget conservation failed")
+ 	}
+ 	return nil
+ }
+ 
+ func c3FeesRequest(n cfg.Network, p rules.DirectPolicy, org protocol.OrgConfig, key ed25519.PrivateKey, in protocol.Input, coin protocol.Output, to protocol.ReceiveDescriptor, proofs []protocol.InputCertificate, fee state.OriginOutput) (protocol.DirectRequest, error) {
++	if finalC3Network(n) {
++		return budgetRequest(n, p, org, key, in, coin, to, proofs)
++	}
+ 	// Reuse the production builder, but bind the requested quote before creating
+ 	// the final transaction identity and signatures.
+ 	r, e := budgetRequest(n, p, org, key, in, coin, to, proofs, fee)
+@@ -207,6 +215,9 @@
+ 	for i := 0; i < count; i++ {
+ 		for user, d := range ds {
+ 			assets := []protocol.Asset{protocol.AssetFUEL}
++			if finalC3Network(n) {
++				assets = nil
++			}
+ 			if user == 0 {
+ 				assets = append(assets, protocol.AssetCAL)
+ 			}
+@@ -256,7 +267,11 @@
+ 	for i := range fixture.Requests {
+ 		q := &fixture.Requests[i]
+ 		origin := origins[i]
+-		q.Source, e = c3FeesRequest(n, policy, n.Organizations[0], keys[0], protocol.Input{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}, origin.Output, ds[1], nil, fees[0][i])
++		var sourceFee, childFee state.OriginOutput
++		if !finalC3Network(n) {
++			sourceFee, childFee = fees[0][i], fees[1][i]
++		}
++		q.Source, e = c3FeesRequest(n, policy, n.Organizations[0], keys[0], protocol.Input{Kind: protocol.FinalInput, Output: origin.ID, Evidence: origin.Fact}, origin.Output, ds[1], nil, sourceFee)
+ 		if e != nil {
+ 			return e
+ 		}
+@@ -265,7 +280,7 @@
+ 			return e
+ 		}
+ 		summary := protocol.SummaryFor(q.Source.Tx, vector)
+-		q.Child, e = c3FeesRequest(n, policy, n.Organizations[1], keys[1], protocol.Input{Kind: protocol.CertificateInput, Output: summary.OutputID(0), Evidence: protocol.Hash(summary.Fact())}, q.Source.Tx.Body.Outputs[0], ds[0], nil, fees[1][i])
++		q.Child, e = c3FeesRequest(n, policy, n.Organizations[1], keys[1], protocol.Input{Kind: protocol.CertificateInput, Output: summary.OutputID(0), Evidence: protocol.Hash(summary.Fact())}, q.Source.Tx.Body.Outputs[0], ds[0], nil, childFee)
+ 		if e != nil {
+ 			return e
+ 		}
+@@ -366,6 +381,10 @@
+ }
+ func (c *c3FeeClient) collect(ctx context.Context, owner int, r protocol.DirectRequest, h *c3FeePayment) (protocol.OutputCertificate, error) {
+ 	h.Tx = r.Tx.ID()
++	if r.Tx.Body.Fee.C3.Final() {
++		h.ServiceFeeCAL = r.Tx.Body.Fee.C3.Quote
++	}
++	h.ExpectedReceiveCAL = r.Tx.Body.Outputs[0].Amount
+ 	raw, e := c.wallets[owner].SaveDirectRequestBytes(r)
+ 	if e != nil {
+ 		return protocol.OutputCertificate{}, e
+@@ -414,6 +433,9 @@
+ 			return e
+ 		}
+ 		if found && (coin.Final != (protocol.Hash{}) || coin.Recovered) {
++			if coin.Output.Asset != protocol.AssetCAL || coin.Output.Amount != h.ExpectedReceiveCAL {
++				return fmt.Errorf("receiver principal mismatch")
++			}
+ 			h.FinalCoin = coin
+ 			h.PublicOffsetNS = time.Since(c.start).Nanoseconds()
+ 			return nil
+@@ -425,7 +447,7 @@
+ }
+ func (c *c3FeeClient) feeAndClosed(ctx context.Context, h *c3FeePayment, owner int) error {
+ 	id := protocol.OutputIdentity(c.n.Genesis.Network, h.Tx, protocol.FeeChangeIndex)
+-	for {
++	for !finalC3Network(c.n) {
+ 		var found bool
+ 		e := c.dbs[owner].View(func(v state.ReadView) error {
+ 			var e error
+@@ -492,8 +514,11 @@
+ 		if e != nil {
+ 			return e
+ 		}
+-		if !found {
++		if !found && !finalC3Network(c.n) {
+ 			return state.ErrNotFound
++		}
++		if found && finalC3Network(c.n) {
++			return fmt.Errorf("final C3 unexpectedly created a user FUEL change")
+ 		}
+ 		refund, found, e := state.Load[wallet.DirectCoin](v, wallet.DirectCoinKey(refundID, 0))
+ 		if e != nil {
+@@ -512,6 +537,13 @@
+ 		return fmt.Errorf("invalid verified fee refund")
+ 	}
+ 	var e error
++	if finalC3Network(c.n) {
++		if h.FeeRefund != nil || h.FeeInput.Output.Amount != 0 {
++			return fmt.Errorf("final C3 has user FUEL effects")
++		}
++		h.FeeNet = 0
++		return nil
++	}
+ 	h.FeeNet, e = c3ObservedFeeNet(*h)
+ 	return e
+ }
+@@ -743,6 +775,9 @@
+ 	defer cancel()
+ 	c := c3FeeClient{n: n, lab: lab, policy: p, client: transport.NewHTTPClient(5 * time.Second), public: transport.NewCommitteeClient(n.CommitteeURLs[0], n.CommitteeURLs[1:]...), start: time.Now()}
+ 	report := c3FeeReport{Version: 1, Case: *mode, Count: *count, SourceDelayNS: int64(*delay), TimeoutSeconds: n.Direct.TimeoutSeconds, StartedUnixNS: c.start.UnixNano(), Pairs: make([]*c3FeePair, *count)}
++	if finalC3Network(n) {
++		report.Version = 2
++	}
+ 	defer func() {
+ 		if len(report.FinalPools) == 0 {
+ 			snapshotCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+@@ -860,6 +895,12 @@
+ 			}
+ 		}
+ 	}
++	if finalC3Network(n) {
++		if len(fees[0]) != 0 || len(fees[1]) != 0 {
++			return fmt.Errorf("final C3 user genesis contains FUEL")
++		}
++		fees[0], fees[1] = make([]state.OriginOutput, *count), make([]state.OriginOutput, *count)
++	}
+ 	if len(origins) != *count || len(fees[0]) != *count || len(fees[1]) != *count {
+ 		return fmt.Errorf("independent input counts mismatch")
+ 	}
+@@ -904,6 +945,110 @@
+ 			return fmt.Errorf("pair %d committed order differs from requested %s case", pair.Index, *mode)
+ 		}
+ 	}
++	if finalC3Network(n) {
++		// Exercise two real public epoch boundaries after economic closure.
++		// Clock ticks pass ordinary committee validation and verified followers.
++		pools, e := c.pools(ctx)
++		if e != nil || len(pools) == 0 {
++			return fmt.Errorf("epoch initial snapshot: %w", e)
++		}
++		targetEpoch := pools[0].Epoch.Epoch + 2
++		for pools[0].Epoch.Epoch < targetEpoch {
++			height, e := blockfollow.Height(c.dbs[0])
++			if e != nil {
++				return e
++			}
++			// Clock commands already have their own wire format; the payment
++			// relay's Submit API would try to wrap them as signed payments.
++			tick, e := c3ReplaySubmit(ctx, c.client, n.CommitteeURLs[0], protocol.ClockTick(n.Genesis.Network, height+1))
++			if e != nil {
++				return e
++			}
++			if tick.HTTPStatus != 202 {
++				return fmt.Errorf("epoch tick HTTP %d: %s", tick.HTTPStatus, tick.ResponseBody)
++			}
++			for {
++				observed, e := blockfollow.Height(c.dbs[0])
++				if e != nil {
++					return e
++				}
++				if observed > height {
++					break
++				}
++				if e = budgetPause(ctx, 25*time.Millisecond); e != nil {
++					return e
++				}
++			}
++			pools, e = c.pools(ctx)
++			if e != nil {
++				return e
++			}
++			report.EpochSettlements = append(report.EpochSettlements, c3FeeSample{OffsetNS: time.Since(c.start).Nanoseconds(), Pools: pools})
++		}
++	}
+ 	report.FinalPools, err = c.pools(ctx)
++	if err == nil && finalC3Network(n) {
++		err = c3FinalBalances(&report)
++	}
+ 	return err
+ }
++
++func c3FinalBalances(r *c3FeeReport) error {
++	if len(r.InitialPools) != 2 || len(r.FinalPools) != 2 {
++		return fmt.Errorf("expected two issuer snapshots")
++	}
++	var initial, current uint64
++	var e error
++	for i, p := range r.FinalPools {
++		initial, e = protocol.Add(initial, r.InitialPools[i].Free+r.InitialPools[i].Held)
++		if e != nil {
++			return e
++		}
++		current, e = protocol.Add(current, p.Free+p.Held)
++		if e != nil {
++			return e
++		}
++		var quotes uint64
++		for _, pair := range r.Pairs {
++			h := pair.Source
++			if i == 1 {
++				h = pair.Child
++			}
++			quotes, e = protocol.Add(quotes, h.ServiceFeeCAL)
++			if e != nil {
++				return e
++			}
++		}
++		if p.CALRevenue < r.InitialPools[i].CALRevenue || p.CALRevenue-r.InitialPools[i].CALRevenue != quotes {
++			return fmt.Errorf("issuer %d CAL revenue does not match executed signed quotes", i)
++		}
++		if p.Burned != 0 || p.PoolBurned != 0 {
++			return fmt.Errorf("final C3 burned FUEL")
++		}
++	}
++	initial, e = protocol.Add(initial, r.InitialPools[0].Rewards)
++	if e != nil {
++		return e
++	}
++	current, e = protocol.Add(current, r.FinalPools[0].Rewards)
++	if e != nil {
++		return e
++	}
++	for _, part := range r.InitialPools[0].Epoch.Pool {
++		initial, e = protocol.Add(initial, part.Amount)
++		if e != nil {
++			return e
++		}
++	}
++	for _, part := range r.FinalPools[0].Epoch.Pool {
++		current, e = protocol.Add(current, part.Amount)
++		if e != nil {
++			return e
++		}
++	}
++	r.FUELConserved = initial == current
++	if !r.FUELConserved {
++		return fmt.Errorf("FUEL total mismatch: initial=%d current=%d", initial, current)
++	}
++	return nil
++}
+--- /dev/null
++++ b/cmd/payctl/c3_final_test.go
+@@ -0,0 +1,37 @@
++package main
++
++import (
++	"testing"
++	"utxo/internal/rules"
++	"utxo/protocol"
++)
++
++func TestFinalC3LabAndRequestUseCALOnly(t *testing.T) {
++	_, _, n, f := c3CLIFixture(t)
++	// The fixture starts with legacy C3. Configure final C3 from an otherwise
++	// identical clean registry to verify the explicit opt-in and quotation.
++	n.Direct.C3 = nil
++	n.Genesis.Grants = f.Genesis.Grants
++	n.Accounts = n.Accounts[:2]
++	if err := configureFinalC3Lab(&n, 2); err != nil {
++		t.Fatal(err)
++	}
++	p, err := n.Direct.Policy(n.Schedule, n.Organizations)
++	if err != nil {
++		t.Fatal(err)
++	}
++	o := f.Genesis.Outputs[0]
++	r, err := budgetRequest(n, p, f.Org, f.Owner, protocol.Input{Kind: protocol.FinalInput, Output: o.ID, Evidence: o.Fact}, o.Output, o.Output.Recipient, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !r.Tx.Body.Fee.C3.Final() || r.Tx.Body.Fee.Source != protocol.CALService || len(r.Tx.Body.Fee.Inputs) != 0 {
++		t.Fatal("final user must have no FUEL input")
++	}
++	if r.Tx.Body.Fee.C3.Quote != 2 || r.Tx.Body.Outputs[0].Amount+2 != o.Output.Amount {
++		t.Fatal("signed CAL quote/value mismatch")
++	}
++	if _, err := rules.PrepareDirectVector(r.Tx, p); err != nil {
++		t.Fatal(err)
++	}
++}
+--- a/cmd/payctl/direct_budget.go
++++ b/cmd/payctl/direct_budget.go
+@@ -101,6 +101,12 @@
+ 	if e := bindC3(&body, n, p); e != nil {
+ 		return protocol.DirectRequest{}, e
+ 	}
++	if body.Fee.C3.Final() {
++		if body.Fee.C3.Quote >= coin.Amount {
++			return protocol.DirectRequest{}, protocol.ErrRule
++		}
++		body.Outputs[0].Amount = coin.Amount - body.Fee.C3.Quote
++	}
+ 	tx, e := protocol.NewFastTx(body, []protocol.InputClaim{{Output: coin}}, p.Key)
+ 	if e != nil {
+ 		return protocol.DirectRequest{}, e
+--- a/cmd/payctl/lab.go
++++ b/cmd/payctl/lab.go
+@@ -34,12 +34,17 @@
+ 	outputs := flags.Int("outputs", 1024, "finite initial CAL outputs per owner")
+ 	direct := flags.Bool("v4", false, "direct-liability laboratory (current protocol), with a 3-of-4 repair key")
+ 	c3 := flags.Bool("c3", false, "issuer-funded fixed-quote laboratory (implies v5)")
++	c3Final := flags.Bool("c3-final", false, "final C3: CAL service fee, fixed rewards and FUEL redistribution")
++	c3BaseFee := flags.Uint64("c3-base-fee", 0, "final-C3 CAL service fee in smallest units")
+ 	flags.BoolVar(direct, "v5", false, "current protocol: fixed wallet binding without payment Intent")
+ 	if e := flags.Parse(args); e != nil {
+ 		return e
+ 	}
+-	if *c3 {
++	if *c3 || *c3Final {
+ 		*direct = true
++	}
++	if (*c3 && *c3Final) || (*c3BaseFee != 0 && !*c3Final) {
++		return fmt.Errorf("choose --c3 or --c3-final; --c3-base-fee requires --c3-final")
+ 	}
+ 	if *dir == "" || *outputs < 1 || *outputs > 100000 || *base < 1024 || *base > 65000-301 {
+ 		return fmt.Errorf("invalid laboratory parameters")
+@@ -191,6 +196,11 @@
+ 			return e
+ 		}
+ 		lab.Nodes = append(lab.Nodes, nodeSpec{Name: name, Binary: "committee", Config: file, URL: network.CommitteeURLs[i]})
++	}
++	if *c3Final {
++		if e = configureFinalC3Lab(&network, *c3BaseFee); e != nil {
++			return e
++		}
+ 	}
+ 	if e = cfg.Write(lab.Network, network); e != nil {
+ 		return e
+--- a/cmd/payctl/main.go
++++ b/cmd/payctl/main.go
+@@ -12,6 +12,8 @@
+ 	}
+ 	var err error
+ 	switch os.Args[1] {
++	case "c3-congestion":
++		err = c3CongestionCommand(os.Args[2:])
+ 	case "c3-fees":
+ 		err = c3FeesCommand(os.Args[2:])
+ 	case "e7":
+--- a/crypto/chameleon/testdata/rsa2048.pem
++++ /dev/null
+@@ -1,27 +0,0 @@
+------BEGIN RSA PRIVATE KEY-----
+-MIIEowIBAAKCAQEAxZHBehWtENqoLOM7rPwME5ioUVVUh1KaLPYhnBtDFo4BWgju
+-WEzzad+h1QPfelaPSCn7kuxqZGW/+ifRrrXeRGw21RX7KYPkKE2z83WPxKxOTrkq
+-CpiaWs2hq/mKHHsVZ7B/KQfMScM1TAzg+SHvLrkkubmC8Lts3IvwUfLo+Q6ed1dW
+-NEIneb/50VExYKqiDDvEFHKAm2ok7q8Omvo9ijL0lbvKFsMBdkYDWlUOMQ2R84IH
+-bx1ZfiUquJ/TMCuAf2NNvrlsIJNpI7gYLnradDiyUprHedVWKKI1U9W8DGD50EBg
+-TNPR3RakljxyAcv+rI6ixhJgk6P09/J+d/5z4QIDAQABAoIBAEI1zZwnZX9vd8rL
+-QDWBpl5u24GeUhyjnw2QUsUpEbueTW+p7I5lA3IowuhLSvqJxazOfQPI/QK2Yrbn
+-30pooptVlK6mlixcifrDx5nAfTTQ9dFGFoPEjn39yb+Dejh/OzYrnQHYHiteIx9g
+-dYioSarj2x3uwKYCecITl68u88p69/wKG6Lo1mqut08Z6MRNQJH3zCpCB3KivKuc
+-5C3FREKR9vt9YKv/2IGgBsIAB4zsxmUiyuCJJOw8QtuSNfakNg5b5ZPFkI7PIHdO
+-OYuPqVcEr6SX46RYBWoHeamHa2GPb53/1lncBxTB/nscGtCtqOG25MuNRXCldTz1
+-uucgui0CgYEA4tvL1Oa89cxgCK02QlQBmHoPT2WBH4HIhI8KZtisxOM64Q+7Yei2
+-dPoYbKC+ehSAtG/rkviVyBYPI1sxumD4n4CE9KZ9jOTDMSgtDhwoutfldvAx5fOI
+-MomasZ7HHa9vHB5doNwvYYLG9NnP4CHI94Y3iBc7hxjR9ESuzkMXiFcCgYEA3vLJ
+-7TOvZYFZQGRfqK4PbMW5RR1eh3m4ktBKo4ItjpE9XVLf057EkTk7TapAXVc2AFTY
+-WJEC/NjMDxVKXXn05V8fwxYTbAWO+h6MsjwU601p9w3K9pKUOFVRfKHM7TdGW6fk
+-Km8EiwMxloXhBoTSWJjozEGlN/DQmvlIPFkWIocCgYBoN2cFUFbAaHo5ojEJ+YOe
+-I3zDEbNm4P1YAEpcAvAjpuvWlp6TlQ+032u3A4VdmeuieMP1CaPtfkzIBk3q/D9b
+-LvRlW9LTlgghnf5MvBzt8N6mbCPQKreH1/Ur4fBBL+XQOhbzHhPaLPTvaNx5b6ve
+-IleCeoHLR1i0aZUQhnvaEwKBgDOrx3rvMKZw3ROcb8MzXCXUiYToMqFpZ4q3NaVB
+-pXdWWAeKDpAISvxxbDoqzDIV5VEcWOvl5/Bb+qdAQvT5L/X9Hupi8mtlumZjsC4a
+-2KpUTcvRaYnOHQYVWAZvpYQQ/IB/n9Tp1/6z5clCDA4ruGiKP+IfEMCvUlmojsJV
+-z1h/AoGBAI7GqimccW4HkOqufZGpJALaR/Si2o4UB0wlkZ1LwCXdDqNKG4Jk0GR0
+-zBRlY4Mqty9rUKUj7/Tya6RkoQ65dm1wBfbT4ovijlhFJVgjzeTDpABji2XdJwUA
+-kqodQ415QlNGynFYxI8Iq/JYoMYUKcag5ha9k3tDfiY4fDaA1B9z
+------END RSA PRIVATE KEY-----
+--- a/internal/committee/app.go
++++ b/internal/committee/app.go
+@@ -1,499 +1,510 @@
+-package committee
+-
+-import (
+-	"bytes"
+-	"context"
+-	"encoding/json"
+-	"errors"
+-	"fmt"
+-	abci "github.com/cometbft/cometbft/abci/types"
+-	"github.com/cometbft/cometbft/crypto/merkle"
+-	cmttypes "github.com/cometbft/cometbft/types"
+-	"sort"
+-	"sync"
+-	"time"
+-	"utxo/finality"
+-	"utxo/internal/requesttrace"
+-	"utxo/internal/state"
+-	"utxo/internal/store"
+-	"utxo/protocol"
+-)
+-
+-var ErrBlock = errors.New("inconsistent block height or identity")
+-var metaKey = []byte{0xff, 2, 'c', 'o', 'm', 'm', 'i', 't'}
+-
+-type MaintenanceFunc func(state.ReadView) (state.Transition, error)
+-type CheckFunc func([]byte) error
+-type ExecuteFunc func(state.ReadView, []byte) (state.Transition, error)
+-type BlockContext struct {
+-	Height int64
+-	Index  uint32
+-	Time   time.Time
+-}
+-type TimedExecuteFunc func(state.ReadView, []byte, BlockContext) (state.Transition, error)
+-type BeginBlockFunc func(state.ReadView, BlockContext) (state.Transition, error)
+-type commitRecord struct {
+-	Commitment finality.Commitment
+-	Leaves     [][]byte
+-	Height     int64
+-	BlockID    []byte
+-	Response   []byte
+-}
+-
+-// App provides ABCI commit isolation. Business execution is supplied by the
+-// deterministic payment rules; no standalone node accepts arbitrary key writes.
+-type App struct {
+-	maintenance MaintenanceFunc
+-	abci.BaseApplication
+-	mu             sync.Mutex
+-	chain          string
+-	db             store.Store
+-	check          CheckFunc
+-	execute        ExecuteFunc
+-	executeAt      TimedExecuteFunc
+-	beginBlock     BeginBlockFunc
+-	committed      commitRecord
+-	response       *abci.ResponseFinalizeBlock
+-	pending        *commitRecord
+-	pendingChanges []state.Change
+-	halted         error
+-}
+-
+-var _ abci.Application = (*App)(nil)
+-
+-// NewTimedApp supplies committed consensus time, never a node's wall clock.
+-func NewTimedApp(chain string, db store.Store, check CheckFunc, execute TimedExecuteFunc, begin ...BeginBlockFunc) (*App, error) {
+-	if execute == nil || len(begin) > 1 {
+-		return nil, protocol.ErrRule
+-	}
+-	app, err := NewApp(chain, db, check, func(state.ReadView, []byte) (state.Transition, error) { return state.Transition{}, protocol.ErrRule })
+-	if err == nil {
+-		app.executeAt = execute
+-		if len(begin) == 1 {
+-			app.beginBlock = begin[0]
+-		}
+-	}
+-	return app, err
+-}
+-
+-func NewApp(chain string, db store.Store, check CheckFunc, execute ExecuteFunc, maintenance ...MaintenanceFunc) (*App, error) {
+-	if chain == "" || db == nil || check == nil || execute == nil || len(maintenance) > 1 {
+-		return nil, protocol.ErrRule
+-	}
+-	a := &App{chain: chain, db: db, check: check, execute: execute, response: &abci.ResponseFinalizeBlock{}}
+-	if len(maintenance) == 1 {
+-		a.maintenance = maintenance[0]
+-	}
+-	e := db.View(func(v state.ReadView) error {
+-		raw, e := v.Get(metaKey)
+-		if errors.Is(e, state.ErrNotFound) {
+-			genesis, found, err := state.Load[protocol.Hash](v, state.Key(state.KeyGenesis))
+-			if err != nil {
+-				return err
+-			}
+-			if found {
+-				a.response.AppHash = bytes.Clone(genesis[:])
+-			}
+-			return nil
+-		}
+-		if e != nil {
+-			return e
+-		}
+-		if e = json.Unmarshal(raw, &a.committed); e != nil {
+-			return e
+-		}
+-		return a.response.Unmarshal(a.committed.Response)
+-	})
+-	if e != nil {
+-		return nil, e
+-	}
+-	return a, nil
+-}
+-func (a *App) Info(context.Context, *abci.RequestInfo) (*abci.ResponseInfo, error) {
+-	a.mu.Lock()
+-	defer a.mu.Unlock()
+-	version, name := uint64(2), "utxo-v2"
+-	if a.executeAt != nil {
+-		version = 4
+-		name = "utxo-v4"
+-	}
+-	return &abci.ResponseInfo{Version: name, AppVersion: version, LastBlockHeight: a.committed.Height, LastBlockAppHash: bytes.Clone(a.response.AppHash)}, nil
+-}
+-func (a *App) InitChain(_ context.Context, r *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
+-	if r.ChainId != a.chain || r.InitialHeight > 1 {
+-		return nil, ErrBlock
+-	}
+-	return &abci.ResponseInitChain{AppHash: bytes.Clone(a.response.AppHash)}, nil
+-}
+-func (a *App) CheckTx(_ context.Context, r *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
+-	requesttrace.Settlement.Command(r.Tx, "mempool_enter", 0)
+-	if e := a.check(r.Tx); e != nil {
+-		return &abci.ResponseCheckTx{Code: 1, Log: e.Error()}, nil
+-	}
+-	requesttrace.Settlement.Command(r.Tx, "mempool_checked", 0)
+-	return &abci.ResponseCheckTx{}, nil
+-}
+-func (a *App) PrepareProposal(_ context.Context, r *abci.RequestPrepareProposal) (*abci.ResponsePrepareProposal, error) {
+-	requesttrace.Consensus.Mark("prepare_enter", "height", r.Height, "candidates", len(r.Txs))
+-	out := &abci.ResponsePrepareProposal{}
+-	var size int64
+-	for _, tx := range r.Txs {
+-		if a.check(tx) != nil {
+-			continue
+-		}
+-		if int64(len(tx)) > r.MaxTxBytes-size {
+-			break
+-		}
+-		size += int64(len(tx))
+-		out.Txs = append(out.Txs, bytes.Clone(tx))
+-		requesttrace.Settlement.Command(tx, "prepared", r.Height)
+-	}
+-	requesttrace.Consensus.Mark("prepare_done", "height", r.Height, "selected", len(out.Txs))
+-	return out, nil
+-}
+-func (a *App) ProcessProposal(_ context.Context, r *abci.RequestProcessProposal) (*abci.ResponseProcessProposal, error) {
+-	requesttrace.Consensus.Mark("process_enter", "height", r.Height, "transactions", len(r.Txs))
+-	for _, tx := range r.Txs {
+-		requesttrace.Settlement.Command(tx, "proposal_seen", r.Height)
+-		if a.check(tx) != nil {
+-			return &abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_REJECT}, nil
+-		}
+-	}
+-	requesttrace.Consensus.Mark("process_done", "height", r.Height)
+-	return &abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_ACCEPT}, nil
+-}
+-func cloneResponse(r *abci.ResponseFinalizeBlock) *abci.ResponseFinalizeBlock {
+-	b, _ := r.Marshal()
+-	c := new(abci.ResponseFinalizeBlock)
+-	_ = c.Unmarshal(b)
+-	return c
+-}
+-func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
+-	requesttrace.Consensus.Mark("finalize_enter", "height", r.Height)
+-	a.mu.Lock()
+-	defer a.mu.Unlock()
+-	requesttrace.Consensus.Mark("finalize_locked", "height", r.Height)
+-	if a.halted != nil {
+-		return nil, a.halted
+-	}
+-	if r.Height == a.committed.Height && bytes.Equal(r.Hash, a.committed.BlockID) {
+-		return cloneResponse(a.response), nil
+-	}
+-	if r.Height != a.committed.Height+1 || len(r.Hash) != 32 {
+-		return nil, ErrBlock
+-	}
+-	if a.pending != nil {
+-		if r.Height != a.pending.Height || !bytes.Equal(r.Hash, a.pending.BlockID) {
+-			return nil, ErrBlock
+-		}
+-		out := new(abci.ResponseFinalizeBlock)
+-		if e := out.Unmarshal(a.pending.Response); e != nil {
+-			return nil, e
+-		}
+-		return out, nil
+-	}
+-	response := &abci.ResponseFinalizeBlock{TxResults: make([]*abci.ExecTxResult, len(r.Txs)), AppHash: bytes.Clone(a.response.AppHash)}
+-	var changes []state.Change
+-	facts := make(map[string]protocol.FinalFact)
+-	var commitment finality.Commitment
+-	var leaves [][]byte
+-	e := a.db.View(func(v state.ReadView) error {
+-		overlay := state.NewOverlay(v)
+-		apply := func(transition state.Transition) error {
+-			for _, c := range transition.Changes {
+-				if len(c.Key) == 0 || c.Key[0] == 0xff {
+-					return errors.New("executor used reserved state key")
+-				}
+-			}
+-			candidate := state.NewOverlay(overlay)
+-			candidate.Apply(transition.Changes)
+-			if a.executeAt != nil && len(transition.Facts) != 0 {
+-				return protocol.ErrRule
+-			}
+-			for _, f := range transition.Facts {
+-				if f.Network != protocol.Digest("NETWORK", []byte(a.chain)) {
+-					return finality.ErrProof
+-				}
+-				raw, err := f.MarshalBinary()
+-				if err != nil {
+-					return err
+-				}
+-				key := f.SortKey()[:34]
+-				latest := state.Key(70, key)
+-				old, found, err := state.Load[protocol.FinalFact](candidate, latest)
+-				if err != nil {
+-					return err
+-				}
+-				if found && old.Revision >= f.Revision {
+-					if old.Revision == f.Revision && old.ID() == f.ID() {
+-						continue
+-					}
+-					return finality.ErrProof
+-				}
+-				if err = state.Put(candidate, latest, f); err != nil {
+-					return err
+-				}
+-				candidate.Set(state.Key(71, f.SortKey()), raw)
+-				facts[string(key)] = f
+-			}
+-			overlay.Apply(candidate.Changes())
+-			return nil
+-		}
+-		if a.beginBlock != nil {
+-			tr, err := a.beginBlock(v, BlockContext{Height: r.Height, Time: r.Time})
+-			if err != nil {
+-				return err
+-			}
+-			if err = apply(tr); err != nil {
+-				return err
+-			}
+-		}
+-		for i, tx := range r.Txs {
+-			response.TxResults[i] = &abci.ExecTxResult{}
+-			requesttrace.Settlement.Command(tx, "final_check_start", r.Height)
+-			if err := a.check(tx); err != nil {
+-				response.TxResults[i].Code = 1
+-				response.TxResults[i].Log = "invalid command"
+-				continue
+-			}
+-			requesttrace.Settlement.Command(tx, "final_check_done", r.Height)
+-			requesttrace.Settlement.Command(tx, "execute_start", r.Height)
+-			var transition state.Transition
+-			var err error
+-			if a.executeAt != nil {
+-				transition, err = a.executeAt(overlay, tx, BlockContext{Height: r.Height, Index: uint32(i), Time: r.Time})
+-			} else {
+-				transition, err = a.execute(overlay, tx)
+-			}
+-			requesttrace.Settlement.Command(tx, "execute_done", r.Height)
+-			if err != nil {
+-				response.TxResults[i].Code = 2
+-				response.TxResults[i].Log = "business rejected"
+-				continue
+-			}
+-			if err = apply(transition); err != nil {
+-				return err
+-			}
+-			response.TxResults[i].Data = bytes.Clone(transition.Data)
+-		}
+-		if a.maintenance != nil {
+-			transition, err := a.maintenance(overlay)
+-			if err != nil {
+-				return err
+-			}
+-			if err = apply(transition); err != nil {
+-				return err
+-			}
+-		}
+-		for _, c := range overlay.Changes() {
+-			old, err := v.Get(c.Key)
+-			if err != nil && !errors.Is(err, state.ErrNotFound) {
+-				return err
+-			}
+-			if c.Delete && errors.Is(err, state.ErrNotFound) {
+-				continue
+-			}
+-			if !c.Delete && err == nil && bytes.Equal(old, c.Value) {
+-				continue
+-			}
+-			changes = append(changes, c)
+-		}
+-		return nil
+-	})
+-	if e != nil {
+-		return nil, e
+-	}
+-	ordered := make([]protocol.FinalFact, 0, len(facts))
+-	for _, f := range facts {
+-		ordered = append(ordered, f)
+-	}
+-	sort.Slice(ordered, func(i, j int) bool { return bytes.Compare(ordered[i].SortKey(), ordered[j].SortKey()) < 0 })
+-	for _, f := range ordered {
+-		raw, e := f.MarshalBinary()
+-		if e != nil {
+-			return nil, e
+-		}
+-		leaves = append(leaves, raw)
+-	}
+-	if len(changes) > 0 {
+-		enc := new(protocol.Encoder)
+-		for _, c := range changes {
+-			enc.Bytes(c.Key)
+-			enc.Optional(c.Delete)
+-			enc.Bytes(c.Value)
+-		}
+-		if a.executeAt != nil {
+-			network := protocol.Digest("NETWORK", []byte(a.chain))
+-			root := protocol.Digest("APP_V4", network[:], a.response.AppHash, enc.Data())
+-			response.AppHash = bytes.Clone(root[:])
+-		} else {
+-			commitment = finality.Commitment{Network: protocol.Digest("NETWORK", []byte(a.chain)), Height: r.Height, Previous: bytes.Clone(a.response.AppHash), WriteSet: protocol.Digest("WRITE_SET", enc.Data()), FactRoot: merkle.HashFromByteSlices(leaves)}
+-			root, e := commitment.Hash()
+-			if e != nil {
+-				return nil, e
+-			}
+-			response.AppHash = bytes.Clone(root[:])
+-		}
+-	}
+-
+-	raw, e := response.Marshal()
+-	if e != nil {
+-		return nil, e
+-	}
+-	a.pending = &commitRecord{Height: r.Height, BlockID: bytes.Clone(r.Hash), Response: raw, Commitment: commitment, Leaves: leaves}
+-	a.pendingChanges = changes
+-	requesttrace.Settlement.Block(r.Height, "finalize_done")
+-	requesttrace.Consensus.Mark("finalize_done", "height", r.Height)
+-	return cloneResponse(response), nil
+-}
+-func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit, error) {
+-	var entered time.Time
+-	var lockWait time.Duration
+-	if requesttrace.Consensus != nil {
+-		entered = time.Now()
+-	}
+-	a.mu.Lock()
+-	if !entered.IsZero() {
+-		lockWait = time.Since(entered)
+-	}
+-	defer a.mu.Unlock()
+-	if a.halted != nil {
+-		return nil, a.halted
+-	}
+-	if a.pending == nil {
+-		return &abci.ResponseCommit{}, nil
+-	}
+-	requesttrace.Settlement.Block(a.pending.Height, "commit_start")
+-	requesttrace.Consensus.Mark("commit_start", "height", a.pending.Height)
+-	if !entered.IsZero() {
+-		requesttrace.Consensus.Mark("commit_lock", "height", a.pending.Height, "wait_ns", lockWait.Nanoseconds())
+-	}
+-	raw, e := json.Marshal(a.pending)
+-	if e != nil {
+-		return nil, e
+-	}
+-	cs := append([]state.Change(nil), a.pendingChanges...)
+-	cs = append(cs, state.Change{Key: metaKey, Value: raw})
+-	if a.executeAt == nil {
+-		cs = append(cs, state.Change{Key: blockKey(a.pending.Height), Value: raw})
+-	}
+-	for i, rawFact := range a.pending.Leaves {
+-		f, e := protocol.DecodeFact(rawFact)
+-		if e != nil {
+-			return nil, e
+-		}
+-		location, _ := json.Marshal(factLocation{Height: a.pending.Height, Index: i})
+-		cs = append(cs, state.Change{Key: proofKey(f.ID()), Value: location})
+-	}
+-	if requesttrace.Consensus != nil {
+-		bytes := 0
+-		for _, c := range cs {
+-			bytes += len(c.Key) + len(c.Value)
+-		}
+-		requesttrace.Consensus.Mark("commit_update_start", "height", a.pending.Height, "changes", len(cs), "bytes", bytes)
+-	}
+-	e = a.db.Update(func(state.ReadView) ([]state.Change, error) {
+-		requesttrace.Consensus.Mark("commit_update_callback", "height", a.pending.Height)
+-		return cs, nil
+-	})
+-	requesttrace.Consensus.Mark("commit_update_return", "height", a.pending.Height)
+-	if e != nil {
+-		a.halted = e
+-		return nil, e
+-	}
+-	a.committed = *a.pending
+-	requesttrace.E8Commit(a.pending.Height)
+-	a.response = new(abci.ResponseFinalizeBlock)
+-	if e = a.response.Unmarshal(a.pending.Response); e != nil {
+-		a.halted = e
+-		return nil, e
+-	}
+-	requesttrace.Settlement.Block(a.pending.Height, "commit_done")
+-	requesttrace.Consensus.Mark("commit_done", "height", a.pending.Height)
+-	a.pending = nil
+-	a.pendingChanges = nil
+-	return &abci.ResponseCommit{}, nil
+-}
+-func (a *App) Query(_ context.Context, r *abci.RequestQuery) (*abci.ResponseQuery, error) {
+-	a.mu.Lock()
+-	defer a.mu.Unlock()
+-	out := &abci.ResponseQuery{Height: a.committed.Height}
+-	if len(r.Data) == 0 || r.Data[0] == 0xff {
+-		return &abci.ResponseQuery{Code: 1, Log: "invalid key"}, nil
+-	}
+-	e := a.db.View(func(v state.ReadView) error {
+-		b, e := v.Get(r.Data)
+-		if errors.Is(e, state.ErrNotFound) {
+-			out.Code = 1
+-			return nil
+-		}
+-		if e != nil {
+-			return e
+-		}
+-		out.Value = b
+-		return nil
+-	})
+-	if e != nil {
+-		return nil, fmt.Errorf("query committed state: %w", e)
+-	}
+-	return out, nil
+-}
+-func (a *App) OfferSnapshot(context.Context, *abci.RequestOfferSnapshot) (*abci.ResponseOfferSnapshot, error) {
+-	return &abci.ResponseOfferSnapshot{Result: abci.ResponseOfferSnapshot_REJECT}, nil
+-}
+-func (a *App) ApplySnapshotChunk(context.Context, *abci.RequestApplySnapshotChunk) (*abci.ResponseApplySnapshotChunk, error) {
+-	return &abci.ResponseApplySnapshotChunk{Result: abci.ResponseApplySnapshotChunk_ABORT}, nil
+-}
+-
+-type factLocation struct {
+-	Height int64
+-	Index  int
+-}
+-
+-func blockKey(height int64) []byte {
+-	e := new(protocol.Encoder)
+-	e.U64(uint64(height))
+-	return append([]byte{0xff, 'b'}, e.Data()...)
+-}
+-func proofKey(id protocol.Hash) []byte { return append([]byte{0xff, 'p'}, id[:]...) }
+-
+-// Proof returns committed material only. Clients still verify the pinned committee.
+-func (a *App) Proof(id protocol.Hash, header cmttypes.SignedHeader) (finality.FactProof, error) {
+-	a.mu.Lock()
+-	defer a.mu.Unlock()
+-	var result finality.FactProof
+-	err := a.db.View(func(v state.ReadView) error {
+-		loc, found, e := state.Load[factLocation](v, proofKey(id))
+-		if e != nil {
+-			return e
+-		}
+-		if !found {
+-			return state.ErrNotFound
+-		}
+-		record, found, e := state.Load[commitRecord](v, blockKey(loc.Height))
+-		if e != nil {
+-			return e
+-		}
+-		if !found || loc.Index < 0 || loc.Index >= len(record.Leaves) {
+-			return finality.ErrProof
+-		}
+-		if header.Header == nil || header.Height != loc.Height+1 {
+-			return finality.ErrProof
+-		}
+-		root, e := record.Commitment.Hash()
+-		if e != nil || !bytes.Equal(root[:], header.AppHash) {
+-			return finality.ErrProof
+-		}
+-		_, paths := merkle.ProofsFromByteSlices(record.Leaves)
+-		f, e := protocol.DecodeFact(record.Leaves[loc.Index])
+-		if e != nil {
+-			return e
+-		}
+-		if f.ID() != id {
+-			return finality.ErrProof
+-		}
+-		result = finality.FactProof{Fact: f, Commitment: record.Commitment, Path: *paths[loc.Index], Header: header}
+-		return nil
+-	})
+-	return result, err
+-}
++package committee
++
++import (
++	"bytes"
++	"context"
++	"encoding/json"
++	"errors"
++	"fmt"
++	abci "github.com/cometbft/cometbft/abci/types"
++	"github.com/cometbft/cometbft/crypto/merkle"
++	cmttypes "github.com/cometbft/cometbft/types"
++	"sort"
++	"sync"
++	"time"
++	"utxo/finality"
++	"utxo/internal/requesttrace"
++	"utxo/internal/state"
++	"utxo/internal/store"
++	"utxo/protocol"
++)
++
++var ErrBlock = errors.New("inconsistent block height or identity")
++var metaKey = []byte{0xff, 2, 'c', 'o', 'm', 'm', 'i', 't'}
++
++type MaintenanceFunc func(state.ReadView) (state.Transition, error)
++type CheckFunc func([]byte) error
++type ExecuteFunc func(state.ReadView, []byte) (state.Transition, error)
++type BlockContext struct {
++	ProposerAddress []byte
++	Height          int64
++	Index           uint32
++	Time            time.Time
++}
++type TimedExecuteFunc func(state.ReadView, []byte, BlockContext) (state.Transition, error)
++type BeginBlockFunc func(state.ReadView, BlockContext) (state.Transition, error)
++type commitRecord struct {
++	Commitment finality.Commitment
++	Leaves     [][]byte
++	Height     int64
++	BlockID    []byte
++	Response   []byte
++}
++
++// App provides ABCI commit isolation. Business execution is supplied by the
++// deterministic payment rules; no standalone node accepts arbitrary key writes.
++type App struct {
++	selectTxs   func([][]byte, int64) ([][]byte, error)
++	maintenance MaintenanceFunc
++	abci.BaseApplication
++	mu             sync.Mutex
++	chain          string
++	db             store.Store
++	check          CheckFunc
++	execute        ExecuteFunc
++	executeAt      TimedExecuteFunc
++	beginBlock     BeginBlockFunc
++	committed      commitRecord
++	response       *abci.ResponseFinalizeBlock
++	pending        *commitRecord
++	pendingChanges []state.Change
++	halted         error
++}
++
++var _ abci.Application = (*App)(nil)
++
++// NewTimedApp supplies committed consensus time, never a node's wall clock.
++func NewTimedApp(chain string, db store.Store, check CheckFunc, execute TimedExecuteFunc, begin ...BeginBlockFunc) (*App, error) {
++	if execute == nil || len(begin) > 1 {
++		return nil, protocol.ErrRule
++	}
++	app, err := NewApp(chain, db, check, func(state.ReadView, []byte) (state.Transition, error) { return state.Transition{}, protocol.ErrRule })
++	if err == nil {
++		app.executeAt = execute
++		if len(begin) == 1 {
++			app.beginBlock = begin[0]
++		}
++	}
++	return app, err
++}
++
++func NewApp(chain string, db store.Store, check CheckFunc, execute ExecuteFunc, maintenance ...MaintenanceFunc) (*App, error) {
++	if chain == "" || db == nil || check == nil || execute == nil || len(maintenance) > 1 {
++		return nil, protocol.ErrRule
++	}
++	a := &App{chain: chain, db: db, check: check, execute: execute, response: &abci.ResponseFinalizeBlock{}}
++	if len(maintenance) == 1 {
++		a.maintenance = maintenance[0]
++	}
++	e := db.View(func(v state.ReadView) error {
++		raw, e := v.Get(metaKey)
++		if errors.Is(e, state.ErrNotFound) {
++			genesis, found, err := state.Load[protocol.Hash](v, state.Key(state.KeyGenesis))
++			if err != nil {
++				return err
++			}
++			if found {
++				a.response.AppHash = bytes.Clone(genesis[:])
++			}
++			return nil
++		}
++		if e != nil {
++			return e
++		}
++		if e = json.Unmarshal(raw, &a.committed); e != nil {
++			return e
++		}
++		return a.response.Unmarshal(a.committed.Response)
++	})
++	if e != nil {
++		return nil, e
++	}
++	return a, nil
++}
++func (a *App) Info(context.Context, *abci.RequestInfo) (*abci.ResponseInfo, error) {
++	a.mu.Lock()
++	defer a.mu.Unlock()
++	version, name := uint64(2), "utxo-v2"
++	if a.executeAt != nil {
++		version = 4
++		name = "utxo-v4"
++	}
++	return &abci.ResponseInfo{Version: name, AppVersion: version, LastBlockHeight: a.committed.Height, LastBlockAppHash: bytes.Clone(a.response.AppHash)}, nil
++}
++func (a *App) InitChain(_ context.Context, r *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
++	if r.ChainId != a.chain || r.InitialHeight > 1 {
++		return nil, ErrBlock
++	}
++	return &abci.ResponseInitChain{AppHash: bytes.Clone(a.response.AppHash)}, nil
++}
++func (a *App) CheckTx(_ context.Context, r *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
++	requesttrace.Settlement.Command(r.Tx, "mempool_enter", 0)
++	if e := a.check(r.Tx); e != nil {
++		return &abci.ResponseCheckTx{Code: 1, Log: e.Error()}, nil
++	}
++	requesttrace.Settlement.Command(r.Tx, "mempool_checked", 0)
++	return &abci.ResponseCheckTx{}, nil
++}
++func (a *App) PrepareProposal(_ context.Context, r *abci.RequestPrepareProposal) (*abci.ResponsePrepareProposal, error) {
++	requesttrace.Consensus.Mark("prepare_enter", "height", r.Height, "candidates", len(r.Txs))
++	out := &abci.ResponsePrepareProposal{}
++	var size int64
++	txs := r.Txs
++	if a.selectTxs != nil {
++		var err error
++		txs, err = a.selectTxs(txs, r.MaxTxBytes)
++		if err != nil {
++			return nil, err
++		}
++	}
++	for _, tx := range txs {
++		if a.check(tx) != nil {
++			continue
++		}
++		txSize := cmttypes.ComputeProtoSizeForTxs([]cmttypes.Tx{tx})
++		if txSize > r.MaxTxBytes-size {
++			break
++		}
++		size += txSize
++		out.Txs = append(out.Txs, bytes.Clone(tx))
++		requesttrace.Settlement.Command(tx, "prepared", r.Height)
++	}
++	requesttrace.Consensus.Mark("prepare_done", "height", r.Height, "selected", len(out.Txs))
++	return out, nil
++}
++func (a *App) ProcessProposal(_ context.Context, r *abci.RequestProcessProposal) (*abci.ResponseProcessProposal, error) {
++	requesttrace.Consensus.Mark("process_enter", "height", r.Height, "transactions", len(r.Txs))
++	for _, tx := range r.Txs {
++		requesttrace.Settlement.Command(tx, "proposal_seen", r.Height)
++		if a.check(tx) != nil {
++			return &abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_REJECT}, nil
++		}
++	}
++	requesttrace.Consensus.Mark("process_done", "height", r.Height)
++	return &abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_ACCEPT}, nil
++}
++func cloneResponse(r *abci.ResponseFinalizeBlock) *abci.ResponseFinalizeBlock {
++	b, _ := r.Marshal()
++	c := new(abci.ResponseFinalizeBlock)
++	_ = c.Unmarshal(b)
++	return c
++}
++func (a *App) FinalizeBlock(_ context.Context, r *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
++	requesttrace.Consensus.Mark("finalize_enter", "height", r.Height)
++	a.mu.Lock()
++	defer a.mu.Unlock()
++	requesttrace.Consensus.Mark("finalize_locked", "height", r.Height)
++	if a.halted != nil {
++		return nil, a.halted
++	}
++	if r.Height == a.committed.Height && bytes.Equal(r.Hash, a.committed.BlockID) {
++		return cloneResponse(a.response), nil
++	}
++	if r.Height != a.committed.Height+1 || len(r.Hash) != 32 {
++		return nil, ErrBlock
++	}
++	if a.pending != nil {
++		if r.Height != a.pending.Height || !bytes.Equal(r.Hash, a.pending.BlockID) {
++			return nil, ErrBlock
++		}
++		out := new(abci.ResponseFinalizeBlock)
++		if e := out.Unmarshal(a.pending.Response); e != nil {
++			return nil, e
++		}
++		return out, nil
++	}
++	response := &abci.ResponseFinalizeBlock{TxResults: make([]*abci.ExecTxResult, len(r.Txs)), AppHash: bytes.Clone(a.response.AppHash)}
++	var changes []state.Change
++	facts := make(map[string]protocol.FinalFact)
++	var commitment finality.Commitment
++	var leaves [][]byte
++	e := a.db.View(func(v state.ReadView) error {
++		overlay := state.NewOverlay(v)
++		apply := func(transition state.Transition) error {
++			for _, c := range transition.Changes {
++				if len(c.Key) == 0 || c.Key[0] == 0xff {
++					return errors.New("executor used reserved state key")
++				}
++			}
++			candidate := state.NewOverlay(overlay)
++			candidate.Apply(transition.Changes)
++			if a.executeAt != nil && len(transition.Facts) != 0 {
++				return protocol.ErrRule
++			}
++			for _, f := range transition.Facts {
++				if f.Network != protocol.Digest("NETWORK", []byte(a.chain)) {
++					return finality.ErrProof
++				}
++				raw, err := f.MarshalBinary()
++				if err != nil {
++					return err
++				}
++				key := f.SortKey()[:34]
++				latest := state.Key(70, key)
++				old, found, err := state.Load[protocol.FinalFact](candidate, latest)
++				if err != nil {
++					return err
++				}
++				if found && old.Revision >= f.Revision {
++					if old.Revision == f.Revision && old.ID() == f.ID() {
++						continue
++					}
++					return finality.ErrProof
++				}
++				if err = state.Put(candidate, latest, f); err != nil {
++					return err
++				}
++				candidate.Set(state.Key(71, f.SortKey()), raw)
++				facts[string(key)] = f
++			}
++			overlay.Apply(candidate.Changes())
++			return nil
++		}
++		if a.beginBlock != nil {
++			tr, err := a.beginBlock(v, BlockContext{Height: r.Height, Time: r.Time, ProposerAddress: bytes.Clone(r.ProposerAddress)})
++			if err != nil {
++				return err
++			}
++			if err = apply(tr); err != nil {
++				return err
++			}
++		}
++		for i, tx := range r.Txs {
++			response.TxResults[i] = &abci.ExecTxResult{}
++			requesttrace.Settlement.Command(tx, "final_check_start", r.Height)
++			if err := a.check(tx); err != nil {
++				response.TxResults[i].Code = 1
++				response.TxResults[i].Log = "invalid command"
++				continue
++			}
++			requesttrace.Settlement.Command(tx, "final_check_done", r.Height)
++			requesttrace.Settlement.Command(tx, "execute_start", r.Height)
++			var transition state.Transition
++			var err error
++			if a.executeAt != nil {
++				transition, err = a.executeAt(overlay, tx, BlockContext{Height: r.Height, Index: uint32(i), Time: r.Time, ProposerAddress: bytes.Clone(r.ProposerAddress)})
++			} else {
++				transition, err = a.execute(overlay, tx)
++			}
++			requesttrace.Settlement.Command(tx, "execute_done", r.Height)
++			if err != nil {
++				response.TxResults[i].Code = 2
++				response.TxResults[i].Log = "business rejected"
++				continue
++			}
++			if err = apply(transition); err != nil {
++				return err
++			}
++			response.TxResults[i].Data = bytes.Clone(transition.Data)
++		}
++		if a.maintenance != nil {
++			transition, err := a.maintenance(overlay)
++			if err != nil {
++				return err
++			}
++			if err = apply(transition); err != nil {
++				return err
++			}
++		}
++		for _, c := range overlay.Changes() {
++			old, err := v.Get(c.Key)
++			if err != nil && !errors.Is(err, state.ErrNotFound) {
++				return err
++			}
++			if c.Delete && errors.Is(err, state.ErrNotFound) {
++				continue
++			}
++			if !c.Delete && err == nil && bytes.Equal(old, c.Value) {
++				continue
++			}
++			changes = append(changes, c)
++		}
++		return nil
++	})
++	if e != nil {
++		return nil, e
++	}
++	ordered := make([]protocol.FinalFact, 0, len(facts))
++	for _, f := range facts {
++		ordered = append(ordered, f)
++	}
++	sort.Slice(ordered, func(i, j int) bool { return bytes.Compare(ordered[i].SortKey(), ordered[j].SortKey()) < 0 })
++	for _, f := range ordered {
++		raw, e := f.MarshalBinary()
++		if e != nil {
++			return nil, e
++		}
++		leaves = append(leaves, raw)
++	}
++	if len(changes) > 0 {
++		enc := new(protocol.Encoder)
++		for _, c := range changes {
++			enc.Bytes(c.Key)
++			enc.Optional(c.Delete)
++			enc.Bytes(c.Value)
++		}
++		if a.executeAt != nil {
++			network := protocol.Digest("NETWORK", []byte(a.chain))
++			root := protocol.Digest("APP_V4", network[:], a.response.AppHash, enc.Data())
++			response.AppHash = bytes.Clone(root[:])
++		} else {
++			commitment = finality.Commitment{Network: protocol.Digest("NETWORK", []byte(a.chain)), Height: r.Height, Previous: bytes.Clone(a.response.AppHash), WriteSet: protocol.Digest("WRITE_SET", enc.Data()), FactRoot: merkle.HashFromByteSlices(leaves)}
++			root, e := commitment.Hash()
++			if e != nil {
++				return nil, e
++			}
++			response.AppHash = bytes.Clone(root[:])
++		}
++	}
++
++	raw, e := response.Marshal()
++	if e != nil {
++		return nil, e
++	}
++	a.pending = &commitRecord{Height: r.Height, BlockID: bytes.Clone(r.Hash), Response: raw, Commitment: commitment, Leaves: leaves}
++	a.pendingChanges = changes
++	requesttrace.Settlement.Block(r.Height, "finalize_done")
++	requesttrace.Consensus.Mark("finalize_done", "height", r.Height)
++	return cloneResponse(response), nil
++}
++func (a *App) Commit(context.Context, *abci.RequestCommit) (*abci.ResponseCommit, error) {
++	var entered time.Time
++	var lockWait time.Duration
++	if requesttrace.Consensus != nil {
++		entered = time.Now()
++	}
++	a.mu.Lock()
++	if !entered.IsZero() {
++		lockWait = time.Since(entered)
++	}
++	defer a.mu.Unlock()
++	if a.halted != nil {
++		return nil, a.halted
++	}
++	if a.pending == nil {
++		return &abci.ResponseCommit{}, nil
++	}
++	requesttrace.Settlement.Block(a.pending.Height, "commit_start")
++	requesttrace.Consensus.Mark("commit_start", "height", a.pending.Height)
++	if !entered.IsZero() {
++		requesttrace.Consensus.Mark("commit_lock", "height", a.pending.Height, "wait_ns", lockWait.Nanoseconds())
++	}
++	raw, e := json.Marshal(a.pending)
++	if e != nil {
++		return nil, e
++	}
++	cs := append([]state.Change(nil), a.pendingChanges...)
++	cs = append(cs, state.Change{Key: metaKey, Value: raw})
++	if a.executeAt == nil {
++		cs = append(cs, state.Change{Key: blockKey(a.pending.Height), Value: raw})
++	}
++	for i, rawFact := range a.pending.Leaves {
++		f, e := protocol.DecodeFact(rawFact)
++		if e != nil {
++			return nil, e
++		}
++		location, _ := json.Marshal(factLocation{Height: a.pending.Height, Index: i})
++		cs = append(cs, state.Change{Key: proofKey(f.ID()), Value: location})
++	}
++	if requesttrace.Consensus != nil {
++		bytes := 0
++		for _, c := range cs {
++			bytes += len(c.Key) + len(c.Value)
++		}
++		requesttrace.Consensus.Mark("commit_update_start", "height", a.pending.Height, "changes", len(cs), "bytes", bytes)
++	}
++	e = a.db.Update(func(state.ReadView) ([]state.Change, error) {
++		requesttrace.Consensus.Mark("commit_update_callback", "height", a.pending.Height)
++		return cs, nil
++	})
++	requesttrace.Consensus.Mark("commit_update_return", "height", a.pending.Height)
++	if e != nil {
++		a.halted = e
++		return nil, e
++	}
++	a.committed = *a.pending
++	requesttrace.E8Commit(a.pending.Height)
++	a.response = new(abci.ResponseFinalizeBlock)
++	if e = a.response.Unmarshal(a.pending.Response); e != nil {
++		a.halted = e
++		return nil, e
++	}
++	requesttrace.Settlement.Block(a.pending.Height, "commit_done")
++	requesttrace.Consensus.Mark("commit_done", "height", a.pending.Height)
++	a.pending = nil
++	a.pendingChanges = nil
++	return &abci.ResponseCommit{}, nil
++}
++func (a *App) Query(_ context.Context, r *abci.RequestQuery) (*abci.ResponseQuery, error) {
++	a.mu.Lock()
++	defer a.mu.Unlock()
++	out := &abci.ResponseQuery{Height: a.committed.Height}
++	if len(r.Data) == 0 || r.Data[0] == 0xff {
++		return &abci.ResponseQuery{Code: 1, Log: "invalid key"}, nil
++	}
++	e := a.db.View(func(v state.ReadView) error {
++		b, e := v.Get(r.Data)
++		if errors.Is(e, state.ErrNotFound) {
++			out.Code = 1
++			return nil
++		}
++		if e != nil {
++			return e
++		}
++		out.Value = b
++		return nil
++	})
++	if e != nil {
++		return nil, fmt.Errorf("query committed state: %w", e)
++	}
++	return out, nil
++}
++func (a *App) OfferSnapshot(context.Context, *abci.RequestOfferSnapshot) (*abci.ResponseOfferSnapshot, error) {
++	return &abci.ResponseOfferSnapshot{Result: abci.ResponseOfferSnapshot_REJECT}, nil
++}
++func (a *App) ApplySnapshotChunk(context.Context, *abci.RequestApplySnapshotChunk) (*abci.ResponseApplySnapshotChunk, error) {
++	return &abci.ResponseApplySnapshotChunk{Result: abci.ResponseApplySnapshotChunk_ABORT}, nil
++}
++
++type factLocation struct {
++	Height int64
++	Index  int
++}
++
++func blockKey(height int64) []byte {
++	e := new(protocol.Encoder)
++	e.U64(uint64(height))
++	return append([]byte{0xff, 'b'}, e.Data()...)
++}
++func proofKey(id protocol.Hash) []byte { return append([]byte{0xff, 'p'}, id[:]...) }
++
++// Proof returns committed material only. Clients still verify the pinned committee.
++func (a *App) Proof(id protocol.Hash, header cmttypes.SignedHeader) (finality.FactProof, error) {
++	a.mu.Lock()
++	defer a.mu.Unlock()
++	var result finality.FactProof
++	err := a.db.View(func(v state.ReadView) error {
++		loc, found, e := state.Load[factLocation](v, proofKey(id))
++		if e != nil {
++			return e
++		}
++		if !found {
++			return state.ErrNotFound
++		}
++		record, found, e := state.Load[commitRecord](v, blockKey(loc.Height))
++		if e != nil {
++			return e
++		}
++		if !found || loc.Index < 0 || loc.Index >= len(record.Leaves) {
++			return finality.ErrProof
++		}
++		if header.Header == nil || header.Height != loc.Height+1 {
++			return finality.ErrProof
++		}
++		root, e := record.Commitment.Hash()
++		if e != nil || !bytes.Equal(root[:], header.AppHash) {
++			return finality.ErrProof
++		}
++		_, paths := merkle.ProofsFromByteSlices(record.Leaves)
++		f, e := protocol.DecodeFact(record.Leaves[loc.Index])
++		if e != nil {
++			return e
++		}
++		if f.ID() != id {
++			return finality.ErrProof
++		}
++		result = finality.FactProof{Fact: f, Commitment: record.Commitment, Path: *paths[loc.Index], Header: header}
++		return nil
++	})
++	return result, err
++}
+--- a/internal/committee/c3.go
++++ b/internal/committee/c3.go
+@@ -6,7 +6,14 @@
+ 	"utxo/protocol"
+ )
+ 
++type C3RewardBalance struct {
++	Validator protocol.Hash
++	Amount    uint64
++}
+ type C3PoolSnapshot struct {
++	RewardAccounts                                                        []C3RewardBalance
++	PoolReflow, CALRevenue                                                uint64
++	Epoch                                                                 rules.C3EpochState
+ 	CumulativeFees, Released, PoolRewards, PoolBurned                     uint64
+ 	Grant                                                                 state.Grant
+ 	OriginalFunding, Funding, Free, Held, Spent, Revenue, Rewards, Burned uint64
+@@ -54,6 +61,15 @@
+ 	if err != nil {
+ 		return s, err
+ 	}
++	s.PoolReflow = totals.Reflow
++	s.Epoch, _, err = state.Load[rules.C3EpochState](v, rules.C3EpochKey())
++	if err != nil {
++		return s, err
++	}
++	s.CALRevenue, _, err = state.Load[uint64](v, rules.AccountKey(issuer.Revenue, protocol.AssetCAL))
++	if err != nil {
++		return s, err
++	}
+ 	s.CumulativeFees, s.Released, s.PoolRewards, s.PoolBurned = totals.CumulativeFees, totals.Released, totals.Rewards, totals.Burned
+ 	for _, x := range []struct {
+ 		k   []byte
+@@ -62,6 +78,20 @@
+ 		*x.dst, _, err = state.Load[uint64](v, x.k)
+ 		if err != nil {
+ 			return s, err
++		}
++	}
++	if e.direct.FinalC3() {
++		s.Rewards = 0
++		for _, validator := range e.direct.C3.Committee {
++			amount, _, err := state.Load[uint64](v, state.Key(state.KeyReward, validator.ID[:]))
++			if err != nil {
++				return s, err
++			}
++			s.Rewards, err = protocol.Add(s.Rewards, amount)
++			if err != nil {
++				return s, err
++			}
++			s.RewardAccounts = append(s.RewardAccounts, C3RewardBalance{validator.ID, amount})
+ 		}
+ 	}
+ 	return s, nil
+--- /dev/null
++++ b/internal/committee/c3_credit_replay_test.go
+@@ -0,0 +1,182 @@
++package committee_test
++
++import (
++	"bytes"
++	abci "github.com/cometbft/cometbft/abci/types"
++	"path/filepath"
++	"testing"
++	"time"
++	"utxo/finality"
++	"utxo/internal/blockfollow"
++	"utxo/internal/committee"
++	"utxo/internal/member"
++	"utxo/internal/rules"
++	"utxo/internal/state"
++	"utxo/internal/store"
++	"utxo/internal/testkit"
++	"utxo/protocol"
++)
++
++func TestFinalC3EpochCreditBeforeFirstTopupReplay(t *testing.T) {
++	f, c := c3EngineConfig(t)
++	other := testkit.NewFixture("c3-engine", "payer-org", 1)
++	settings := c.Direct.C3
++	settings.Policies[0].Version = 2
++	settings.Policies[0].Schedule = protocol.FeeSchedule{AttachReward: 1, ResolveReward: 1, Compensate: 4, Repay: 5}
++	settings.EpochBlocks = 1
++	settings.ReservedBPS = 2500
++	settings.Committee = []rules.C3Validator{{ID: protocol.Digest("validator"), Address: bytes.Repeat([]byte{1}, 20), Weight: 1}}
++	otherPool := protocol.Digest("payer-pool")
++	otherGrant := state.Grant{ID: protocol.Digest("payer-grant"), Organization: other.Org.Hash(), Key: protocol.ResourceKey{Kind: protocol.ResourceFUEL, Account: otherPool, Version: 1}, Amount: 100, Subject: other.Genesis.Outputs[0].Output.Recipient.Owner}
++	settings.Issuers = append(settings.Issuers, rules.C3Issuer{Config: other.Org.Hash(), Funding: protocol.AdmissionRef{Key: otherGrant.Key, Grant: otherGrant.ID}, Revenue: protocol.Digest("payer-revenue"), Beneficiary: protocol.Digest("payer-beneficiary")})
++	c.Organizations = append(c.Organizations, other.Org)
++	c.Genesis.Grants = append(c.Genesis.Grants, otherGrant)
++	c.Accounts = append(c.Accounts, committee.GenesisAccount{Owner: other.Org.Org, Asset: protocol.AssetCAL, Balance: 100}, committee.GenesisAccount{Owner: otherPool, Asset: protocol.AssetFUEL, Balance: 100})
++	ledgerPath := filepath.Join(t.TempDir(), "ledger.db")
++	ledgerID := store.Identity{Network: "credit-replay", Role: "committee", Node: "0", Schema: 9}
++	ledger, e := store.Open(ledgerPath, ledgerID)
++	if e != nil {
++		t.Fatal(e)
++	}
++	defer func() { ledger.Close() }()
++	engine, e := committee.NewEngine(c, ledger)
++	if e != nil {
++		t.Fatal(e)
++	}
++	// Start from an accounted timeout-pool fixture: payer has spent 9 and its
++	// protected free balance is 91. Epoch transitions and top-ups use real engine
++	// execution; the recipient follows only consensus-verified public blocks.
++	if e = ledger.Update(func(v state.ReadView) ([]state.Change, error) {
++		o := state.NewOverlay(v)
++		if e := state.Put(o, rules.AccountKey(otherPool, protocol.AssetFUEL), uint64(91)); e != nil {
++			return nil, e
++		}
++		if e := state.Put(o, state.Key(state.KeyUsage, otherGrant.Key.Encode()), rules.PublicUsage{Spent: 9}); e != nil {
++			return nil, e
++		}
++		if e := state.Put(o, rules.C3EpochKey(), rules.C3EpochState{Pool: []rules.C3PoolPart{{Payer: other.Org.Org, Amount: 9}}}); e != nil {
++			return nil, e
++		}
++		return o.Changes(), nil
++	}); e != nil {
++		t.Fatal(e)
++	}
++	memberPath := filepath.Join(t.TempDir(), "member.db")
++	memberID := store.Identity{Network: "credit-replay", Role: "member", Node: "0", Schema: 9}
++	md, e := store.Open(memberPath, memberID)
++	if e != nil {
++		t.Fatal(e)
++	}
++	defer func() { md.Close() }()
++	mc := member.Config{Organization: f.Org, Index: 0, Key: f.Keys[0], Peers: c.Organizations, Schedule: f.Schedule, Workers: 1, Direct: c.Direct, DisableSourceRecovery: true}
++	m, e := member.New(mc, md, c.Genesis)
++	if e != nil {
++		t.Fatal(e)
++	}
++	var previous []byte
++	block := func(h int64, txs [][]byte) finality.VerifiedBlock {
++		t.Helper()
++		var results []*abci.ExecTxResult
++		if e := ledger.Update(func(v state.ReadView) ([]state.Change, error) {
++			begin, e := engine.BeginBlock(v, committee.BlockContext{Height: h, Time: time.Unix(100+h, 0)})
++			if e != nil {
++				return nil, e
++			}
++			o := state.NewOverlay(v)
++			o.Apply(begin.Changes)
++			for i, raw := range txs {
++				tr, e := engine.ExecuteAt(o, raw, committee.BlockContext{Height: h, Index: uint32(i), Time: time.Unix(100+h, 0), ProposerAddress: settings.Committee[0].Address})
++				if e != nil {
++					return nil, e
++				}
++				o.Apply(tr.Changes)
++				results = append(results, &abci.ExecTxResult{Data: tr.Data})
++			}
++			return o.Changes(), nil
++		}); e != nil {
++			t.Fatal(e)
++		}
++		trust, data := testkit.Block("c3-engine", h, previous, txs, results)
++		b, e := finality.VerifyBlock(trust, data)
++		if e != nil {
++			t.Fatal(e)
++		}
++		previous = b.Hash()
++		return b
++	}
++	first := block(1, nil)
++	if e = blockfollow.Commit(md, first, m.PrepareBlock); e != nil {
++		t.Fatal(e)
++	}
++	if e = md.Close(); e != nil {
++		t.Fatal(e)
++	}
++	md, e = store.Open(memberPath, memberID)
++	if e != nil {
++		t.Fatal(e)
++	}
++	m, e = member.New(mc, md, c.Genesis)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if e = ledger.Close(); e != nil {
++		t.Fatal(e)
++	}
++	ledger, e = store.Open(ledgerPath, ledgerID)
++	if e != nil {
++		t.Fatal(e)
++	}
++	engine, e = committee.NewEngine(c, ledger)
++	if e != nil {
++		t.Fatal(e)
++	}
++	issuer := settings.Issuers[0]
++	topup := protocol.ReserveIncrease{Network: c.Network, Organization: f.Org.Hash(), Grant: issuer.Funding.Grant, Key: issuer.Funding.Key, Previous: 109, Amount: 10}
++	topup.Sign(f.Owner)
++	raw, e := topup.MarshalBinary()
++	if e != nil {
++		t.Fatal(e)
++	}
++	next := topup
++	next.Previous = 119
++	next.Amount = 3
++	next.Sign(f.Owner)
++	nextRaw, e := next.MarshalBinary()
++	if e != nil {
++		t.Fatal(e)
++	}
++	second := block(2, [][]byte{raw, raw, nextRaw})
++	if e = blockfollow.Commit(md, second, m.PrepareBlock); e != nil {
++		t.Fatal("epoch credit was not applied before first top-up", e)
++	}
++	if e = blockfollow.Commit(md, second, m.PrepareBlock); e != nil {
++		t.Fatal(e)
++	}
++	if e = md.Close(); e != nil {
++		t.Fatal(e)
++	}
++	md, e = store.Open(memberPath, memberID)
++	if e != nil {
++		t.Fatal(e)
++	}
++	m, e = member.New(mc, md, c.Genesis)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if e = blockfollow.Commit(md, second, m.PrepareBlock); e != nil {
++		t.Fatal(e)
++	}
++	if e = md.View(func(v state.ReadView) error {
++		g, _, e := state.Load[state.Grant](v, state.Key(state.KeyGrant, issuer.Funding.Key.Encode()))
++		if g.Amount != 122 {
++			t.Fatalf("reflow/top-up replay amount %d", g.Amount)
++		}
++		slice, _, e := state.Load[state.Slice](v, state.SliceKey(issuer.Funding.Key, 0))
++		if slice.Available != 81 || slice.Reserved != 0 {
++			t.Fatalf("replay slice %+v", slice)
++		}
++		return e
++	}); e != nil {
++		t.Fatal(e)
++	}
++}
+--- /dev/null
++++ b/internal/committee/c3_final_test.go
+@@ -0,0 +1,276 @@
++package committee_test
++
++import (
++	"bytes"
++	"context"
++	"fmt"
++	abci "github.com/cometbft/cometbft/abci/types"
++	cmttypes "github.com/cometbft/cometbft/types"
++	"path/filepath"
++	"sync"
++	"testing"
++	"time"
++	"utxo/finality"
++	"utxo/internal/blockfollow"
++	"utxo/internal/committee"
++	"utxo/internal/member"
++	"utxo/internal/rules"
++	"utxo/internal/state"
++	"utxo/internal/store"
++	"utxo/internal/testkit"
++	"utxo/protocol"
++)
++
++func TestFinalC3MembersLedgerAndReservedSource(t *testing.T) {
++	f, c := c3EngineConfig(t)
++	final := c.Direct.C3
++	final.Policies[0].Version = 2
++	final.Policies[0].Schedule = protocol.FeeSchedule{AttachReward: 1, ExecuteReward: 2, ResolveReward: 3, Compensate: 4, Repay: 5}
++	final.Policies[0].Tiers = []rules.C3Tier{{ID: protocol.Digest("priority-tier"), CAL: 1, MinimumReward: 2}}
++	final.EpochBlocks = 2
++	final.ReservedBPS = 2500
++	address := bytes.Repeat([]byte{1}, 20)
++	validator := protocol.Digest("C3_VALIDATOR", address)
++	final.Committee = []rules.C3Validator{{ID: validator, Address: address, Weight: 1}}
++	f.Genesis.Grants[len(f.Genesis.Grants)-1].Amount = 45
++	c.Genesis = f.Genesis
++	c.Accounts[2].Balance = 45
++	policy, err := c.Direct.Policy(f.Schedule, c.Organizations)
++	if err != nil {
++		t.Fatal(err)
++	}
++	ledgerPath := filepath.Join(t.TempDir(), "ledger.db")
++	ledgerID := store.Identity{Network: "c3-final", Role: "committee", Node: "0", Schema: 9}
++	db, err := store.Open(ledgerPath, ledgerID)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer func() { db.Close() }()
++	engine, err := committee.NewEngine(c, db)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var members []*member.Member
++	var stores []store.Store
++	var memberPaths []string
++	defer func() {
++		for _, s := range stores {
++			s.Close()
++		}
++	}()
++	for i := 0; i < 3; i++ {
++		path := filepath.Join(t.TempDir(), "member.db")
++		memberPaths = append(memberPaths, path)
++		md, err := store.Open(path, store.Identity{Network: "c3-final", Role: "member", Node: fmt.Sprint(i), Schema: 9})
++		if err != nil {
++			t.Fatal(err)
++		}
++		m, err := member.New(member.Config{Organization: f.Org, Index: uint16(i), Key: f.Keys[i], Peers: c.Organizations, Schedule: f.Schedule, Workers: 1, Direct: c.Direct, DisableSourceRecovery: true}, md, f.Genesis)
++		if err != nil {
++			t.Fatal(err)
++		}
++		members = append(members, m)
++		stores = append(stores, md)
++	}
++	certify := func(r protocol.DirectRequest) protocol.DirectPayment {
++		t.Helper()
++		p := protocol.DirectPayment{Tx: r.Tx, InputCertificates: r.InputCertificates}
++		for _, m := range members {
++			a, e := m.ApproveDirect(context.Background(), r)
++			if e != nil {
++				t.Fatal(e)
++			}
++			p.Certificate.Summary = a.Summary
++			p.Certificate.QC.Fact = a.Summary.Fact()
++			p.Certificate.QC.Votes = append(p.Certificate.QC.Votes, a.Vote)
++		}
++		return p
++	}
++	source := certify(c3Build(t, f, policy, 0, nil))
++	child := certify(c3Build(t, f, policy, 1, &source.Certificate))
++	third := c3Build(t, f, policy, 2, nil)
++	if _, e := members[0].ApproveDirect(context.Background(), third); e == nil {
++		t.Fatal("hidden final budgets escaped atomic reserve")
++	}
++	var previous []byte
++	execute := func(p protocol.DirectPayment, h int64) {
++		t.Helper()
++		raw, e := p.Submission().MarshalBinary()
++		if e != nil {
++			t.Fatal(e)
++		}
++		var tr state.Transition
++		if e = db.Update(func(v state.ReadView) ([]state.Change, error) {
++			begin, e := engine.BeginBlock(v, committee.BlockContext{Height: h, Time: time.Unix(100+h, 0)})
++			if e != nil {
++				return nil, e
++			}
++			o := state.NewOverlay(v)
++			o.Apply(begin.Changes)
++			tr, e = engine.ExecuteAt(o, raw, committee.BlockContext{Height: h, Time: time.Unix(100+h, 0), ProposerAddress: address})
++			o.Apply(tr.Changes)
++			return o.Changes(), e
++		}); e != nil {
++			t.Fatal(e)
++		}
++		trust, data := testkit.Block("c3-engine", h, previous, [][]byte{raw}, []*abci.ExecTxResult{{Data: tr.Data}})
++		b, e := finality.VerifyBlock(trust, data)
++		if e != nil {
++			t.Fatal(e)
++		}
++		for i, m := range members {
++			if e = blockfollow.Commit(stores[i], b, m.PrepareBlock); e != nil {
++				t.Fatal(e)
++			}
++			if e = blockfollow.Commit(stores[i], b, m.PrepareBlock); e != nil {
++				t.Fatal(e)
++			}
++		}
++		previous = b.Hash()
++	}
++	execute(child, 1)
++	// A process restart must retain hidden approvals, output events, and funds.
++	if err = db.Close(); err != nil {
++		t.Fatal(err)
++	}
++	db, err = store.Open(ledgerPath, ledgerID)
++	if err != nil {
++		t.Fatal(err)
++	}
++	engine, err = committee.NewEngine(c, db)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for i := range members {
++		if err = stores[i].Close(); err != nil {
++			t.Fatal(err)
++		}
++		md, e := store.Open(memberPaths[i], store.Identity{Network: "c3-final", Role: "member", Node: fmt.Sprint(i), Schema: 9})
++		if e != nil {
++			t.Fatal(e)
++		}
++		stores[i] = md
++		members[i], e = member.New(member.Config{Organization: f.Org, Index: uint16(i), Key: f.Keys[i], Peers: c.Organizations, Schedule: f.Schedule, Workers: 1, Direct: c.Direct, DisableSourceRecovery: true}, md, f.Genesis)
++		if e != nil {
++			t.Fatal(e)
++		}
++	}
++	if _, e := members[0].ApproveDirect(context.Background(), third); e == nil {
++		t.Fatal("restart discarded hidden approval reserve")
++	}
++	sourceRaw, _ := source.Submission().MarshalBinary()
++	// This ordinary request is validly certified but not approved in member state;
++	// the proposer only classifies public authorization, not private approval logs.
++	ordinary := protocol.DirectPayment{Tx: third.Tx, Certificate: protocol.OutputCertificate{}}
++	vector, e := rules.PrepareDirectVector(third.Tx, policy)
++	if e != nil {
++		t.Fatal(e)
++	}
++	ordinary.Certificate.Summary = protocol.SummaryFor(third.Tx, vector)
++	ordinary.Certificate.QC.Fact = ordinary.Certificate.Summary.Fact()
++	for i := 0; i < 3; i++ {
++		ordinary.Certificate.QC.Votes = append(ordinary.Certificate.QC.Votes, protocol.SignSpend(ordinary.Certificate.QC.Fact, uint16(i), f.Keys[i]))
++	}
++	ordinaryRaw, _ := ordinary.Submission().MarshalBinary()
++	paidBody := third.Tx.Body
++	paidBody.Outputs = append([]protocol.Output(nil), paidBody.Outputs...)
++	paidBody.Fee.C3.Tier = final.Policies[0].Tiers[0].ID
++	var refs []protocol.AdmissionRef
++	for _, g := range f.Genesis.Grants {
++		refs = append(refs, protocol.AdmissionRef{Key: g.Key, Grant: g.ID})
++	}
++	if e = rules.BindC3(&paidBody, policy, refs); e != nil {
++		t.Fatal(e)
++	}
++	paidBody.Outputs[0].Amount--
++	paidTx, e := protocol.NewFastTx(paidBody, third.Tx.Claims, policy.Key)
++	if e != nil {
++		t.Fatal(e)
++	}
++	paidTx.Auth = []protocol.OwnerAuth{protocol.SignOwner(paidTx.ID(), f.Owner)}
++	paid := protocol.DirectPayment{Tx: paidTx}
++	paidVector, e := rules.PrepareDirectVector(paidTx, policy)
++	if e != nil {
++		t.Fatal(e)
++	}
++	paid.Certificate.Summary = protocol.SummaryFor(paidTx, paidVector)
++	paid.Certificate.QC.Fact = paid.Certificate.Summary.Fact()
++	for i := 0; i < 3; i++ {
++		paid.Certificate.QC.Votes = append(paid.Certificate.QC.Votes, protocol.SignSpend(paid.Certificate.QC.Fact, uint16(i), f.Keys[i]))
++	}
++	paidRaw, e := paid.Submission().MarshalBinary()
++	if e != nil {
++		t.Fatal(e)
++	}
++	idle, e := engine.SelectProposal([][]byte{ordinaryRaw, paidRaw}, cmttypes.ComputeProtoSizeForTxs([]cmttypes.Tx{ordinaryRaw, paidRaw}))
++	if e != nil || len(idle) != 2 || !bytes.Equal(idle[0], paidRaw) {
++		t.Fatal("ordinary priority/idle reserved reuse", e)
++	}
++	selected, e := engine.SelectProposal([][]byte{ordinaryRaw, sourceRaw}, cmttypes.ComputeProtoSizeForTxs([]cmttypes.Tx{sourceRaw}))
++	if e != nil || len(selected) != 1 || !bytes.Equal(selected[0], sourceRaw) {
++		t.Fatal("reserved source excluded", e)
++	}
++	execute(source, 2)
++	if _, e = members[0].ApproveDirect(context.Background(), third); e != nil {
++		t.Fatal("unused final budget did not release", e)
++	}
++	snap, e := engine.C3Fee(source.Certificate.Summary.Fact())
++	if e != nil || snap.Record.Escrow.Rewards != 6 || snap.Record.Escrow.Burned != 0 || snap.Pool.PoolReflow != 0 {
++		t.Fatalf("snapshot %+v %v", snap, e)
++	}
++	if e = db.View(func(v state.ReadView) error {
++		amount, _, e := state.Load[uint64](v, state.Key(state.KeyReward, validator[:]))
++		if amount != 12 {
++			t.Fatalf("wrong includer/shared total %d", amount)
++		}
++		return e
++	}); e != nil {
++		t.Fatal(e)
++	}
++}
++
++func TestFinalC3ConcurrentHiddenApprovals(t *testing.T) {
++	f, c := c3EngineConfig(t)
++	settings := c.Direct.C3
++	settings.Policies[0].Version = 2
++	settings.Policies[0].Schedule = protocol.FeeSchedule{AttachReward: 1, ExecuteReward: 1, ResolveReward: 2, Compensate: 1, Repay: 1}
++	settings.EpochBlocks = 2
++	settings.ReservedBPS = 2500
++	settings.Committee = []rules.C3Validator{{ID: protocol.Digest("validator"), Address: bytes.Repeat([]byte{1}, 20), Weight: 1}}
++	f.Genesis.Grants[len(f.Genesis.Grants)-1].Amount = 18
++	p, e := c.Direct.Policy(f.Schedule, c.Organizations)
++	if e != nil {
++		t.Fatal(e)
++	}
++	db := store.NewMemory()
++	defer db.Close()
++	m, e := member.New(member.Config{Organization: f.Org, Index: 0, Key: f.Keys[0], Peers: c.Organizations, Schedule: f.Schedule, Workers: 1, Direct: c.Direct}, db, f.Genesis)
++	if e != nil {
++		t.Fatal(e)
++	}
++	requests := make([]protocol.DirectRequest, 3)
++	for i := range requests {
++		requests[i] = c3Build(t, f, p, i, nil)
++	}
++	results := make(chan error, 3)
++	var wg sync.WaitGroup
++	for _, r := range requests {
++		wg.Add(1)
++		go func(r protocol.DirectRequest) {
++			defer wg.Done()
++			_, e := m.ApproveDirect(context.Background(), r)
++			results <- e
++		}(r)
++	}
++	wg.Wait()
++	close(results)
++	approved := 0
++	for e := range results {
++		if e == nil {
++			approved++
++		}
++	}
++	if approved != 2 {
++		t.Fatalf("concurrent final budgets admitted %d", approved)
++	}
++}
+--- /dev/null
++++ b/internal/committee/c3_framing_test.go
+@@ -0,0 +1,32 @@
++package committee
++
++import (
++	"bytes"
++	"context"
++	abci "github.com/cometbft/cometbft/abci/types"
++	cmttypes "github.com/cometbft/cometbft/types"
++	"testing"
++	"utxo/internal/state"
++	"utxo/internal/store"
++)
++
++func TestFinalC3ProposalRespectsProtoFraming(t *testing.T) {
++	db := store.NewMemory()
++	defer db.Close()
++	app, e := NewApp("framing", db, func([]byte) error { return nil }, func(state.ReadView, []byte) (state.Transition, error) { return state.Transition{}, nil })
++	if e != nil {
++		t.Fatal(e)
++	}
++	tx := bytes.Repeat([]byte{1}, 127)
++	result, e := app.PrepareProposal(context.Background(), &abci.RequestPrepareProposal{Txs: [][]byte{tx}, MaxTxBytes: 128})
++	if e != nil {
++		t.Fatal(e)
++	}
++	var txs []cmttypes.Tx
++	for _, tx := range result.Txs {
++		txs = append(txs, tx)
++	}
++	if n := cmttypes.ComputeProtoSizeForTxs(txs); n > 128 {
++		t.Fatalf("raw-fit proposal exceeds consensus frame bound: %d", n)
++	}
++}
+--- /dev/null
++++ b/internal/committee/c3_scheduler.go
+@@ -0,0 +1,90 @@
++package committee
++
++import (
++	cmttypes "github.com/cometbft/cometbft/types"
++	"sort"
++	"utxo/internal/rules"
++	"utxo/internal/state"
++	"utxo/protocol"
++)
++
++// SetProposalScheduler installs the configured honest-proposer policy. Proposal
++// validation cannot infer which valid requests the remote proposer received.
++func (a *App) SetProposalScheduler(selectTxs func([][]byte, int64) ([][]byte, error)) {
++	a.selectTxs = selectTxs
++}
++
++func (e *Engine) SelectProposal(txs [][]byte, capacity int64) ([][]byte, error) {
++	if e.direct == nil || !e.direct.FinalC3() {
++		return txs, nil
++	}
++	type candidate struct {
++		raw      []byte
++		priority uint64
++	}
++	var reserved, ordinary []candidate
++	err := e.db.View(func(v state.ReadView) error {
++		for _, raw := range txs {
++			if e.Check(raw) != nil {
++				continue
++			}
++			c := candidate{raw: raw}
++			closure := protocol.IsCompensationDecision(raw)
++			if !closure {
++				p, err := protocol.DecodeDirectSubmission(raw)
++				if err == nil {
++					c.priority = p.Tx.Body.Fee.C3.PriorityReward
++					s := p.Summary()
++					for i := range s.Outputs {
++						ob, found, err := state.Load[rules.DirectObligation](v, rules.DirectObligationKey(s.OutputID(uint32(i))))
++						if err != nil {
++							return err
++						}
++						if found && (ob.Status == rules.DirectOpen || ob.Status == rules.DirectRepaired) {
++							closure = true
++							break
++						}
++					}
++				}
++			}
++			if closure {
++				reserved = append(reserved, c)
++			} else {
++				ordinary = append(ordinary, c)
++			}
++		}
++		return nil
++	})
++	if err != nil {
++		return nil, err
++	}
++	sort.SliceStable(ordinary, func(i, j int) bool { return ordinary[i].priority > ordinary[j].priority })
++	quota := capacity/10000*int64(e.direct.C3.ReservedBPS) + (capacity%10000*int64(e.direct.C3.ReservedBPS)+9999)/10000
++	out := make([][]byte, 0, len(txs))
++	used := int64(0)
++	r := 0
++	add := func(c candidate) bool {
++		n := cmttypes.ComputeProtoSizeForTxs([]cmttypes.Tx{c.raw})
++		if n > capacity-used {
++			return false
++		}
++		out = append(out, c.raw)
++		used += n
++		return true
++	}
++	for r < len(reserved) && used < quota {
++		if !add(reserved[r]) {
++			break
++		}
++		r++
++	}
++	for _, c := range ordinary {
++		add(c)
++	}
++	for ; r < len(reserved); r++ {
++		if !add(reserved[r]) {
++			break
++		}
++	}
++	return out, nil
++}
+--- a/internal/committee/direct.go
++++ b/internal/committee/direct.go
+@@ -1,6 +1,7 @@
+ package committee
+ 
+ import (
++	"bytes"
+ 	"time"
+ 	"utxo/internal/requesttrace"
+ 	"utxo/internal/rules"
+@@ -89,9 +90,29 @@
+ 				return state.Transition{}, protocol.ErrAuth
+ 			}
+ 		}
+-		return rules.EvaluateReserveIncrease(v, c, e.protectedCAL)
++		tr, err := rules.EvaluateReserveIncrease(v, c, e.protectedCAL)
++		if err != nil || !e.direct.FinalC3() {
++			return tr, err
++		}
++		// The command's Previous amount may already include a begin-block
++		// epoch credit. Publish that authenticated cumulative credit on this
++		// result so followers apply it before replaying the strict top-up.
++		epoch, _, err := state.Load[rules.C3EpochState](v, rules.C3EpochKey())
++		if err != nil {
++			return state.Transition{}, err
++		}
++		tr.Data, err = (protocol.ExecutionResult{C3Credits: epoch.Credits}).MarshalBinary()
++		return tr, err
+ 	}
+ 	if protocol.IsClockTick(raw, e.cfg.Network) {
++		if e.direct.FinalC3() {
++			epoch, _, err := state.Load[rules.C3EpochState](v, rules.C3EpochKey())
++			if err != nil {
++				return state.Transition{}, err
++			}
++			data, err := (protocol.ExecutionResult{C3Credits: epoch.Credits}).MarshalBinary()
++			return state.Transition{Data: data}, err
++		}
+ 		return state.Transition{}, nil
+ 	}
+ 	if protocol.IsRepairInput(raw) || protocol.IsRepairBatch(raw) || protocol.IsCompensationDecision(raw) {
+@@ -104,7 +125,18 @@
+ 	if err != nil {
+ 		return state.Transition{}, err
+ 	}
+-	tr, err := rules.EvaluateDirectPaymentAt(v, verified, *e.direct, b.Time.Unix(), b.Height)
++	p := *e.direct
++	if p.FinalC3() {
++		for _, validator := range p.C3.Committee {
++			if bytes.Equal(validator.Address, b.ProposerAddress) {
++				p.Includer = validator.ID
++			}
++		}
++		if p.Includer == (protocol.Hash{}) {
++			return state.Transition{}, protocol.ErrAuth
++		}
++	}
++	tr, err := rules.EvaluateDirectPaymentAt(v, verified, p, b.Time.Unix(), b.Height)
+ 	if err != nil || len(tr.Changes) == 0 {
+ 		return tr, err
+ 	}
+@@ -114,6 +146,21 @@
+ 		return state.Transition{}, err
+ 	}
+ 	tr.Changes = o.Changes()
++	if p.FinalC3() && len(tr.Data) > 0 {
++		result, err := protocol.DecodeExecution(tr.Data)
++		if err != nil {
++			return state.Transition{}, err
++		}
++		epoch, _, err := state.Load[rules.C3EpochState](o, rules.C3EpochKey())
++		if err != nil {
++			return state.Transition{}, err
++		}
++		result.C3Credits = epoch.Credits
++		tr.Data, err = result.MarshalBinary()
++		if err != nil {
++			return state.Transition{}, err
++		}
++	}
+ 	return tr, nil
+ }
+ 
+@@ -121,7 +168,18 @@
+ 	if e.direct == nil {
+ 		return state.Transition{}, nil
+ 	}
+-	return rules.AnchorDirectDeadlines(v, *e.direct, b.Height, b.Time.Unix())
++	tr, err := rules.BeginC3Epoch(v, *e.direct, uint64(b.Height))
++	if err != nil {
++		return state.Transition{}, err
++	}
++	o := state.NewOverlay(v)
++	o.Apply(tr.Changes)
++	anchored, err := rules.AnchorDirectDeadlines(v, *e.direct, b.Height, b.Time.Unix())
++	if err != nil {
++		return state.Transition{}, err
++	}
++	o.Apply(anchored.Changes)
++	return state.Transition{Changes: o.Changes()}, nil
+ }
+ 
+ func (e *Engine) DirectPayment(id protocol.SpendFactID) (p rules.DirectPaymentState, err error) {
+--- a/internal/member/blocks.go
++++ b/internal/member/blocks.go
+@@ -199,6 +199,27 @@
+ 	}
+ 	var updates []blockfollow.Apply
+ 	for _, entry := range b.Transactions() {
++		if entry.Code == 0 && len(entry.Data) > 0 && (protocol.NewDecoder(entry.Data).U16() == 414 || protocol.IsClockTick(entry.Bytes, m.cfg.Organization.Network)) {
++			result, err := protocol.DecodeExecution(entry.Data)
++			if err != nil {
++				return nil, err
++			}
++			for _, credit := range result.C3Credits {
++				if m.direct.C3 == nil {
++					return nil, protocol.ErrAuth
++				}
++				issuer, ok := m.direct.C3Issuer(credit.Organization)
++				if !ok || issuer.Funding.Key != credit.Key || issuer.Funding.Grant != credit.Grant {
++					return nil, protocol.ErrAuth
++				}
++				updates = append(updates, func(o *state.Overlay) error {
++					return rules.ApplyC3Credit(o, credit, m.cfg.Organization.Hash(), m.cfg.Workers)
++				})
++			}
++			if protocol.IsClockTick(entry.Bytes, m.cfg.Organization.Network) {
++				continue
++			}
++		}
+ 		if entry.Code == 0 && protocol.IsPoolCertificate(entry.Bytes) {
+ 			if !m.cfg.EnableInternalPools {
+ 				return nil, protocol.ErrUnsupported
+--- a/internal/member/direct.go
++++ b/internal/member/direct.go
+@@ -98,6 +98,12 @@
+ 			return protocol.DirectApproval{}, err
+ 		}
+ 	}
++	if t.Fee.C3.Final() {
++		totalOut, err = protocol.Add(totalOut, t.Fee.Maximum)
++		if err != nil {
++			return protocol.DirectApproval{}, err
++		}
++	}
+ 	if totalIn != totalOut || len(used) != len(parents) {
+ 		return protocol.DirectApproval{}, protocol.ErrRule
+ 	}
+--- a/internal/rules/c3.go
++++ b/internal/rules/c3.go
+@@ -30,6 +30,7 @@
+ 	Fact                            protocol.SpendFactID
+ 	Commitment                      protocol.FeeCommitment
+ 	Held, Rewards, Burned, Released uint64
++	Reflow                          uint64
+ 	Completed                       uint8
+ 	Outputs                         [protocol.MaxOutputs]uint8
+ }
+@@ -107,6 +108,14 @@
+ 	r, b, u, h, e := s.totals()
+ 	if e != nil {
+ 		return e
++	}
++	if s.Commitment.Final() {
++		if s.Reflow != b || s.Burned != 0 {
++			return ErrAccounting
++		}
++		b = 0
++	} else if s.Reflow != 0 {
++		return ErrAccounting
+ 	}
+ 	if s.Rewards != r || s.Burned != b || s.Released != u || s.Held != h {
+ 		return ErrAccounting
+@@ -191,5 +200,9 @@
+ 	if e != nil {
+ 		return s, e
+ 	}
++	if c.Final() {
++		n.Reflow = n.Burned
++		n.Burned = 0
++	}
+ 	return n, nil
+ }
+--- /dev/null
++++ b/internal/rules/c3_epoch.go
+@@ -0,0 +1,195 @@
++package rules
++
++import (
++	"bytes"
++	"sort"
++	"utxo/internal/state"
++	"utxo/protocol"
++)
++
++// C3EpochState retains payer attribution across epoch boundaries, including
++// integer dust and periods with no other eligible capital provider.
++type C3EpochState struct {
++	LastHeight, Epoch uint64
++	Weights           []uint64
++	Pool              []C3PoolPart
++	Credits           []protocol.FuelCredit
++}
++type C3PoolPart struct {
++	Payer  protocol.Hash
++	Amount uint64
++}
++
++func C3EpochKey() []byte { return state.Key(174) }
++func C3EpochHistoryKey(epoch uint64) []byte {
++	e := new(protocol.Encoder)
++	e.U64(epoch)
++	return state.Key(176, e.Data())
++}
++func (p DirectPolicy) FinalC3() bool {
++	if p.C3 != nil {
++		for _, x := range p.C3.Policies {
++			if x.Version == protocol.C3FinalVersion {
++				return true
++			}
++		}
++	}
++	return false
++}
++func addC3Pool(o *state.Overlay, payer protocol.Hash, amount uint64) error {
++	if amount == 0 {
++		return nil
++	}
++	s, _, e := state.Load[C3EpochState](o, C3EpochKey())
++	if e != nil {
++		return e
++	}
++	for i := range s.Pool {
++		if s.Pool[i].Payer == payer {
++			s.Pool[i].Amount, e = protocol.Add(s.Pool[i].Amount, amount)
++			if e != nil {
++				return e
++			}
++			return state.Put(o, C3EpochKey(), s)
++		}
++	}
++	s.Pool = append(s.Pool, C3PoolPart{payer, amount})
++	sort.Slice(s.Pool, func(i, j int) bool { return bytes.Compare(s.Pool[i].Payer[:], s.Pool[j].Payer[:]) < 0 })
++	return state.Put(o, C3EpochKey(), s)
++}
++func BeginC3Epoch(v state.ReadView, p DirectPolicy, height uint64) (state.Transition, error) {
++	if !p.FinalC3() {
++		return state.Transition{}, nil
++	}
++	if height == 0 || p.C3.EpochBlocks == 0 {
++		return state.Transition{}, protocol.ErrRule
++	}
++	o := state.NewOverlay(v)
++	s, _, e := state.Load[C3EpochState](o, C3EpochKey())
++	if e != nil {
++		return state.Transition{}, e
++	}
++	if height == s.LastHeight {
++		return state.Transition{}, nil
++	}
++	if height != s.LastHeight+1 {
++		return state.Transition{}, protocol.ErrRule
++	}
++	if len(s.Weights) == 0 {
++		s.Weights = make([]uint64, len(p.C3.Issuers))
++	}
++	if len(s.Weights) != len(p.C3.Issuers) {
++		return state.Transition{}, protocol.ErrRule
++	}
++	epoch := (height - 1) / p.C3.EpochBlocks
++	if epoch != s.Epoch {
++		for i := range s.Pool {
++			part := &s.Pool[i]
++			var denom uint64
++			for j, issuer := range p.C3.Issuers {
++				if p.Organizations[issuer.Config].Org != part.Payer {
++					denom, e = protocol.Add(denom, s.Weights[j])
++					if e != nil {
++						return state.Transition{}, e
++					}
++				}
++			}
++			if denom == 0 {
++				continue
++			}
++			original := part.Amount
++			for j, issuer := range p.C3.Issuers {
++				if p.Organizations[issuer.Config].Org == part.Payer {
++					continue
++				}
++				amount, err := protocol.MulDiv(original, s.Weights[j], denom)
++				if err != nil {
++					return state.Transition{}, err
++				}
++				if amount == 0 {
++					continue
++				}
++				part.Amount -= amount
++				key := state.Key(state.KeyGrant, issuer.Funding.Key.Encode())
++				g, found, err := state.Load[state.Grant](o, key)
++				if err != nil {
++					return state.Transition{}, err
++				}
++				if !found || g.ID != issuer.Funding.Grant {
++					return state.Transition{}, ErrMissing
++				}
++				g.Amount, err = protocol.Add(g.Amount, amount)
++				if err != nil {
++					return state.Transition{}, err
++				}
++				if err = state.Put(o, key, g); err != nil {
++					return state.Transition{}, err
++				}
++				if err = changeAmount(o, AccountKey(issuer.Funding.Key.Account, protocol.AssetFUEL), amount, false); err != nil {
++					return state.Transition{}, err
++				}
++				foundCredit := false
++				for k := range s.Credits {
++					if s.Credits[k].Key == g.Key {
++						s.Credits[k].Cumulative, err = protocol.Add(s.Credits[k].Cumulative, amount)
++						if err != nil {
++							return state.Transition{}, err
++						}
++						foundCredit = true
++					}
++				}
++				if !foundCredit {
++					s.Credits = append(s.Credits, protocol.FuelCredit{Key: g.Key, Grant: g.ID, Organization: g.Organization, Cumulative: amount})
++				}
++			}
++		}
++		if e = state.Put(o, C3EpochHistoryKey(s.Epoch), s); e != nil {
++			return state.Transition{}, e
++		}
++		s.Epoch = epoch
++		for i := range s.Weights {
++			s.Weights[i] = 0
++		}
++	}
++	for j, issuer := range p.C3.Issuers {
++		balance, _, err := state.Load[uint64](o, AccountKey(p.Organizations[issuer.Config].Org, protocol.AssetCAL))
++		if err != nil {
++			return state.Transition{}, err
++		}
++		s.Weights[j], err = protocol.Add(s.Weights[j], balance)
++		if err != nil {
++			return state.Transition{}, err
++		}
++	}
++	s.LastHeight = height
++	sort.Slice(s.Credits, func(i, j int) bool { return bytes.Compare(s.Credits[i].Key.Encode(), s.Credits[j].Key.Encode()) < 0 })
++	if e = state.Put(o, C3EpochKey(), s); e != nil {
++		return state.Transition{}, e
++	}
++	return state.Transition{Changes: o.Changes()}, nil
++}
++
++func ApplyC3Credit(o *state.Overlay, c protocol.FuelCredit, org protocol.Hash, workers uint32) error {
++	if c.Organization != org {
++		return nil
++	}
++	key := state.Key(175, c.Key.Encode())
++	old, _, e := state.Load[uint64](o, key)
++	if e != nil {
++		return e
++	}
++	if c.Cumulative <= old {
++		return nil
++	}
++	g, found, e := state.Load[state.Grant](o, state.Key(state.KeyGrant, c.Key.Encode()))
++	if e != nil {
++		return e
++	}
++	if !found || g.ID != c.Grant {
++		return protocol.ErrAuth
++	}
++	if e = ApplyReserveIncrease(o, protocol.ReserveIncrease{Organization: org, Key: c.Key, Grant: c.Grant, Subject: g.Subject, Previous: g.Amount, Amount: c.Cumulative - old}, org, workers); e != nil {
++		return e
++	}
++	return state.Put(o, key, c.Cumulative)
++}
+--- /dev/null
++++ b/internal/rules/c3_final_test.go
+@@ -0,0 +1,423 @@
++package rules
++
++import (
++	"math"
++	"reflect"
++	"testing"
++	"utxo/internal/state"
++	"utxo/protocol"
++)
++
++func finalFixture(t *testing.T) directFixture {
++	f := c3Fixture(t)
++	f.policy.C3.Policies[0].Version = 2
++	f.policy.C3.Committee = []C3Validator{{ID: protocol.Digest("validator"), Weight: 1, Address: []byte{1}}}
++	f.policy.Includer = f.policy.C3.Committee[0].ID
++	f.policy.C3.EpochBlocks = 2
++	f.policy.C3.ReservedBPS = 2500
++	f.policy.C3.Policies[0].Schedule = protocol.FeeSchedule{AttachReward: 1, ExecuteReward: 2, ResolveReward: 3, Compensate: 4, Repay: 5}
++	return f
++}
++func finalPayment(t *testing.T, f directFixture, parent *protocol.OutputCertificate, n byte) DirectPayment {
++	if parent != nil {
++		f.output.Amount = parent.Summary.Outputs[0].Amount
++	}
++	legacy := f
++	legacy.policy.C3 = nil
++	legacy.grants = legacy.grants[:len(legacy.grants)-1]
++	in := f.genesis
++	if parent != nil {
++		in = parent.Summary.OutputID(0)
++	}
++	p := legacy.payment(t, in, parent, n)
++	b := p.Tx.Body
++	b.Fee = protocol.FeeTerms{Source: protocol.CALService}
++	if e := BindC3(&b, f.policy, f.grants); e != nil {
++		t.Fatal(e)
++	}
++	if b.Fee.Maximum >= b.Outputs[0].Amount {
++		t.Fatal("quote consumes output")
++	}
++	b.Outputs[0].Amount -= b.Fee.Maximum
++	tx, e := protocol.NewFastTx(b, p.Tx.Claims, f.policy.Key)
++	if e != nil {
++		t.Fatal(e)
++	}
++	tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.owner)}
++	return f.certify(t, tx, p.InputCertificates)
++}
++func TestFinalC3OrderAndTimeout(t *testing.T) {
++	for _, mode := range []string{"ordered", "reverse", "timeout"} {
++		t.Run(mode, func(t *testing.T) {
++			f := finalFixture(t)
++			source := finalPayment(t, f, nil, 1)
++			child := finalPayment(t, f, &source.Certificate, 2)
++			if mode == "ordered" {
++				f.settle(t, source, 100)
++				f.settle(t, child, 101)
++			} else {
++				f.settle(t, child, 100)
++				if mode == "timeout" {
++					if e := f.db.Update(func(v state.ReadView) ([]state.Change, error) {
++						tr, e := EvaluateDirectCompensation(v, source.Certificate.Summary.OutputID(0), f.policy, 131)
++						return tr.Changes, e
++					}); e != nil {
++						t.Fatal(e)
++					}
++					r := loadDirect[C3Record](t, f.db, C3EscrowKey(source.Certificate.Summary.Fact()))
++					if r.Escrow.Held != 7 {
++						t.Fatalf("source reward/repay hold %d", r.Escrow.Held)
++					}
++				}
++				f.settle(t, source, 132)
++			}
++			r := loadDirect[C3Record](t, f.db, C3EscrowKey(source.Certificate.Summary.Fact()))
++			if r.Escrow.Rewards != 6 || r.Escrow.Held != 0 {
++				t.Fatalf("fixed reward %+v", r)
++			}
++			if r.Escrow.Burned != 0 {
++				t.Fatal("final fuel burned")
++			}
++			wantReflow := uint64(0)
++			if mode == "timeout" {
++				wantReflow = 9
++			}
++			if r.Escrow.Reflow != wantReflow {
++				t.Fatalf("timeout reflow %d", r.Escrow.Reflow)
++			}
++			before := loadDirect[C3PoolTotals](t, f.db, C3PoolTotalsKey(source.Tx.Body.Fee.C3.Funding().Key))
++			f.settle(t, source, 133)
++			after := loadDirect[C3PoolTotals](t, f.db, C3PoolTotalsKey(source.Tx.Body.Fee.C3.Funding().Key))
++			if before != after {
++				t.Fatal("repeat spent fees twice")
++			}
++		})
++	}
++}
++
++func TestFinalC3EpochPayerExclusionAndDust(t *testing.T) {
++	f := finalFixture(t)
++	for i := 1; i < 3; i++ {
++		cfg := f.org
++		cfg.Org = protocol.Digest("other-issuer", []byte{byte(i)})
++		f.policy.Organizations[cfg.Hash()] = cfg
++		funding := protocol.AdmissionRef{Key: protocol.ResourceKey{Kind: protocol.ResourceFUEL, Account: protocol.Digest("other-pool", []byte{byte(i)}), Version: 1}, Grant: protocol.Digest("other-grant", []byte{byte(i)})}
++		f.policy.C3.Issuers = append(f.policy.C3.Issuers, C3Issuer{Config: cfg.Hash(), Funding: funding})
++	}
++	update := func(fn func(*state.Overlay) error) {
++		t.Helper()
++		if e := f.db.Update(func(v state.ReadView) ([]state.Change, error) {
++			o := state.NewOverlay(v)
++			e := fn(o)
++			return o.Changes(), e
++		}); e != nil {
++			t.Fatal(e)
++		}
++	}
++	update(func(o *state.Overlay) error {
++		for i, issuer := range f.policy.C3.Issuers {
++			if e := state.Put(o, AccountKey(f.policy.Organizations[issuer.Config].Org, protocol.AssetCAL), uint64((i+1)*10)); e != nil {
++				return e
++			}
++			if i > 0 {
++				if e := state.Put(o, state.Key(state.KeyGrant, issuer.Funding.Key.Encode()), state.Grant{ID: issuer.Funding.Grant, Key: issuer.Funding.Key, Organization: issuer.Config, Amount: 100}); e != nil {
++					return e
++				}
++			}
++		}
++		return nil
++	})
++	begin := func(h uint64) {
++		t.Helper()
++		if e := f.db.Update(func(v state.ReadView) ([]state.Change, error) {
++			tr, e := BeginC3Epoch(v, f.policy, h)
++			return tr.Changes, e
++		}); e != nil {
++			t.Fatal(e)
++		}
++	}
++	begin(1)
++	update(func(o *state.Overlay) error { return addC3Pool(o, f.org.Org, 11) })
++	begin(2)
++	begin(3)
++	s := loadDirect[C3EpochState](t, f.db, C3EpochKey())
++	if len(s.Pool) != 1 || s.Pool[0].Payer != f.org.Org || s.Pool[0].Amount != 1 {
++		t.Fatalf("lost payer dust %+v", s)
++	}
++	got := map[protocol.Hash]uint64{}
++	for _, c := range s.Credits {
++		got[c.Organization] = c.Cumulative
++	}
++	if got[f.org.Hash()] != 0 || got[f.policy.C3.Issuers[1].Config] != 4 || got[f.policy.C3.Issuers[2].Config] != 6 {
++		t.Fatalf("payer exclusion %+v", got)
++	}
++	before := s
++	begin(3)
++	after := loadDirect[C3EpochState](t, f.db, C3EpochKey())
++	if after.LastHeight != before.LastHeight || after.Pool[0] != before.Pool[0] {
++		t.Fatal("epoch replay")
++	}
++	begin(4)
++	begin(5)
++	s = loadDirect[C3EpochState](t, f.db, C3EpochKey())
++	if s.Pool[0].Amount != 1 || s.Pool[0].Payer != f.org.Org {
++		t.Fatal("carry attribution lost")
++	}
++}
++
++func TestFinalC3SolePayerRetainsFees(t *testing.T) {
++	f := finalFixture(t)
++	for h := uint64(1); h <= 3; h++ {
++		if e := f.db.Update(func(v state.ReadView) ([]state.Change, error) {
++			tr, e := BeginC3Epoch(v, f.policy, h)
++			o := state.NewOverlay(v)
++			o.Apply(tr.Changes)
++			if e == nil && h == 1 {
++				e = addC3Pool(o, f.org.Org, 9)
++			}
++			return o.Changes(), e
++		}); e != nil {
++			t.Fatal(e)
++		}
++	}
++	s := loadDirect[C3EpochState](t, f.db, C3EpochKey())
++	if len(s.Credits) != 0 || s.Pool[0].Amount != 9 {
++		t.Fatal("sole payer received own fees")
++	}
++}
++
++func TestFinalC3CALFeeIsAtomicAndSigned(t *testing.T) {
++	f := finalFixture(t)
++	f.policy.C3.Policies[0].BaseFee = 2
++	source := finalPayment(t, f, nil, 1)
++	child := finalPayment(t, f, &source.Certificate, 2)
++	if source.Tx.Body.Outputs[0].Amount != 98 || child.Tx.Body.Outputs[0].Amount != 96 {
++		t.Fatal("recipient amount/fee arithmetic")
++	}
++	if len(source.Tx.Body.Fee.Inputs) != 0 || source.Tx.Body.Fee.Source != protocol.CALService {
++		t.Fatal("user fuel required")
++	}
++	f.settle(t, child, 100)
++	revenue := source.Tx.Body.Fee.C3.Revenue
++	if got := loadDirect[uint64](t, f.db, AccountKey(revenue, protocol.AssetCAL)); got != 2 {
++		t.Fatalf("unexecuted source collected CAL %d", got)
++	}
++	modified := source.Tx
++	modified.Body.Fee.C3.BaseFee++
++	modified.Body.Fee.C3.Quote++
++	modified.Body.Fee.Maximum++
++	if modified.VerifyAuth() == nil {
++		t.Fatal("CAL fee mutation kept owner signature valid")
++	}
++	f.settle(t, source, 101)
++	f.settle(t, source, 102)
++	if got := loadDirect[uint64](t, f.db, AccountKey(revenue, protocol.AssetCAL)); got != 4 {
++		t.Fatalf("CAL fee duplicate %d", got)
++	}
++}
++
++func TestFinalC3MemberCreditOnlyAddsObservedDelta(t *testing.T) {
++	f := finalFixture(t)
++	issuer := f.policy.C3.Issuers[0]
++	key := issuer.Funding.Key
++	if e := f.db.Update(func(v state.ReadView) ([]state.Change, error) {
++		o := state.NewOverlay(v)
++		if e := state.Put(o, state.SliceKey(key, 0), state.Slice{Available: 600, Reserved: 66, Generation: 1}); e != nil {
++			return nil, e
++		}
++		credit := protocol.FuelCredit{Key: key, Grant: issuer.Funding.Grant, Organization: f.org.Hash(), Cumulative: 9}
++		if e := ApplyC3Credit(o, credit, f.org.Hash(), 1); e != nil {
++			return nil, e
++		}
++		if e := ApplyC3Credit(o, credit, f.org.Hash(), 1); e != nil {
++			return nil, e
++		}
++		return o.Changes(), nil
++	}); e != nil {
++		t.Fatal(e)
++	}
++	got := loadDirect[state.Slice](t, f.db, state.SliceKey(key, 0))
++	if got.Available != 606 || got.Reserved != 66 {
++		t.Fatalf("credit changed spent/held liabilities %+v", got)
++	}
++}
++
++func TestFinalC3MultiOutputQuorumDedupAndLateSource(t *testing.T) {
++	f := finalFixture(t)
++	source := finalPayment(t, f, nil, 1)
++	body := source.Tx.Body
++	body.Outputs = append(body.Outputs, body.Outputs[0])
++	body.Outputs[0].Amount = 40
++	body.Outputs[1].Amount = 60
++	if e := BindC3(&body, f.policy, f.grants); e != nil {
++		t.Fatal(e)
++	}
++	tx, e := protocol.NewFastTx(body, source.Tx.Claims, f.policy.Key)
++	if e != nil {
++		t.Fatal(e)
++	}
++	tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.owner)}
++	source = f.certify(t, tx, nil)
++	makeChild := func(index uint32) DirectPayment {
++		ff := f
++		ff.output.Amount = body.Outputs[index].Amount
++		// Build a normal body, then bind the selected direct source output.
++		p := finalPayment(t, ff, nil, byte(index+2))
++		b := p.Tx.Body
++		b.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: source.Certificate.Summary.OutputID(index), Evidence: protocol.Hash(source.Certificate.QC.Fact)}}
++		tx, e := protocol.NewFastTx(b, p.Tx.Claims, f.policy.Key)
++		if e != nil {
++			t.Fatal(e)
++		}
++		tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.owner)}
++		parent := source.Certificate
++		parent.QC.Votes = nil
++		for _, i := range []uint16{0, 2, 3} {
++			parent.QC.Votes = append(parent.QC.Votes, protocol.SignSpend(parent.QC.Fact, i, f.members[i]))
++		}
++		return f.certify(t, tx, []InputCertificate{{Certificate: parent, Index: index}})
++	}
++	first, second := makeChild(0), makeChild(1)
++	f.settle(t, first, 100)
++	f.settle(t, second, 101)
++	r := loadDirect[C3Record](t, f.db, C3EscrowKey(source.Certificate.QC.Fact))
++	if r.Escrow.Rewards != 1 || r.Escrow.Held != 26 {
++		t.Fatalf("duplicate quorum attachment %+v", r)
++	}
++	if e = f.db.Update(func(v state.ReadView) ([]state.Change, error) {
++		tr, e := EvaluateDirectCompensation(v, source.Certificate.Summary.OutputID(0), f.policy, 131)
++		return tr.Changes, e
++	}); e != nil {
++		t.Fatal(e)
++	}
++	r = loadDirect[C3Record](t, f.db, C3EscrowKey(source.Certificate.QC.Fact))
++	if r.Escrow.Held != 19 {
++		t.Fatalf("multi-output future cost %d", r.Escrow.Held)
++	}
++	f.settle(t, source, 132)
++	r = loadDirect[C3Record](t, f.db, C3EscrowKey(source.Certificate.QC.Fact))
++	if r.Escrow.Rewards != 9 || r.Escrow.Reflow != 9 || r.Escrow.Released != 9 || r.Escrow.Held != 0 {
++		t.Fatalf("multi-output closure %+v", r)
++	}
++}
++
++func TestFinalC3FailureLeavesNoEscrowOrFee(t *testing.T) {
++	f := finalFixture(t)
++	p := finalPayment(t, f, nil, 1)
++	b := p.Tx.Body
++	b.Outputs[0].Amount++
++	tx, e := protocol.NewFastTx(b, p.Tx.Claims, f.policy.Key)
++	if e != nil {
++		t.Fatal(e)
++	}
++	tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.owner)}
++	bad := f.certify(t, tx, nil)
++	verified, e := VerifyDirectPayment(bad, f.policy)
++	if e != nil {
++		t.Fatal(e)
++	}
++	before := loadDirect[uint64](t, f.db, AccountKey(b.Fee.C3.Pool, protocol.AssetFUEL))
++	if e = f.db.Update(func(v state.ReadView) ([]state.Change, error) {
++		tr, e := EvaluateDirectPayment(v, verified, f.policy, 100)
++		return tr.Changes, e
++	}); e == nil {
++		t.Fatal("unbalanced CAL executed")
++	}
++	if got := loadDirect[uint64](t, f.db, AccountKey(b.Fee.C3.Pool, protocol.AssetFUEL)); got != before {
++		t.Fatal("failed transition debited pool")
++	}
++	if e = f.db.View(func(v state.ReadView) error {
++		_, found, e := state.Load[C3Record](v, C3EscrowKey(bad.Certificate.Summary.Fact()))
++		if found {
++			t.Fatal("failed transition published escrow")
++		}
++		return e
++	}); e != nil {
++		t.Fatal(e)
++	}
++}
++
++func TestFinalC3EpochWeightsIgnoreLastBlockTopup(t *testing.T) {
++	f := finalFixture(t)
++	for h := uint64(1); h <= 3; h++ {
++		if e := f.db.Update(func(v state.ReadView) ([]state.Change, error) {
++			tr, e := BeginC3Epoch(v, f.policy, h)
++			o := state.NewOverlay(v)
++			o.Apply(tr.Changes)
++			if e == nil && h == 2 {
++				e = state.Put(o, AccountKey(f.org.Org, protocol.AssetCAL), uint64(1<<40))
++			}
++			return o.Changes(), e
++		}); e != nil {
++			t.Fatal(e)
++		}
++	}
++	old := loadDirect[C3EpochState](t, f.db, C3EpochHistoryKey(0))
++	current := loadDirect[C3EpochState](t, f.db, C3EpochKey())
++	if reflect.DeepEqual(old.Weights, current.Weights) || old.Weights[0] >= 1<<40 || current.Weights[0] != 1<<40 {
++		t.Fatalf("end epoch topup weight old=%v current=%v", old.Weights, current.Weights)
++	}
++}
++
++func TestFinalC3WeightedRewardsConserveAtUint64Limit(t *testing.T) {
++	f := finalFixture(t)
++	validators := []C3Validator{{ID: protocol.Digest("v0"), Weight: 1}, {ID: protocol.Digest("v1"), Weight: 2}, {ID: protocol.Digest("v2"), Weight: 3}}
++	f.policy.C3.Committee = validators
++	f.policy.Includer = validators[0].ID
++	if e := f.db.Update(func(v state.ReadView) ([]state.Change, error) {
++		ev := newDirectEval(v, f.policy, f.org.Network)
++		err := ev.c3Reward(math.MaxUint64, 0)
++		return ev.o.Changes(), err
++	}); e != nil {
++		t.Fatal(e)
++	}
++	var sum uint64
++	for _, validator := range validators {
++		amount := loadDirect[uint64](t, f.db, state.Key(state.KeyReward, validator.ID[:]))
++		var e error
++		sum, e = protocol.Add(sum, amount)
++		if e != nil {
++			t.Fatal(e)
++		}
++	}
++	if sum != math.MaxUint64 {
++		t.Fatal("weighted rewards lost integer units")
++	}
++}
++
++func TestFinalC3PriorityHeldThroughCompensation(t *testing.T) {
++	f := finalFixture(t)
++	tier := C3Tier{ID: protocol.Digest("priority"), CAL: 3, MinimumReward: 2}
++	f.policy.C3.Policies[0].Tiers = []C3Tier{tier}
++	source := finalPayment(t, f, nil, 1)
++	b := source.Tx.Body
++	b.Fee.C3.Tier = tier.ID
++	if e := BindC3(&b, f.policy, f.grants); e != nil {
++		t.Fatal(e)
++	}
++	b.Outputs = append([]protocol.Output(nil), b.Outputs...)
++	b.Outputs[0].Amount -= 3
++	tx, e := protocol.NewFastTx(b, source.Tx.Claims, f.policy.Key)
++	if e != nil {
++		t.Fatal(e)
++	}
++	tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), f.owner)}
++	source = f.certify(t, tx, nil)
++	child := finalPayment(t, f, &source.Certificate, 2)
++	f.settle(t, child, 100)
++	if e = f.db.Update(func(v state.ReadView) ([]state.Change, error) {
++		tr, e := EvaluateDirectCompensation(v, source.Certificate.Summary.OutputID(0), f.policy, 131)
++		return tr.Changes, e
++	}); e != nil {
++		t.Fatal(e)
++	}
++	rec := loadDirect[C3Record](t, f.db, C3EscrowKey(source.Certificate.Summary.Fact()))
++	if rec.Escrow.Held != 9 || rec.QuoteCollected {
++		t.Fatal("priority/source execution released before late source")
++	}
++	f.settle(t, source, 132)
++	rec = loadDirect[C3Record](t, f.db, C3EscrowKey(source.Certificate.Summary.Fact()))
++	if rec.Escrow.Rewards != 8 || rec.Escrow.Reflow != 9 || rec.Escrow.Held != 0 || rec.Escrow.Released != 0 {
++		t.Fatalf("late priority fee %+v", rec)
++	}
++}
+--- a/internal/rules/c3_ledger.go
++++ b/internal/rules/c3_ledger.go
+@@ -11,7 +11,7 @@
+ 	Escrow         C3Escrow
+ 	QuoteCollected bool
+ }
+-type C3PoolTotals struct{ CumulativeFees, Released, Rewards, Burned uint64 }
++type C3PoolTotals struct{ CumulativeFees, Released, Rewards, Burned, Reflow uint64 }
+ 
+ func C3PoolTotalsKey(key protocol.ResourceKey) []byte { return state.Key(173, key.Encode()) }
+ 
+@@ -77,8 +77,21 @@
+ 	if err != nil {
+ 		return err
+ 	}
++	reflow := next.Reflow - old.Reflow
+ 	reward, burn, release := next.Rewards-old.Rewards, next.Burned-old.Burned, next.Released-old.Released
+-	if err = changeAmount(e.o, state.Key(state.KeyReward, s.C3.Beneficiary[:]), reward, false); err != nil {
++	if s.C3.Final() {
++		exec := uint64(0)
++		if !old.has(C3Execute) && next.has(C3Execute) {
++			plan, _ := s.C3.Plan()
++			exec = plan.ExecuteReward
++		}
++		if err = e.c3Reward(reward-exec, exec); err != nil {
++			return err
++		}
++		if err = addC3Pool(e.o, s.C3.Issuer, reflow); err != nil {
++			return err
++		}
++	} else if err = changeAmount(e.o, state.Key(state.KeyReward, s.C3.Beneficiary[:]), reward, false); err != nil {
+ 		return err
+ 	}
+ 	if err = changeAmount(e.o, state.Key(state.KeyBurned), burn, false); err != nil {
+@@ -94,7 +107,7 @@
+ 	if !ok || g.ID != s.C3.Grant {
+ 		return protocol.ErrAuth
+ 	}
+-	if err = updateUsage(e.o, g.Key, reward+burn+release, reward+burn, g.Amount, false); err != nil {
++	if err = updateUsage(e.o, g.Key, reward+burn+reflow+release, reward+burn+reflow, g.Amount, false); err != nil {
+ 		return err
+ 	}
+ 	rec.Escrow = next
+@@ -105,7 +118,7 @@
+ 	for _, x := range []struct {
+ 		dst    *uint64
+ 		amount uint64
+-	}{{&totals.Released, release}, {&totals.Rewards, reward}, {&totals.Burned, burn}} {
++	}{{&totals.Released, release}, {&totals.Rewards, reward}, {&totals.Burned, burn}, {&totals.Reflow, reflow}} {
+ 		*x.dst, err = protocol.Add(*x.dst, x.amount)
+ 		if err != nil {
+ 			return err
+--- a/internal/rules/c3_policy.go
++++ b/internal/rules/c3_policy.go
+@@ -10,8 +10,15 @@
+ // C3Settings is a genesis-frozen registry. Current selects new quotes only;
+ // every accepted historical policy remains independently authenticated.
+ type C3Policy struct {
++	Version  uint64
++	BaseFee  uint64
++	Tiers    []C3Tier
+ 	ID       protocol.Hash
+ 	Schedule protocol.FeeSchedule
++}
++type C3Tier struct {
++	ID                 protocol.Hash
++	CAL, MinimumReward uint64
+ }
+ type C3Issuer struct {
+ 	Config               protocol.Hash
+@@ -19,9 +26,17 @@
+ 	Revenue, Beneficiary protocol.Hash
+ }
+ type C3Settings struct {
+-	Current  protocol.Hash
+-	Policies []C3Policy
+-	Issuers  []C3Issuer
++	Committee   []C3Validator
++	EpochBlocks uint64
++	ReservedBPS uint32
++	Current     protocol.Hash
++	Policies    []C3Policy
++	Issuers     []C3Issuer
++}
++type C3Validator struct {
++	ID      protocol.Hash
++	Address []byte
++	Weight  uint64
+ }
+ 
+ func (s *C3Settings) clone() *C3Settings {
+@@ -38,11 +53,49 @@
+ 		return nil
+ 	}
+ 	policies := map[protocol.Hash]bool{}
++	final := false
+ 	for _, p := range s.Policies {
+ 		if p.ID == (protocol.Hash{}) || policies[p.ID] {
+ 			return protocol.ErrRule
+ 		}
+ 		policies[p.ID] = true
++		if p.Version != 0 && p.Version != protocol.C3Version && p.Version != protocol.C3FinalVersion {
++			return protocol.ErrUnsupported
++		}
++		if p.Version == protocol.C3FinalVersion {
++			final = true
++			sc := p.Schedule
++			if sc.Register != 0 || sc.RegisterPerInput != 0 || sc.RegisterPerOutput != 0 || sc.RegisterPerResource != 0 || sc.RegisterPerExecution != 0 || sc.RegisterPerByte != 0 || sc.Open != 0 || sc.Close != 0 {
++				return protocol.ErrRule
++			}
++			seen := map[protocol.Hash]bool{}
++			for _, tier := range p.Tiers {
++				if tier.ID == (protocol.Hash{}) || tier.CAL == 0 || tier.MinimumReward == 0 || seen[tier.ID] {
++					return protocol.ErrRule
++				}
++				seen[tier.ID] = true
++			}
++		}
++	}
++	if final {
++		if s.EpochBlocks == 0 || s.ReservedBPS == 0 || s.ReservedBPS >= 10000 || len(s.Committee) == 0 || len(s.Issuers) > protocol.MaxAdmission {
++			return protocol.ErrRule
++		}
++		ids := map[protocol.Hash]bool{}
++		addresses := map[string]bool{}
++		var total uint64
++		for _, v := range s.Committee {
++			if v.ID == (protocol.Hash{}) || len(v.Address) != 20 || v.Weight == 0 || ids[v.ID] || addresses[string(v.Address)] {
++				return protocol.ErrRule
++			}
++			ids[v.ID] = true
++			addresses[string(v.Address)] = true
++			var err error
++			total, err = protocol.Add(total, v.Weight)
++			if err != nil {
++				return err
++			}
++		}
+ 	}
+ 	if !policies[s.Current] || len(s.Issuers) == 0 {
+ 		return protocol.ErrRule
+@@ -54,11 +107,21 @@
+ 			return protocol.ErrRule
+ 		}
+ 		configs[i.Config] = true
++		if pools[i.Funding.Key.Account] {
++			return protocol.ErrRule
++		}
+ 		pools[i.Funding.Key.Account] = true
+ 	}
+ 	for _, i := range s.Issuers {
+ 		if pools[i.Revenue] || pools[i.Beneficiary] || i.Revenue == i.Beneficiary {
+ 			return protocol.ErrRule
++		}
++		if final {
++			for _, org := range orgs {
++				if i.Revenue == org.Org {
++					return protocol.ErrRule
++				}
++			}
+ 		}
+ 	}
+ 	return nil
+@@ -96,6 +159,26 @@
+ 	}
+ 	for _, policy := range p.C3.Policies {
+ 		if policy.ID == c.Policy && policy.Schedule == c.Schedule {
++			if c.Final() {
++				if policy.Version != protocol.C3FinalVersion || c.BaseFee != policy.BaseFee {
++					return protocol.ErrAuth
++				}
++				if c.Tier == (protocol.Hash{}) {
++					if c.PriorityFee != 0 || c.PriorityReward != 0 {
++						return protocol.ErrAuth
++					}
++					return nil
++				}
++				for _, tier := range policy.Tiers {
++					if tier.ID == c.Tier && tier.CAL == c.PriorityFee && tier.MinimumReward <= c.PriorityReward {
++						return nil
++					}
++				}
++				return protocol.ErrAuth
++			}
++			if policy.Version != 0 && policy.Version != protocol.C3Version {
++				return protocol.ErrAuth
++			}
+ 			return nil
+ 		}
+ 	}
+@@ -180,7 +263,38 @@
+ 			c.Schedule = policy.Schedule
+ 		}
+ 	}
+-	if b.Fee.Source == protocol.OwnerFinalUTXO {
++	if selected, found := func() (C3Policy, bool) {
++		for _, x := range p.C3.Policies {
++			if x.ID == c.Policy {
++				return x, true
++			}
++		}
++		return C3Policy{}, false
++	}(); found && selected.Version == protocol.C3FinalVersion {
++		c.Version = protocol.C3FinalVersion
++		c.BaseFee = selected.BaseFee
++		c.Payer = b.Subject
++		c.Tier = b.Fee.C3.Tier
++		if c.Tier != (protocol.Hash{}) {
++			found := false
++			for _, tier := range selected.Tiers {
++				if tier.ID == c.Tier {
++					c.PriorityFee = tier.CAL
++					c.PriorityReward = tier.MinimumReward
++					found = true
++				}
++			}
++			if !found {
++				return protocol.ErrAuth
++			}
++		}
++		var err error
++		c.Quote, err = protocol.Add(c.BaseFee, c.PriorityFee)
++		if err != nil {
++			return err
++		}
++		b.Fee = protocol.FeeTerms{Source: protocol.CALService, Maximum: c.Quote}
++	} else if b.Fee.Source == protocol.OwnerFinalUTXO {
+ 		c.Payer = b.Fee.Refund.Owner
+ 	} else if b.Fee.Source == protocol.OrgReserve {
+ 		c.Sponsor = b.Fee.Account
+--- /dev/null
++++ b/internal/rules/c3_rewards.go
+@@ -0,0 +1,62 @@
++package rules
++
++import (
++	"bytes"
++	"math/big"
++	"sort"
++	"utxo/internal/state"
++	"utxo/protocol"
++)
++
++func (e *directEval) c3Reward(shared, execution uint64) error {
++	validators := e.policy.C3.Committee
++	if len(validators) == 0 {
++		return protocol.ErrAuth
++	}
++	total := uint64(0)
++	validIncluder := false
++	for _, v := range validators {
++		var err error
++		total, err = protocol.Add(total, v.Weight)
++		if err != nil {
++			return err
++		}
++		if v.ID == e.policy.Includer {
++			validIncluder = true
++		}
++	}
++	if total == 0 || execution > 0 && !validIncluder {
++		return protocol.ErrAuth
++	}
++	type allocation struct {
++		id        protocol.Hash
++		amount    uint64
++		remainder *big.Int
++	}
++	rows := make([]allocation, 0, len(validators))
++	remaining := shared
++	for _, v := range validators {
++		n := new(big.Int).Mul(new(big.Int).SetUint64(shared), new(big.Int).SetUint64(v.Weight))
++		q, r := new(big.Int), new(big.Int)
++		q.QuoRem(n, new(big.Int).SetUint64(total), r)
++		amount := q.Uint64()
++		remaining -= amount
++		rows = append(rows, allocation{v.ID, amount, r})
++	}
++	sort.Slice(rows, func(i, j int) bool {
++		n := rows[i].remainder.Cmp(rows[j].remainder)
++		if n == 0 {
++			return bytes.Compare(rows[i].id[:], rows[j].id[:]) < 0
++		}
++		return n > 0
++	})
++	for i := range rows {
++		if uint64(i) < remaining {
++			rows[i].amount++
++		}
++		if err := changeAmount(e.o, state.Key(state.KeyReward, rows[i].id[:]), rows[i].amount, false); err != nil {
++			return err
++		}
++	}
++	return changeAmount(e.o, state.Key(state.KeyReward, e.policy.Includer[:]), execution, false)
++}
+--- a/internal/rules/direct.go
++++ b/internal/rules/direct.go
+@@ -12,7 +12,8 @@
+ 
+ // DirectPolicy belongs to a fixed genesis. Timeouts use committed block time.
+ type DirectPolicy struct {
+-	C3             *C3Settings `json:",omitempty"`
++	Includer       protocol.Hash `json:"-"`
++	C3             *C3Settings   `json:",omitempty"`
+ 	Base           Schedule
+ 	TimeoutSeconds int64
+ 	RepairCost     uint64
+@@ -113,7 +114,7 @@
+ 
+ func PrepareDirectVector(tx protocol.FastTx, p DirectPolicy) (protocol.AdmissionVector, error) {
+ 	t := tx.Body
+-	if p.Key == nil || p.TimeoutSeconds <= 0 || p.RepairCost == 0 || p.Base.Validate() != nil || t.Rules != p.Rules() || t.Kind != protocol.FastTransfer || (t.Fee.Source != protocol.OrgReserve && t.Fee.Source != protocol.OwnerFinalUTXO) {
++	if p.Key == nil || p.TimeoutSeconds <= 0 || p.RepairCost == 0 || p.Base.Validate() != nil || t.Rules != p.Rules() || t.Kind != protocol.FastTransfer || (t.Fee.Source != protocol.OrgReserve && t.Fee.Source != protocol.OwnerFinalUTXO && t.Fee.Source != protocol.CALService) {
+ 		return nil, protocol.ErrRule
+ 	}
+ 	// Authenticate once and retain those exact bytes for the work-size check.
+@@ -721,11 +722,18 @@
+ 		if err = e.feeOutput(&p, protocol.FeeChangeIndex, total-t.Fee.Maximum); err != nil {
+ 			return state.Transition{}, err
+ 		}
+-	} else if err = changeAmount(e.o, AccountKey(t.Fee.Account, protocol.AssetFUEL), t.Fee.Maximum, true); err != nil {
+-		return state.Transition{}, err
++	} else if t.Fee.Source != protocol.CALService {
++		if err = changeAmount(e.o, AccountKey(t.Fee.Account, protocol.AssetFUEL), t.Fee.Maximum, true); err != nil {
++			return state.Transition{}, err
++		}
+ 	}
+ 	if t.Fee.C3.Enabled() {
+-		if err = changeAmount(e.o, AccountKey(t.Fee.C3.Revenue, protocol.AssetFUEL), t.Fee.Maximum, false); err != nil {
++		if err = changeAmount(e.o, AccountKey(t.Fee.C3.Revenue, func() protocol.Asset {
++			if t.Fee.C3.Final() {
++				return protocol.AssetCAL
++			}
++			return protocol.AssetFUEL
++		}()), t.Fee.Maximum, false); err != nil {
+ 			return state.Transition{}, err
+ 		}
+ 	} else {
+@@ -802,6 +810,12 @@
+ 	}
+ 	for _, out := range t.Outputs {
+ 		outgoing, err = protocol.Add(outgoing, out.Amount)
++		if err != nil {
++			return state.Transition{}, err
++		}
++	}
++	if t.Fee.C3.Final() {
++		outgoing, err = protocol.Add(outgoing, t.Fee.Maximum)
+ 		if err != nil {
+ 			return state.Transition{}, err
+ 		}
+--- a/internal/transport/committee_test.go
++++ b/internal/transport/committee_test.go
+@@ -1,38 +1,38 @@
+-package transport
+-
+-import (
+-	"bytes"
+-	"context"
+-	"io"
+-	"net/http"
+-	"net/http/httptest"
+-	"testing"
+-	"utxo/internal/testkit"
+-	"utxo/protocol"
+-)
+-
+-func TestSubmitPreservesDurableEnvelope(t *testing.T) {
+-	f := testkit.NewFixture("transport-retry", "a", 1)
+-	c, err := f.Certify(f.Transaction(0, 1))
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	body, _ := c.MarshalBinary()
+-	raw, _ := (protocol.Submission{Network: f.Org.Network, Body: body}).MarshalBinary()
+-	var received [][]byte
+-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+-		b, _ := io.ReadAll(r.Body)
+-		received = append(received, b)
+-		w.WriteHeader(202)
+-	}))
+-	defer server.Close()
+-	client := NewCommitteeClient(server.URL)
+-	for i := 0; i < 2; i++ {
+-		if err := client.Submit(context.Background(), raw); err != nil {
+-			t.Fatal(err)
+-		}
+-	}
+-	if len(received) != 2 || !bytes.Equal(received[0], raw) || !bytes.Equal(received[1], raw) {
+-		t.Fatal("retry changed durable envelope")
+-	}
+-}
++package transport
++
++import (
++	"bytes"
++	"context"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"testing"
++	"utxo/internal/testkit"
++	"utxo/protocol"
++)
++
++func TestSubmitPreservesDurableEnvelope(t *testing.T) {
++	f := testkit.NewFixture("transport-retry", "a", 1)
++	c, err := f.Certify(f.Transaction(0, 1))
++	if err != nil {
++		t.Fatal(err)
++	}
++	body, _ := c.MarshalBinary()
++	raw, _ := (protocol.Submission{Network: f.Org.Network, Body: body}).MarshalBinary()
++	var received [][]byte
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		b, _ := io.ReadAll(r.Body)
++		received = append(received, b)
++		w.WriteHeader(202)
++	}))
++	defer server.Close()
++	client := NewCommitteeClient(server.URL)
++	for i := 0; i < 2; i++ {
++		if err := client.Submit(context.Background(), raw); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if len(received) != 2 || !bytes.Equal(received[0], raw) || !bytes.Equal(received[1], raw) {
++		t.Fatal("retry changed durable envelope")
++	}
++}
+--- a/protocol/c3.go
++++ b/protocol/c3.go
+@@ -3,6 +3,7 @@
+ import "math"
+ 
+ const C3Version uint64 = 1
++const C3FinalVersion uint64 = 2
+ const C3SummaryVersion uint64 = 6
+ const MaxFeeCommitmentBytes uint32 = 1024
+ 
+@@ -38,17 +39,20 @@
+ // Payer identifies the owner of the final FUEL inputs. Revenue is an operating
+ // account and must differ from the protected Pool.
+ type FeeCommitment struct {
+-	Version                       uint64
+-	Policy, Issuer, Pool, Grant   Hash
+-	GrantVersion                  uint64
+-	Quote                         uint64
+-	Payer                         PublicKey
+-	Sponsor, Revenue, Beneficiary Hash
+-	Resources                     FeeResources
+-	Schedule                      FeeSchedule
+-	Budget                        uint64
+-}
+-
++	Version                              uint64
++	Policy, Issuer, Pool, Grant          Hash
++	GrantVersion                         uint64
++	Quote                                uint64
++	Payer                                PublicKey
++	Sponsor, Revenue, Beneficiary        Hash
++	Resources                            FeeResources
++	Schedule                             FeeSchedule
++	Budget                               uint64
++	BaseFee, PriorityFee, PriorityReward uint64
++	Tier                                 Hash
++}
++
++func (c FeeCommitment) Final() bool   { return c.Version == C3FinalVersion }
+ func (c FeeCommitment) Enabled() bool { return c.Version != 0 }
+ func (c FeeCommitment) Funding() AdmissionRef {
+ 	return AdmissionRef{Key: ResourceKey{Kind: ResourceFUEL, Account: c.Pool, Version: c.GrantVersion}, Grant: c.Grant}
+@@ -98,7 +102,15 @@
+ 	if e != nil {
+ 		return C3FeePlan{}, e
+ 	}
+-	p.RewardCeiling, e = c3Sum(s.AttachReward, s.ExecuteReward, resolved)
++	priority := uint64(0)
++	if c.Final() {
++		priority = c.PriorityReward
++		p.ExecuteReward, e = Add(p.ExecuteReward, priority)
++		if e != nil {
++			return C3FeePlan{}, e
++		}
++	}
++	p.RewardCeiling, e = c3Sum(s.AttachReward, s.ExecuteReward, resolved, priority)
+ 	if e != nil {
+ 		return C3FeePlan{}, e
+ 	}
+@@ -114,10 +126,18 @@
+ 	return p, e
+ }
+ func (c FeeCommitment) Validate() error {
+-	if c.Version != C3Version {
++	if c.Version != C3Version && !c.Final() {
+ 		return ErrUnsupported
+ 	}
+-	if c.Policy == (Hash{}) || c.Issuer == (Hash{}) || c.Pool == (Hash{}) || c.Grant == (Hash{}) || c.GrantVersion == 0 || c.Quote == 0 || c.Revenue == (Hash{}) || c.Revenue == c.Pool || c.Sponsor == c.Pool || c.Beneficiary == c.Pool || c.Beneficiary == (Hash{}) || (c.Payer == (PublicKey{})) == (c.Sponsor == (Hash{})) {
++	if c.Policy == (Hash{}) || c.Issuer == (Hash{}) || c.Pool == (Hash{}) || c.Grant == (Hash{}) || c.GrantVersion == 0 || (!c.Final() && c.Quote == 0) || c.Revenue == (Hash{}) || c.Revenue == c.Pool || c.Sponsor == c.Pool || c.Beneficiary == c.Pool || c.Beneficiary == (Hash{}) || (c.Payer == (PublicKey{})) == (c.Sponsor == (Hash{})) {
++		return ErrRule
++	}
++	if c.Final() {
++		q, e := Add(c.BaseFee, c.PriorityFee)
++		if e != nil || q != c.Quote || c.Payer == (PublicKey{}) || c.Sponsor != (Hash{}) || c.Schedule.Register != 0 || c.Schedule.RegisterPerInput != 0 || c.Schedule.RegisterPerOutput != 0 || c.Schedule.RegisterPerResource != 0 || c.Schedule.RegisterPerExecution != 0 || c.Schedule.RegisterPerByte != 0 || c.Schedule.Open != 0 || c.Schedule.Close != 0 || (c.Tier == (Hash{})) != (c.PriorityFee == 0) || c.PriorityFee == 0 && c.PriorityReward != 0 {
++			return ErrRule
++		}
++	} else if c.BaseFee != 0 || c.PriorityFee != 0 || c.PriorityReward != 0 || c.Tier != (Hash{}) {
+ 		return ErrRule
+ 	}
+ 	p, e := c.Plan()
+@@ -138,6 +158,12 @@
+ 	}
+ 	if t.Wire != DirectWireVersion || t.Version != DirectVersion || t.Kind != FastTransfer || c.Issuer != t.Certifier || c.Quote != t.Fee.Maximum || c.Resources != FeeResourcesFor(t) {
+ 		return ErrRule
++	}
++	if c.Final() {
++		if t.Fee.Source != CALService || c.Payer != t.Subject {
++			return ErrAuth
++		}
++		return nil
+ 	}
+ 	if t.Fee.Source == OwnerFinalUTXO {
+ 		if c.Payer != t.Fee.Refund.Owner || c.Sponsor != (Hash{}) {
+@@ -178,6 +204,12 @@
+ 		e.U64(v)
+ 	}
+ 	e.U64(c.Budget)
++	if c.Final() {
++		e.U64(c.BaseFee)
++		e.U64(c.PriorityFee)
++		e.U64(c.PriorityReward)
++		e.Fixed(c.Tier[:])
++	}
+ }
+ func (c FeeCommitment) MarshalBinary() ([]byte, error) {
+ 	if e := c.Validate(); e != nil {
+@@ -206,6 +238,12 @@
+ 	c.Resources = FeeResources{Inputs: d.U32(), FeeInputs: d.U32(), Outputs: d.U32(), Admissions: d.U32(), Work: WorkLimit{ExecUnits(d.U64()), RetainedBytes(d.U64()), d.U32(), d.U32()}}
+ 	c.Schedule = FeeSchedule{d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64(), d.U64()}
+ 	c.Budget = d.U64()
++	if c.Final() {
++		c.BaseFee = d.U64()
++		c.PriorityFee = d.U64()
++		c.PriorityReward = d.U64()
++		copy(c.Tier[:], d.Fixed(32))
++	}
+ 	if e := d.Done(); e != nil {
+ 		return c, e
+ 	}
+--- /dev/null
++++ b/protocol/c3_final_test.go
+@@ -0,0 +1,28 @@
++package protocol
++
++import "testing"
++
++func TestFinalC3PlanAndWire(t *testing.T) {
++	c := testC3()
++	c.Version = 2
++	c.Quote = 0
++	c.Sponsor = Hash{}
++	c.Payer = PublicKey{1}
++	c.Schedule = FeeSchedule{AttachReward: 1, ExecuteReward: 2, ResolveReward: 3, Compensate: 4, Repay: 5}
++	c.Budget = 15
++	if e := c.Validate(); e != nil {
++		t.Fatal("final free CAL quote rejected", e)
++	}
++	raw, e := c.MarshalBinary()
++	if e != nil {
++		t.Fatal(e)
++	}
++	got, e := DecodeFeeCommitment(raw)
++	if e != nil || got != c {
++		t.Fatal("final wire", e)
++	}
++	c.Schedule.Open = 1
++	if c.Validate() == nil {
++		t.Fatal("final normal disorder charged")
++	}
++}
+--- a/protocol/execution.go
++++ b/protocol/execution.go
+@@ -18,7 +18,13 @@
+ // ExecutionResult records only execution choices not derivable from the signed
+ // transaction: missing inputs, recovered outputs, and final fee change/refunds.
+ // It contains public ledger effects, not private notifications or credit proofs.
++type FuelCredit struct {
++	Key                 ResourceKey
++	Grant, Organization Hash
++	Cumulative          uint64
++}
+ type ExecutionResult struct {
++	C3Credits                       []FuelCredit
+ 	Applied                         bool
+ 	MissingInputs, RecoveredOutputs []uint32
+ 	FeeOutputs                      []FeeOutput
+@@ -26,7 +32,9 @@
+ 
+ func (r ExecutionResult) MarshalBinary() ([]byte, error) {
+ 	e := new(Encoder)
+-	if len(r.FeeOutputs) == 0 {
++	if len(r.C3Credits) > 0 {
++		e.U16(414)
++	} else if len(r.FeeOutputs) == 0 {
+ 		e.U16(412)
+ 	} else {
+ 		e.U16(413)
+@@ -44,8 +52,8 @@
+ 			e.U32(n)
+ 		}
+ 	}
+-	if len(r.FeeOutputs) > 0 {
+-		if !r.Applied || len(r.FeeOutputs) > MaxOutputs+2 {
++	if len(r.FeeOutputs) > 0 || len(r.C3Credits) > 0 {
++		if !r.Applied && len(r.FeeOutputs) > 0 || len(r.FeeOutputs) > MaxOutputs+2 {
+ 			return nil, ErrEncoding
+ 		}
+ 		e.U32(uint32(len(r.FeeOutputs)))
+@@ -65,12 +73,27 @@
+ 			encodeOutput(e, f.Output)
+ 		}
+ 	}
++	if len(r.C3Credits) > 0 {
++		if len(r.C3Credits) > MaxAdmission {
++			return nil, ErrEncoding
++		}
++		e.U32(uint32(len(r.C3Credits)))
++		for i, c := range r.C3Credits {
++			if c.Key.Kind != ResourceFUEL || c.Key.Version == 0 || c.Key.Account == (Hash{}) || c.Cumulative == 0 || c.Grant == (Hash{}) || c.Organization == (Hash{}) || i > 0 && bytes.Compare(r.C3Credits[i-1].Key.Encode(), c.Key.Encode()) >= 0 {
++				return nil, ErrEncoding
++			}
++			e.Fixed(c.Key.Encode())
++			e.Fixed(c.Grant[:])
++			e.Fixed(c.Organization[:])
++			e.U64(c.Cumulative)
++		}
++	}
+ 	return e.Data(), nil
+ }
+ func DecodeExecution(b []byte) (r ExecutionResult, err error) {
+ 	d := NewDecoder(b)
+ 	tag := d.U16()
+-	if tag != 412 && tag != 413 {
++	if tag != 412 && tag != 413 && tag != 414 {
+ 		return r, ErrEncoding
+ 	}
+ 	r.Applied = d.Optional()
+@@ -80,9 +103,9 @@
+ 			(*v)[i] = d.U32()
+ 		}
+ 	}
+-	if tag == 413 {
++	if tag == 413 || tag == 414 {
+ 		r.FeeOutputs = make([]FeeOutput, d.Count(MaxOutputs+2))
+-		if len(r.FeeOutputs) == 0 {
++		if len(r.FeeOutputs) == 0 && tag != 414 {
+ 			return r, ErrEncoding
+ 		}
+ 		for i := range r.FeeOutputs {
+@@ -90,6 +113,19 @@
+ 			copy(f.Transaction[:], d.Fixed(32))
+ 			f.Index = d.U32()
+ 			f.Output = decodeOutput(d)
++		}
++	}
++	if tag == 414 {
++		r.C3Credits = make([]FuelCredit, d.Count(MaxAdmission))
++		for i := range r.C3Credits {
++			c := &r.C3Credits[i]
++			c.Key = decodeResource(d)
++			copy(c.Grant[:], d.Fixed(32))
++			copy(c.Organization[:], d.Fixed(32))
++			c.Cumulative = d.U64()
++		}
++		if len(r.C3Credits) == 0 {
++			return r, ErrEncoding
+ 		}
+ 	}
+ 	if err = d.Done(); err != nil {
+--- a/protocol/transaction.go
++++ b/protocol/transaction.go
+@@ -49,6 +49,7 @@
+ const (
+ 	OrgReserve     FeeSource = 1
+ 	OwnerFinalUTXO FeeSource = 2
++	CALService     FeeSource = 3
+ )
+ 
+ type FeeTerms struct {
+@@ -190,10 +191,14 @@
+ 			return ErrRule
+ 		}
+ 	}
+-	if t.Fee.Maximum == 0 {
++	if t.Fee.Maximum == 0 && !t.Fee.C3.Final() {
+ 		return ErrRule
+ 	}
+ 	switch t.Fee.Source {
++	case CALService:
++		if !t.Fee.C3.Final() || t.Fee.Account != (Hash{}) || t.Fee.Policy != (Hash{}) || t.Fee.Version != 0 || len(t.Fee.Inputs) != 0 || t.Fee.Refund != (ReceiveDescriptor{}) {
++			return ErrRule
++		}
+ 	case OrgReserve:
+ 		if t.Kind != FastTransfer || t.Fee.Account == (Hash{}) || t.Fee.Policy == (Hash{}) || t.Fee.Version == 0 || len(t.Fee.Inputs) != 0 || t.Fee.Refund != (ReceiveDescriptor{}) {
+ 			return ErrRule
+--- a/third_party/cometbft/README.md
++++ /dev/null
+@@ -1,90 +0,0 @@
+-# Pinned CometBFT adaptation
+-
+-Run `python3 third_party/cometbft/overlay.py` with Go on PATH before the first
+-build. It materializes CometBFT v0.38.26 into `.scratch/comet-src`, checks every
+-upstream patch anchor and sets the root module's local replace. It does not edit
+-the module cache. Source additions are kept here; generated upstream code is
+-ignored. Build the payment application with `-tags=comet_v3`.
+-
+-The fork changes transaction commitments, block-part commitments/wire encoding,
+-authenticated historical BlockStore revision, original-version replay and
+-catch-up, and the node's pre-replay application hook. It preserves normal BFT
+-rounds and quorum rules. It is not wire-compatible with an unmodified network.
+-
+-Consensus compares the full BlockID (stable hash and original part header) for
+-locks, valid candidates and commits. A matching current-round polka can advance
+-its exact candidate without a Proposal message; normal proposal/POL checks bind
+-the same full identity. Existing round/step guards prevent signing a second
+-precommit. `TestStableHashIdentity` covers aliases, arrival orders and execution
+-of the exact committed bytes in an isolated process. See the
+-[security connection and evidence](../../docs/research/security-analysis-validation-2026-09-27/hardening.md).
+-
+-An application-committed exact RepairInput or RepairBatch authorizes the
+-historical representation and its materialization. CompensationDecision first
+-executes the monetary change at its own new public height, independently of
+-adaptation. Representation and installation do not execute that change again.
+-Original bytes are retained for replay; current parts are genuinely rewritten.
+-The internal Canonical reader uses a verified application-state snapshot, not
+-hash compatibility alone. See the [reader contract](../../docs/design/historical-reader-contract.md).
+-
+-The cryptographic package is supplied by this application's root module. This
+-directory is a patch source bundle, not a standalone Comet distribution.
+-See [implementation and evidence](../../docs/archive/development/implementation-v1.2.md).
+-
+-For local profiling, set both `UTXO_SETTLEMENT_TRACE=1` and
+-`UTXO_COMET_PROFILE=1` before starting committee processes. The optional
+-`libs/operationtrace` hook records proposal construction, WAL synchronization,
+-validator signing-state saves, and BlockStore saves in the existing bounded
+-in-memory timeline. It adds no diagnostic disk writes and changes no durability
+-or consensus rule. Signature timing includes the nested signing-state save;
+-do not add the two measurements together. The hook stays nil in normal runs.
+-
+-The hook also records actual flow-rate limiter waits (only when its wait branch
+-executes), FinalizeBlock response persistence, consensus-state persistence, and
+-mempool lock/flush waits. Concurrent or nested operation durations must not be
+-summed as critical-path latency. Committee JSON accepts optional `P2PSendRate`
+-and `P2PRecvRate` in bytes/second: zero keeps Comet's default; negative values are
+-rejected before either override is applied. Earlier low-load trials retained
+-5,120,000 bytes/second and 10/10 ms flush/gossip after
+-[controlled trials](../../docs/experiments/consensus-propagation-2026-09-20/README.md)
+-found no stable total-completion benefit from smaller intervals or higher limits.
+-The later sustained-load trials found real bandwidth limiting at higher rates;
+-new loopback v4 laboratories use 51,200,000 bytes/second and 10/10 ms. Other
+-deployments retain the configured rate or the upstream default when unset.
+-See [TPS trials](../../docs/experiments/consensus-tps-2026-09-21/README.md).
+-
+-OriginalBlockPart holds the revision read lock through its decision and read.
+-For blocks with no historical revision it reads the requested stored part
+-directly, instead of decoding and rebuilding every part of the entire block.
+-Revised blocks still reconstruct immutable original execution bytes for replay
+-and catch-up; no current rewritten part is substituted into that path.
+-
+-FinalizeBlock history and its latest recovery record use one database batch and
+-`WriteSync` per height, before App.Commit. Keys and encoded values are unchanged;
+-discard mode still writes only the recovery record. This removes a separate
+-database write operation, not a second fsync (the original path had only one
+-explicit sync). A write error is returned without rollback or retry: storage may
+-already contain the batch, so existing halt/handshake recovery rules still apply.
+-See [storage trials](../../docs/experiments/committee-storage-2026-09-20/README.md).
+-
+-Optional profiling also splits response encoding, database writes, FilePV
+-encoding, and atomic-file open / O_SYNC write / close / rename. The synchronous
+-write measurement combines kernel write and sync costs. No signing-state
+-durability or atomic-replacement rule is changed.
+-
+-AutoFile avoids repeating Sync on the same open handle after a successful Sync
+-with no intervening Write. Writes (including errors) and reopening invalidate
+-that state under the existing mutex. Group still flushes first, so an empty
+-buffer is never mistaken for durable data. WAL ordering/format and all syncs
+-covering new writes are preserved. This assumes the WAL has its normal exclusive
+-process writer; external modification of an active WAL is unsupported.
+-See [measurement and validation](../../docs/experiments/wal-sync-2026-09-20/README.md).
+-
+-The local consensus queue batches already-ready proposal/part records only in
+-the current Propose step, bounded by 16 messages and 512 KiB of part bodies.
+-Actual missing-part count limits each batch so block completion can happen only
+-at its tail, preserving intervening state-record order on replay. Records are
+-synced before handling; partial durable prefixes remain replayable after errors.
+-Votes and all other messages keep the single-record durable path. There is no
+-batch-fill timer. See [tests and paired results](../../docs/experiments/proposal-batch-2026-09-20/README.md),
+-including the foreground latency tradeoff in this single-host workload.
+--- a/third_party/cometbft/go.mod
++++ /dev/null
+@@ -1,4 +0,0 @@
+-// Source fragments for the pinned build overlay, not a standalone module.
+-module utxo-comet-overlay
+-
+-go 1.27.1
+--- a/third_party/cometbft/overlay.py
++++ /dev/null
+@@ -1,194 +0,0 @@
+-#!/usr/bin/env python3
+-"""Materialize the small pinned Comet fork; never edit Go's module cache."""
+-import json
+-import pathlib
+-import subprocess
+-import shutil
+-import os
+-
+-root = pathlib.Path(__file__).resolve().parents[2]
+-module = json.loads(subprocess.check_output(
+-    ["go", "mod", "download", "-json", "github.com/cometbft/cometbft@v0.38.26"], cwd=root))
+-source = pathlib.Path(module["Dir"])
+-out = root / ".scratch/comet-src"
+-if not out.exists():
+-    shutil.copytree(source, out)
+-    for parent, dirs, files in os.walk(out):
+-        os.chmod(parent, 0o755)
+-        for name in files:
+-            os.chmod(pathlib.Path(parent) / name, 0o644)
+-
+-def patch(name, edits):
+-    text = (source / name).read_text(encoding="utf-8")
+-    for edit in edits:
+-        before, after = edit[:2]
+-        expected = edit[2] if len(edit) == 3 else 1
+-        if text.count(before) != expected:
+-            raise RuntimeError(f"pinned source mismatch: {name}: {before[:70]}")
+-        text = text.replace(before, after, expected)
+-    target = out / name
+-    target.parent.mkdir(parents=True, exist_ok=True)
+-    target.write_text(text, encoding="utf-8")
+-
+-patch("types/tx.go", [
+-    ("return tmhash.Sum(tx)", "return redactionTxHash(tx)"),
+-    ("return sha256.Sum256(tx)", "var key TxKey; copy(key[:], tx.Hash()); return key"),
+-    ('\n\t"github.com/cometbft/cometbft/crypto/tmhash"', ''),
+-])
+-patch("types/part_set.go", [
+-    ('type PartSet struct {', 'type PartSet struct {\n redactionSeen bool\n redactionHeight int64\n redactionRevision uint64'),
+-    ('type Part struct {', 'type Part struct {\n Redaction *PartRedaction `json:"redaction,omitempty"`'),
+-    ('pb.Bytes = part.Bytes', 'pb.Bytes = encodeRedactionPart(part)'),
+-    ('part.Bytes = pb.Bytes', 'if err := decodeRedactionPart(part, pb.Bytes); err != nil { return nil, err }'),
+-    ('if part.Proof.Verify(ps.Hash(), part.Bytes) != nil {',
+-     'leaf, err := partCommitment(part)\n if err != nil || part.Proof.Verify(ps.Hash(), leaf) != nil {'),
+-    ('// Add part\n', '// Add part\n if !ps.acceptRedaction(part) { return false, ErrPartSetInvalidProof }\n'),
+-])
+-patch("types/block.go", [
+-    ('return NewPartSetFromData(bz, partSize), nil',
+-     'if redactionKey != nil { return NewRedactablePartSet(bz, partSize, b.Height, 0, nil) }; return NewPartSetFromData(bz, partSize), nil'),
+-])
+-patch("store/store.go", [
+-    ('type BlockStore struct {', 'type BlockStore struct {\n revisionMtx cmtsync.RWMutex'),
+-    ('func (bs *BlockStore) LoadBlock(height int64) *types.Block {',
+-     'func (bs *BlockStore) LoadBlock(height int64) *types.Block {\n bs.revisionMtx.RLock(); defer bs.revisionMtx.RUnlock(); return bs.loadBlock(height)\n}\nfunc (bs *BlockStore) loadBlock(height int64) *types.Block {'),
+-])
+-patch("consensus/replay.go", [
+-    ('block := h.store.LoadBlock(i)', 'block := h.store.LoadBlock(i)\n if original, ok := h.store.(interface { LoadOriginalBlock(int64) (*types.Block,error) }); ok { block, err = original.LoadOriginalBlock(i); if err != nil { return nil, err } }'),
+-    ('block := h.store.LoadBlock(height)', 'block := h.store.LoadBlock(height)\n if original, ok := h.store.(interface { LoadOriginalBlock(int64) (*types.Block,error) }); ok { var e error; block, e = original.LoadOriginalBlock(height); if e != nil { return sm.State{}, e } }'),
+-])
+-patch("blocksync/reactor.go", [
+-    ('block := bcR.store.LoadBlock(msg.Height)', 'block := bcR.store.LoadBlock(msg.Height)\n if original, ok := bcR.store.(interface { LoadOriginalBlock(int64) (*types.Block,error) }); ok { var e error; block, e = original.LoadOriginalBlock(msg.Height); if e != nil { bcR.Logger.Error("load original block", "err", e); return false } }'),
+-])
+-patch("consensus/reactor.go", [
+-    ('part := conR.conS.blockStore.LoadBlockPart(prs.Height, index)', 'part := conR.conS.blockStore.LoadBlockPart(prs.Height, index)\n if original, ok := conR.conS.blockStore.(interface { OriginalBlockPart(int64,int) (*types.Part,error) }); ok { var e error; part, e = original.OriginalBlockPart(prs.Height,index); if e != nil { logger.Error("load original part", "err", e); return } }'),
+-    ('if err := m.Part.ValidateBasic(); err != nil {', 'if err := m.Part.ValidateOriginal(m.Height); err != nil { return err }\n if err := m.Part.ValidateBasic(); err != nil {'),
+-])
+-patch("node/node.go", [
+-    (') (*Node, error) {\n\tblockStore, stateDB, err := initDBs(config, dbProvider)\n\tif err != nil {\n\t\treturn nil, err\n\t}', ') (*Node, error) {\n\tblockStore, stateDB, err := initDBs(config, dbProvider)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n if BeforeReplay != nil { if err := BeforeReplay(blockStore); err != nil { return nil, err } }'),
+-])
+-# Opt-in timings around the pinned implementation's real synchronous calls.
+-# The hook is nil in normal runs; no extra log or storage writes are introduced.
+-trace_import = ('import (', 'import (\n "github.com/cometbft/cometbft/libs/operationtrace"')
+-patch("libs/flowrate/flowrate.go", [trace_import,
+-    ('now = m.waitNextSample(now)',
+-     'endWait := operationtrace.Start("p2p_rate_limit_wait", 0)\n now = m.waitNextSample(now)\n endWait()'),
+-])
+-patch("state/store.go", [trace_import,
+-    ('func (store dbStore) SaveFinalizeBlockResponse(height int64, resp *abci.ResponseFinalizeBlock) error {',
+-     'func (store dbStore) SaveFinalizeBlockResponse(height int64, resp *abci.ResponseFinalizeBlock) error {\n defer operationtrace.Start("finalize_response_save", height)()\n batch := store.db.NewBatch()\n defer batch.Close()'),
+-    ('func (store dbStore) Save(state State) error {',
+-     'func (store dbStore) Save(state State) error {\n defer operationtrace.Start("consensus_state_save", state.LastBlockHeight)()'),
+-    ('bz, err := resp.Marshal()',
+-     'endEncode := operationtrace.Start("finalize_history_encode", height)\n bz, err := resp.Marshal()\n endEncode()'),
+-    ('if err := store.db.Set(calcABCIResponsesKey(height), bz); err != nil {',
+-     'endSet := operationtrace.Start("finalize_history_batch_set", height)\n setErr := batch.Set(calcABCIResponsesKey(height), bz)\n endSet()\n if err := setErr; err != nil {'),
+-    ('bz, err := response.Marshal()',
+-     'endLastEncode := operationtrace.Start("finalize_recovery_encode", height)\n bz, err := response.Marshal()\n endLastEncode()'),
+-    ('return store.db.SetSync(lastABCIResponseKey, bz)',
+-     'if err := batch.Set(lastABCIResponseKey, bz); err != nil { return err }\n endSync := operationtrace.Start("finalize_batch_write_sync", height)\n syncErr := batch.WriteSync()\n endSync()\n return syncErr'),
+-])
+-patch("state/execution.go", [trace_import,
+-    ('blockExec.mempool.Lock()\n\tdefer blockExec.mempool.Unlock()',
+-     'endLock := operationtrace.Start("commit_mempool_lock", block.Height)\n blockExec.mempool.Lock()\n endLock()\n defer blockExec.mempool.Unlock()'),
+-    ('err := blockExec.mempool.FlushAppConn()',
+-     'endFlush := operationtrace.Start("commit_mempool_flush", block.Height)\n err := blockExec.mempool.FlushAppConn()\n endFlush()'),
+-])
+-patch("libs/autofile/autofile.go", [trace_import,
+-    ('file *os.File', 'file *os.File\n synced bool // Protected by mtx; invalidated by writes and every reopen.'),
+-    ('n, err = af.file.Write(b)', 'af.synced = false\n n, err = af.file.Write(b)'),
+-    ('return af.file.Sync()', '''// No new writes since this handle's last successful sync.
+- // Flush still runs in Group, including writes that outgrew its buffer.
+- if af.synced {
+-  defer operationtrace.Start("autofile_sync_skipped", 0)()
+-  return nil
+- }
+- defer operationtrace.Start("autofile_sync_needed", 0)()
+- err := af.file.Sync()
+- af.synced = err == nil
+- return err'''),
+-    ('af.file = file\n', 'af.file = file\n af.synced = false\n'),
+-])
+-patch("privval/file.go", [trace_import,
+-    ('func (lss *FilePVLastSignState) Save() {',
+-     'func (lss *FilePVLastSignState) Save() {\n defer operationtrace.Start("filepv_save", lss.Height)()'),
+-    ('jsonBytes, err := cmtjson.MarshalIndent(lss, "", "  ")',
+-     'endEncode := operationtrace.Start("filepv_encode", lss.Height)\n jsonBytes, err := cmtjson.MarshalIndent(lss, "", "  ")\n endEncode()'),
+-])
+-patch("libs/tempfile/tempfile.go", [trace_import,
+-    ('f, err = os.OpenFile(name, atomicWriteFileFlag, perm)',
+-     'endOpen := operationtrace.Start("atomic_file_open", 0)\n f, err = os.OpenFile(name, atomicWriteFileFlag, perm)\n endOpen()'),
+-    ('if n, err := f.Write(data); err != nil {',
+-     'endWrite := operationtrace.Start("atomic_file_write_sync", 0)\n n, writeErr := f.Write(data)\n endWrite()\n if err := writeErr; err != nil {'),
+-    ('\tf.Close()\n',
+-     '\tendClose := operationtrace.Start("atomic_file_close", 0)\n f.Close()\n endClose()\n'),
+-    ('return os.Rename(f.Name(), filename)',
+-     'endRename := operationtrace.Start("atomic_file_rename", 0)\n renameErr := os.Rename(f.Name(), filename)\n endRename()\n return renameErr'),
+-])
+-patch("consensus/state.go", [trace_import,
+-    ('cs.LockedBlock.HashesTo(blockID.Hash)',
+-     'matchesBlockID(cs.LockedBlock, cs.LockedBlockParts, blockID)', 3),
+-    ('cs.ProposalBlock.HashesTo(blockID.Hash)',
+-     'matchesBlockID(cs.ProposalBlock, cs.ProposalBlockParts, blockID)', 5),
+-    ('if cs.Proposal == nil || cs.ProposalBlock == nil {', 'if !cs.hasProposalBlock() {'),
+-    ('return cs.Votes.Prevotes(cs.Proposal.POLRound).HasTwoThirdsMajority()',
+-     'id, ok := cs.Votes.Prevotes(cs.Proposal.POLRound).TwoThirdsMajority()\n return ok && id.Equals(cs.Proposal.BlockID)'),
+-    ('// If ProposalBlock is nil, prevote nil.\n\tif cs.ProposalBlock == nil {\n\t\tlogger.Debug("prevote step: ProposalBlock is nil")',
+-     '// A timeout does not authorize another proposal identity. The locked path above is independent.\n if !cs.hasProposalBlock() {\n logger.Debug("prevote step: matching proposal block is unavailable")'),
+-    ('if ok && (cs.isProposalComplete() || len(blockID.Hash) == 0) {',
+-     'if ok && (matchesBlockID(cs.ProposalBlock, cs.ProposalBlockParts, blockID) || len(blockID.Hash) == 0) {'),
+-    ('\n\tif cs.Step <= cstypes.RoundStepPropose && cs.isProposalComplete() {',
+-     '''
+- // A current-round polka authorizes its own exact candidate independently
+- // of a missing or conflicting Proposal. enterPrecommit retains step/round
+- // guards, so late parts cannot cause a second precommit in the same round.
+- if cs.Step != cstypes.RoundStepCommit && hasTwoThirds && !blockID.IsZero() && matchesBlockID(cs.ProposalBlock, cs.ProposalBlockParts, blockID) {
+-     cs.enterPrecommit(blockHeight, cs.Round)
+-     return
+- }
+-
+-	if cs.Step <= cstypes.RoundStepPropose && cs.isProposalComplete() {'''),
+-    ('block, err = cs.createProposalBlock(context.TODO())',
+-     'endBuild := operationtrace.Start("proposal_build", height)\n block, err = cs.createProposalBlock(context.TODO())\n endBuild()'),
+-    ('blockParts, err = block.MakePartSet(types.BlockPartSizeBytes)',
+-     'endParts := operationtrace.Start("proposal_parts", height)\n blockParts, err = block.MakePartSet(types.BlockPartSizeBytes)\n endParts()'),
+-    ('if err := cs.wal.FlushAndSync(); err != nil {\n\t\tcs.Logger.Error("failed flushing WAL to disk")\n\t}',
+-     'endFlush := operationtrace.Start("proposal_wal_flush", height)\n if err := cs.wal.FlushAndSync(); err != nil {\n cs.Logger.Error("failed flushing WAL to disk")\n }\n endFlush()'),
+-    ('if err := cs.privValidator.SignProposal(cs.state.ChainID, p); err == nil {',
+-     'endSign := operationtrace.Start("proposal_sign", height)\n signErr := cs.privValidator.SignProposal(cs.state.ChainID,p)\n endSign()\n if err := signErr; err == nil {'),
+-    ('if err := cs.wal.FlushAndSync(); err != nil {\n\t\treturn nil, err\n\t}',
+-     'endFlush := operationtrace.Start("vote_wal_flush", cs.Height)\n flushErr := cs.wal.FlushAndSync()\n endFlush()\n if flushErr != nil { return nil, flushErr }'),
+-    ('recoverable, err := types.SignAndCheckVote(vote, cs.privValidator, cs.state.ChainID, extEnabled && (msgType == cmtproto.PrecommitType))',
+-     'endSign := operationtrace.Start("vote_sign", cs.Height)\n recoverable, err := types.SignAndCheckVote(vote, cs.privValidator, cs.state.ChainID, extEnabled && (msgType == cmtproto.PrecommitType))\n endSign()'),
+-    ('''case mi = <-cs.internalMsgQueue:
+-			err := cs.wal.WriteSync(mi) // NOTE: fsync
+-			if err != nil {
+-				panic(fmt.Sprintf(
+-					"failed to write %v msg to consensus WAL due to %v; check your file system and restart the node",
+-					mi, err,
+-				))
+-			}
+-
+-			if _, ok := mi.Msg.(*VoteMessage); ok {
+-				// we actually want to simulate failing during
+-				// the previous WriteSync, but this isn't easy to do.
+-				// Equivalent would be to fail here and manually remove
+-				// some bytes from the end of the wal.
+-				fail.Fail() // XXX
+-			}
+-
+-			// handles proposals, block parts, votes
+-			cs.handleMsg(mi)''',
+-     'case mi = <-cs.internalMsgQueue:\n cs.handleInternalMessage(mi)'),
+-    ('// Save to blockStore.\n', '// Save to blockStore.\n endStore := operationtrace.Start("blockstore_save", height)\n'),
+-    ('\n\tfail.Fail() // XXX\n\n\t// Write EndHeightMessage', '\n endStore()\n\tfail.Fail() // XXX\n\n\t// Write EndHeightMessage'),
+-    ('endMsg := EndHeightMessage{height}', 'endEndHeight := operationtrace.Start("endheight_wal", height)\n endMsg := EndHeightMessage{height}'),
+-    ('\n\tfail.Fail() // XXX\n\n\t// Create a copy of the state', '\n endEndHeight()\n\tfail.Fail() // XXX\n\n\t// Create a copy of the state'),
+-])
+-
+-for name in ["types/redaction.go", "store/redaction.go", "node/redaction.go", "libs/operationtrace/trace.go", "libs/autofile/sync_test.go", "consensus/proposal_batch.go", "consensus/proposal_batch_test.go", "consensus/block_identity.go", "consensus/block_identity_test.go", "state/results_batch_test.go", "store/catchup_test.go"]:
+-    (out / name).parent.mkdir(parents=True, exist_ok=True)
+-    shutil.copyfile(root / "third_party/cometbft" / name, out / name)
+-subprocess.check_call(["go", "mod", "edit", "-replace",
+-                      "github.com/cometbft/cometbft=./.scratch/comet-src"], cwd=root)
+-print(out)

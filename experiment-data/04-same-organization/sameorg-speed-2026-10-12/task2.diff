@@ -1,0 +1,335 @@
+diff --git a/internal/gateway/pool.go b/internal/gateway/pool.go
+--- a/internal/gateway/pool.go
++++ b/internal/gateway/pool.go
+@@ -4,6 +4,7 @@
+ 	"context"
+ 	"crypto/ed25519"
+ 	"errors"
++	"time"
+ 	"utxo/protocol"
+ )
+ 
+@@ -28,19 +29,8 @@
+ 		index uint16
+ 	}
+ 	ch := make(chan result, 4)
+-	recovered := make(chan protocol.PoolCertificate, 4)
+ 	id := r.Action.ID()
+ 	for i, m := range members {
+-		go func(m PoolApprover) {
+-			var saved protocol.PoolCertificate
+-			if m != nil {
+-				c, err := m.PoolCertificate(ctx, id)
+-				if err == nil && c.Action.ID() == id && c.Verify(org) == nil {
+-					saved = c
+-				}
+-			}
+-			recovered <- saved
+-		}(m)
+ 		go func(i int, m PoolApprover) {
+ 			if m == nil {
+ 				ch <- result{err: protocol.ErrAuth}
+@@ -52,11 +42,36 @@
+ 	}
+ 	h := protocol.Digest("INTERNAL_POOL_VOTE_V1", id[:])
+ 	var failures []error
+-	votesRemaining, recoveriesRemaining := 4, 4
++	votesRemaining, recoveriesRemaining := 4, 0
++	var recovered chan protocol.PoolCertificate
++	startRecovery := func() {
++		if recovered != nil {
++			return
++		}
++		recovered = make(chan protocol.PoolCertificate, 4)
++		recoveriesRemaining = 4
++		for _, m := range members {
++			go func(m PoolApprover) {
++				var saved protocol.PoolCertificate
++				if m != nil {
++					candidate, err := m.PoolCertificate(ctx, id)
++					if err == nil && candidate.Action.ID() == id && candidate.Verify(org) == nil {
++						saved = candidate
++					}
++				}
++				recovered <- saved
++			}(m)
++		}
++	}
++	// A stalled approval must not hold a previously installed QC hostage.
++	slow := time.NewTimer(200 * time.Millisecond)
++	defer slow.Stop()
+ 	for votesRemaining > 0 || recoveriesRemaining > 0 {
+ 		select {
+ 		case <-ctx.Done():
+ 			return c, ctx.Err()
++		case <-slow.C:
++			startRecovery()
+ 		case saved := <-recovered:
+ 			recoveriesRemaining--
+ 			if len(saved.Votes) >= 3 {
+@@ -66,11 +81,13 @@
+ 			votesRemaining--
+ 			if res.err != nil {
+ 				failures = append(failures, res.err)
++				startRecovery()
+ 				continue
+ 			}
+ 			v := res.vote
+ 			if v.Member != res.index || v.Member >= 4 || !ed25519.Verify(org.Members[v.Member][:], h[:], v.Signature[:]) {
+ 				failures = append(failures, protocol.ErrAuth)
++				startRecovery()
+ 				continue
+ 			}
+ 			c.Votes = append(c.Votes, v)
+diff --git a/internal/gateway/pool_certificate_test.go b/internal/gateway/pool_certificate_test.go
+--- a/internal/gateway/pool_certificate_test.go
++++ b/internal/gateway/pool_certificate_test.go
+@@ -6,6 +6,7 @@
+ 	"errors"
+ 	"sync"
+ 	"testing"
++	"time"
+ 	"utxo/protocol"
+ )
+ 
+@@ -15,9 +16,18 @@
+ 	stored                 protocol.PoolCertificate
+ 	approveErr, installErr error
+ 	installs               int
++	gets                   int
++	approveWait            <-chan struct{}
+ }
+ 
+-func (m *poolReplica) ApprovePool(context.Context, protocol.PoolRequest) (protocol.PoolVote, error) {
++func (m *poolReplica) ApprovePool(ctx context.Context, _ protocol.PoolRequest) (protocol.PoolVote, error) {
++	if m.approveWait != nil {
++		select {
++		case <-m.approveWait:
++		case <-ctx.Done():
++			return protocol.PoolVote{}, ctx.Err()
++		}
++	}
+ 	return m.vote, m.approveErr
+ }
+ func (m *poolReplica) InstallPool(_ context.Context, c protocol.PoolCertificate) error {
+@@ -30,9 +40,74 @@
+ 	m.installs++
+ 	return nil
+ }
++func TestPoolCollectionFreshHasNoHistoricalReads(t *testing.T) {
++	org, req, replicas := poolCollectionFixture()
++	var members [4]PoolApprover
++	for i := range members {
++		members[i] = replicas[i]
++	}
++	c, err := CollectPool(context.Background(), org, members, req)
++	if err != nil || c.Verify(org) != nil {
++		t.Fatal("fresh collection", err)
++	}
++	for i, m := range replicas {
++		m.mu.Lock()
++		gets := m.gets
++		m.mu.Unlock()
++		if gets != 0 {
++			t.Fatalf("member %d: %d historical reads", i, gets)
++		}
++	}
++	n := 0
++	for _, m := range replicas {
++		m.mu.Lock()
++		n += m.installs
++		m.mu.Unlock()
++	}
++	if n < 2 {
++		t.Fatalf("only %d durable copies", n)
++	}
++}
++
++func TestPoolCollectionRecoversWithWithheldApprovals(t *testing.T) {
++	org, req, replicas := poolCollectionFixture()
++	qc := protocol.PoolCertificate{Action: req.Action, Votes: []protocol.PoolVote{replicas[0].vote, replicas[1].vote, replicas[2].vote}}
++	replicas[0].stored = qc
++	blocked := make(chan struct{})
++	for _, m := range replicas {
++		m.approveWait = blocked
++	}
++	var members [4]PoolApprover
++	for i := range members {
++		members[i] = replicas[i]
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
++	defer cancel()
++	c, err := CollectPool(ctx, org, members, req)
++	if err != nil || c.Verify(org) != nil {
++		t.Fatal("bounded recovery with withheld approvals", err)
++	}
++}
++func TestPoolCollectionRecoversAfterInvalidVote(t *testing.T) {
++	org, req, replicas := poolCollectionFixture()
++	qc := protocol.PoolCertificate{Action: req.Action, Votes: []protocol.PoolVote{replicas[0].vote, replicas[1].vote, replicas[2].vote}}
++	replicas[0].stored = qc
++	for _, m := range replicas {
++		m.vote.Signature[0] ^= 1
++	}
++	var members [4]PoolApprover
++	for i := range members {
++		members[i] = replicas[i]
++	}
++	c, err := CollectPool(context.Background(), org, members, req)
++	if err != nil || c.Verify(org) != nil {
++		t.Fatal("invalid vote recovery", err)
++	}
++}
+ func (m *poolReplica) PoolCertificate(_ context.Context, id protocol.Hash) (protocol.PoolCertificate, error) {
+ 	m.mu.Lock()
+ 	defer m.mu.Unlock()
++	m.gets++
+ 	if m.stored.Action.ID() != id {
+ 		return protocol.PoolCertificate{}, errors.New("missing")
+ 	}
+diff --git a/internal/member/pool.go b/internal/member/pool.go
+--- a/internal/member/pool.go
++++ b/internal/member/pool.go
+@@ -35,7 +35,18 @@
+ 			return vote, protocol.ErrRule
+ 		}
+ 	} else {
+-		if r.Parent == nil || r.Parent.Verify(c) != nil {
++		if r.Parent == nil {
++			return vote, protocol.ErrAuth
++		}
++		var trusted bool
++		if err := m.db.View(func(v state.ReadView) error {
++			var e error
++			trusted, e = poolParentArchived(v, *r.Parent)
++			return e
++		}); err != nil {
++			return vote, err
++		}
++		if !trusted && r.Parent.Verify(c) != nil {
+ 			return vote, protocol.ErrAuth
+ 		}
+ 		p := r.Parent.Action
+diff --git a/internal/member/pool_certificate.go b/internal/member/pool_certificate.go
+--- a/internal/member/pool_certificate.go
++++ b/internal/member/pool_certificate.go
+@@ -8,6 +8,21 @@
+ )
+ 
+ func poolCertificateKey(id protocol.Hash) []byte { return state.Key(182, id[:]) }
++
++// poolParentArchived recognizes only the complete proof installed after
++// verification by this member. The action ID alone omits the owner signature.
++func poolParentArchived(v state.ReadView, parent protocol.PoolCertificate) (bool, error) {
++	archived, found, err := state.Load[protocol.PoolCertificate](v, poolCertificateKey(parent.Action.ID()))
++	if err != nil || !found || len(archived.Votes) < 3 || len(archived.Votes) > 4 || len(archived.Votes) != len(parent.Votes) || archived.Action != parent.Action {
++		return false, err
++	}
++	for i, vote := range archived.Votes {
++		if vote != parent.Votes[i] {
++			return false, nil
++		}
++	}
++	return true, nil
++}
+ 
+ // InstallPool stores a complete QC before acknowledging it. A deposit QC is
+ // availability evidence only: the verified public block creates PoolRecord.
+diff --git a/internal/member/pool_certificate_test.go b/internal/member/pool_certificate_test.go
+--- a/internal/member/pool_certificate_test.go
++++ b/internal/member/pool_certificate_test.go
+@@ -89,6 +89,30 @@
+ 	if err != nil || c.Verify(org) != nil {
+ 		t.Fatal("full QC unavailable after reopening", err)
+ 	}
++	checkArchive := func(parent protocol.PoolCertificate, want bool) {
++		t.Helper()
++		if e := db.View(func(v state.ReadView) error {
++			got, e := poolParentArchived(v, parent)
++			if e == nil && got != want {
++				t.Fatalf("archive match = %t, want %t", got, want)
++			}
++			return e
++		}); e != nil {
++			t.Fatal(e)
++		}
++	}
++	checkArchive(c, true)
++	tamperedOwner := c
++	tamperedOwner.Action.Signature[0] ^= 1 // The action ID excludes this signature.
++	checkArchive(tamperedOwner, false)
++	tamperedVote := c
++	tamperedVote.Votes = append([]protocol.PoolVote(nil), c.Votes...)
++	tamperedVote.Votes[0].Signature[0] ^= 1
++	checkArchive(tamperedVote, false)
++	reordered := c
++	reordered.Votes = append([]protocol.PoolVote(nil), c.Votes...)
++	reordered.Votes[0], reordered.Votes[1] = reordered.Votes[1], reordered.Votes[0]
++	checkArchive(reordered, false)
+ 	if _, err = m.ApprovePool(ctx, protocol.PoolRequest{Action: minority, Parent: &dc}); err != nil {
+ 		t.Fatal("original vote archive lost", err)
+ 	}
+@@ -97,8 +121,31 @@
+ 	next.Sequence = 2
+ 	next.Previous = a.ID()
+ 	next.Sign(keys[0])
+-	if _, err = m.ApprovePool(ctx, protocol.PoolRequest{Action: next, Parent: &c}); err != nil {
+-		t.Fatal("QC catchup failed", err)
++	for _, bad := range []protocol.PoolCertificate{tamperedOwner, tamperedVote} {
++		if _, err = m.ApprovePool(ctx, protocol.PoolRequest{Action: next, Parent: &bad}); err == nil {
++			t.Fatal("modified same-ID parent accepted")
++		}
++	}
++	checkArchive(qc(next), false)
++	wrongOwner := next
++	wrongOwner.Sign(keys[1])
++	if _, err = m.ApprovePool(ctx, protocol.PoolRequest{Action: wrongOwner, Parent: &c}); err == nil {
++		t.Fatal("wrong owner accepted")
++	}
++	wrongSequence := next
++	wrongSequence.Sequence++
++	wrongSequence.Sign(keys[0])
++	if _, err = m.ApprovePool(ctx, protocol.PoolRequest{Action: wrongSequence, Parent: &c}); err == nil {
++		t.Fatal("wrong sequence accepted")
++	}
++	if _, err = m.ApprovePool(ctx, protocol.PoolRequest{Action: next, Parent: &reordered}); err != nil {
++		t.Fatal("differently ordered valid QC fallback failed", err)
++	}
++	conflict := next
++	conflict.Kind = protocol.PoolTransfer
++	conflict.Sign(keys[0])
++	if _, err = m.ApprovePool(ctx, protocol.PoolRequest{Action: conflict, Parent: &c}); err == nil {
++		t.Fatal("conflicting action accepted")
+ 	}
+ 	bad := qc(next)
+ 	bad.Votes = bad.Votes[:2]
+diff --git a/docs/experiments/sameorg-speed-2026-10-12/task2-report.md b/docs/experiments/sameorg-speed-2026-10-12/task2-report.md
+--- /dev/null
++++ b/docs/experiments/sameorg-speed-2026-10-12/task2-report.md
+@@ -0,0 +1,26 @@
++# Task 2: pool approval fast path
++
++## Change
++
++- `CollectPool` sends approvals immediately. It reads archived full QCs only after an approval error, an invalid vote, or a 200 ms slow-path timer. It still verifies a recovered QC and requires two successful `InstallPool` acknowledgments before success. The caller's context continues to bound unresolved approval or recovery calls.
++- `ApprovePool` compares the complete parent action (including owner signature) and every vote, in order, with the member's durable key-182 QC archive. Only an exact archived match skips full parent QC verification. Unknown or changed proofs use `PoolCertificate.Verify`; new action authorization, parent relation, and persisted conflict checks remain in place.
++
++## Red and green evidence
++
++- Added the fresh-flow and withheld-approval gateway tests first. Before the gateway change, `go test ./internal/gateway -run 'TestPoolCollectionFreshHasNoHistoricalReads|TestPoolCollectionRecoversWithWithheldApprovals' -count=1 -timeout=10s` failed: `member 0: 1 historical reads`.
++- Added exact-archive and modified-parent member tests first. Before the member change, `go test ./internal/member -run 'TestPoolCertificateInstallPersistsAndSupersedesMinority' -count=1` failed to compile with `undefined: poolParentArchived`.
++- The first gateway implementation failed four existing `internal/poollab` tests because recovery with no archived QC returned before three pending healthy votes. The collector now continues accepting votes after the recovery reads finish; the required package run passes.
++- Final: `go test ./internal/gateway ./internal/member ./internal/poollab` passed.
++
++Gateway tests cover fresh success with zero historical reads and two installations, archived QC recovery when votes fail or are invalid, and timer-triggered recovery when approvals are withheld. Member tests cover exact archive matching after restart, tampered same-ID owner signature and vote rejection, changed vote order falling back to full verification, an unknown valid QC, and wrong owner, sequence, and conflict rejection. Existing poollab recovery and exit tests pass.
++
++## Changed files
++
++- `internal/gateway/pool.go`
++- `internal/gateway/pool_certificate_test.go`
++- `internal/member/pool.go`
++- `internal/member/pool_certificate.go`
++- `internal/member/pool_certificate_test.go`
++- `docs/experiments/sameorg-speed-2026-10-12/task2-report.md` (this report)
++
++`task2.diff` compares these files with `.scratch/speed-baseline-20261012`. The diff artifact itself is excluded to avoid self-reference. No files were staged or committed. No latency claim is made without benchmark measurements.

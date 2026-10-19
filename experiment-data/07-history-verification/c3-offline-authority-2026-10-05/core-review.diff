@@ -1,0 +1,911 @@
+diff --git a/internal/redaction/receipt.go b/internal/redaction/receipt.go
+new file mode 100644
+index 0000000..ee68d60
+--- /dev/null
++++ b/internal/redaction/receipt.go
+@@ -0,0 +1,425 @@
++//go:build comet_v3
++
++package redaction
++
++import (
++	"bytes"
++	"fmt"
++	"github.com/cometbft/cometbft/types"
++	"utxo/crypto/chameleon"
++	"utxo/finality"
++	"utxo/internal/rules"
++	"utxo/protocol"
++)
++
++type HistoricalReceipt struct {
++	OriginalBody, BaseBody, Body []byte
++	OriginalCommit               *types.Commit
++	Execution                    finality.BlockData
++	CommandIndex                 uint32
++}
++
++// LeanHistoricalReceipt relies on the pinned committee's successful execution
++// of the repair rules; it does not re-execute the original-to-base diff.
++type LeanHistoricalReceipt struct {
++	Body           []byte
++	OriginalCommit *types.Commit
++	Execution      finality.BlockData
++	CommandIndex   uint32
++}
++type AuthorizedFunding struct {
++	Output               protocol.OutputID
++	Transaction, Input   uint32
++	ConsumerTx           protocol.TxID
++	Organization         protocol.Hash
++	Amount               uint64
++	Decision, Debit      protocol.Hash
++	Original, Authorized protocol.Funding
++	OriginalAvailable    bool
++}
++
++// VerifyHistoricalAuthorization proves one exact historical body was applied
++// under the pinned rules, then verifies its original full BlockID compatibility.
++// OriginalFunding bytes are not supplied or claimed by this lean witness.
++func VerifyHistoricalAuthorization(t finality.Trust, p rules.DirectPolicy, r LeanHistoricalReceipt) (AuthorizedRevision, error) {
++	fail := AuthorizedRevision{}
++	if p.Key == nil || types.ConfigureRedaction(t.ChainID, p.Key) != nil {
++		return fail, protocol.ErrAuth
++	}
++	tx, height, err := receiptExecution(t, r.Execution, r.CommandIndex)
++	if err != nil {
++		return fail, err
++	}
++	var out AuthorizedRevision
++	var network protocol.Hash
++	var items []protocol.RepairItem
++	var parts []chameleon.Opening
++	var single []byte
++	if protocol.IsRepairBatch(tx.Bytes) {
++		c, e := protocol.DecodeRepairBatch(tx.Bytes)
++		if e != nil {
++			return fail, e
++		}
++		out.Command, out.TargetHeight, out.Base, out.Previous, out.Next = c.ID(), c.Height, c.Base, c.Previous, c.Next
++		network, items, parts = c.Network, c.Items, c.Parts
++	} else {
++		c, e := protocol.DecodeRepairInput(tx.Bytes)
++		if e != nil {
++			return fail, e
++		}
++		out.Command, out.TargetHeight, out.Base, out.Previous, out.Next = c.ID(), c.Height, c.Base, c.Previous, c.Next
++		network, parts, single = c.Network, c.Parts, c.TransactionBytes
++		pay, e := protocol.DecodeDirectSubmission(single)
++		if e != nil || int(c.Input) >= len(pay.Tx.Funding) {
++			return fail, protocol.ErrAuth
++		}
++		items = []protocol.RepairItem{{Output: c.Output, Transaction: c.Transaction, Input: c.Input, Opening: pay.Tx.Funding[c.Input].Opening}}
++	}
++	result, err := protocol.DecodeRepairResult(tx.Data)
++	if err != nil {
++		return fail, err
++	}
++	if network != t.Network || out.TargetHeight >= height || result.Command != out.Command || !result.Applied || digest(r.Body) != out.Next {
++		return fail, protocol.ErrAuth
++	}
++	body, err := decodeBody(r.Body)
++	if err != nil {
++		return fail, err
++	}
++	if body.ChainID != t.ChainID || body.Height != out.TargetHeight {
++		return fail, protocol.ErrAuth
++	}
++	for _, x := range items {
++		if int(x.Transaction) >= len(body.Txs) {
++			return fail, protocol.ErrAuth
++		}
++		raw := body.Txs[x.Transaction]
++		if single != nil && !bytes.Equal(raw, single) {
++			return fail, protocol.ErrAuth
++		}
++		pay, e := protocol.DecodeDirectSubmission(raw)
++		if e != nil {
++			return fail, e
++		}
++		if int(x.Input) >= len(pay.Tx.Funding) || pay.Tx.Body.Network != t.Network || pay.Tx.Body.Rules != p.Rules() || pay.Tx.Body.Inputs[x.Input].Output != x.Output {
++			return fail, protocol.ErrAuth
++		}
++		if err = receiptPayment(p, pay); err != nil {
++			return fail, err
++		}
++		funding := pay.Tx.Funding[x.Input]
++		if funding.Kind != protocol.ReserveFunding || funding.Ref != protocol.ReserveDebitIdentity(network, x.Output) || funding.Opening != x.Opening || !p.Key.Verify(pay.Tx.FundingContext(int(x.Input), p.Key.KeyID()), funding.ReferenceBytes(), pay.Tx.Commitments[x.Input], funding.Opening) {
++			return fail, protocol.ErrAuth
++		}
++		var organization protocol.Hash
++		for _, parent := range pay.InputCertificates {
++			if parent.Certificate.Summary.OutputID(parent.Index) == x.Output {
++				organization = parent.Certificate.Summary.Issuer
++			}
++		}
++		if organization == (protocol.Hash{}) {
++			return fail, protocol.ErrAuth
++		}
++		decision := protocol.CompensationDecision{Network: network, Output: x.Output, Height: out.TargetHeight, Transaction: x.Transaction, Input: x.Input}
++		out.Funding = append(out.Funding, AuthorizedFunding{Output: x.Output, Transaction: x.Transaction, Input: x.Input, ConsumerTx: pay.Tx.ID(), Organization: organization, Amount: pay.Tx.Claims[x.Input].Output.Amount, Decision: decision.ID(), Debit: funding.Ref, Authorized: funding})
++	}
++	revised, err := types.NewRedactablePartSet(r.Body, types.BlockPartSizeBytes, out.TargetHeight, out.Base+1, parts)
++	if err != nil {
++		return fail, err
++	}
++	id := types.BlockID{Hash: body.Hash(), PartSetHeader: revised.Header()}
++	if r.OriginalCommit == nil || r.OriginalCommit.Height != out.TargetHeight {
++		return fail, protocol.ErrAuth
++	}
++	if err = t.Validators.VerifyCommitLight(t.ChainID, id, out.TargetHeight, r.OriginalCommit); err != nil {
++		return fail, err
++	}
++	out.ExecutionHeight = height
++	out.Revision = out.Base + 1
++	out.OriginalBlockID = id
++	return out, nil
++}
++
++type AuthorizedRevision struct {
++	Command                       protocol.Hash
++	ExecutionHeight, TargetHeight int64
++	Base, Revision                uint64
++	Previous, Next                protocol.Hash
++	OriginalBlockID               types.BlockID
++	Funding                       []AuthorizedFunding
++}
++type AuthorizedCompensation struct {
++	ExecutionHeight int64
++	Decision        protocol.CompensationDecision
++	Effect          protocol.RepairEffect
++}
++
++// VerifyCompensationReceipts authenticates one block once and projects the
++// selected economic effects in caller order. Both layouts can share this work.
++func VerifyCompensationReceipts(t finality.Trust, b finality.BlockData, indices []uint32) ([]AuthorizedCompensation, error) {
++	verified, err := receiptBlock(t, b)
++	if err != nil {
++		return nil, err
++	}
++	txs := verified.Transactions()
++	out := make([]AuthorizedCompensation, 0, len(indices))
++	for _, index := range indices {
++		if int(index) >= len(txs) || txs[index].Code != 0 {
++			return nil, protocol.ErrAuth
++		}
++		effect, err := receiptCompensation(t, txs[index], verified.Height())
++		if err != nil {
++			return nil, err
++		}
++		out = append(out, effect)
++	}
++	return out, nil
++}
++
++// VerifyHistoricalReceipt verifies one ever-authorized body and its compatibility
++// with the original full BlockID. It makes no latest/current/absence claim.
++func VerifyHistoricalReceipt(t finality.Trust, p rules.DirectPolicy, r HistoricalReceipt) (AuthorizedRevision, error) {
++	return verifyHistorical(t, p, r, true)
++}
++
++// VerifyHistoricalProjection gives ordinary overlays the identical exact-version
++// authorization check, without requiring the revised part identity property.
++func VerifyHistoricalProjection(t finality.Trust, p rules.DirectPolicy, r HistoricalReceipt) (AuthorizedRevision, error) {
++	return verifyHistorical(t, p, r, false)
++}
++
++// Fresh decoding prevents a caller's cached Block.Hash from authenticating a
++// subsequently mutated in-memory header. Result data is checked by VerifyBlock.
++func receiptExecution(t finality.Trust, b finality.BlockData, index uint32) (finality.ExecutedTx, int64, error) {
++	verified, err := receiptBlock(t, b)
++	if err != nil {
++		return finality.ExecutedTx{}, 0, err
++	}
++	txs := verified.Transactions()
++	if int(index) >= len(txs) || txs[index].Code != 0 {
++		return finality.ExecutedTx{}, 0, protocol.ErrAuth
++	}
++	return txs[index], verified.Height(), nil
++}
++
++func receiptBlock(t finality.Trust, b finality.BlockData) (finality.VerifiedBlock, error) {
++	if b.Block == nil {
++		return finality.VerifiedBlock{}, protocol.ErrAuth
++	}
++	pb, err := b.Block.ToProto()
++	if err != nil {
++		return finality.VerifiedBlock{}, err
++	}
++	raw, err := pb.Marshal()
++	if err != nil {
++		return finality.VerifiedBlock{}, err
++	}
++	fresh, err := decodeBody(raw)
++	if err != nil {
++		return finality.VerifiedBlock{}, err
++	}
++	b.Block = fresh
++	return finality.VerifyBlock(t, b)
++}
++
++// VerifyCompensationReceipt is the independent T1 economic explanation. It
++// needs neither a repair command nor any CH revision, and returns the amount
++// and consumer identities from the authenticated successful execution effect.
++func VerifyCompensationReceipt(t finality.Trust, b finality.BlockData, index uint32) (AuthorizedCompensation, error) {
++	fail := AuthorizedCompensation{}
++	tx, height, err := receiptExecution(t, b, index)
++	if err != nil {
++		return fail, err
++	}
++	return receiptCompensation(t, tx, height)
++}
++
++func receiptCompensation(t finality.Trust, tx finality.ExecutedTx, height int64) (AuthorizedCompensation, error) {
++	fail := AuthorizedCompensation{}
++	c, err := protocol.DecodeCompensationDecision(tx.Bytes)
++	if err != nil {
++		return fail, err
++	}
++	result, err := protocol.DecodeCompensationResult(tx.Data)
++	if err != nil {
++		return fail, err
++	}
++	if c.Network != t.Network || c.Height >= height || result.Decision != c.ID() || !result.Applied || len(result.Effects) != 1 {
++		return fail, protocol.ErrAuth
++	}
++	e := result.Effects[0]
++	if e.Output != c.Output || e.Input != c.Input || e.Debit != protocol.ReserveDebitIdentity(c.Network, c.Output) {
++		return fail, protocol.ErrAuth
++	}
++	return AuthorizedCompensation{ExecutionHeight: height, Decision: c, Effect: e}, nil
++}
++
++func verifyHistorical(t finality.Trust, p rules.DirectPolicy, r HistoricalReceipt, identity bool) (AuthorizedRevision, error) {
++	fail := AuthorizedRevision{}
++	if p.Key == nil || types.ConfigureRedaction(t.ChainID, p.Key) != nil {
++		return fail, protocol.ErrAuth
++	}
++	executed, height, err := receiptExecution(t, r.Execution, r.CommandIndex)
++	if err != nil {
++		return fail, err
++	}
++	var out AuthorizedRevision
++	var network protocol.Hash
++	var items []protocol.RepairItem
++	var parts []chameleon.Opening
++	var single []byte
++	if protocol.IsRepairBatch(executed.Bytes) {
++		c, e := protocol.DecodeRepairBatch(executed.Bytes)
++		if e != nil {
++			return fail, e
++		}
++		out.Command, out.TargetHeight, out.Base, out.Previous, out.Next = c.ID(), c.Height, c.Base, c.Previous, c.Next
++		network, items, parts = c.Network, c.Items, c.Parts
++	} else {
++		c, e := protocol.DecodeRepairInput(executed.Bytes)
++		if e != nil {
++			return fail, e
++		}
++		out.Command, out.TargetHeight, out.Base, out.Previous, out.Next = c.ID(), c.Height, c.Base, c.Previous, c.Next
++		network, parts, single = c.Network, c.Parts, c.TransactionBytes
++		pay, e := protocol.DecodeDirectSubmission(single)
++		if e != nil || int(c.Input) >= len(pay.Tx.Funding) {
++			return fail, protocol.ErrAuth
++		}
++		items = []protocol.RepairItem{{Output: c.Output, Transaction: c.Transaction, Input: c.Input, Opening: pay.Tx.Funding[c.Input].Opening}}
++	}
++	result, err := protocol.DecodeRepairResult(executed.Data)
++	if err != nil {
++		return fail, err
++	}
++	if network != t.Network || out.TargetHeight >= height || result.Command != out.Command || !result.Applied || digest(r.BaseBody) != out.Previous || digest(r.Body) != out.Next {
++		return fail, protocol.ErrAuth
++	}
++	original, err := decodeBody(r.OriginalBody)
++	if err != nil {
++		return fail, err
++	}
++	base, err := decodeBody(r.BaseBody)
++	if err != nil {
++		return fail, err
++	}
++	next, err := decodeBody(r.Body)
++	if err != nil {
++		return fail, err
++	}
++	for _, b := range []*types.Block{original, base, next} {
++		if b.ChainID != t.ChainID || b.Height != out.TargetHeight {
++			return fail, protocol.ErrAuth
++		}
++	}
++	// Unlike payment projection hashes, the initial fixed-opening part root
++	// commits the original full serialized body, including its funding bytes.
++	initial, err := types.NewRedactablePartSet(r.OriginalBody, types.BlockPartSizeBytes, out.TargetHeight, 0, nil)
++	if err != nil {
++		return fail, err
++	}
++	originalID := types.BlockID{Hash: original.Hash(), PartSetHeader: initial.Header()}
++	if r.OriginalCommit == nil || r.OriginalCommit.Height != out.TargetHeight {
++		return fail, protocol.ErrAuth
++	}
++	if err = t.Validators.VerifyCommitLight(t.ChainID, originalID, out.TargetHeight, r.OriginalCommit); err != nil {
++		return fail, err
++	}
++	if out.Base == 0 && !bytes.Equal(r.OriginalBody, r.BaseBody) {
++		return fail, protocol.ErrAuth
++	}
++	if len(original.Txs) != len(base.Txs) {
++		return fail, protocol.ErrAuth
++	}
++	pb, err := base.ToProto()
++	if err != nil {
++		return fail, err
++	}
++	payments := map[uint32]protocol.DirectSubmission{}
++	for _, x := range items {
++		if int(x.Transaction) >= len(base.Txs) {
++			return fail, protocol.ErrAuth
++		}
++		before, e := protocol.DecodeDirectSubmission(original.Txs[x.Transaction])
++		if e != nil {
++			return fail, e
++		}
++		pay, ok := payments[x.Transaction]
++		if !ok {
++			pay, e = protocol.DecodeDirectSubmission(base.Txs[x.Transaction])
++			if e != nil {
++				return fail, e
++			}
++		}
++		if int(x.Input) >= len(pay.Tx.Funding) || int(x.Input) >= len(before.Tx.Funding) || pay.Tx.ID() != before.Tx.ID() || before.Tx.Body.Network != t.Network || before.Tx.Body.Rules != p.Rules() || before.Tx.Body.Inputs[x.Input].Output != x.Output || pay.Tx.Funding[x.Input].Kind != protocol.OriginalFunding || pay.Tx.Funding[x.Input].Ref != protocol.Hash(x.Output) {
++			return fail, protocol.ErrAuth
++		}
++		if err = receiptPayment(p, before); err != nil {
++			return fail, err
++		}
++		funding := protocol.Funding{Kind: protocol.ReserveFunding, Ref: protocol.ReserveDebitIdentity(network, x.Output), Opening: x.Opening}
++		if !p.Key.Verify(pay.Tx.FundingContext(int(x.Input), p.Key.KeyID()), funding.ReferenceBytes(), pay.Tx.Commitments[x.Input], funding.Opening) {
++			return fail, protocol.ErrAuth
++		}
++		var organization protocol.Hash
++		for _, parent := range before.InputCertificates {
++			if parent.Certificate.Summary.OutputID(parent.Index) == x.Output {
++				organization = parent.Certificate.Summary.Issuer
++			}
++		}
++		if organization == (protocol.Hash{}) {
++			return fail, protocol.ErrAuth
++		}
++		decision := protocol.CompensationDecision{Network: network, Output: x.Output, Height: out.TargetHeight, Transaction: x.Transaction, Input: x.Input}
++		out.Funding = append(out.Funding, AuthorizedFunding{Output: x.Output, Transaction: x.Transaction, Input: x.Input, ConsumerTx: before.Tx.ID(), Organization: organization, Amount: before.Tx.Claims[x.Input].Output.Amount, Decision: decision.ID(), Debit: funding.Ref, Original: before.Tx.Funding[x.Input], Authorized: funding, OriginalAvailable: true})
++		pay.Tx.Funding[x.Input] = funding
++		payments[x.Transaction] = pay
++	}
++	for index, pay := range payments {
++		raw, e := pay.MarshalBinary()
++		if e != nil {
++			return fail, e
++		}
++		if single != nil && !bytes.Equal(raw, single) {
++			return fail, protocol.ErrAuth
++		}
++		pb.Data.Txs[index] = raw
++	}
++	reconstructed, err := pb.Marshal()
++	if err != nil {
++		return fail, err
++	}
++	if !bytes.Equal(reconstructed, r.Body) {
++		return fail, fmt.Errorf("exact authorized transformation: %w", protocol.ErrAuth)
++	}
++	if identity {
++		revised, e := types.NewRedactablePartSet(r.Body, types.BlockPartSizeBytes, out.TargetHeight, out.Base+1, parts)
++		if e != nil {
++			return fail, e
++		}
++		if !originalID.Equals(types.BlockID{Hash: next.Hash(), PartSetHeader: revised.Header()}) {
++			return fail, protocol.ErrAuth
++		}
++	}
++	out.ExecutionHeight = height
++	out.Revision = out.Base + 1
++	out.OriginalBlockID = originalID
++	return out, nil
++}
++
++func receiptPayment(p rules.DirectPolicy, pay protocol.DirectSubmission) error {
++	if pay.Tx.VerifyAuth() != nil {
++		return protocol.ErrAuth
++	}
++	cfg, ok := p.Organizations[pay.Tx.Body.Config]
++	if !ok || pay.Authorization.Fact != pay.Summary().Fact() || protocol.VerifyQC(pay.Authorization, cfg) != nil {
++		return protocol.ErrAuth
++	}
++	for _, parent := range pay.InputCertificates {
++		cfg, ok := p.Organizations[parent.Certificate.Summary.Config]
++		if !ok || parent.Certificate.Summary.Network != pay.Tx.Body.Network || parent.Certificate.Summary.Rules != p.Rules() || parent.Certificate.Verify(cfg) != nil {
++			return protocol.ErrAuth
++		}
++	}
++	return nil
++}
+diff --git a/internal/redaction/receipt_test.go b/internal/redaction/receipt_test.go
+new file mode 100644
+index 0000000..7ed4aaf
+--- /dev/null
++++ b/internal/redaction/receipt_test.go
+@@ -0,0 +1,474 @@
++//go:build comet_v3
++
++package redaction_test
++
++import (
++	"bytes"
++	"context"
++	dbm "github.com/cometbft/cometbft-db"
++	abci "github.com/cometbft/cometbft/abci/types"
++	"github.com/cometbft/cometbft/crypto/ed25519"
++	cmtstore "github.com/cometbft/cometbft/store"
++	"github.com/cometbft/cometbft/types"
++	"os"
++	"reflect"
++	"testing"
++	"time"
++	"utxo/crypto/chameleon"
++	"utxo/finality"
++	apppkg "utxo/internal/committee"
++	"utxo/internal/redaction"
++	"utxo/internal/rules"
++	"utxo/internal/state"
++	"utxo/internal/store"
++	"utxo/internal/testkit"
++	"utxo/protocol"
++)
++
++// receiptFixture retains real execution results and signs their successor
++// headers. Its exported packages need no application database to verify.
++type receiptFixture struct {
++	trust    finality.Trust
++	policy   rules.DirectPolicy
++	db       *store.Memory
++	blocks   *cmtstore.BlockStore
++	engine   *apppkg.Engine
++	app      *apppkg.App
++	signers  []chameleon.Signer
++	keys     map[string]ed25519.PrivKey
++	evidence []finality.BlockData
++	last     *types.Commit
++	height   int64
++	receipts []redaction.HistoricalReceipt
++	parents  [][]byte
++	TimingNS map[string]int64
++}
++
++func newReceiptFixture(t *testing.T, n, m int, batch bool) *receiptFixture {
++	t.Helper()
++	pub, signers, vals, keys := committee(t)
++	lab := testkit.NewFixture(chain, "receipt", n)
++	lab.EnableDirect()
++	pemBytes, err := os.ReadFile("../../crypto/chameleon/testdata/rsa2048.pem")
++	readerOK(t, err)
++	settings, err := readerSettings(pemBytes)
++	readerOK(t, err)
++	policy, err := settings.Policy(lab.Schedule, []protocol.OrgConfig{lab.Org})
++	readerOK(t, err)
++	db := store.NewMemory()
++	t.Cleanup(func() { readerOK(t, db.Close()) })
++	blocks := cmtstore.NewBlockStore(dbm.NewMemDB())
++	engine, err := apppkg.NewEngine(apppkg.EngineConfig{Network: lab.Org.Network, Organizations: []protocol.OrgConfig{lab.Org}, Schedule: lab.Schedule, Genesis: lab.Genesis, Direct: &settings, Accounts: []apppkg.GenesisAccount{{Owner: lab.Org.Org, Asset: protocol.AssetCAL, Balance: 1000000000}, {Owner: lab.Org.Org, Asset: protocol.AssetFUEL, Balance: 1000000000}}}, db)
++	readerOK(t, err)
++	readerOK(t, engine.EnableRepair(blocks))
++	app, err := apppkg.NewTimedApp(chain, db, engine.Check, engine.ExecuteAt, engine.BeginBlock)
++	readerOK(t, err)
++	f := &receiptFixture{trust: finality.Trust{ChainID: chain, Network: lab.Org.Network, Validators: vals}, policy: policy, db: db, blocks: blocks, engine: engine, app: app, signers: signers, keys: keys, last: &types.Commit{}, TimingNS: map[string]int64{}}
++	var payments [][]byte
++	var missing []protocol.OutputID
++	for i := 0; i < n; i++ {
++		tx, err := lab.FastTransaction(i, uint64(i+1), policy)
++		readerOK(t, err)
++		var certs []protocol.InputCertificate
++		if i < m {
++			parent, err := lab.DirectCertificate(tx, policy)
++			readerOK(t, err)
++			raw, err := (protocol.DirectPayment{Tx: tx, Certificate: parent}).Submission().MarshalBinary()
++			readerOK(t, err)
++			f.parents = append(f.parents, raw)
++			body := tx.Body
++			body.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: parent.Summary.OutputID(0), Evidence: protocol.Hash(parent.QC.Fact)}}
++			body.Nonce[15] = 1
++			body.Intent = body.IntentID()
++			tx, err = protocol.NewFastTx(body, []protocol.InputClaim{{Output: tx.Body.Outputs[0]}}, pub)
++			readerOK(t, err)
++			tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), lab.Owner)}
++			certs = []protocol.InputCertificate{{Certificate: parent}}
++			missing = append(missing, parent.Summary.OutputID(0))
++		}
++		cert, err := lab.DirectCertificate(tx, policy)
++		readerOK(t, err)
++		raw, err := (protocol.DirectPayment{Tx: tx, Certificate: cert, InputCertificates: certs}).Submission().MarshalBinary()
++		readerOK(t, err)
++		payments = append(payments, raw)
++	}
++	f.append(t, 1700000001, payments)
++	original := receiptBody(t, f.evidence[0].Block)
++	originalCommit := f.last
++	f.append(t, 1700000002, [][]byte{protocol.ClockTick(lab.Org.Network, 2)})
++	var decisions [][]byte
++	for i, out := range missing {
++		raw, err := (protocol.CompensationDecision{Network: lab.Org.Network, Output: out, Height: 1, Transaction: uint32(i), Input: 0}).MarshalBinary()
++		readerOK(t, err)
++		decisions = append(decisions, raw)
++	}
++	f.append(t, 1700000032, decisions)
++	// Single commands deliberately produce later revisions of the same body.
++	groups := [][]protocol.OutputID{missing}
++	if !batch {
++		groups = nil
++		for _, out := range missing {
++			groups = append(groups, []protocol.OutputID{out})
++		}
++	}
++	for _, group := range groups {
++		var raw, base, next []byte
++		buildStart := time.Now()
++		readerOK(t, db.View(func(v state.ReadView) error {
++			_, revision, err := redaction.Canonical(v, blocks, 1)
++			if err != nil {
++				return err
++			}
++			base = bytes.Clone(revision.Body)
++			var singles []protocol.RepairInput
++			for _, out := range group {
++				target, pay, err := redaction.InputTarget(v, blocks, policy, out, 1700000032)
++				if err != nil {
++					return err
++				}
++				var shares []chameleon.Contribution
++				for _, signer := range signers[:3] {
++					s, err := redaction.InputShare(v, blocks, policy, signer, out, 1700000032)
++					if err != nil {
++						return err
++					}
++					shares = append(shares, s)
++				}
++				target, err = redaction.ReplaceInput(policy, target, pay, shares)
++				if err != nil {
++					return err
++				}
++				singles = append(singles, target)
++			}
++			if batch {
++				c, err := redaction.BuildBatch(v, blocks, policy, singles, 1700000032)
++				if err != nil {
++					return err
++				}
++				var rows [][]chameleon.Contribution
++				for _, signer := range signers[:3] {
++					s, err := redaction.BatchPartShares(v, blocks, policy, signer, c, 1700000032)
++					if err != nil {
++						return err
++					}
++					rows = append(rows, s)
++				}
++				c, err = redaction.CompleteBatchParts(v, blocks, policy, c, 1700000032, rows)
++				if err != nil {
++					return err
++				}
++				raw, err = c.MarshalBinary()
++				return err
++			}
++			c := singles[0]
++			var rows [][]chameleon.Contribution
++			for _, signer := range signers[:3] {
++				s, err := redaction.PartShares(v, blocks, policy, signer, c, 1700000032)
++				if err != nil {
++					return err
++				}
++				rows = append(rows, s)
++			}
++			c, err = redaction.CompleteParts(v, blocks, policy, c, 1700000032, rows)
++			if err != nil {
++				return err
++			}
++			raw, err = c.MarshalBinary()
++			return err
++		}))
++		f.TimingNS["repair_build_adaptation"] += time.Since(buildStart).Nanoseconds()
++		f.append(t, 1700000033+f.height, [][]byte{raw})
++		readerOK(t, db.View(func(v state.ReadView) error {
++			_, r, err := redaction.Canonical(v, blocks, 1)
++			next = bytes.Clone(r.Body)
++			return err
++		}))
++		f.receipts = append(f.receipts, redaction.HistoricalReceipt{OriginalBody: original, OriginalCommit: originalCommit, BaseBody: base, Body: next, CommandIndex: 0})
++	}
++	f.append(t, 1700000040, [][]byte{protocol.ClockTick(lab.Org.Network, f.height+1)})
++	for i := range f.receipts {
++		f.receipts[i].Execution = f.evidence[3+i]
++	}
++	return f
++}
++
++func (f *receiptFixture) append(t *testing.T, stamp int64, commands [][]byte, allowFailure ...bool) {
++	t.Helper()
++	f.height++
++	txs := make(types.Txs, len(commands))
++	for i, raw := range commands {
++		txs[i] = raw
++	}
++	b := types.MakeBlock(f.height, txs, f.last, nil)
++	b.ChainID = chain
++	b.Time = time.Unix(stamp, 0).UTC()
++	b.ValidatorsHash = f.trust.Validators.Hash()
++	b.NextValidatorsHash = b.ValidatorsHash
++	b.ProposerAddress = f.trust.Validators.Proposer.Address
++	if f.height > 1 {
++		b.LastBlockID = f.last.BlockID
++		b.LastResultsHash = types.NewResults(f.evidence[len(f.evidence)-1].Results).Hash()
++	}
++	parts, err := b.MakePartSet(types.BlockPartSizeBytes)
++	readerOK(t, err)
++	f.last = commit(t, f.height, types.BlockID{Hash: b.Hash(), PartSetHeader: parts.Header()}, f.trust.Validators, f.keys)
++	if len(f.evidence) > 0 {
++		f.evidence[len(f.evidence)-1].Next = types.SignedHeader{Header: &b.Header, Commit: f.last}
++	}
++	f.blocks.SaveBlock(b, parts, f.last)
++	isRepair := len(commands) > 0 && (protocol.IsRepairBatch(commands[0]) || protocol.IsRepairInput(commands[0]))
++	executionStart := time.Now()
++	result, err := f.app.FinalizeBlock(context.Background(), &abci.RequestFinalizeBlock{Height: f.height, Hash: b.Hash(), Time: b.Time, Txs: commands})
++	readerOK(t, err)
++	if isRepair {
++		f.TimingNS["repair_execution"] += time.Since(executionStart).Nanoseconds()
++	}
++	for _, r := range result.TxResults {
++		if r.Code != 0 && len(allowFailure) == 0 {
++			t.Fatalf("execution: %+v", r)
++		}
++	}
++	commitStart := time.Now()
++	_, err = f.app.Commit(context.Background(), &abci.RequestCommit{})
++	readerOK(t, err)
++	if isRepair {
++		f.TimingNS["repair_commit"] += time.Since(commitStart).Nanoseconds()
++	}
++	f.evidence = append(f.evidence, finality.BlockData{Block: b, Results: result.TxResults})
++}
++
++func receiptBody(t *testing.T, b *types.Block) []byte {
++	t.Helper()
++	pb, err := b.ToProto()
++	readerOK(t, err)
++	raw, err := pb.Marshal()
++	readerOK(t, err)
++	return raw
++}
++
++func TestHistoricalReceiptRealExecution(t *testing.T) {
++	for _, batch := range []bool{false, true} {
++		t.Run(map[bool]string{false: "single", true: "batch"}[batch], func(t *testing.T) {
++			f := newReceiptFixture(t, 3, 2, batch)
++			for i, r := range f.receipts {
++				got, err := redaction.VerifyHistoricalReceipt(f.trust, f.policy, r)
++				readerOK(t, err)
++				if got.TargetHeight != 1 || got.ExecutionHeight != int64(4+i) || got.Revision != uint64(i+1) || len(got.Funding) == 0 || got.Funding[0].Amount == 0 || got.Funding[0].Organization == (protocol.Hash{}) {
++					t.Fatalf("bad descriptor: %+v", got)
++				}
++				same, err := redaction.VerifyHistoricalProjection(f.trust, f.policy, r)
++				readerOK(t, err)
++				if !reflect.DeepEqual(got.Funding, same.Funding) {
++					t.Fatal("N*/B authentication differs")
++				}
++			}
++			saved := f.receipts[0]
++			f.append(t, 1700000041, f.parents)
++			readerOK(t, f.db.Close())
++			// Verification is entirely offline after later revision and repayment.
++			got, err := redaction.VerifyHistoricalReceipt(f.trust, f.policy, saved)
++			readerOK(t, err)
++			if got.Revision != 1 {
++				t.Fatal("historical version changed")
++			}
++		})
++	}
++}
++
++func TestCompensationReceiptPrecedesRepresentation(t *testing.T) {
++	f := newReceiptFixture(t, 2, 1, true)
++	got, err := redaction.VerifyCompensationReceipt(f.trust, f.evidence[2], 0)
++	readerOK(t, err)
++	if got.ExecutionHeight != 3 || got.Decision.Height != 1 || got.Effect.Amount == 0 || got.Effect.Debit != protocol.ReserveDebitIdentity(f.trust.Network, got.Decision.Output) {
++		t.Fatalf("bad economic evidence: %+v", got)
++	}
++}
++
++func TestCompensationReceiptsShareBlockAuthentication(t *testing.T) {
++	f := newReceiptFixture(t, 3, 2, true)
++	got, err := redaction.VerifyCompensationReceipts(f.trust, f.evidence[2], []uint32{1, 0})
++	readerOK(t, err)
++	if len(got) != 2 {
++		t.Fatalf("expected two authenticated economic effects, got %d", len(got))
++	}
++	for i, index := range []uint32{1, 0} {
++		one, err := redaction.VerifyCompensationReceipt(f.trust, f.evidence[2], index)
++		readerOK(t, err)
++		if !reflect.DeepEqual(one, got[i]) {
++			t.Fatal("batch economic proof differs")
++		}
++	}
++	if _, err := redaction.VerifyCompensationReceipts(f.trust, f.evidence[2], []uint32{2}); err == nil {
++		t.Fatal("bad index accepted")
++	}
++}
++
++func TestLeanHistoricalAuthorization(t *testing.T) {
++	for _, batch := range []bool{false, true} {
++		t.Run(map[bool]string{false: "single", true: "batch"}[batch], func(t *testing.T) {
++			f := newReceiptFixture(t, 3, 2, batch)
++			for _, r := range f.receipts {
++				lean := redaction.LeanHistoricalReceipt{Body: r.Body, OriginalCommit: r.OriginalCommit, Execution: r.Execution, CommandIndex: r.CommandIndex}
++				full, err := redaction.VerifyHistoricalReceipt(f.trust, f.policy, r)
++				readerOK(t, err)
++				got, err := redaction.VerifyHistoricalAuthorization(f.trust, f.policy, lean)
++				readerOK(t, err)
++				if got.Command != full.Command || got.Next != full.Next || got.Revision != full.Revision || !got.OriginalBlockID.Equals(full.OriginalBlockID) || len(got.Funding) != len(full.Funding) {
++					t.Fatal("lean authorization differs")
++				}
++				for i, row := range got.Funding {
++					want := full.Funding[i]
++					if row.OriginalAvailable || row.Amount != want.Amount || row.Organization != want.Organization || row.Authorized != want.Authorized || row.Decision != want.Decision {
++						t.Fatal("lean funding differs")
++					}
++				}
++				bad := lean
++				bad.Body = r.BaseBody
++				if _, err := redaction.VerifyHistoricalAuthorization(f.trust, f.policy, bad); err == nil {
++					t.Fatal("unapproved lean body accepted")
++				}
++			}
++		})
++	}
++}
++
++func receiptCloneEvidence(t *testing.T, p finality.BlockData) finality.BlockData {
++	t.Helper()
++	pb, err := p.Block.ToProto()
++	readerOK(t, err)
++	p.Block, err = types.BlockFromProto(pb)
++	readerOK(t, err)
++	rs := make([]*abci.ExecTxResult, len(p.Results))
++	for i, r := range p.Results {
++		copy := *r
++		copy.Data = bytes.Clone(r.Data)
++		rs[i] = &copy
++	}
++	p.Results = rs
++	header := *p.Next.Header
++	p.Next.Header = &header
++	return p
++}
++
++func (f *receiptFixture) resignResults(t *testing.T, p finality.BlockData) finality.BlockData {
++	t.Helper()
++	p.Next.LastResultsHash = types.NewResults(p.Results).Hash()
++	p.Next.Commit = commit(t, p.Next.Height, types.BlockID{Hash: p.Next.Header.Hash(), PartSetHeader: p.Next.Commit.BlockID.PartSetHeader}, f.trust.Validators, f.keys)
++	return p
++}
++
++func TestHistoricalReceiptRejectsAdversarialEvidence(t *testing.T) {
++	f := newReceiptFixture(t, 3, 2, false)
++	original := f.receipts[0]
++	cases := map[string]func(*redaction.HistoricalReceipt){
++		"raw command mutation": func(r *redaction.HistoricalReceipt) {
++			r.Execution.Block.Txs[0] = bytes.Clone(r.Execution.Block.Txs[0])
++			r.Execution.Block.Txs[0][10] ^= 1
++		},
++		"wrong slot command": func(r *redaction.HistoricalReceipt) {
++			c, err := protocol.DecodeRepairInput(r.Execution.Block.Txs[0])
++			readerOK(t, err)
++			c.Transaction = 2
++			raw, err := c.MarshalBinary()
++			readerOK(t, err)
++			r.Execution.Block.Txs[0] = raw
++		},
++		"wrong result": func(r *redaction.HistoricalReceipt) {
++			r.Execution.Results[0].Data = bytes.Clone(f.receipts[1].Execution.Results[0].Data)
++			r.Execution = f.resignResults(t, r.Execution)
++		},
++		"result tampering": func(r *redaction.HistoricalReceipt) { r.Execution.Results[0].Data[2] ^= 1 },
++		"bad result decoding": func(r *redaction.HistoricalReceipt) {
++			r.Execution.Results[0].Data = []byte{1}
++			r.Execution = f.resignResults(t, r.Execution)
++		},
++		"wrong target":               func(r *redaction.HistoricalReceipt) { r.OriginalBody = receiptBody(t, f.evidence[1].Block) },
++		"wrong base":                 func(r *redaction.HistoricalReceipt) { r.BaseBody = f.receipts[1].BaseBody },
++		"compatible unapproved body": func(r *redaction.HistoricalReceipt) { r.Body = f.receipts[1].Body },
++		"wrong command index":        func(r *redaction.HistoricalReceipt) { r.CommandIndex = 7 },
++		"cached header mutation": func(r *redaction.HistoricalReceipt) {
++			_ = r.Execution.Block.Hash()
++			r.Execution.Block.Time = r.Execution.Block.Time.Add(time.Second)
++		},
++		"cached immutable tx mutation": func(r *redaction.HistoricalReceipt) {
++			_ = r.Execution.Block.Hash()
++			r.Execution.Block.Txs[0] = bytes.Clone(r.Execution.Block.Txs[0])
++			r.Execution.Block.Txs[0][len(r.Execution.Block.Txs[0])-1] ^= 1
++		},
++		"wrong original mutable bytes": func(r *redaction.HistoricalReceipt) { r.OriginalBody = f.receipts[1].Body },
++	}
++	for name, change := range cases {
++		t.Run(name, func(t *testing.T) {
++			r := original
++			r.Execution = receiptCloneEvidence(t, r.Execution)
++			change(&r)
++			if _, err := redaction.VerifyHistoricalReceipt(f.trust, f.policy, r); err == nil {
++				t.Fatal("accepted invalid evidence")
++			}
++			lean := redaction.LeanHistoricalReceipt{Body: r.Body, OriginalCommit: r.OriginalCommit, Execution: r.Execution, CommandIndex: r.CommandIndex}
++			// Original/BaseBody exist only in audit mode, so their mutations
++			// are not evidence mutations in the lean interface.
++			if name != "wrong target" && name != "wrong base" && name != "wrong original mutable bytes" {
++				if _, err := redaction.VerifyHistoricalAuthorization(f.trust, f.policy, lean); err == nil {
++					t.Fatal("lean verifier accepted invalid evidence")
++				}
++			}
++		})
++	}
++	wrong := f.trust
++	wrong.Network[0] ^= 1
++	if _, err := redaction.VerifyHistoricalReceipt(wrong, f.policy, original); err == nil {
++		t.Fatal("wrong network accepted")
++	}
++	wrong = f.trust
++	wrong.ChainID = "other-chain"
++	if _, err := redaction.VerifyHistoricalReceipt(wrong, f.policy, original); err == nil {
++		t.Fatal("wrong chain accepted")
++	}
++	_, _, vals, _ := committee(t)
++	wrong = f.trust
++	wrong.Validators = vals
++	if _, err := redaction.VerifyHistoricalReceipt(wrong, f.policy, original); err == nil {
++		t.Fatal("wrong committee accepted")
++	}
++	wrongPolicy := f.policy
++	wrongPolicy.RepairCost++
++	if _, err := redaction.VerifyHistoricalReceipt(f.trust, wrongPolicy, original); err == nil {
++		t.Fatal("wrong rules accepted")
++	}
++}
++
++func TestHistoricalReceiptRejectsRealNoopAndFailure(t *testing.T) {
++	f := newReceiptFixture(t, 2, 1, true)
++	saved := f.receipts[0]
++	raw := saved.Execution.Block.Txs[0]
++	f.append(t, 1700000041, [][]byte{raw})
++	noopIndex := len(f.evidence) - 1
++	bad := bytes.Clone(raw)
++	bad[8] ^= 1
++	f.append(t, 1700000042, [][]byte{bad}, true)
++	failureIndex := len(f.evidence) - 1
++	f.append(t, 1700000043, [][]byte{protocol.ClockTick(f.trust.Network, f.height+1)})
++	result, err := protocol.DecodeRepairResult(f.evidence[noopIndex].Results[0].Data)
++	readerOK(t, err)
++	if result.Applied || f.evidence[noopIndex].Results[0].Code != 0 {
++		t.Fatal("fixture is not a genuine successful noop")
++	}
++	for _, index := range []int{noopIndex, failureIndex} {
++		r := saved
++		r.Execution = f.evidence[index]
++		if _, err := redaction.VerifyHistoricalReceipt(f.trust, f.policy, r); err == nil {
++			t.Fatal("noop/failed command accepted as authorization")
++		}
++		lean := redaction.LeanHistoricalReceipt{Body: r.Body, OriginalCommit: r.OriginalCommit, Execution: r.Execution, CommandIndex: r.CommandIndex}
++		if _, err := redaction.VerifyHistoricalAuthorization(f.trust, f.policy, lean); err == nil {
++			t.Fatal("lean verifier accepted noop/failed command")
++		}
++	}
++	if f.evidence[failureIndex].Results[0].Code == 0 {
++		t.Fatal("fixture failure was successful")
++	}
++	// A cached original receipt continues to work after those later events.
++	_, err = redaction.VerifyHistoricalReceipt(f.trust, f.policy, saved)
++	readerOK(t, err)
++}

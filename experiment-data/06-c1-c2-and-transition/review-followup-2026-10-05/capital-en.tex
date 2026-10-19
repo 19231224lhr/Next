@@ -1,0 +1,67 @@
+\subsection{Finite Signing Capacity Under Delayed Sources}
+\label{sec:eval-capital}
+
+We vary organization CAL backing and authorization, $B\in\{3600,28800\}$,
+against a 1- or 3-second source-publication delay. Each member has the
+overlapping capacity $\lfloor2B/3\rfloor$, namely 2,400 or 19,200 CAL.
+Three wallets execute independent A$\to$B$\to$C units, each with a
+100-CAL principal and separate final, user-funded FUEL inputs for both
+payments. The child requests certification using its parent's TXCer.
+Once the parent certificate is ready, an independent timer publishes
+the parent after the selected delay, regardless of the child's progress.
+Automatic source resubmission is disabled in every arm to preserve this
+delay; there is no top-up, serialized certification, or time-based unlock.
+Execution and Bytes grants are sufficient and incur no resource refusals.
+
+Each cell has three fresh runs, with reversed order in the second
+repetition. The driver schedules 1,200 units at 20 units/s over 60\,s,
+caps unfinished units at 128, records skipped starts when full, and
+allows up to 60\,s of drain. The nine services use in-memory committee,
+member, gateway and BlockStore state, with NoSync wallets; this experiment
+measures signing-capacity behavior rather than durable-storage latency.
+
+\begin{table}[t]\centering\small
+\caption{Finite-capital outcomes per 1,200 planned units. Entries are
+  medians [minimum, maximum] of three runs. Partial counts distinct
+  payment candidates with one or two retained member approvals.}
+\label{tab:capital-current}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}rrrr@{}}\toprule
+$B$ / delay & Started & Closed & Partial \\\midrule
+3,600 / 1 s & 212 [193,227] & 84 [65,99] & 63 [62,68] \\
+3,600 / 3 s & 171 [166,208] & 43 [38,83] & 61 [55,64] \\
+28,800 / 1 s & 1,200 & 1,200 & 0 \\
+28,800 / 3 s & 1,200 & 1,200 & 0 \\
+\bottomrule\end{tabular}\end{table}
+
+At $B=28800$, all six runs close all 1,200 units without a CAL refusal
+or residual partial approval. Maximum sampled member reservation is
+5,000--5,200 CAL with a one-second delay and 9,000--9,100 CAL with
+three seconds, below the 19,200-CAL quota (Fig.~\ref{fig:capital-current}).
+At $B=3600$, all members end with 2,400 CAL reserved and none available.
+The stopped-state audit accounts for all 96 retained signatures in
+one- or two-signature candidates; their 100-CAL reservations exactly
+explain the four overlapping local totals. These are distinct input
+instances, so no successful input-conflict transition reclaims them.
+Between 973 and 1,034 planned units never start, and 125--128 started
+units remain unfinished at the bounded stop.
+
+Every publicly executed payment nevertheless closes, all replicas
+agree, and the final public gap is zero. User-funded fees are charged
+once, with no organization FUEL debit. Thus closure restores capacity
+for completed approvals while leaving unrelated partial approvals
+charged. The high-budget runs sustain this offered load; the low-budget
+runs demonstrate why coverage safety alone does not ensure continued
+admission. Unfinished requests remain censored rather than being
+assigned successful latencies. Supplement~S4 records the per-member
+reservations, fees, failures and complete time series.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\columnwidth]{capital-current.pdf}
+\caption{CAL reservation divided by member quota: one-second maxima
+across sampled members. Each budget has three run traces (solid, dashed,
+dotted). The 60-second admission window is followed by bounded drain;
+traces end when their runs stop.}
+\label{fig:capital-current}
+\end{figure}
+

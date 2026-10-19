@@ -1,0 +1,89 @@
+# utxo/third_party/cometbft/libs/autofile [utxo/third_party/cometbft/libs/autofile.test]
+third_party\cometbft\libs\autofile\sync_test.go:30:13: undefined: OpenAutoFile
+third_party\cometbft\libs\autofile\sync_test.go:59:12: undefined: OpenGroup
+third_party\cometbft\libs\autofile\sync_test.go:89:12: undefined: OpenGroup
+# utxo/third_party/cometbft/types
+third_party\cometbft\types\redaction.go:42:48: undefined: Tx
+third_party\cometbft\types\redaction.go:49:9: undefined: Tx
+third_party\cometbft\types\redaction.go:52:25: undefined: Tx
+third_party\cometbft\types\redaction.go:74:10: undefined: Part
+third_party\cometbft\types\redaction.go:102:24: undefined: Part
+third_party\cometbft\types\redaction.go:120:29: undefined: Part
+third_party\cometbft\types\redaction.go:133:29: undefined: Part
+third_party\cometbft\types\redaction.go:148:11: undefined: PartSet
+third_party\cometbft\types\redaction.go:148:39: undefined: Part
+third_party\cometbft\types\redaction.go:162:120: undefined: PartSet
+third_party\cometbft\types\redaction.go:49:9: too many errors
+# utxo/third_party/cometbft/state [utxo/third_party/cometbft/state.test]
+third_party\cometbft\state\results_batch_test.go:69:9: undefined: NewStore
+third_party\cometbft\state\results_batch_test.go:69:28: undefined: StoreOptions
+third_party\cometbft\state\results_batch_test.go:74:33: undefined: calcABCIResponsesKey
+third_party\cometbft\state\results_batch_test.go:88:7: undefined: NewStore
+third_party\cometbft\state\results_batch_test.go:88:26: undefined: StoreOptions
+third_party\cometbft\state\results_batch_test.go:107:7: undefined: NewStore
+third_party\cometbft\state\results_batch_test.go:107:26: undefined: StoreOptions
+third_party\cometbft\state\results_batch_test.go:116:6: undefined: NewStore
+third_party\cometbft\state\results_batch_test.go:116:25: undefined: StoreOptions
+third_party\cometbft\state\results_batch_test.go:125:13: undefined: NewStore
+third_party\cometbft\state\results_batch_test.go:125:13: too many errors
+# utxo/third_party/cometbft/store [utxo/third_party/cometbft/store.test]
+third_party\cometbft\store\redaction.go:20:11: undefined: BlockStore
+third_party\cometbft\store\redaction.go:29:11: undefined: BlockStore
+third_party\cometbft\store\redaction.go:33:11: undefined: BlockStore
+third_party\cometbft\store\redaction.go:134:22: undefined: calcBlockPartKey
+third_party\cometbft\store\redaction.go:149:11: undefined: BlockStore
+third_party\cometbft\store\redaction.go:168:11: undefined: BlockStore
+third_party\cometbft\store\catchup_test.go:28:37: undefined: BlockStore
+third_party\cometbft\store\catchup_test.go:30:23: undefined: makeStateAndBlockStore
+third_party\cometbft\store\catchup_test.go:34:8: undefined: NewBlockStore
+third_party\cometbft\store\catchup_test.go:40:47: undefined: makeTestExtCommit
+third_party\cometbft\store\catchup_test.go:40:47: too many errors
+# utxo/third_party/cometbft/consensus [utxo/third_party/cometbft/consensus.test]
+third_party\cometbft\consensus\proposal_batch_test.go:21:2: undefined: WAL
+third_party\cometbft\consensus\proposal_batch_test.go:22:15: undefined: WALMessage
+third_party\cometbft\consensus\block_identity.go:11:11: undefined: State
+third_party\cometbft\consensus\proposal_batch.go:15:11: undefined: State
+third_party\cometbft\consensus\proposal_batch.go:15:43: undefined: msgInfo
+third_party\cometbft\consensus\proposal_batch.go:49:11: undefined: State
+third_party\cometbft\consensus\proposal_batch.go:49:45: undefined: msgInfo
+third_party\cometbft\consensus\proposal_batch.go:105:11: undefined: State
+third_party\cometbft\consensus\proposal_batch.go:105:42: undefined: msgInfo
+third_party\cometbft\consensus\block_identity_test.go:32:85: undefined: State
+third_party\cometbft\consensus\block_identity_test.go:32:85: too many errors
+ok  	utxo/cmd/bench	2.763s
+ok  	utxo/cmd/committee	4.199s
+ok  	utxo/cmd/gateway	3.350s
+ok  	utxo/cmd/internal/config	2.886s
+?   	utxo/cmd/member	[no test files]
+ok  	utxo/cmd/payctl	20.501s
+?   	utxo/cmd/pool-lab	[no test files]
+?   	utxo/cmd/poolctl	[no test files]
+ok  	utxo/crypto/chameleon	0.518s
+ok  	utxo/finality	1.689s
+ok  	utxo/internal/blockfollow	1.711s
+ok  	utxo/internal/budgetprobe	1.688s
+ok  	utxo/internal/committee	3.827s
+ok  	utxo/internal/delivery	2.992s
+ok  	utxo/internal/gateway	11.033s
+ok  	utxo/internal/member	3.783s
+ok  	utxo/internal/poollab	4.207s
+ok  	utxo/internal/recipient	3.083s
+ok  	utxo/internal/redaction	8.574s
+ok  	utxo/internal/requesttrace	1.590s
+ok  	utxo/internal/reservecontrol	0.328s
+ok  	utxo/internal/rules	3.749s
+ok  	utxo/internal/sameorglab	3.782s
+?   	utxo/internal/state	[no test files]
+ok  	utxo/internal/store	0.695s
+?   	utxo/internal/testkit	[no test files]
+ok  	utxo/internal/transport	3.644s
+ok  	utxo/internal/wallet	1.807s
+ok  	utxo/protocol	0.579s
+FAIL	utxo/third_party/cometbft/consensus [build failed]
+FAIL	utxo/third_party/cometbft/libs/autofile [build failed]
+?   	utxo/third_party/cometbft/libs/operationtrace	[no test files]
+?   	utxo/third_party/cometbft/node	[no test files]
+FAIL	utxo/third_party/cometbft/state [build failed]
+FAIL	utxo/third_party/cometbft/store [build failed]
+FAIL	utxo/third_party/cometbft/types [build failed]
+FAIL

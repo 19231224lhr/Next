@@ -1,0 +1,198 @@
+--- before/evaluation.tex
++++ after/evaluation.tex
+@@ -356,6 +356,56 @@
+ than an economically necessary or universally faster alternative
+ to indexed history.
+ 
++\subsection{Offline Historical Authorization}
++\label{sec:eval-receipts}
++
++We compare the two receipt modes of Section~\ref{sec:history-receipts}
++on the same compensation facts. N*-lean verifies the economic
++explanation; B-lean also verifies the exact authorized revision and its
++original complete identity. Fixtures use actual ABCI execution and
++commits. After closing the exporter database, a separate process with
++an empty working directory accepts only public configuration and
++serialized evidence. Both modes reproduce independently constructed
++economic rows. Tests reject wrong commands, results, coordinates,
++networks, and bodies, including compatible but unauthorized replacements,
++actual failed commands, and no-effect replays. Old authorized revisions
++remain valid historical evidence after later revision and repayment.
++
++The additional verifier build is frozen by source and binary hashes in
++the artifact. On a 16-core M4 Max with 64\,GiB, Go~1.27.1,
++\texttt{GOMAXPROCS=16}, and \texttt{GOGC=100}, three independent
++processes each test four $(n,m)$ configurations. After five warm-ups,
++each method performs 30 interleaved fresh export-and-verification
++iterations. Timing begins with prepared in-memory evidence and includes
++serialization, fresh-object decoding, and full verification; it excludes
++database discovery, network transfer, and subprocess startup. These are
++local post-warm-up measurements, not cold-disk or network latencies.
++
++\input{receipt-table}
++
++Medians of process medians are 0.181--0.935\,ms for N*-lean and
++0.762--4.516\,ms for B-lean (Table~\ref{tab:offline-receipts}).
++The actual JSON/base64 packets occupy 3.67--15.30 and
++106.96--818.29\,KiB, respectively; the common 1,799-B pinned public
++configuration is separate. B carries the revised target body, so its
++size grows with $n$. Both modes use the same validated-cache strategy:
++an admitted packet yields immutable economic rows bound to its mode
++and configuration. Cached row queries take less than 0.1\,$\mu$s,
++with no interpretable lookup advantage at this timing resolution.
++
++Repair construction and threshold adaptation take 18.257--183.046\,ms,
++with one setup observation per configuration in each process. Repair
++Finalize takes 1.123--16.934\,ms and in-memory Commit
++0.012--0.039\,ms. These setup medians exclude installation and
++network/consensus waits; they have a different scope from the preceding
++43--214\,ms maintenance experiment. N* becomes usable once compensation
++evidence is authenticated, whereas B also needs the repair evidence.
++The measurements favor N* for economic reconciliation. B additionally
++delivers a specifically authorized revised body compatible with the
++original complete BlockID, at a quantified verification and transmission
++cost. Offline authorization checking is shared by both representations;
++it is not a CH-specific performance gain.
++
+ \input{network-current}
+ 
+ \subsection{Boundary and Composition Checks}
+--- before/history.tex
++++ after/history.tex
+@@ -24,9 +24,10 @@
+ attributes the input to another issuer's debit. The repair must preserve
+ both the permitted funding reference and the fixed payment and block
+ identities; decision-derived checks reject such a candidate.
+-Our prototype implements this Next-aware local workflow
+-(Table~\ref{tab:c3-function}); it requires the executed prefix, rather
+-than treating an exported body as a standalone remote proof.
++Our local reader implements this workflow using the executed prefix
++(Table~\ref{tab:c3-function}). A separate historical receipt interface
++lets a recipient verify a specific past authorization without running
++that replica (Section~\ref{sec:history-receipts}).
+ 
+ A read at $(h,j,k)$ returns $(H,h,j,k,F,r,d,s_H)$, assembled from existing functions inside one read transaction on $V_H$. Here $F$ is the funding representation, $r$ its revision, $d$ the decision or an absent marker, and $s_H$ the obligation state. This logical tuple describes local composition, not a deployed network interface. The index $j$ counts the original transaction list and is not renumbered after filtering maintenance commands or failed transactions. The logical body comes from the committed revision in $V_H$ and falls back to the original block only when no revision exists, so physical installation progress, or a block store that already holds a later version during replay, does not change the answer. A revision that exists but cannot be decoded is an error and never falls back to the original. Missing history is reported as unavailable and is not read as the absence of compensation; the contract assumes that the relevant history is not pruned. In a complete, verified, unpruned $V_H$, a missing decision means that none exists as of $H$.
+ 
+@@ -52,6 +53,39 @@
+ and openings, and blocks carry chameleon part commitments, whether or
+ not they are later repaired. Section~\ref{sec:eval-reader} reports both
+ the incremental repair costs and these always-on components.
++
++\subsection{Offline Historical Authorization}
++\label{sec:history-receipts}
++
++An archive recipient may need to check a funding explanation without
++trusting its exporter or maintaining an executed replica. We provide
++two receipt modes under the same independently pinned committee,
++network, and rules configuration. T1 establishes that a compensation
++decision took effect and identifies its issuer, amount, and debit.
++T2 additionally authenticates a specific revised body and checks its
++compatibility with the original complete BlockID. Neither mode
++queries a database or network during verification.
++
++The verifier authenticates the execution block and indexed results
++through a successor signed header. It requires a matching exact command,
++\texttt{Code=0}, and \texttt{Applied=true}. For T1, the ordinary
++N*-lean packet carries the compensation effect and a verified parent
++certificate binding its parent fact, output, and amount to the issuer.
++The B-lean packet also supplies the repair execution evidence, revised
++body, and original commit. The repair command binds revision $r$ and
++the exact replacement-body digest. B verifies the reconstructed
++complete BlockID against the original commit and cross-checks the
++body's debit, issuer, amount, original coordinates, and parent/consumer
++facts against T1. It reuses the parent certificate already verified
++inside that body. Original and base bodies need not be retransmitted:
++their state-dependent checks are covered by the authenticated successful
++execution under the committee-correctness assumption. The caller fixes
++the required mode before accepting a packet.
++
++Both modes establish past successful authorization. A valid old receipt
++remains historical evidence after repayment or a later revision; it does
++not establish the latest revision, current repayment status, or absence
++of another event. Those queries use the executed-prefix reader above.
+ 
+ \subsection{Representation Commands and Batches}
+ \label{sec:protocol-batch}
+--- before/security.tex
++++ after/security.tex
+@@ -366,7 +366,19 @@
+ \end{IEEEproof}
+ 
+ \noindent\textbf{Reader scope.}
+-These lemmas concern a replica whose own state ran the guards, so the reader of Section~\ref{sec:protocol-reader} trusts local state that executed them. A block that carries a \texttt{RepairBatch} which did not execute successfully confers no representation authority. An inclusion proof, an equal BlockID, or the chameleon relation alone does not show that a representation was authorized as of $H$. Serving untrusted remote readers would need authorization evidence tied to an authenticated state root or to proofs of original execution, which this paper does not define.
++The local reader of Section~\ref{sec:protocol-reader} uses state that
++executed these guards. The historical verifier of
++Section~\ref{sec:history-receipts} instead authenticates the exact command
++and its successful, applied result under a successor signed header.
++Under the committee-correctness assumption, that result establishes
++that the execution guards accepted the command. The command's ordinary
++replacement-body digest binds the supplied bytes; the original commit
++separately checks complete-identity compatibility. Thus a compatible
++body without the exact successful authorization is rejected, as are
++failed commands and no-effect replays. This argument establishes a
++particular past authorization, not completeness of a supplied history
++or the current version at $H$. Current-state queries retain the
++executed-prefix requirement.
+ 
+ \subsection{Protected Continuation and Progress}
+ \label{sec:security-composition}
+--- before/zh-evaluation.tex
++++ after/zh-evaluation.tex
+@@ -229,6 +229,19 @@
+ 
+ 等价性检查涵盖：先赔付后表示、先表示后物化，以及偿还时保留历史扣减且状态为 Recovered。无效坐标、跨前缀决定以及错误的扣减/金额都被拒绝；无法解码的修订会失败而不回退。这些检查并不确立对任意可解码的损坏的检测。Canonical 在稳定的历史坐标处提供授权的资金表示，并带有所测得的维护代价，而不是一个经济上必需的、或普遍更快的索引历史替代方案。
+ 
++\subsection{离线历史授权核验}
++\label{sec:eval-receipts}
++
++我们在相同赔付事实上对照第~\ref{sec:history-receipts}~节的两种收据模式。N*-lean 验证经济解释；B-lean 还验证精确的授权修订及其原完整身份。夹具使用实际的 ABCI 执行与提交。导出者数据库关闭后，一个工作目录为空的独立进程只接收公有配置和序列化证据。两种模式均复现独立构造的经济行。测试拒绝错误命令、结果、坐标、网络和正文，包括相容但未获授权的替换、实际失败的命令以及无效果重放。后续修订和偿还之后，旧授权修订仍是有效历史证据。
++
++新增验证器构建通过制品中的源码与二进制哈希冻结。在 16 核 M4 Max、64\,GiB、Go~1.27.1、\texttt{GOMAXPROCS=16} 和 \texttt{GOGC=100} 下，三个独立进程各测试四个 $(n,m)$ 配置。五次预热后，每种方法执行 30 次交错的重新导出与验证。计时从准备好的内存证据开始，包含序列化、新对象解码和完整验证；不含数据库发现、网络传输及子进程启动。这些是本地预热后的测量，不是冷磁盘或网络时延。
++
++\input{zh-receipt-table}
++
++进程级中位数的中位数为 N*-lean 的 0.181--0.935\,ms 和 B-lean 的 0.762--4.516\,ms（表~\ref{tab:offline-receipts}）。实际 JSON/base64 证据包分别占 3.67--15.30 和 106.96--818.29\,KiB；共同预置的 1,799-B 公有配置单独计算。B 携带修订目标正文，因此大小随 $n$ 增长。两种模式使用相同的验后缓存策略：通过验证的包产生绑定模式和配置的不可变经济行。缓存行查询低于 0.1\,$\mu$s，在这一计时粒度下没有可解释的查询优势。
++
++修复构建与门限适配用时 18.257--183.046\,ms，每个进程、每个配置各有一次准备观察。修复 Finalize 用时 1.123--16.934\,ms，内存 Commit 用时 0.012--0.039\,ms。这些准备阶段中位数不含安装以及网络/共识等待，与前述 43--214\,ms 维护实验的范围不同。赔付证据获认证后 N* 即可使用，而 B 还需要修复证据。对于经济对账，实测支持选择 N*。B 额外交付一份经过特定授权、与原完整 BlockID 相容的修订正文，其验证与传输代价已量化。离线授权核验是两种表示共有的能力，不是 CH 独有的性能收益。
++
+ \input{zh-network-current}
+ 
+ \subsection{当前构建的边界与组合检查}
+--- before/zh-history.tex
++++ after/zh-history.tex
+@@ -8,7 +8,7 @@
+ 
+ 该服务已验证并执行前缀 $H$。它在同一 $V_H$ 中获取授权正文、精确的 Revision 与 Task（已提交的修订记录及其精确安装授权）、永久决定及当前义务状态；使用授权开口重建区块和 part，对照保存的原始提交证据检查完整 BlockID，并连同决定和修订上下文导出原始与修订正文。提交证据检查与既有区块身份的相容性；已执行命令与精确 Task 授权替换字节。投票同时覆盖头部哈希与 part-set header，因此只保持头部哈希并不足够。如果 Alice 的来源随后偿还发行方，扣款引用仍记录历史垫付，而义务状态变为 Recovered。
+ 
+-因此，C3 的正确性目标不同于 C2 所结算的金额：即使备付扣款正确，也不得授权一个将该输入归因于另一发行方扣款的正文。修复必须同时保持被允许的资金引用，以及固定的付款与区块身份；依据决定进行的检查拒绝此类候选。原型实现了这一使用 Next 接口的本地工作流（表~\ref{tab:c3-function}）；它依赖已执行前缀，而不将导出的正文视为独立的远程证明。
++因此，C3 的正确性目标不同于 C2 所结算的金额：即使备付扣款正确，也不得授权一个将该输入归因于另一发行方扣款的正文。修复必须同时保持被允许的资金引用，以及固定的付款与区块身份；依据决定进行的检查拒绝此类候选。本地读取接口利用已执行前缀实现这一工作流（表~\ref{tab:c3-function}）。另一个历史收据接口允许接收方在不运行该副本的情况下核验特定的历史授权（第~\ref{sec:history-receipts}~节）。
+ 
+ 位于 $(h,j,k)$ 的读取返回 $(H,h,j,k,F,r,d,s_H)$，由现有函数在 $V_H$ 上的一个读事务内组装而成。其中 $F$ 是资金表示，$r$ 是其修订，$d$ 是决定或缺失标记，$s_H$ 是义务状态。该逻辑元组描述本地组合，而不是已部署的网络接口。索引 $j$ 对原始交易列表计数，不会因过滤维护命令或失败交易而重新编号。逻辑区块体来自 $V_H$ 中已提交的修订，仅当不存在修订时才回退到原始区块，因此物理安装进度，或重放期间已持有较晚版本的区块存储，都不改变答案。存在但无法解码的修订是错误，绝不回退到原始区块。缺失的历史被报告为不可用，而不被解读为不存在赔付；该契约假设相关历史未被裁剪。在完整、已验证、未裁剪的 $V_H$ 中，缺失决定意味着截至 $H$ 不存在决定。
+ 
+@@ -19,6 +19,15 @@
+ 第~\ref{sec:model-records}~节介绍的状态维度保持相互分离。
+ 
+ 索引或普通物化视图保持原始正文，同样能回答经济问题；如果所需服务就是这些答案，这两种方式已足够。经过另行认证的修订副本也可保留旧 ID 查询，Reparo 展示了这种访问模式~\cite{reparo}。C3 则使授权修订正文自身仍满足原完整 BlockID。这是其记录层服务，而非支付最终性的额外条件。其成本分为两部分。适配、修订命令与安装针对已有决定的槽位运行，可以在经济闭合继续推进时暂停（引理~\ref{lem:security-closure}）。支持后续修复的编码则在部署时已经确定：支付输入携带资金承诺与开口，区块携带变色龙 part 承诺，无论之后是否进行修复。第~\ref{sec:eval-reader}~节同时报告增量修复成本和这些常开组件的成本。
++
++\subsection{离线历史授权核验}
++\label{sec:history-receipts}
++
++归档接收方可能需要核查一份资金解释，同时不信任导出者、也不维护已执行副本。我们提供两种收据模式，使用相同且独立预置的委员会、网络和规则配置。T1 确认一项赔付决定已经生效，并标明发行方、金额与扣减。T2 进一步认证特定修订正文，并检查其与原完整 BlockID 的相容性。两种模式在验证过程中均不查询数据库或网络。
++
++验证器通过后继签名头认证执行块及按索引定位的结果，要求精确命令匹配、\texttt{Code=0} 且 \texttt{Applied=true}。对于 T1，普通 N*-lean 证据包携带赔付效果及经验证的父证书；父证书将其中的父事实、输出和金额绑定到发行方。B-lean 证据包还提供修复执行证据、修订正文与原始提交证据。修复命令绑定修订 $r$ 和精确替换正文摘要。B 对照原始提交证据验证重建的完整 BlockID，并将正文中的扣减、发行方、金额、原始坐标及父/消费方事实与 T1 交叉核对；父证书直接复用正文中已验证的证书。无需重复传输原始或基础正文：在委员会正确执行假设下，其依赖状态的检查由经认证的成功执行覆盖。调用者在接受证据包前固定所需模式。
++
++两种模式均确立过去成功发生的授权。偿还或后续修订发生后，有效的旧收据仍是历史证据；它不确立最新修订、当前偿还状态或其他事件未发生。此类查询使用前述已执行前缀读取接口。
+ 
+ \subsection{表示命令与批次}
+ \label{sec:protocol-batch}
+--- before/zh-security.tex
++++ after/zh-security.tex
+@@ -353,7 +353,7 @@
+ \end{IEEEproof}
+ 
+ \noindent\textbf{读取方范围。}
+-这些引理适用于在自身状态上执行过守卫检查的副本，因此第~\ref{sec:protocol-reader}~节的读取方信任执行了这些检查的本地状态。一个区块即使携带 \texttt{RepairBatch}，如果该命令未成功执行，也不赋予任何表示权限。单凭包含证明、相等的 BlockID 或变色龙关系，都不能证明某个表示截至 $H$ 已获授权。若要服务于不可信的远程读取方，就需要与认证状态根或原始执行证明绑定的授权证据；本文未定义此类证据。
++第~\ref{sec:protocol-reader}~节的本地读取接口使用执行过这些守卫检查的状态。第~\ref{sec:history-receipts}~节的历史验证器则通过后继签名头认证精确命令及其成功且实际应用的结果。在委员会正确执行假设下，该结果确立执行守卫已接受此命令。命令中的普通替换正文摘要绑定所提供的字节；原始提交证据另行检查完整身份相容性。因此，缺乏精确成功授权的相容正文会被拒绝，失败命令和无效果重放同样被拒绝。该论证确立特定的历史授权，而非所提供历史的完整性或截至 $H$ 的当前版本。当前状态查询仍要求已执行前缀。
+ 
+ \subsection{受保护的连续支付与进展}
+ \label{sec:security-composition}

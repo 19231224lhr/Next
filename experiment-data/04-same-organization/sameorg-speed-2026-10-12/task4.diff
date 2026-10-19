@@ -1,0 +1,730 @@
+--- before/internal/recipient/collector.go
++++ after/internal/recipient/collector.go
+@@ -0,0 +1,146 @@
++// Package recipient provides an opt-in receiving-wallet collector. The payer's
++// signed request goes to the recipient, which collects the existing member votes.
++package recipient
++
++import (
++	"context"
++	"io"
++	"net/http"
++	"sync"
++	"time"
++	"utxo/internal/gateway"
++	"utxo/internal/state"
++	"utxo/internal/store"
++	"utxo/internal/transport"
++	"utxo/internal/wallet"
++	"utxo/protocol"
++)
++
++type Collector struct {
++	collector *gateway.Collector
++	wallet    *wallet.Wallet
++	owner     protocol.PublicKey
++	org       protocol.OrgConfig
++	db        store.Store
++	slots     chan struct{}
++	lifecycle sync.RWMutex
++	closed    bool
++}
++
++// New uses the same durable store as the supplied gateway collector. Its public
++// relay must consume that collector's outbox, as with a regular gateway. Only
++// outputs owned by this wallet are acknowledged as received; payer change and
++// other recipients remain available in the complete returned certificate.
++func New(c *gateway.Collector, w *wallet.Wallet, owner protocol.PublicKey, org protocol.OrgConfig, db store.Store) (*Collector, error) {
++	if c == nil || w == nil || db == nil || owner == (protocol.PublicKey{}) || org.Validate() != nil {
++		return nil, protocol.ErrRule
++	}
++	return &Collector{collector: c, wallet: w, owner: owner, org: org, db: db, slots: make(chan struct{}, 16)}, nil
++}
++
++// Payment exposes retained full material for restart, retry, and public relay.
++func (c *Collector) Payment(id protocol.TxID) (protocol.DirectPayment, error) {
++	var raw []byte
++	e := c.db.View(func(v state.ReadView) error {
++		var e error
++		raw, e = v.Get(state.Key(state.KeyCollected, id[:]))
++		return e
++	})
++	if e != nil {
++		return protocol.DirectPayment{}, e
++	}
++	p, e := protocol.DecodeDirectPayment(raw)
++	if e != nil {
++		return p, e
++	}
++	if p.Tx.ID() != id || p.Certificate.Summary.Tx != id || p.Certificate.Verify(c.org) != nil {
++		return protocol.DirectPayment{}, protocol.ErrAuth
++	}
++	return p, nil
++}
++
++func (c *Collector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
++	c.serve(w, r, false)
++}
++
++// PrepareHTTP reserves the local received coin for an owner-signed onward
++// request. A 204 means saved locally, not approved by members. The caller then
++// submits the same bytes to the next recipient collector or regular gateway.
++func (c *Collector) PrepareHTTP(w http.ResponseWriter, r *http.Request) { c.serve(w, r, true) }
++
++func (c *Collector) serve(w http.ResponseWriter, r *http.Request, prepare bool) {
++	c.lifecycle.RLock()
++	defer c.lifecycle.RUnlock()
++	if c.closed {
++		http.Error(w, "SHUTTING_DOWN", 503)
++		return
++	}
++	if r.Method != http.MethodPost || r.Header.Get("Content-Type") != transport.MediaType {
++		http.Error(w, "INVALID_ENCODING", 400)
++		return
++	}
++	select {
++	case c.slots <- struct{}{}:
++		defer func() { <-c.slots }()
++	default:
++		http.Error(w, "LIMITED", 429)
++		return
++	}
++	raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, protocol.MaxRequestBytes))
++	if e != nil {
++		http.Error(w, "INVALID_ENCODING", 400)
++		return
++	}
++	req, e := protocol.DecodeDirectRequest(raw)
++	if e != nil {
++		http.Error(w, "INVALID_REQUEST", 400)
++		return
++	}
++	if prepare {
++		if e = c.wallet.SaveDirectRequest(req); e != nil {
++			http.Error(w, "INVALID_OWNER_OR_INPUT", 400)
++			return
++		}
++		w.WriteHeader(http.StatusNoContent)
++		return
++	}
++	var indices []uint32
++	for i, o := range req.Tx.Body.Outputs {
++		if o.Recipient.Owner == c.owner {
++			indices = append(indices, uint32(i))
++		}
++	}
++	if len(indices) == 0 {
++		http.Error(w, "WRONG_RECIPIENT", 400)
++		return
++	}
++	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
++	defer cancel()
++	cert, e := c.collector.CollectDirect(ctx, req)
++	if e != nil {
++		http.Error(w, "QUORUM_UNAVAILABLE_RETRY_SAME_REQUEST", 503)
++		return
++	}
++	p := protocol.DirectPayment{Tx: req.Tx, Certificate: cert, InputCertificates: req.InputCertificates}
++	// Save full material and the public outbox before acknowledging a received coin.
++	if e = c.collector.PersistDirect(p); e != nil {
++		http.Error(w, "PERSIST_FAILED_RETRY_SAME_REQUEST", 503)
++		return
++	}
++	for _, i := range indices {
++		if e = c.wallet.ReceiveDirect(req.Tx.Body.Outputs[i], cert, i); e != nil {
++			http.Error(w, "RECEIVE_FAILED_RETRY_SAME_REQUEST", 503)
++			return
++		}
++	}
++	raw, e = cert.MarshalBinary()
++	if e != nil {
++		http.Error(w, "INVALID_CERTIFICATE", 500)
++		return
++	}
++	w.Header().Set("Content-Type", transport.MediaType)
++	_, _ = w.Write(raw)
++}
++
++// Close rejects new requests and joins active handlers before their stores close.
++func (c *Collector) Close() { c.lifecycle.Lock(); defer c.lifecycle.Unlock(); c.closed = true }
+--- before/internal/recipient/collector_test.go
++++ after/internal/recipient/collector_test.go
+@@ -0,0 +1,205 @@
++package recipient
++
++import (
++	"bytes"
++	"context"
++	"errors"
++	"net/http"
++	"net/http/httptest"
++	"path/filepath"
++	"sync/atomic"
++	"testing"
++	"utxo/internal/gateway"
++	"utxo/internal/poollab"
++	"utxo/internal/state"
++	"utxo/internal/store"
++	"utxo/internal/transport"
++	"utxo/protocol"
++)
++
++func request(t *testing.T, l *poollab.Lab, previous *protocol.OutputCertificate, owner, to int) protocol.DirectRequest {
++	t.Helper()
++	tx, e := l.OrdinaryTemplate(owner, 1)
++	if e != nil {
++		t.Fatal(e)
++	}
++	b := tx.Body
++	b.Subject = l.Descriptors[owner].Owner
++	input := l.Fixture.Genesis.Outputs[0].Output
++	var parents []protocol.InputCertificate
++	if previous != nil {
++		input = protocol.Output{Asset: protocol.AssetCAL, Amount: 100, Recipient: l.Descriptors[owner]}
++		b.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: previous.Summary.OutputID(0), Evidence: protocol.Hash(previous.QC.Fact)}}
++		parents = []protocol.InputCertificate{{Certificate: *previous, Index: 0}}
++	}
++	b.Outputs = []protocol.Output{{Asset: protocol.AssetCAL, Amount: 100, Recipient: l.Descriptors[to]}}
++	tx, e = protocol.NewFastTx(b, []protocol.InputClaim{{Output: input}}, l.Policy.Key)
++	if e != nil {
++		t.Fatal(e)
++	}
++	tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), l.Keys[owner])}
++	return protocol.DirectRequest{Tx: tx, InputCertificates: parents}
++}
++
++type alteredMember struct {
++	gateway.MemberClient
++	direct gateway.DirectMemberClient
++	kind   string
++	calls  *atomic.Int32
++}
++
++func (m alteredMember) ApproveDirect(ctx context.Context, r protocol.DirectRequest) (protocol.DirectApproval, error) {
++	if m.calls != nil {
++		m.calls.Add(1)
++	}
++	a, e := m.direct.ApproveDirect(ctx, r)
++	if e != nil {
++		return a, e
++	}
++	switch m.kind {
++	case "bad-signature":
++		a.Vote.Signature[0] ^= 1
++	case "mixed-fact":
++		a.Summary.Tx[0] ^= 1
++	case "duplicate":
++		a.Vote.Member = 0
++	}
++	return a, nil
++}
++func (m alteredMember) InstallDirect(ctx context.Context, p protocol.DirectPayment) error {
++	return m.direct.InstallDirect(ctx, p)
++}
++
++func TestReceiverCollectsAndRetainsFullPayment(t *testing.T) {
++	l, e := poollab.New(t.TempDir())
++	if e != nil {
++		t.Fatal(e)
++	}
++	defer l.Close()
++	path := filepath.Join(t.TempDir(), "collector.db")
++	identity := store.Identity{Network: "receiver-test", Role: "collector", Node: "1", Schema: 1}
++	db, e := store.Open(path, identity)
++	if e != nil {
++		t.Fatal(e)
++	}
++	defer func() { db.Close() }()
++	var clients [4]gateway.MemberClient
++	for i, s := range l.Servers {
++		clients[i] = transport.NewMemberClient(s.URL)
++	}
++	c, e := gateway.New(l.Fixture.Org, clients, db)
++	if e != nil {
++		t.Fatal(e)
++	}
++	h, e := New(c, l.Wallets[1], l.Descriptors[1].Owner, l.Fixture.Org, db)
++	if e != nil {
++		t.Fatal(e)
++	}
++	req := request(t, l, nil, 0, 1)
++	raw, e := req.MarshalBinary()
++	if e != nil {
++		t.Fatal(e)
++	}
++	w := httptest.NewRecorder()
++	r := httptest.NewRequest(http.MethodPost, "/collect", bytes.NewReader(raw))
++	r.Header.Set("Content-Type", transport.MediaType)
++	h.ServeHTTP(w, r)
++	if w.Code != 200 {
++		t.Fatalf("collect: %d %s", w.Code, w.Body.String())
++	}
++	cert, e := protocol.DecodeOutputCertificate(w.Body.Bytes())
++	if e != nil {
++		t.Fatal(e)
++	}
++	child := request(t, l, &cert, 1, 2)
++	childRaw, e := child.MarshalBinary()
++	if e != nil {
++		t.Fatal(e)
++	}
++	prepared := httptest.NewRecorder()
++	prep := httptest.NewRequest(http.MethodPost, "/prepare", bytes.NewReader(childRaw))
++	prep.Header.Set("Content-Type", transport.MediaType)
++	h.PrepareHTTP(prepared, prep)
++	if prepared.Code != http.StatusNoContent {
++		t.Fatalf("received output not spendable: %d %s", prepared.Code, prepared.Body.String())
++	}
++	// Reopen the durable collector store before recovering the full payment.
++	if e = db.Close(); e != nil {
++		t.Fatal(e)
++	}
++	db, e = store.Open(path, identity)
++	if e != nil {
++		t.Fatal(e)
++	}
++	c, e = gateway.New(l.Fixture.Org, clients, db)
++	if e != nil {
++		t.Fatal(e)
++	}
++	reopened, e := New(c, l.Wallets[1], l.Descriptors[1].Owner, l.Fixture.Org, db)
++	if e != nil {
++		t.Fatal(e)
++	}
++	saved, e := reopened.Payment(req.Tx.ID())
++	if e != nil || saved.Certificate.QC.Fact != cert.QC.Fact {
++		t.Fatal("full payment recovery", e)
++	}
++	if e = db.View(func(v state.ReadView) error { _, e := v.Get(state.Key(state.KeyOutbox, cert.QC.Fact[:])); return e }); e != nil {
++		t.Fatal("public relay material missing", e)
++	}
++}
++
++func TestReceiverRejectsWrongOwnerAndBadQuorums(t *testing.T) {
++	for _, kind := range []string{"wrong-owner", "bad-signature", "mixed-fact", "duplicate", "disk-failure"} {
++		t.Run(kind, func(t *testing.T) {
++			l, e := poollab.New("")
++			if e != nil {
++				t.Fatal(e)
++			}
++			defer l.Close()
++			var db store.Store = store.NewMemory()
++			defer db.Close()
++			if kind == "disk-failure" {
++				db = failedStore{db}
++			}
++			var calls atomic.Int32
++			var clients [4]gateway.MemberClient
++			for i, s := range l.Servers {
++				m := transport.NewMemberClient(s.URL)
++				clients[i] = alteredMember{m, m, kind, &calls}
++			}
++			c, e := gateway.New(l.Fixture.Org, clients, db)
++			if e != nil {
++				t.Fatal(e)
++			}
++			h, e := New(c, l.Wallets[1], l.Descriptors[1].Owner, l.Fixture.Org, db)
++			if e != nil {
++				t.Fatal(e)
++			}
++			to := 1
++			if kind == "wrong-owner" {
++				to = 2
++			}
++			req := request(t, l, nil, 0, to)
++			raw, _ := req.MarshalBinary()
++			w := httptest.NewRecorder()
++			r := httptest.NewRequest(http.MethodPost, "/collect", bytes.NewReader(raw))
++			r.Header.Set("Content-Type", transport.MediaType)
++			h.ServeHTTP(w, r)
++			if kind == "wrong-owner" && calls.Load() != 0 {
++				t.Fatal("wrong recipient contacted members")
++			}
++			if w.Code == 200 {
++				t.Fatal("accepted invalid recipient/quorum")
++			}
++			if _, e = h.Payment(req.Tx.ID()); e == nil {
++				t.Fatal("persisted invalid result")
++			}
++		})
++	}
++}
++
++type failedStore struct{ store.Store }
++
++func (f failedStore) Update(func(state.ReadView) ([]state.Change, error)) error {
++	return errors.New("injected disk failure")
++}
+--- before/cmd/gateway/main.go
++++ after/cmd/gateway/main.go
+@@ -1,47 +1,52 @@
+ package main
+ 
+ import (
+ 	"context"
+ 	"errors"
+ 	"flag"
++	"fmt"
+ 	"io"
+ 	"log/slog"
+ 	"net/http"
+ 	"os"
+ 	"os/signal"
+ 	"path/filepath"
+ 	"strconv"
+ 	"syscall"
+ 	"time"
+ 	cfg "utxo/cmd/internal/config"
+ 	"utxo/internal/blockfollow"
+ 	"utxo/internal/delivery"
+ 	"utxo/internal/gateway"
++	"utxo/internal/recipient"
+ 	"utxo/internal/requesttrace"
+ 	"utxo/internal/store"
+ 	"utxo/internal/transport"
++	"utxo/internal/wallet"
+ 	"utxo/protocol"
+ )
+ 
+ type configuration struct {
+ 	Network, DataDir, Listen string
+ 	Organization             protocol.Hash
+ 	Members                  [4]string
+ 	TLS                      cfg.TLS
+-	RecipientRoutes          []delivery.Route `json:",omitempty"`
+-	RecipientTLS             cfg.TLS `json:",omitempty"`
++	RecipientRoutes          []delivery.Route   `json:",omitempty"`
++	RecipientTLS             cfg.TLS            `json:",omitempty"`
++	RecipientOwner           protocol.PublicKey `json:",omitempty"`
++	RecipientKey             string             `json:",omitempty"`
+ }
+ 
+ func paymentHandler(collector *gateway.Collector) http.HandlerFunc {
+ 	slots := make(chan struct{}, 128)
+ 	return func(w http.ResponseWriter, r *http.Request) {
+ 		ctx := r.Context()
+ 		if r.Header.Get(requesttrace.HeaderName) == "1" {
+ 			ctx = requesttrace.Start(ctx, "gateway")
+ 		}
+ 		requesttrace.Mark(ctx, "http_handler_enter")
+ 		select {
+ 		case slots <- struct{}{}:
+ 			defer func() { <-slots }()
+ 		default:
+ 			http.Error(w, "LIMITED", 429)
+@@ -82,38 +87,54 @@
+ 		_, _ = w.Write(raw)
+ 		_ = http.NewResponseController(w).Flush()
+ 		// ponytail: reuse the bounded request handler instead of another worker queue.
+ 		// Keep its slot until persistence ends; server shutdown drains active handlers.
+ 		if err := collector.Persist(certificate); err != nil {
+ 			slog.Error("background certificate persistence failed; wallet may resubmit", "spend", protocol.Hash(certificate.QC.Fact).String(), "error", err)
+ 		}
+ 	}
+ }
+ 
+ func run() (result error) {
+ 	path := flag.String("config", "", "gateway config JSON")
+ 	continuation := flag.Bool("same-org-continuation", false, "send compact parent quorum proofs to their original same-organization signers")
+ 	compactApprovals := flag.Bool("compact-direct-approvals", false, "request compact admission-vector and vote responses")
+ 	directDelivery := flag.Bool("direct-recipient-delivery", false, "durably deliver full payments to operator-configured RecipientRoutes")
++	collectAtRecipient := flag.Bool("collect-at-recipient", false, "enable /v3/recipient/collect for configured RecipientOwner with a durable local receiving wallet")
+ 	flag.Parse()
+ 	var c configuration
+ 	if e := cfg.Read(*path, &c); e != nil {
+ 		return e
+ 	}
+ 	var n cfg.Network
+ 	if e := cfg.Read(c.Network, &n); e != nil {
+ 		return e
++	}
++	if *collectAtRecipient {
++		if n.Direct == nil || c.RecipientKey == "" || os.Getenv("UTXO_EXPERIMENT_GATEWAY_MEMORY") == "1" {
++			return errors.New("recipient collection requires direct protocol, RecipientKey and persistent gateway storage")
++		}
++		key, err := cfg.PrivateKey(c.RecipientKey)
++		if err != nil {
++			return err
++		}
++		var owner protocol.PublicKey
++		copy(owner[:], key[32:])
++		if c.RecipientOwner != (protocol.PublicKey{}) && c.RecipientOwner != owner {
++			return errors.New("RecipientOwner does not match RecipientKey")
++		}
++		c.RecipientOwner = owner
+ 	}
+ 	trust, e := n.Trust()
+ 	if e != nil {
+ 		return e
+ 	}
+ 	org, e := n.Organization(c.Organization)
+ 	if e != nil {
+ 		return e
+ 	}
+ 	id := store.Identity{Network: n.Genesis.Network.String(), Role: "gateway", Node: org.Org.String(), Schema: n.Schema()}
+ 	var base store.Store
+ 	if os.Getenv("UTXO_EXPERIMENT_GATEWAY_MEMORY") == "1" {
+ 		base, e = store.OpenEphemeral(filepath.Join(c.DataDir, "gateway.db"), id)
+ 	} else {
+ 		base, e = store.Open(filepath.Join(c.DataDir, "gateway.db"), id)
+@@ -130,45 +151,65 @@
+ 	var clients [4]gateway.MemberClient
+ 	for i, url := range c.Members {
+ 		clients[i] = transport.NewMemberClient(url)
+ 	}
+ 	collector, e := gateway.New(org, clients, db)
+ 	if e != nil {
+ 		return e
+ 	}
+ 	collector.SameOrgContinuation = *continuation
+ 	collector.CompactDirectApprovals = *compactApprovals
+ 	if os.Getenv("UTXO_EXPERIMENT_SERIAL_DIRECT") == "1" {
+ 		collector.EnableSerialDirect()
+ 		slog.Info("experimental single-collector signing admission enabled")
+ 	}
+ 	mux := http.NewServeMux()
++	if *collectAtRecipient {
++		walletDB, err := store.Open(filepath.Join(c.DataDir, "recipient-wallet.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "recipient-wallet", Node: fmt.Sprintf("%x", c.RecipientOwner), Schema: 1})
++		if err != nil {
++			return err
++		}
++		defer walletDB.Close()
++		local, err := wallet.NewWithGenesis(walletDB, n.Genesis.Network, c.RecipientOwner, n.Organizations, n.Genesis)
++		if err != nil {
++			return err
++		}
++		h, err := recipient.New(collector, local, c.RecipientOwner, org, db)
++		if err != nil {
++			return err
++		}
++		defer h.Close()
++		mux.Handle("POST /v3/recipient/collect", h)
++		mux.HandleFunc("POST /v3/recipient/prepare", h.PrepareHTTP)
++	}
+ 	requesttrace.RegisterTimeline(mux)
+ 	mux.HandleFunc("POST /v1/transactions", paymentHandler(collector))
+ 	drainDirect := func() {}
+ 	var recipientOutbox *delivery.Outbox
+ 	if *directDelivery {
+ 		if n.Direct == nil || len(c.RecipientRoutes) == 0 {
+ 			return errors.New("direct recipient delivery requires direct protocol and RecipientRoutes")
+ 		}
+ 		deliveryDB, err := store.Open(filepath.Join(c.DataDir, "recipient-delivery.db"), store.Identity{Network: n.Genesis.Network.String(), Role: "recipient-delivery", Node: org.Org.String(), Schema: 1})
+ 		if err != nil {
+ 			return err
+ 		}
+ 		defer deliveryDB.Close()
+ 		client, err := recipientHTTP(c.RecipientTLS)
+-		if err != nil { return err }
++		if err != nil {
++			return err
++		}
+ 		recipientOutbox, err = delivery.NewWithClient(deliveryDB, c.RecipientRoutes, n.Organizations, client)
+ 		if err != nil {
+ 			return err
+ 		}
+ 	}
+ 	if n.Direct != nil {
+ 		var handler http.HandlerFunc
+ 		handler, drainDirect = newDirectPaymentHandlerWithDelivery(collector, true, recipientOutbox)
+ 		mux.HandleFunc("POST /v3/transactions", handler)
+ 		if os.Getenv("UTXO_EXPERIMENT_BUDGET") == "1" {
+ 			collectOnly, drainCollect := newDirectPaymentHandler(collector, false)
+ 			mux.HandleFunc("POST /debug/budget/collect", collectOnly)
+ 			drainPayment := drainDirect
+ 			drainDirect = func() { drainPayment(); drainCollect() }
+ 		}
+--- before/cmd/gateway/recipient_collect_experiment_test.go
++++ after/cmd/gateway/recipient_collect_experiment_test.go
+@@ -0,0 +1,191 @@
++package main
++
++import (
++	"bytes"
++	"context"
++	"fmt"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"os"
++	"path/filepath"
++	"sort"
++	"testing"
++	"time"
++	"utxo/internal/delivery"
++	"utxo/internal/gateway"
++	"utxo/internal/poollab"
++	"utxo/internal/recipient"
++	"utxo/internal/store"
++	"utxo/internal/transport"
++	"utxo/internal/wallet"
++	"utxo/protocol"
++)
++
++// Matched full-payment experiment using the actual gateway direct-delivery
++// handler. Additional link delay is deliberately imposed, not a WAN measurement.
++func TestRecipientCollectionExperiment(t *testing.T) {
++	if os.Getenv("UTXO_RECIPIENT_EXPERIMENT") != "1" {
++		t.Skip("set UTXO_RECIPIENT_EXPERIMENT=1")
++	}
++	const n = 50
++	for round := 0; round < 3; round++ {
++		for _, delay := range []time.Duration{0, 20 * time.Millisecond} {
++			modes := []bool{false, true}
++			if round%2 == 1 {
++				modes = []bool{true, false}
++			}
++			for _, direct := range modes {
++				t.Run(fmt.Sprintf("round%d_delay%d_receiver%v", round, delay.Milliseconds(), direct), func(t *testing.T) {
++					l, e := poollab.New(t.TempDir())
++					if e != nil {
++						t.Fatal(e)
++					}
++					defer l.Close()
++					open := func(name string) store.Store {
++						db, e := store.Open(filepath.Join(t.TempDir(), name), store.Identity{Network: "recipient-experiment", Role: name, Node: "1", Schema: 1})
++						if e != nil {
++							t.Fatal(e)
++						}
++						t.Cleanup(func() { db.Close() })
++						return db
++					}
++					db := open("collector")
++					outDB := open("delivery")
++					var clients [4]gateway.MemberClient
++					for i, s := range l.Servers {
++						clients[i] = transport.NewMemberClient(s.URL)
++					}
++					c, e := gateway.New(l.Fixture.Org, clients, db)
++					if e != nil {
++						t.Fatal(e)
++					}
++					type receipt struct {
++						at   time.Time
++						cert protocol.OutputCertificate
++					}
++					arrived := make(chan receipt, n)
++					wallets := map[protocol.PublicKey]*wallet.Wallet{}
++					var routes []delivery.Route
++					var receiving [3]*httptest.Server
++					var collecting [3]*httptest.Server
++					for i := 0; i < 3; i++ {
++						wallets[l.Descriptors[i].Owner] = l.Wallets[i]
++					}
++					h := delivery.Handler(wallets, func(p protocol.DirectPayment, _ uint32, _ string) error {
++						arrived <- receipt{time.Now(), p.Certificate}
++						return nil
++					})
++					for i := 0; i < 3; i++ {
++						receiving[i] = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { time.Sleep(delay); h.ServeHTTP(w, r) }))
++						defer receiving[i].Close()
++						routes = append(routes, delivery.Route{Owner: l.Descriptors[i].Owner, URL: receiving[i].URL})
++						rc, e := recipient.New(c, l.Wallets[i], l.Descriptors[i].Owner, l.Fixture.Org, db)
++						if e != nil {
++							t.Fatal(e)
++						}
++						defer rc.Close()
++						collecting[i] = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++							rec := httptest.NewRecorder()
++							rc.ServeHTTP(rec, r)
++							if rec.Code == 200 {
++								cert, e := protocol.DecodeOutputCertificate(rec.Body.Bytes())
++								if e != nil {
++									t.Error(e)
++								} else {
++									arrived <- receipt{time.Now(), cert}
++								}
++							}
++							for k, v := range rec.Header() {
++								w.Header()[k] = v
++							}
++							w.WriteHeader(rec.Code)
++							_, _ = w.Write(rec.Body.Bytes())
++						}))
++						defer collecting[i].Close()
++					}
++					q, e := delivery.New(outDB, routes, []protocol.OrgConfig{l.Fixture.Org})
++					if e != nil {
++						t.Fatal(e)
++					}
++					ctx, cancel := context.WithCancel(context.Background())
++					done := make(chan error, 1)
++					go func() { done <- q.Run(ctx) }()
++					defer func() {
++						cancel()
++						if e := <-done; e != nil {
++							t.Error(e)
++						}
++					}()
++					gh, drain := newDirectPaymentHandlerWithDelivery(c, true, q)
++					defer drain()
++					gs := httptest.NewServer(gh)
++					defer gs.Close()
++					var previous protocol.OutputCertificate
++					var prevOut protocol.Output
++					owner := 0
++					var samples []float64
++					for i := 0; i < n; i++ {
++						to := (owner + 1) % 3
++						template, e := l.OrdinaryTemplate(owner, uint64(i+1))
++						if e != nil {
++							t.Fatal(e)
++						}
++						b := template.Body
++						b.Subject = l.Descriptors[owner].Owner
++						input := l.Fixture.Genesis.Outputs[0].Output
++						var parents []protocol.InputCertificate
++						if i > 0 {
++							input = prevOut
++							b.Inputs = []protocol.Input{{Kind: protocol.CertificateInput, Output: previous.Summary.OutputID(0), Evidence: protocol.Hash(previous.QC.Fact)}}
++							parents = []protocol.InputCertificate{{Certificate: previous, Index: 0}}
++						}
++						out := protocol.Output{Asset: protocol.AssetCAL, Amount: 100, Recipient: l.Descriptors[to]}
++						b.Outputs = []protocol.Output{out}
++						tx, e := protocol.NewFastTx(b, []protocol.InputClaim{{Output: input}}, l.Policy.Key)
++						if e != nil {
++							t.Fatal(e)
++						}
++						tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(tx.ID(), l.Keys[owner])}
++						req := protocol.DirectRequest{Tx: tx, InputCertificates: parents}
++						raw, e := req.MarshalBinary()
++						if e != nil {
++							t.Fatal(e)
++						}
++						started := time.Now()
++						if e = l.Wallets[owner].SaveDirectRequest(req); e != nil {
++							t.Fatal(e)
++						}
++						endpoint := gs.URL
++						if direct {
++							endpoint = collecting[to].URL
++						}
++						resp, e := http.Post(endpoint, transport.MediaType, bytes.NewReader(raw))
++						if e != nil {
++							t.Fatal(e)
++						}
++						response, e := io.ReadAll(resp.Body)
++						resp.Body.Close()
++						if e != nil || resp.StatusCode != 200 {
++							t.Fatalf("request: %d %s %v", resp.StatusCode, response, e)
++						}
++						var got receipt
++						select {
++						case got = <-arrived:
++						case <-time.After(5 * time.Second):
++							t.Fatal("no receipt")
++						}
++						ms := float64(got.at.Sub(started).Nanoseconds()) / 1e6
++						samples = append(samples, ms)
++						fmt.Printf("recipient_csv,%d,%d,%v,%d,%.4f\n", round, delay.Milliseconds(), direct, i, ms)
++						previous = got.cert
++						prevOut = out
++						owner = to
++					}
++					sort.Float64s(samples)
++					t.Logf("round=%d extra_gateway_receiver_delay_ms=%d recipient_collector=%v n=%d p50_ms=%.4f p95_ms=%.4f", round, delay.Milliseconds(), direct, n, samples[(n-1)*50/100], samples[(n-1)*95/100])
++				})
++			}
++		}
++	}
++}

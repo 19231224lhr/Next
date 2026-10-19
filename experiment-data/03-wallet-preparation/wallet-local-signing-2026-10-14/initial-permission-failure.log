@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/docs/experiments/c3-issuer-funded-2026-10-13/run_c3.py", line 235, in <module>
+    main()
+  File "/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/docs/experiments/c3-issuer-funded-2026-10-13/run_c3.py", line 224, in main
+    result = run(args)
+             ^^^^^^^^^
+  File "/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/docs/experiments/c3-issuer-funded-2026-10-13/run_c3.py", line 157, in run
+    process = subprocess.Popen([payctl,'lab-run','--dir',str(directory),'--bin',str(binary)],
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+PermissionError: [Errno 13] Permission denied: '/home/qyinf/next-wallet-local-20261014/sign-compact-bin/payctl'

@@ -1,0 +1,148 @@
+C3 offline receipt experiment runner implementation
+2026-10-05; no commit, browser, network TPS, protocol/key/state-tree change or paper edit.
+
+Owned files:
+  internal/redaction/receipt_experiment_test.go
+  docs/experiments/c3-offline-authority-2026-10-05/measurement-implementation-report.txt
+The core implementation and existing dirty files were preserved.
+
+Methods and matched task
+N*-lean authenticates the actual compensation block/result vector and signed
+successor once through VerifyCompensationReceipts. Parent certificates are
+independently verified against pinned organization/rules/network, linked to the
+authenticated ParentFact and Output, and checked for the exact effect amount.
+There is no original/repaired body, saved original commit, repair command or
+opening in this packet. The signed compensation execution is the common trusted
+application-execution assumption; this is not a no-CH deployment claim.
+
+B-lean includes that same compensation evidence, plus Body, OriginalCommit,
+repair Execution and CommandIndex. It invokes
+LeanHistoricalReceipt + VerifyHistoricalAuthorization, checks every projected
+funding row against T1, then links the exact authenticated revised payment's
+consumer certificate fact and source parent fact to the compensation effects.
+Parent certificates are already present in mandatory Body and authenticated by
+VerifyHistoricalAuthorization. B omits external Parents and reuses those exact
+authenticated body bytes for fact/output/amount/organization links, without a
+second parent QC verification. Independent review identified and removed the
+earlier redundant external copies; this avoids charging B avoidable transport
+and verification costs. Its additional T2 capability is the exact applied revision and original full
+BlockID compatibility. These are additional properties, not identical byte-level
+outputs, and require retaining the B packet to reproduce later.
+
+Both return equal contiguous economic rows: target height/transaction/input,
+consumer transaction/fact, parent fact/source Output, organization, amount,
+decision, reserve debit, compensation execution height. Independently expected
+rows use original owner-signed submissions verified with VerifyDirectSubmission,
+source certificates verified with VerifyOutput, and actual result bytes checked
+via independently verified finality.VerifyBlock. B output is never the oracle.
+Neither method proves latest/current state, absence of later events, ancestry or
+an externally chosen authorized-by-H checkpoint.
+
+Trust, isolation and cache
+Receiver configuration is separately caller-pinned. Serialized configuration
+contains validator-set protobuf, public CH modulus, chain/network, schedule,
+timeout/repair cost, and organization public configurations. Execution blocks,
+results, successor signed headers and commits use explicit protobuf bytes;
+certificates use canonical protocol bytes. JSON carries these bytes as base64.
+No validator PubKey interface is trusted to round-trip through plain JSON.
+No private signer key/share or database directory is in the public transport.
+
+The verifier receives requested method as an argument; the packet cannot choose
+a weaker method. B rejects an N packet. N rejects representation evidence.
+The independent child test is guarded by UTXO_RECEIPT_RECEIVER_CHILD=1, runs this
+compiled test executable in an empty temp directory, gets only public config,
+packets and expected rows through stdin, and has a minimal environment. It
+accepts both valid methods and rejects tampered compensation results, parent
+signatures, and (B) a changed revised body or downgrade to an N packet. Fixture
+application storage is closed before invoking the child. It never calls the
+fixture constructor or loads the private fixture key.
+
+Both methods admit a cache entry only after full successful verification. The
+immutable handle binds exact config bytes, requested method and packet bytes
+with SHA256. The cache stores contiguous verified economic rows only. Lookup
+clones rows, so callers cannot mutate cached values. Cached timing is explicitly
+prevalidated immutable-row handle lookup, not arbitrary-packet authentication or
+latestness. To reverify or expose B's T2 body, retain its packet separately.
+Retained cache size is actual compact JSON encoding of {Handle,Rows}; retained
+packet size is the actual wire encoding. These are not RSS or database sizes.
+
+Declared measurement
+Four configurations n=32/256, m=1/8, one actual batch repair per configuration.
+30 serialize/decode/verify samples per method/configuration, fixed 5 prewarm
+samples, alternating method order. Each cold path reconstructs public trust and
+fresh protobuf objects, with no prevalidated verifier data. Export includes
+source evidence/certificate/protobuf serialization plus outer JSON serialization.
+verifyNS includes config and packet decode, all authentication and B/T1 checking.
+totalNS is paired wall time across export and verify (not signed timestamps).
+100 cache lookups per method/configuration, alternating order, after 5 fixed
+cache prewarm lookups. Warm OS/runtime is explicit; no cold-disk claim.
+
+Setup timing is the core fixture's TimingNS: repair_build_adaptation is the actual
+input/part adaptation and command completion db.View, including immutable reads;
+repair_execution is actual repair FinalizeBlock, repair_commit is actual Commit.
+Transaction fixture construction, common evidence construction and committee
+signing are excluded. These are one setup observation per process/configuration,
+not query samples, and are not mislabeled as total setup.
+
+JSON schema (all times int64 nanoseconds, bytes integer encoding lengths)
+report.json:
+  schema: "c3-offline-receipt-v1"
+  environment: {goVersion, goos, goarch, gomaxprocs, numCPU, pid}
+  contracts: method/trust/cold/cache/retention/setup descriptions
+  coldSamples: 30; prewarm: 5; cachedSamples: 100
+  configurations: [
+    {n,m,setupTimingNS:{repair_build_adaptation,repair_execution,repair_commit},
+     publicConfigBytes,independentReceiver:true,expectedRows,
+     methods:[{method:"N*-lean"|"B-lean",packetBytes,packetBytesPerSlot,
+       components:{envelope,Compensation,Indices,Parents (N only),Body/OriginalCommit/Repair (B only)},
+       retainedPacketBytes,retainedCacheBytes}],
+     samples:[{method,iteration:0..29,exportNS,verifyNS,totalNS}],
+     cachedSamples:[{method,iteration:0..99,cachedLookupNS}]}
+  ]
+Raw cold/cache samples are fully retained in these arrays, with no aggregation.
+Every component includes its actual JSON field name/colon/base64 value; envelope
+accounts for braces/commas. Component sum equals packetBytes. Public config is
+counted separately, not hidden as a packet component. Economic row field names
+are Go's exported names: TargetHeight, Transaction, Input, ConsumerTx,
+ConsumerFact, ParentFact, Output, Organization, Amount, Decision, Debit,
+ExecutionHeight. Hash/ID values encode as fixed byte arrays in these JSON rows.
+Separate n<N>-m<M>-N/B-packet.json and n<N>-m<M>-public-config.json files allow
+inspection and reuse. No run outputs are written inside the repository.
+
+Test commands and evidence
+Initial TDD stubs failed the matched-row and verified-cache tests as expected:
+"offline transport not implemented" and "unimplemented". The transport then
+passed those tests. Additional tests verify cross-parent and signature rejection,
+caller-pinned method guarantees, cache immutability, exact configuration/method
+handle binding, wrong-network admission rejection, absence of representation
+fields from N packets, exact byte accounting and independent subprocess behavior.
+
+Fresh full functional command:
+  go test -tags comet_v3 ./internal/redaction ./finality -count=1
+Result after B deduplication: redaction passed (4.954s); finality passed (0.153s).
+Focused TestOfflineReceipt* passed (0.526s). The new B omission regression test
+first failed with "B duplicated parent certificates already authenticated in
+Body", then passed after fixing packaging and verifier flow. B cross-parent and
+parent-signature tampering target certificates inside mandatory Body; N targets
+its external certificate data. Both continue rejecting caller-mode downgrade.
+
+Fresh Windows smoke (PowerShell, from repository root):
+  $env:UTXO_RECEIPT_EXPERIMENT = Join-Path $env:TEMP ('c3-offline-' + [guid]::NewGuid().ToString('N'))
+  go test -tags comet_v3 ./internal/redaction -run '^TestOfflineReceiptExperiment$' -count=1 -v
+Final deduplicated full matrix result: PASS, experiment 2.19s, package 2.375s. The JSON was
+also checked for exactly 30 cold/100 cached samples per method/configuration,
+independentReceiver=true and exact component sums. These are smoke observations,
+not the three-process Mac result or a universal speedup claim. Exact final smoke
+packet bytes (N/B): n32,m1 3754/109531; n32,m8 15672/124070;
+n256,m1 3754/823383; n256,m8 15672/837930. B has no Parents component.
+
+Mac compiled-run commands (fresh output paths; run binary in package directory
+because the source fixture reads ../../crypto/chameleon/testdata/rsa2048.pem):
+  go test -tags comet_v3 -c -o /tmp/c3-offline-receipt.test ./internal/redaction
+  cd internal/redaction
+  UTXO_RECEIPT_EXPERIMENT=/tmp/c3-offline-run-1 /tmp/c3-offline-receipt.test -test.run '^TestOfflineReceiptExperiment$' -test.count=1 -test.v
+  UTXO_RECEIPT_EXPERIMENT=/tmp/c3-offline-run-2 /tmp/c3-offline-receipt.test -test.run '^TestOfflineReceiptExperiment$' -test.count=1 -test.v
+  UTXO_RECEIPT_EXPERIMENT=/tmp/c3-offline-run-3 /tmp/c3-offline-receipt.test -test.run '^TestOfflineReceiptExperiment$' -test.count=1 -test.v
+Every output directory must not already exist; the runner rejects reuse.
+Root aggregates per-process P50, then median and min/max of the three independent
+process values. Queries within one process are not independent experiment runs.

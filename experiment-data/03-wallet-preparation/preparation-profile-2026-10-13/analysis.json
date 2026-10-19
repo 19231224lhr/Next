@@ -1,0 +1,279 @@
+{
+  "valid_native_runs": 16,
+  "verified_receipts": 1600,
+  "initial_timing_runs": [
+    {
+      "name": "timing-0-native.json",
+      "build_99_ms": 98.011653,
+      "receipt_sum_ms": 534.541866,
+      "chain_ms": 634.79043,
+      "interhop_other_ms": 2.236910999999992,
+      "build_unattributed_ms": 0.16840100000000074,
+      "stages_99_ms": {
+        "assemble_body": 4.015511,
+        "encode_request": 17.977755,
+        "generate_transaction": 23.206659000000002,
+        "read_coin": 14.538419,
+        "record_identifiers": 3.2849269999999997,
+        "save_request": 31.701217,
+        "sign_transaction": 3.118764
+      }
+    },
+    {
+      "name": "timing-1-native.json",
+      "build_99_ms": 136.395094,
+      "receipt_sum_ms": 687.941856,
+      "chain_ms": 827.491203,
+      "interhop_other_ms": 3.1542530000000113,
+      "build_unattributed_ms": 0.057809999999998085,
+      "stages_99_ms": {
+        "assemble_body": 11.953943,
+        "encode_request": 16.739305,
+        "generate_transaction": 30.62012,
+        "read_coin": 6.821958,
+        "record_identifiers": 3.189194,
+        "save_request": 55.316935,
+        "sign_transaction": 11.695829
+      }
+    },
+    {
+      "name": "timing-2-native.json",
+      "build_99_ms": 149.005517,
+      "receipt_sum_ms": 626.315803,
+      "chain_ms": 776.781198,
+      "interhop_other_ms": 1.4598780000000602,
+      "build_unattributed_ms": 0.04627099999999895,
+      "stages_99_ms": {
+        "assemble_body": 8.581564,
+        "encode_request": 14.69277,
+        "generate_transaction": 28.882545,
+        "read_coin": 3.800512,
+        "record_identifiers": 1.5516,
+        "save_request": 69.714568,
+        "sign_transaction": 21.735687
+      }
+    },
+    {
+      "name": "timing-3-native.json",
+      "build_99_ms": 106.131227,
+      "receipt_sum_ms": 683.598002,
+      "chain_ms": 791.913266,
+      "interhop_other_ms": 2.1840370000000746,
+      "build_unattributed_ms": 0.05022899999999886,
+      "stages_99_ms": {
+        "assemble_body": 5.512855,
+        "encode_request": 14.692413,
+        "generate_transaction": 23.642135,
+        "read_coin": 6.644755,
+        "record_identifiers": 3.038455,
+        "save_request": 38.101096,
+        "sign_transaction": 14.449289
+      }
+    },
+    {
+      "name": "timing-4-native.json",
+      "build_99_ms": 113.328312,
+      "receipt_sum_ms": 495.115454,
+      "chain_ms": 609.518568,
+      "interhop_other_ms": 1.0748019999999627,
+      "build_unattributed_ms": 0.051305999999999186,
+      "stages_99_ms": {
+        "assemble_body": 1.810176,
+        "encode_request": 11.572333,
+        "generate_transaction": 27.570128,
+        "read_coin": 5.069577,
+        "record_identifiers": 0.611582,
+        "save_request": 55.728698,
+        "sign_transaction": 10.914512
+      }
+    }
+  ],
+  "initial_mean_build_99_ms": 120.57436059999999,
+  "initial_mean_stages_99_ms": {
+    "assemble_body": 6.3748098,
+    "encode_request": 15.1349152,
+    "generate_transaction": 26.7843174,
+    "read_coin": 7.3750442,
+    "record_identifiers": 2.3351516,
+    "save_request": 50.1125028,
+    "sign_transaction": 12.3828162
+  },
+  "initial_mean_stage_share_pct": {
+    "assemble_body": 5.287035957128684,
+    "encode_request": 12.55234954154922,
+    "generate_transaction": 22.213941062358828,
+    "read_coin": 6.116594077961878,
+    "record_identifiers": 1.936690013017577,
+    "save_request": 41.561491639375944,
+    "sign_transaction": 10.269858482666505
+  },
+  "observer_ab_pairs": [
+    {
+      "round": 0,
+      "polling": {
+        "name": "ab-0-polling-native.json",
+        "build_99_ms": 88.686397,
+        "receipt_sum_ms": 481.205465,
+        "chain_ms": 570.740283,
+        "interhop_other_ms": 0.8484209999999734,
+        "build_unattributed_ms": 0.07014399999999987,
+        "stages_99_ms": {
+          "assemble_body": 3.5723439999999997,
+          "encode_request": 12.522534,
+          "generate_transaction": 18.127269000000002,
+          "read_coin": 5.601274,
+          "record_identifiers": 3.024693,
+          "save_request": 38.442593,
+          "sign_transaction": 7.325546
+        },
+        "final_checks": 34196,
+        "save_stages_99_ms": {
+          "commit_and_resume": 12.543267,
+          "encode_before_update": 12.095048,
+          "queue_wait": 6.116973,
+          "update_total": 26.347545,
+          "validation_and_locks": 7.687305
+        }
+      },
+      "events": {
+        "name": "ab-0-events-native.json",
+        "build_99_ms": 82.515684,
+        "receipt_sum_ms": 547.083171,
+        "chain_ms": 630.662177,
+        "interhop_other_ms": 1.0633220000000563,
+        "build_unattributed_ms": 0.04559199999999969,
+        "stages_99_ms": {
+          "assemble_body": 2.007549,
+          "encode_request": 8.769272,
+          "generate_transaction": 18.639978,
+          "read_coin": 11.908014,
+          "record_identifiers": 3.3437099999999997,
+          "save_request": 32.782635,
+          "sign_transaction": 5.018934
+        },
+        "final_checks": 251,
+        "save_stages_99_ms": {
+          "commit_and_resume": 7.287437,
+          "encode_before_update": 16.514876,
+          "queue_wait": 1.423536,
+          "update_total": 16.267758999999998,
+          "validation_and_locks": 7.556786
+        }
+      },
+      "preparation_reduction_pct": 6.957902461636822,
+      "chain_reduction_pct": -10.498977518290943
+    },
+    {
+      "round": 1,
+      "polling": {
+        "name": "ab-1-polling-native.json",
+        "build_99_ms": 119.662249,
+        "receipt_sum_ms": 600.698047,
+        "chain_ms": 721.190669,
+        "interhop_other_ms": 0.8303729999999803,
+        "build_unattributed_ms": 0.049468000000001566,
+        "stages_99_ms": {
+          "assemble_body": 3.692621,
+          "encode_request": 23.412393,
+          "generate_transaction": 25.899155,
+          "read_coin": 5.2474169999999996,
+          "record_identifiers": 1.354049,
+          "save_request": 50.250952,
+          "sign_transaction": 9.756194
+        },
+        "final_checks": 22528,
+        "save_stages_99_ms": {
+          "commit_and_resume": 14.978224,
+          "encode_before_update": 12.559157999999998,
+          "queue_wait": 11.431691,
+          "update_total": 37.691794,
+          "validation_and_locks": 11.281879
+        }
+      },
+      "events": {
+        "name": "ab-1-events-native.json",
+        "build_99_ms": 87.24140799999999,
+        "receipt_sum_ms": 486.117135,
+        "chain_ms": 574.17833,
+        "interhop_other_ms": 0.8197869999999483,
+        "build_unattributed_ms": 0.037767999999999136,
+        "stages_99_ms": {
+          "assemble_body": 1.602537,
+          "encode_request": 15.610684,
+          "generate_transaction": 16.369109,
+          "read_coin": 8.400212,
+          "record_identifiers": 0.578133,
+          "save_request": 40.678406,
+          "sign_transaction": 3.964559
+        },
+        "final_checks": 228,
+        "save_stages_99_ms": {
+          "commit_and_resume": 11.149995,
+          "encode_before_update": 13.070177,
+          "queue_wait": 3.583115,
+          "update_total": 27.608229,
+          "validation_and_locks": 12.875119
+        }
+      },
+      "preparation_reduction_pct": 27.093624991119803,
+      "chain_reduction_pct": 20.38467014608588
+    },
+    {
+      "round": 2,
+      "polling": {
+        "name": "ab-2-polling-native.json",
+        "build_99_ms": 115.124508,
+        "receipt_sum_ms": 646.569818,
+        "chain_ms": 762.625105,
+        "interhop_other_ms": 0.9307789999999017,
+        "build_unattributed_ms": 0.059653999999999874,
+        "stages_99_ms": {
+          "assemble_body": 2.036017,
+          "encode_request": 16.132550000000002,
+          "generate_transaction": 22.463521,
+          "read_coin": 9.293415,
+          "record_identifiers": 7.882344,
+          "save_request": 52.436137,
+          "sign_transaction": 4.82087
+        },
+        "final_checks": 23222,
+        "save_stages_99_ms": {
+          "commit_and_resume": 13.146822,
+          "encode_before_update": 16.271281000000002,
+          "queue_wait": 15.18751,
+          "update_total": 36.164856,
+          "validation_and_locks": 7.830524
+        }
+      },
+      "events": {
+        "name": "ab-2-events-native.json",
+        "build_99_ms": 96.538207,
+        "receipt_sum_ms": 566.052779,
+        "chain_ms": 664.75468,
+        "interhop_other_ms": 2.163694000000021,
+        "build_unattributed_ms": 0.04571900000000234,
+        "stages_99_ms": {
+          "assemble_body": 2.162996,
+          "encode_request": 8.34915,
+          "generate_transaction": 24.239886,
+          "read_coin": 8.426747,
+          "record_identifiers": 1.729649,
+          "save_request": 46.038401,
+          "sign_transaction": 5.545659
+        },
+        "final_checks": 205,
+        "save_stages_99_ms": {
+          "commit_and_resume": 11.291474000000001,
+          "encode_before_update": 18.778019,
+          "queue_wait": 3.996009,
+          "update_total": 27.260382,
+          "validation_and_locks": 11.972899
+        }
+      },
+      "preparation_reduction_pct": 16.14452154705409,
+      "chain_reduction_pct": 12.833359977049263
+    }
+  ],
+  "observer_ab_median_paired_preparation_reduction_pct": 16.14452154705409,
+  "observer_ab_median_paired_chain_reduction_pct": 12.833359977049263
+}

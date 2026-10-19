@@ -1,0 +1,6 @@
+go test ./internal/gateway -run TestDirectRelayExhaustedScan|TestDirectRelayCapacityBlocked -count=1
+--- FAIL: TestDirectRelayExhaustedScanDoesNotRestartOnCompletion (0.00s)
+    direct_scan_completion_test.go:73: completion restarted exhausted cooling scan
+FAIL
+FAIL utxo/internal/gateway 1.727s
+Exit code: 1. Preserved from tool execution before implementation.

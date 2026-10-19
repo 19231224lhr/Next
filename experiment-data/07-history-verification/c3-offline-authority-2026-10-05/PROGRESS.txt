@@ -1,0 +1,30 @@
+C3 historical authorization receipt experiment, 2026-10-05
+
+Approved specification: ../../paper/review-2026-10-02/c3-value-resolution-2026-10-05/DECISION.txt
+Starting branch fix/partial-approval-reclamation; HEAD 594d237. Existing paper/test changes preserved.
+
+Task 1 COMPLETE: binding audit and test-first offline verifier. Two independent read-only reviews found no blocker under the pinned trust model; T1 negative tests and shared API scope comments added. No new state tree, signing keys, transaction format or committee protocol changes.
+Task 2 COMPLETE: matched ordinary projection and repaired-body export/verify measurement; real executed fixtures, no receiving database, same trust and optimization opportunity.
+Task 3 COMPLETE: independent-process Mac experiment (32/256 transactions, 1/8 affected inputs), three fresh processes; actual source/binary/environment manifest and staged costs.
+Task 4 COMPLETE: two implementation reviews, Claude design consultation and GPT results/writing review; reader contract/report/index and bilingual paper updated, four PDFs compiled and inspected. Claude results request hit explicit platform quota; no Claude result endorsement is claimed.
+
+Baseline: go test -tags comet_v3 ./internal/redaction ./finality passed (cached).
+Workspace is existing isolated git worktree, not main. No new checkout required.
+
+Predeclared claims and gates:
+- Historical ever-authorized revision, not latest revision/current economic status/absence.
+- Common ordinary N* supports authentic original + public decisions/projection. Do not force repair waiting for economic-only task.
+- Exact revision T2 must authenticate same precise authorization as B.
+- Full original BlockID compatibility does not alone authorize mutable funding bytes.
+- No local DB/network in receiving verifier. Independent-process negative tests.
+- Same-chain incremental comparison is not full no-CH deployment comparison; report CH always-on costs separately.
+- Common offline proof service gains are not CH-specific gains. A more efficient ordinary alternative is a valid experimental result.
+- Stop scope expansion if new state tree, new keys or protocol changes are required; retain findings and discuss with Claude.
+
+
+Formal Mac source: results/source-manifest.json; all 1011 hashes verified. Three PIDs 65798/65804/65810; all four configurations and independent child checks PASS. Result summary in results/summary.json.
+No ordinary-economic-query CH advantage measured. N total P50 0.181-0.935ms; B 0.762-4.516ms with additional T2 exact-revision/full-identity checks.
+Claude proof-design consultation completed; actual result message blocked by explicit platform65/65 quota. GPT fallback response finished and archived; supports scope closure and fair N*/B interpretation. See gpt-results-review.txt.
+
+Paper delivery: pdf/main.pdf (23 pages), main-zh.pdf (25), supplement-main.pdf (30), supplement-main-zh.pdf (30); no undefined references, missing characters, overfull boxes or out-of-page text. New method/table pages visually checked. Existing template underfull warnings retained. No production hot-path change, no network TPS rerun, no commit/push or Overleaf sync in this task.
+

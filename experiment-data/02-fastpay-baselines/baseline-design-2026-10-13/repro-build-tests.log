@@ -1,0 +1,80 @@
+info: syncing channel updates for 1.99.0-x86_64-unknown-linux-gnu
+
+  1.99.0-x86_64-unknown-linux-gnu unchanged - rustc 1.99.0 (b940084d7 2026-09-28)
+
+info: checking for self-update (current version: 1.29.1)
+   Compiling fastpay v0.1.0 (/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/.scratch/fastpay-upstream/fastpay)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.47s
+warning: the following packages contain code that will be rejected by a future version of Rust: fastpay_core v0.1.0 (/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/.scratch/fastpay-upstream/fastpay_core)
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+   Compiling fastpay v0.1.0 (/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/.scratch/fastpay-upstream/fastpay)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.53s
+warning: the following packages contain code that will be rejected by a future version of Rust: fastpay_core v0.1.0 (/mnt/c/Users/Bocchi/Desktop/Next/.e8-worktree/.scratch/fastpay-upstream/fastpay_core)
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 2`
+     Running unittests src/lib.rs (/home/qyinf/.local/share/next-baseline-tools/fastpay-target/release/deps/fastpay-fb0febbf2ddb2cbd)
+
+running 2 tests
+test transport::transport_tests::tcp_server ... ok
+test transport::transport_tests::udp_server ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.06s
+
+     Running unittests examples/baseline_client.rs (/home/qyinf/.local/share/next-baseline-tools/fastpay-target/release/examples/baseline_client-b7a58343b20f9682)
+
+running 1 test
+test tests::clock_starts_on_first_rpc_and_resets ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/qyinf/.local/share/next-baseline-tools/fastpay-target/release/deps/fastpay_core-7125b9765a07d3c3)
+
+running 45 tests
+test authority::authority_tests::test_account_state_ok ... ok
+test authority::authority_tests::test_handle_primary_synchronization_order_double_spend ... ok
+test authority::authority_tests::test_get_shards ... ok
+test authority::authority_tests::test_handle_cross_shard_recipient_commit ... ok
+test authority::authority_tests::test_account_state_unknown_account ... ok
+test authority::authority_tests::test_handle_transfer_order_double_spend ... ok
+test authority::authority_tests::test_handle_confirmation_order_bad_sequence_number ... ok
+test authority::authority_tests::test_handle_confirmation_order_receiver_equal_sender ... ok
+test authority::authority_tests::test_handle_confirmation_order_unknown_sender ... ok
+test authority::authority_tests::test_handle_confirmation_order_ok ... ok
+test authority::authority_tests::test_handle_confirmation_order_exceed_balance ... ok
+test authority::authority_tests::test_handle_transfer_order_bad_sequence_number ... ok
+test authority::authority_tests::test_handle_confirmation_order_receiver_balance_overflow ... ok
+test authority::authority_tests::test_handle_transfer_order_exceed_balance ... ok
+test authority::authority_tests::test_handle_transfer_order_bad_signature ... ok
+test authority::authority_tests::test_handle_transfer_order_ok ... ok
+test authority::authority_tests::test_handle_transfer_order_unknown_sender ... ok
+test authority::authority_tests::test_handle_primary_synchronization_order_update ... ok
+test authority::authority_tests::test_handle_transfer_order_zero_amount ... ok
+test base_types::base_types_tests::test_max_sequence_number ... ok
+test base_types::base_types_tests::test_signatures ... ok
+test fastpay_smart_contract::fastpay_smart_contract_tests::test_handle_funding_transaction_ok ... ok
+test fastpay_smart_contract::fastpay_smart_contract_tests::test_handle_redeem_transaction_negative_balance ... ok
+test messages::messages_tests::test_signed_values ... ok
+test serialize::serialize_tests::test_error ... ok
+test serialize::serialize_tests::test_cert ... ok
+test fastpay_smart_contract::fastpay_smart_contract_tests::test_handle_funding_transaction_zero_amount ... ok
+test serialize::serialize_tests::test_info_request ... ok
+test fastpay_smart_contract::fastpay_smart_contract_tests::test_handle_redeem_transaction_double_spend ... ok
+test serialize::serialize_tests::test_order ... ok
+test fastpay_smart_contract::fastpay_smart_contract_tests::test_handle_redeem_transaction_ok ... ok
+test messages::messages_tests::test_certificates ... ok
+test serialize::serialize_tests::test_info_response ... ok
+test serialize::serialize_tests::test_vote ... ok
+test serialize::serialize_tests::test_time_order ... ok
+test serialize::serialize_tests::test_time_vote ... ok
+test serialize::serialize_tests::test_time_cert ... ok
+test client::client_tests::test_initiating_valid_transfer ... ok
+test client::client_tests::test_initiating_transfer_low_funds ... ok
+test client::client_tests::test_initiating_valid_transfer_despite_bad_authority ... ok
+test client::client_tests::test_bidirectional_transfer ... ok
+test downloader::downloader_tests::test_local_downloader ... ok
+test client::client_tests::test_receiving_unconfirmed_transfer ... ok
+test client::client_tests::test_get_strong_majority_balance ... ok
+test client::client_tests::test_receiving_unconfirmed_transfer_with_lagging_sender_balances ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+FastPay release binaries: /home/qyinf/.local/share/next-baseline-tools/fastpay-target/release

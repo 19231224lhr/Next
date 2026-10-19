@@ -1,0 +1,68 @@
+{
+  "diagnostic_only": true,
+  "length": 1000,
+  "trace": true,
+  "cpu_profile_seconds": 6,
+  "runtime_trace_seconds": null,
+  "runtime_trace_delay_seconds": null,
+  "client_cpu_profile": "/home/qyinf/next-wallet-local-20261014/final-diagnostic/client.pprof",
+  "client_cpu_scope": "whole chain including observer drain",
+  "client_build_profile": true,
+  "service_variant": {
+    "payctl": {
+      "binary": "/home/qyinf/next-wallet-local-20261014/full-bin/payctl",
+      "sha256": "d89a7051cc852c3445f307a6c213f43d671388258198c4b0667ba33b259c64d1",
+      "options": []
+    },
+    "member": {
+      "binary": "/home/qyinf/next-c3-speed-20261014/final-bin/member",
+      "sha256": "f348b9b24ae0bbe04c698ad706e12dfc9648f60df6e037dadbd7f7e9c296ec07",
+      "options": []
+    },
+    "gateway": {
+      "binary": "/home/qyinf/next-c3-speed-20261014/final-bin/gateway",
+      "sha256": "64bb31a2f5b111ee3aa5e66a776e403daa581d566d73f51bbb25fa84c1f00991",
+      "options": [
+        "--compact-direct-approvals"
+      ]
+    },
+    "committee": {
+      "binary": "/home/qyinf/next-c3-speed-20261014/final-bin/committee",
+      "sha256": "cce49f2e9afd8ee9ad57cf640d092feae15340174ee88cf3419e5a689b12fdb8",
+      "options": []
+    }
+  },
+  "gomaxprocs": 1,
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "fixture": "/home/qyinf/next-c3-speed-20261014/fixtures/chain1000",
+  "services": "/home/qyinf/next-wallet-local-20261014/full-compact-bin",
+  "common_client": "/home/qyinf/next-wallet-local-20261014/full-bin/payctl",
+  "binary_sha256": {
+    "payctl": "d89a7051cc852c3445f307a6c213f43d671388258198c4b0667ba33b259c64d1",
+    "member": "f348b9b24ae0bbe04c698ad706e12dfc9648f60df6e037dadbd7f7e9c296ec07",
+    "gateway": "170ecef465a18a898c74de24894ad7ee7d2621907bc2847543928eddc7901ada",
+    "committee": "cce49f2e9afd8ee9ad57cf640d092feae15340174ee88cf3419e5a689b12fdb8"
+  },
+  "driver_sha256": "800ab1f6e006621e87b19fe168eaeed363a8b83002e8d5eb5eba4e03a93645bd",
+  "runner_sha256": "91796dd97d7e8369ca48e9da986fcbfb94d6bbc3cf99b20cd4f8e15ae0d8dc64",
+  "started_unix_ns": 1791952749867814794,
+  "workload_dispatch_unix_ns": 1791952750799482946,
+  "workload_command": [
+    "/home/qyinf/next-wallet-local-20261014/final-diagnostic/bin/payctl",
+    "chain-v4",
+    "--dir",
+    "/home/qyinf/next-wallet-local-20261014/final-diagnostic/chain",
+    "--length",
+    "1000",
+    "--trace"
+  ]
+}

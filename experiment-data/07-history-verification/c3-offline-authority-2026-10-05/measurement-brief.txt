@@ -1,0 +1,27 @@
+Task: implement and execute matched offline receipt experiment after receipt.go core is ready.
+Repo C:/Users/Bocchi/Desktop/Next/.e8-worktree. Preserve all existing changes.
+Own ONLY internal/redaction/receipt_experiment_test.go and this experiment directory's measurement implementation report. Core owner owns receipt.go/receipt_test.go.
+
+Production interfaces:
+VerifyHistoricalAuthorization(trust,policy,LeanHistoricalReceipt) -> AuthorizedRevision (strict B, Body + OriginalCommit + repair execution evidence).
+VerifyCompensationReceipts(trust,execution,indices) -> []AuthorizedCompensation (one validation for the common execution block).
+newReceiptFixture(t,n,m,true) from receipt_test.go provides f.trust/f.policy/f.evidence/f.receipts and actual App/Engine/rule execution, signed results successor headers. f.evidence[2] compensation height3, f.receipts[0] height4 repair. Trust and public policy independently configured by receiver.
+
+Question / predeclared scope:
+Independent receiver verifies historical economic rows (target coordinates, consumer Tx, source Output, organization, amount, decision, debit, execution height). No current/latest/absence claim.
+N*-lean = compensation proof + parent certificates if required for org identity. Optimize: no original block body required if exact authenticated effect plus parent certificate Fact/output link suffices. Include original saved commit only if actually used for meaningful coordinate/fullID binding; do not add unused bytes.
+B-lean = exact authorized revised body + original saved commit + repair receipt + the same compensation proof. Same T1 rows, plus additional precise revision and fullID compatibility property. Crosscheck body rows to compensation effects; every decision proof/certificate/network/input/amount must be authenticated, not read from fixture database.
+Do NOT call skip-part-validation on the CH body a no-CH economic baseline. N* never depends on repaired Body, openings or completed repair command. B adds extra T2 capability; report this rather than claim identical byte-level output.
+Provide strongest ordinary cached contiguous rows, cache ONLY after complete successful verification. Same strategy for B. Cache is local verified result reuse keyed by exact package+trusted configuration within fixed process, never unauthenticated exporter data. If simpler, clearly label warm-cache as verified immutable row lookup with prevalidated handle; no latestness or arbitrary packet acceptance claimed.
+
+Meaningful tests before implementation:
+Both modes return equal independently expected economic rows, invalid/cross-target proof and bad parent certificate rejected, cache rows cannot be introduced unauthenticated. Independent subprocess receives serialized public trust/policy and packet only (no application/BlockStore directory), accepts valid proof and rejects one tampered proof; child test entry guarded by env so normal go test does not recursively spawn.
+Serialization must not trust in-memory private caches. Standard JSON/protobuf supported by Comet; encoding/json may not roundtrip validator PubKey interface so explicitly use validator-set protobuf bytes / pinned public keys. No private signer keys exported to receiver. Can save packets to local experiment output, pass trust separately under test harness-controlled path.
+
+Measurement:
+TestOfflineReceiptExperiment gated by UTXO_RECEIPT_EXPERIMENT=<fresh output directory>. Four configs n=32/256, m=1/8, use newReceiptFixture. Default 30 or 50 independent verifications per config/mode with fixed prewarm5; alternate N/B order. Distinguish cold verifier (decode packet + verify, fresh objects, warm OS) from verified-row cache access; no OS disk-cache claims. Export serialization measured separately; report end-to-end serialize+decode+verify paired sample as well if possible. No cost-free prevalidated data in cold path.
+Packet bytes total and components, amortized per repaired slot. Retained packet/cache bytes actual encoding size (not RSS or whole database). Allocation optional only if clean measurement.
+Setup costs record input+part adaptation, repair rule/ABCI execution if fixture exposes; else time real fixture stage instrumentation minimally coordinate with core owner, not total setup mislabeled adaptation. Common evidence construction/committee signing and unrelated transaction setup excluded from adaptation.
+Write machine-readable JSON report plus raw samples. Include runtime.Version/GOOS/GOARCH/GOMAXPROCS and method contract. Root runs compiled test in 3 independent processes on Mac, aggregates per-run P50 then median and min/max; never count queries as independent runs or claim universal speedup.
+
+No network TPS runs, no new protocol/key/state tree, no paper edits, no git commit. Run targeted functional tests, then small experiment smoke (n fixed full matrix okay) locally. Full report path measurement-implementation-report.txt; tell root exact env and schema.

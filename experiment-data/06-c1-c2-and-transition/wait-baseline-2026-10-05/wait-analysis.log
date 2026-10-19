@@ -1,0 +1,165 @@
+{
+  "runs": [
+    {
+      "case": "r1-fast",
+      "mode": "fast",
+      "chain_ms": 4695.347125,
+      "attempts": 100,
+      "failed_attempts": 0,
+      "failed_service_ms": 0.0,
+      "retry_sleep_ms": 0.0,
+      "intermediate_gate_ms": 0.0,
+      "gate_samples": 0,
+      "intermediate_wallet_wait_ms": 0.0,
+      "diagnostic_scope": "HTTP responses and member observations; no inferred approval-failure reason"
+    },
+    {
+      "case": "r1-wallet-wait",
+      "mode": "wait_final",
+      "chain_ms": 64215.573459,
+      "attempts": 123,
+      "failed_attempts": 23,
+      "failed_service_ms": 826.327874,
+      "retry_sleep_ms": 1153.4187089999998,
+      "intermediate_gate_ms": 0.0,
+      "gate_samples": 0,
+      "intermediate_wallet_wait_ms": 58193.222408999995,
+      "diagnostic_scope": "HTTP responses and member observations; no inferred approval-failure reason"
+    },
+    {
+      "case": "r1-member-wait",
+      "mode": "wait_member_inputs",
+      "chain_ms": 64283.844917,
+      "attempts": 100,
+      "failed_attempts": 0,
+      "failed_service_ms": 0.0,
+      "retry_sleep_ms": 0.0,
+      "intermediate_gate_ms": 1693.8411630000003,
+      "gate_samples": 836,
+      "intermediate_wallet_wait_ms": 58981.15528900001,
+      "diagnostic_scope": "HTTP responses and member observations; no inferred approval-failure reason",
+      "initial_bootstrap_gate_ms_excluded": 4.996042
+    },
+    {
+      "case": "r2-fast",
+      "mode": "fast",
+      "chain_ms": 4595.03,
+      "attempts": 100,
+      "failed_attempts": 0,
+      "failed_service_ms": 0.0,
+      "retry_sleep_ms": 0.0,
+      "intermediate_gate_ms": 0.0,
+      "gate_samples": 0,
+      "intermediate_wallet_wait_ms": 0.0,
+      "diagnostic_scope": "HTTP responses and member observations; no inferred approval-failure reason"
+    },
+    {
+      "case": "r2-wallet-wait",
+      "mode": "wait_final",
+      "chain_ms": 64136.675834,
+      "attempts": 112,
+      "failed_attempts": 12,
+      "failed_service_ms": 522.8115829999999,
+      "retry_sleep_ms": 601.432582,
+      "intermediate_gate_ms": 0.0,
+      "gate_samples": 0,
+      "intermediate_wallet_wait_ms": 58323.32604100001,
+      "diagnostic_scope": "HTTP responses and member observations; no inferred approval-failure reason"
+    },
+    {
+      "case": "r2-member-wait",
+      "mode": "wait_member_inputs",
+      "chain_ms": 64307.250333,
+      "attempts": 100,
+      "failed_attempts": 0,
+      "failed_service_ms": 0.0,
+      "retry_sleep_ms": 0.0,
+      "intermediate_gate_ms": 1544.223873,
+      "gate_samples": 770,
+      "intermediate_wallet_wait_ms": 59315.33466700001,
+      "diagnostic_scope": "HTTP responses and member observations; no inferred approval-failure reason",
+      "initial_bootstrap_gate_ms_excluded": 4.840333
+    },
+    {
+      "case": "r3-fast",
+      "mode": "fast",
+      "chain_ms": 4599.457458,
+      "attempts": 100,
+      "failed_attempts": 0,
+      "failed_service_ms": 0.0,
+      "retry_sleep_ms": 0.0,
+      "intermediate_gate_ms": 0.0,
+      "gate_samples": 0,
+      "intermediate_wallet_wait_ms": 0.0,
+      "diagnostic_scope": "HTTP responses and member observations; no inferred approval-failure reason"
+    },
+    {
+      "case": "r3-wallet-wait",
+      "mode": "wait_final",
+      "chain_ms": 64393.566125,
+      "attempts": 125,
+      "failed_attempts": 25,
+      "failed_service_ms": 1177.722205,
+      "retry_sleep_ms": 1256.377125,
+      "intermediate_gate_ms": 0.0,
+      "gate_samples": 0,
+      "intermediate_wallet_wait_ms": 57980.75074900001,
+      "diagnostic_scope": "HTTP responses and member observations; no inferred approval-failure reason"
+    },
+    {
+      "case": "r3-member-wait",
+      "mode": "wait_member_inputs",
+      "chain_ms": 64339.242125,
+      "attempts": 100,
+      "failed_attempts": 0,
+      "failed_service_ms": 0.0,
+      "retry_sleep_ms": 0.0,
+      "intermediate_gate_ms": 1647.0907969999994,
+      "gate_samples": 804,
+      "intermediate_wallet_wait_ms": 59209.662252999995,
+      "diagnostic_scope": "HTTP responses and member observations; no inferred approval-failure reason",
+      "initial_bootstrap_gate_ms_excluded": 4.964583
+    }
+  ],
+  "aggregates": {
+    "fast": {
+      "mean_ms": 4629.944861,
+      "median_ms": 4599.457458,
+      "min_ms": 4595.03,
+      "max_ms": 4695.347125
+    },
+    "wallet-wait": {
+      "mean_ms": 64248.60513933333,
+      "median_ms": 64215.573459,
+      "min_ms": 64136.675834,
+      "max_ms": 64393.566125
+    },
+    "member-wait": {
+      "mean_ms": 64310.11245833334,
+      "median_ms": 64307.250333,
+      "min_ms": 64283.844917,
+      "max_ms": 64339.242125
+    }
+  },
+  "paired_ratios": [
+    {
+      "repeat": 1,
+      "wallet_wait_over_fast": 13.6764272692618,
+      "member_wait_over_fast": 13.690967505836962,
+      "member_wait_over_wallet_wait": 1.0010631604503788
+    },
+    {
+      "repeat": 2,
+      "wallet_wait_over_fast": 13.95783614775094,
+      "member_wait_over_fast": 13.994957667958644,
+      "member_wait_over_wallet_wait": 1.002659546925093
+    },
+    {
+      "repeat": 3,
+      "wallet_wait_over_fast": 14.00025257609416,
+      "member_wait_over_fast": 13.988441617846137,
+      "member_wait_over_wallet_wait": 0.9991563753450997
+    }
+  ],
+  "note": "Different input evidence paths remain; gate timings include client polling."
+}

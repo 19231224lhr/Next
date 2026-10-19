@@ -1,0 +1,34 @@
+Independent follow-up code and runner review, 2026-10-05
+Reviewer scope: .e8-worktree, cmd/payctl/chain_wait.go, chain_wait_test.go, direct_chain.go follow-up diff; wait-baseline run_chain.py/analyze.py/test_analyze.py; current-capital run.py/freeze.py and necessary imported helpers. No C3 or unrelated historical changes reviewed. Read-only review except this report; no browser, remote or Git mutations.
+
+Verdict: No remaining critical or important finding in the final inspected files. This is code/runner review and local targeted verification, not a claim that the Mac experiments have run or passed.
+
+Resolved findings observed during review:
+1. Gate rounds initially blocked on the fourth reply when only two members were ready and a third responding member needed another poll. Confirmed by failing TestChainWaitRepollsThirdWithoutWaitingForFourth (deadline 80ms, PollRounds1, quorum only two). Final implementation uses four independent member watchers; each nonready member repolls every 5ms and the gate returns after any three observed successes. Regression now passes.
+2. Capital runner initially called an imported build helper that required git rev-parse/git diff, incompatible with its .git-less frozen bundle. Final runner builds overlay and all four roles directly; Git metadata is optional.
+3. Wait analyzer initially counted failure only when HTTPStatus!=200, missing an HTTP200 body-read error that is retried. Final analyzer counts Error; successful final attempt also requires no Error. Three analyzer tests pass.
+4. Wait source-hash map initially omitted go.mod/go.sum. Final map includes both and optionally links the combined source-manifest hash.
+5. Historical capital analyzer dropped Bytes kind4. Final runner supplements Bytes curves/occupancy from the same raw snapshots. Raw resource refusal counters for all kinds remain available.
+
+Gate/measurement checks:
+- Opt-in member wait requires wait-final and e5-owner-fuel; attempt recording requires e5-owner-fuel before lab reading.
+- Exact immediate parent output/evidence/claim checked; first principal checked against genesis; final independent genesis FUEL has exact evidence, route, owner authorization inclusion and no reuse.
+- Observation gate does not authorize a transaction or skip member checks. Three of four routed members observe the exact parent; bootstrap requires three healthy replies.
+- Bootstrap gate completes before the actual first send starts the chain timer. Subsequent 99 gates lie between Sent1 and final Ready100.
+- All three arms preserve literal signed request bytes, SHA256 per retry, actual HTTP service interval/status/error/body and actual retry pause. Existing uninstrumented/default paths retain faultSend/submitChain behavior.
+- Analyzer keeps wallet wait, member gate and HTTP failure costs separate and does not infer a member approval failure cause from transport status.
+
+Capital checks:
+- Source hashes cover production Go, root go.mod/go.sum, overlay inputs, four imported helpers and new runner/docs. Freeze includes actual materialized Comet sources and full wait folder; runtime records all materialized Comet files before/after build.
+- Unique output tree and pristine pre-node template, copytree to new labs per cell, no old .run/budget-pristine-template.
+- CAL reserve account and grant both 3600/28800; independent 100-CAL origins and 10000-FUEL user origins; sponsor FUEL accounts/grants absent; ample Execution/Bytes grants.
+- All arms set source recovery disabled and serial direct off; no adaptive funding/recharge/lock clearing.
+- Parent delay 1/3s, rate20 units/s, duration60s, drain60s, pending128; imported driver retains monotonic publication-delay verification and stopped-state audits.
+- Pilot checks real public responsibility and local reservation. Genuine low-arm residuals stay in results rather than being discarded. High-arm incompletion is reported.
+- Three repetitions are supported and cell order recorded; run.py default remains one, so authorized suite must explicitly use --repeats 3.
+
+Local verification after fixes:
+- go test ./cmd/payctl -run 'Test(MeasuredChain|ChainWait)' -count=1: PASS, 0.351s.
+- python -m unittest discover -s docs/experiments/wait-baseline-2026-10-05 -p test_analyze.py: PASS, 3 tests.
+- AST parse of four changed Python runners/analyzers: PASS.
+- current-capital run.py --help and freeze.py --help: PASS.

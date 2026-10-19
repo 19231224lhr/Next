@@ -1,0 +1,139 @@
+C3 offline authority prototype implementation report
+Date: 2026-10-05
+Status: implemented and verified locally; no paper claims, commit, push or network verifier.
+
+Files owned by implementation task:
+- internal/redaction/receipt.go
+- internal/redaction/receipt_test.go
+Existing dirty paper and committee measurement files were preserved. No protocol
+field, signing key, state tree, database index or finality API was changed.
+
+APIs and common task boundary
+
+VerifyCompensationReceipt(Trust, BlockData, index) and
+VerifyCompensationReceipts(Trust, BlockData, indices) implement independent T1:
+authenticate the precise public compensation decision and its first successful
+economic execution. The plural API authenticates the signed block/result vector
+once and projects selected effects in caller order. Returned amount, parent fact,
+consumer fact/transaction, input and debit are actual signed result fields; the
+exact decision's ID, network and coordinates are checked. This does not require
+a repair command, changed body, application DB or adapter witness. Organization
+is not in CompensationResult: callers obtain it from the corresponding original
+authenticated parent certificate, rather than accepting an exporter label.
+
+VerifyHistoricalAuthorization(Trust, DirectPolicy, LeanHistoricalReceipt) is the
+measurement-default B interface. The witness contains Body, OriginalCommit,
+Execution (original execution block, full results, successor signed header) and
+CommandIndex. It authenticates one exact repair/batch command and successful
+RepairResult, checks Next against the actual supplied body, derives funding rows
+from that authenticated body and its certificates, verifies the command's target
+slots, reserve references and input openings, and reconstructs the revised full
+BlockID using command Parts at Base+1. That full ID must verify against the
+retained original commit. OriginalAvailable=false explicitly avoids claiming
+original mutable funding/opening bytes that the lean package does not contain.
+
+VerifyHistoricalReceipt adds audit-mode OriginalBody and BaseBody. Original full
+body is authenticated by a canonical initial-opening part set and retained
+original commit, BaseBody by the authenticated command Previous digest, and the
+actual allowed slot transformation is reconstructed byte-for-byte against Body.
+OriginalAvailable=true marks the resulting original-funding descriptor fields.
+
+VerifyHistoricalProjection performs identical audit-mode exact revision
+authorization without the extra revised part-identity property. It affords an
+ordinary stored overlay the same T2 evidence opportunity. Because this API still
+contains a CH-generated exact authorized Body, it is not an independent no-CH
+economic baseline and must not be labelled as one. An ordinary T1 comparison
+uses compensation evidence and parent certificates directly, without waiting for
+representation repair. Offline proof service and single-file export are shared
+capabilities, not CH-exclusive benefits.
+
+Binding and trust scope
+
+The verifier pins caller-provided ChainID, Network, fixed four equal-weight
+validators and DirectPolicy (rules, organization configurations and CH key).
+Signature safety assumes the pinned committee executes the pinned application
+semantics correctly under the existing BFT assumptions. This authenticates a
+positive historical execution, not a stateless proof of execution from genesis.
+The local Comet redaction context is the existing startup-only chain/key setting;
+ConfigureRedaction checks it against the pinned chain/key and cannot replace a
+different configured context.
+
+Exact REPAIR5/RPBATCH5 command bytes enter ordinary transaction hashing, unlike
+the normalized UTXO4CH payment projection. All command network/target/base/
+Previous/Next/slot/input/part openings are authenticated. Successful Code alone
+is insufficient: decoded result Command must equal the command's canonical ID
+and Applied must be true. A successful replay with Applied=false is rejected.
+
+The receipt verifier serializes and freshly decodes the execution block before
+finality.VerifyBlock, avoiding mutable-object cached Block.Hash inheritance.
+Signed successor header checks then bind exact command/result index, ordered
+transaction root, ordered result root, chain, height, validator set and commit.
+
+Payment DataHash intentionally omits mutable funding bytes. Therefore merely
+calling VerifyBlock on a payment cannot prove those bytes were the original
+executed funding. Audit mode uses the original commit's full part identity with
+fixed initial opening 1 to authenticate the entire original body. Lean mode
+authenticates supplied exact body bytes through the successful repair command's
+plain SHA256 Next digest, with original full identity checked separately. A
+compatible CH collision never suffices as authorization.
+
+Returned organization and amount come from the authenticated payment claim and
+verified source certificate. The decision identity in a T2 row is deterministically
+derived from authenticated network/output/target coordinates; successful repair
+execution is assumed to have enforced its prerequisite decision. Consumers
+needing independently presented economic execution additionally verify T1 and
+cross-check actual effect identities/amount/debit, as the benchmark does.
+
+All interfaces prove ever-authorized / ever-executed only. No latest revision,
+current outstanding/repaid state, absence of later events, complete prefix, or
+per-key Direct state proof is returned. Trust has no checkpoint/prefix field.
+An authorized-by-H consumer must externally pin H and reject successor headers
+beyond H; result authentication requires the successor header to be available.
+No arbitrary checkpoint ancestry is implied by independently signed heights.
+
+Witness size choices
+
+Audit mode deliberately contains original/base/next bodies; when Base==0 original
+and base duplicate bytes and can be deduplicated by packaging/cache. These full
+bodies are not required for the lean positive authorization claim under trusted
+correct execution. The lean B interface omits them. No blanket N* or B size or
+performance advantage is asserted here; actual transport/layout costs must be
+measured with the task and trust assumptions stated.
+
+Tests and verification
+
+Fixtures use testkit valid signed owner payments and source certificates, real
+Engine/App FinalizeBlock/Commit execution, ExecuteDecision and Execute/ExecuteBatch,
+and actual complete results certified by newly signed successor block headers.
+They do not invent Applied:true fixture booleans. Two single commands create
+successive revisions of one original block; batch tests authorize two targets.
+Replay and failure fixtures are actual subsequent executed commands.
+
+TDD evidence: initial single/batch/T1 tests failed with invalid authorization from
+minimal stubs; implementation then passed. The plural economic API first failed
+with zero effects instead of two; implementation then passed. The lean interface
+first failed invalid authorization; implementation then passed. Additional
+adversarial tests cover rejection guards and regression invariants.
+
+Covered rejection cases: raw command and wrong-slot mutation; signed result from
+another actual repair command; result-root tampering; malformed signed result;
+wrong target body/base/command index; original funding-byte substitution; wrong
+network/chain/committee/rules; cached header/command mutation; a compatible later
+body substituted without its own command; actual successful Applied:false replay;
+actual failed command. Lean mode rejects applicable cases too. N*/B audit-mode
+exact authorization descriptors agree. T1 is available before representation.
+Historical receipt remains valid after later revision/repayment with DB closed.
+
+Verified command (2026-10-05):
+  go test -tags comet_v3 ./internal/redaction ./finality
+Result: both packages passed (latest redaction 4.622s, finality cached).
+
+Fixture TimingNS exposes cumulative repair_build_adaptation (the actual input/
+part-share and command-completion db.View, including immutable reads, excluding
+fixture setup), repair_execution (repair FinalizeBlock only) and repair_commit.
+These enable the measurement task to report revision costs separately from
+proof-package export/verification; they are not production instrumentation.
+
+This report does not claim external customer adoption, new cryptographic
+originality, latest-state proofs, a measured C3 benefit, or a no-CH deployment
+comparison. Comparative measurements are a separate artifact in this directory.

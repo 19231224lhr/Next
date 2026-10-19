@@ -1,0 +1,125 @@
+C3 offline receipt measurement review, 2026-10-05
+
+Scope and limits
+Independent static review of measurement-brief.txt, measurement-implementation-report.txt,
+internal/redaction/receipt_experiment_test.go, receipt.go, receipt_test.go,
+finality/block.go, and protocol/v3.go certificate verification. Graph discovery was
+attempted first; newly added receipt symbols were not indexed, so the named files
+were read directly. No tests, benchmarks, network calls, or source edits were run
+by this reviewer. Reported implementation test/smoke results were read, not
+independently reproduced. No Mac measurements or output JSON were inspected.
+Line references below refer to the reviewed source before subsequent changes.
+
+Finding to address before describing B as the strongest lean implementation
+[P2] Remove duplicate B parent certificates and authentication.
+receipt_experiment_test.go:228-235 exports Parents for both methods, although
+B's mandatory Body (line 239) already contains those same parent certificates.
+offlineRows authenticates external Parents at line 265 before B invokes
+VerifyHistoricalAuthorization at line 322. The latter authenticates each revised
+payment and its parent certificates through receipt.go:115 and 418-431.
+Thus B pays an avoidable second parent-certificate wire copy, decoding and QC
+verification. This affects packet bytes and cold/export timings, particularly
+for m=8, and overstates the cost required for B's extra T2 guarantee.
+N needs its standalone parent certificates. B can omit standalone Parents,
+derive parent identities/issuer/amount from its already authenticated revised
+payments, and bind Output/ParentFact/ConsumerFact to the common compensation
+effects; preserve the existing target/decision/debit/funding checks. Do not add
+cache admission before those crosschecks. Update B tamper construction and the
+component schema description accordingly. If unchanged, label the comparison
+as the current common-T1-prefix implementation, not strongest B-lean.
+
+No additional static safety blocker found in the reviewed paths
+- N proof is compensation execution plus parent certificate identity, without
+  original/repaired body, repair command or opening (export 225-249; N guard
+  302-305). Its target coordinates and consumer identities are authenticated
+  execution effects under the trusted committee's correct execution assumption;
+  it does not independently replay historical authorization or claim latestness.
+- B authenticates successful exact revision and full BlockID compatibility
+  (receipt.go:52-148) and binds its projected funding and consumer/parent facts
+  to the same compensation rows (experiment:333-360). T2 is extra capability,
+  so byte/timing comparisons must retain that contract distinction.
+- Parent configuration, network, rules, fact, output index and amount are
+  checked (experiment:262-272). OutputCertificate.Verify binds issuer to the
+  pinned organization and verifies its QC (protocol/v3.go:337-345), so the row
+  Organization is authenticated rather than fixture database metadata.
+- Requested mode and serialized trust/config are separately caller-pinned
+  arguments (experiment:278-307). The packet has no mode field. B explicitly
+  rejects an N packet; the functional/child tests exercise that rejection.
+- Child receives only serialized public config, packets, and harness expected
+  rows, with a guarded test entry and empty temp working directory
+  (experiment:463-518). offlineVerify calls no DB/network/fixture APIs. This is
+  code-level offline isolation, not an OS-enforced filesystem/network sandbox.
+- Expected rows are derived from original owner-authorized payments and source
+  certificates, then compared to authenticated actual compensation execution
+  (experiment:370-400). B output is not the sole oracle.
+- Cache admission follows complete verification; exact config, method and
+  packet bytes bind its SHA256 handle; lookup clones a contiguous row slice
+  (experiment:432-449). Both methods use the same one-entry cache and strategy.
+  Cache timing is economic-row handle lookup only, not packet authentication or
+  replay of B's full-body T2 capability.
+
+Measurement/schema assessment
+- Four declared configurations, 30 measured cold samples per method after five
+  prewarm samples, alternating method order (experiment:627,642-691).
+  Cold timing includes fresh config/packet decode and complete verification;
+  export and verify are paired wall-clock intervals. Correctness/oracle checks
+  are outside the measured interval (681-689). Source evidence is retained in
+  memory; export reuses the already serialized canonical B Body, then serializes
+  its outer transport. This is not cold disk or original body regeneration.
+- One hundred cache lookups use the identical cache strategy and alternate order
+  (702-715). Each individual lookup is very short, so clock/allocator noise may
+  dominate; treat small method ratios as noise rather than a speedup result.
+- Setup timers cover actual adaptation/command construction, repair FinalizeBlock,
+  and Commit (receipt_test.go:116-179,219-235); they exclude fixture construction
+  and block/committee signing. They are single setup observations per process,
+  not 30 independent adaptation samples.
+- Packet component lengths are actual compact JSON/base64 wire lengths with
+  envelope overhead (610-617). Public config bytes are reported separately.
+  Cache retention is encoded {Handle,Rows} length (661-665), not Go heap/RSS or
+  whole DB footprint. B full-body reuse requires its separately retained packet.
+- Schema c3-offline-receipt-v1 preserves all raw paired cold and cached samples,
+  environment, contracts, expected rows, setup observations and component bytes
+  (566-604,627-636). Root must require successful process exit and validate four
+  configurations, per-method sample counts/iteration coverage and component sums
+  before aggregating. Aggregate per-process P50 then median/min/max across three
+  independent processes; repeated queries within one process are not runs.
+
+Disposition
+Address the B redundancy finding or narrow its implementation label before the
+full measurement claim. The remaining reviewed structure supports the declared
+positive historical T1 vs T1+T2 experiment, subject to root's fresh functional
+verification and independent measurement/output validation.
+
+Follow-up delta verdict, 2026-10-05 (B parent deduplication)
+The sole initial P2 finding is resolved in the reviewed source. Ready for root's
+frozen measurement run; no further static blocker found in this narrow delta.
+This follow-up remains read-only apart from appending this verdict. No tests or
+measurements were rerun by the reviewer; implementation-report testpass/smoke
+claims were read rather than independently reproduced.
+
+- offlineExport now exports standalone Parents only for N (229-236), while the
+  packet field uses omitempty (115). The B omission regression checks the actual
+  JSON field is absent (587-591), and B verification rejects a nonempty external
+  Parents field (307). This removes the duplicate parent wire/QC burden.
+- There is no separate offlineBodyRows helper in the reviewed final file; the
+  body-derived row construction/binding is inline in offlineVerify (333-371).
+  VerifyHistoricalAuthorization must succeed first (322-327), authenticating
+  the exact Body and selected payment/parent QCs through receipt.go:115,418-431.
+  Fact binding then decodes those same bytes without repeating QC verification.
+- B retains target/execution order, transaction/input, consumer Tx, output,
+  amount, decision/debit and duplicate-decision checks (340-343). ConsumerFact
+  matches the authenticated payment summary and ParentFact the input evidence
+  (356-357). A bounded parent index must match Output, ParentFact, issuer and
+  amount together (362-364). Organization comes from the authenticated funding
+  projection and is independently matched to the authenticated source parent;
+  it is not supplied by an exporter row. No T1 issuer/amount/fact check was lost.
+- B T2 still uses the strict historical authorization/full BlockID check and
+  still rejects absent repair/body/original commit (307), plus the caller's
+  request cannot be downgraded by an N packet. Tamper constructors now alter
+  the mandatory B Body's parent identity/signature (424-435,444-453); ordinary
+  invalid-cache tests still exercise both modes. Child negatives retain changed
+  compensation result, parent signature, B body tamper and N-to-B downgrade
+  (527-531). These prove rejection; B parent tampering may fail the exact Body
+  digest before reaching its QC check, as expected for exact-version evidence.
+- Cache admission still follows all method-specific authentication and bindings
+  (469-483). The row-cache strategy and measurement timers are unchanged.

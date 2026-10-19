@@ -1,0 +1,138 @@
+C3 offline receipt core: independent spec and code-quality review
+Date: 2026-10-05
+Scope: internal/redaction/receipt.go and receipt_test.go, as supplied in
+core-review.diff; supporting protocol/finality bindings read for verification.
+No production edits, browser work, benchmark review, commit or push.
+
+Verdict
+
+No blocking correctness defect or false authorization guarantee found within
+the stated fixed-configuration, correct-committee-execution trust model. The
+implementation meets the bounded historical T1/T2 receipt scope. This is not
+acceptance of the full C3 benefit claim or of the later comparative experiment.
+Two non-blocking test/documentation improvements are recorded below.
+
+Spec compliance and evidence
+
+1. Authentic execution and exact command identity: receipt.go:193-222 freshly
+serializes/decodes the supplied execution block and invokes VerifyBlock; the
+selected transaction must exist and have Code==0. finality/block.go:37-74 binds
+the ordered transaction/result roots to the successor signed header and fixed
+committee. This closes the cached Block.Hash inheritance concern in the
+binding audit. REPAIR5/RPBATCH5 are decoded from the selected raw transaction,
+and result.Command must equal its canonical ID with Applied==true
+(receipt.go:58-83, 270-297). These command formats hash all raw bytes; the
+UTXO4CH payment projection exception does not apply to them. The fixed-width
+command decoders reject trailing/invalid fields and call their marshal
+validation, including batch order/duplicate constraints and Base overflow.
+
+2. T1 is genuinely independent of representation repair: receipt.go:228-254
+requires a signed successful compensation result for the exact decision,
+checks network/target ordering and effect output/input/debit, and returns the
+actual signed economic effect. It does not invent economic fields from a
+RepairResult. receipt.go:159-178 shares block authentication for selected
+indices without changing the individual checks or caller order. Organization
+is intentionally not a returned T1 effect field; an authenticated parent
+certificate is still needed for that display value.
+
+3. T2 authenticates the exact body/version: receipt.go:82 checks the plain
+body digest against signed Next; target chain/height, coordinates, exact single
+transaction bytes, reserve reference and opening are checked at 89-124.
+Audit mode also checks signed Previous, canonical original-body parts, original
+commit, and base-to-next byte reconstruction (295-400). A CH-compatible body
+alone does not pass authority verification. A later successful revision cannot
+be substituted into an earlier command's receipt merely because it shares the
+original full BlockID.
+
+4. Original full identity: lean mode rebuilds the revised part root with the
+authenticated command Parts at Base+1, then verifies the original target-height
+commit against the complete BlockID (receipt.go:126-135). Audit mode verifies
+the original body with canonical initial openings and the retained original
+commit before comparing the revised complete identity (315-327, 395-402).
+The lean API explicitly leaves OriginalAvailable false; it does not label
+missing original mutable funding bytes as proven. Projection mode uses the
+same audit authority path but omits only the revised full-identity property.
+
+5. Trust and derived values: the caller supplies Trust and DirectPolicy. Key
+configuration, network, rules and certificate/owner checks occur at
+receipt.go:46, 104-124, 259, 354-374 and 410-424. Returned amounts and
+organizations derive from authenticated payment/certificate material; they
+are not exporter-provided labels. T2 decision IDs are derived from authenticated
+coordinates, while prerequisite decision execution relies on the signed
+successful execution of the pinned repair semantics. Independent economic
+evidence must use T1. This distinction is accurately stated in the report.
+
+6. Offline boundary: receipt.go has no database, block-store or network reads.
+Its only environmental configuration is the existing startup-only Comet CH
+context, checked against the caller's pinned chain/key. Full/lean proof
+verification otherwise consumes only supplied bytes, signatures and local
+trust/policy. Tests explicitly close the DB and retain validity after later
+revision and repayment (receipt_test.go:249-275).
+
+7. Fixture provenance: newReceiptFixture constructs valid signed testkit owner
+payments/source certificates and a real Engine/App (receipt_test.go:47-193).
+append calls actual FinalizeBlock and Commit and retains their TxResults
+(195-237). The following signed header includes the previous actual result
+root. Positive receipts do not manufacture Applied:true. The replay/failure
+test executes real subsequent commands, verifies a genuine successful noop,
+and rejects both it and the failed command (441-477). The resignResults helper
+is used only for deliberately malformed/mismatched negative evidence.
+
+8. Negative coverage: T2 covers altered raw command/slot, an actual unrelated
+command's signed result, root tampering, malformed signed result, wrong body/
+base/index, cached object mutations, original mutable-byte substitution,
+network/chain/committee/rules mismatch, compatible-but-unapproved replacement,
+and actual noop/failure. Applicable cases are also applied to lean mode.
+Single successive revisions and a two-target batch both have positive tests.
+
+Non-blocking improvements
+
+A. Add a compact T1 rejection test matrix (receipt_test.go:278-304; verifier
+guards receipt.go:237-252). Current T1 tests cover positive effects, batch order
+and bad index, but do not directly exercise mismatched decision/effect,
+malformed result, or real compensation replay/failure. T2's negatives validate
+shared block authentication but cannot protect T1-specific checks from a
+future regression. Minimal follow-up: reuse the fixture to execute a decision
+replay and failed decision; additionally substitute a different actual signed
+decision result and mutate the effect coordinates/debit with the existing
+negative-only signing helper. Exercise both singular and plural APIs. This is
+a coverage gap, not an observed acceptance bug; the present guards are correct.
+
+B. Put the shared trust/temporal contract beside all exported entry points
+(receipt.go:41-44, 157-159, 225-228). The implementation report states it well,
+and VerifyHistoricalReceipt explicitly says ever-authorized, but the lean and
+T1 Go comments do not carry the complete no-latest/no-prefix boundary. A short
+shared package/type comment would reduce misuse: fixed correct-execution
+committee, caller-pinned consistent network/rules, ever-executed only; callers
+match returned target coordinates and enforce successor-header availability
+within their chosen H. Do not add a new state/checkpoint subsystem merely to
+address this comment.
+
+Quality and scope assessment
+
+The implementation is bounded and does not add keys, state trees, database
+indices or protocol fields. Lean and audit T2 duplicate command parsing and
+some row validation; that is a maintenance opportunity, not a required
+pre-acceptance refactor. Avoid a broad abstraction rewrite. The distinct
+witness modes and OriginalAvailable marker make their different guarantees
+reviewable. Single-file export and offline proof service remain shared
+capabilities; the code does not establish a CH-exclusive benefit or a no-CH
+deployment comparison.
+
+No H/checkpoint/latest-state proof is implemented or claimed by these APIs.
+The original decision document's broader consumer task therefore remains a
+caller/experiment responsibility. Do not present this core review as evidence
+that current outstanding/repaid state, absence of later events, complete
+prefix ancestry, or C3 net performance benefit has been established.
+
+Verification limits
+
+This was a source review. The graph was queried first; new receipt symbols
+were not indexed, so direct reads of the explicitly supplied files were used.
+Supporting existing symbols were found/read through codebase-memory-mcp.
+No tests were rerun because the owner had just reported passing
+  go test -tags comet_v3 ./internal/redaction ./finality
+and review found no concrete counterexample requiring a new execution.
+That passing result is owner-supplied evidence, not an independent rerun.
+
+Owner closure note, 2026-10-05: both nonblocking suggestions A/B were implemented before source freeze. Fresh root redaction/finality test passed; final Mac correctness.log reran all receipt tests, including the nine T1 invalid-evidence subcases. The original reviewer did not independently rerun tests; this note preserves that distinction.

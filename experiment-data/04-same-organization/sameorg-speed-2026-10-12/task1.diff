@@ -1,0 +1,455 @@
+--- before/internal/delivery/delivery.go
++++ after/internal/delivery/delivery.go
+@@ -123,89 +123,174 @@
+ 				return nil, e
+ 			}
+ 			o.Set(key, b)
+ 		}
+ 		return o.Changes(), nil
+ 	})
+ 	if e == nil {
+ 		select {
+ 		case q.wake <- struct{}{}:
+ 		default:
+ 		}
+ 	}
+ 	return e
+ }
+ 
+-// Run has four workers and a bounded page. Failed deliveries remain on disk; the
+-// cursor advances past them so offline recipients do not starve later records.
++// Run keeps four slots busy independently. A recipient has at most one active
++// delivery; failed recipients back off without holding slots needed by others.
+ func (q *Outbox) Run(ctx context.Context) error {
++	ctx, cancel := context.WithCancel(ctx)
++	var wg sync.WaitGroup
++	defer func() { cancel(); wg.Wait() }()
++	type recipientState struct {
++		active       bool
++		failures     uint
++		retry        time.Time
++		lastKey      []byte
++		eligiblePass bool
++	}
++	type result struct {
++		owner     protocol.PublicKey
++		delivered bool
++		fatal     error
++	}
++	recipients := make(map[protocol.PublicKey]*recipientState, len(q.routes))
++	results := make(chan result, workers)
++	active := 0
+ 	var after []byte
++	finish := func(r result) error {
++		active--
++		st := recipients[r.owner]
++		st.active = false
++		if r.fatal != nil {
++			return r.fatal
++		}
++		if r.delivered {
++			st.failures = 0
++			st.retry = time.Time{}
++		} else {
++			if st.failures < 5 {
++				st.failures++
++			}
++			st.retry = time.Now().Add(100 * time.Millisecond * time.Duration(1<<(st.failures-1)))
++		}
++		return nil
++	}
+ 	for ctx.Err() == nil {
+-		entries, e := store.Scan(q.db, []byte("pending/"), after, workers)
+-		if e != nil {
+-			return e
+-		}
+-		if len(entries) == 0 {
+-			after = nil
++		// Drain completions before scanning another bounded page.
++		for draining := true; draining; {
+ 			select {
+-			case <-ctx.Done():
+-				return nil
+-			case <-q.wake:
+-			case <-time.After(100 * time.Millisecond):
+-			}
+-			continue
+-		}
+-		var wg sync.WaitGroup
+-		errs := make(chan error, len(entries))
+-		for _, entry := range entries {
+-			wg.Add(1)
+-			go func(entry state.Entry) {
+-				defer wg.Done()
++			case r := <-results:
++				if e := finish(r); e != nil {
++					return e
++				}
++			default:
++				draining = false
++			}
++		}
++		exhausted := false
++		if active < workers {
++			if after == nil {
++				for _, st := range recipients {
++					st.eligiblePass = !st.active && !time.Now().Before(st.retry)
++				}
++			}
++			entries, e := store.Scan(q.db, []byte("pending/"), after, 32)
++			if e != nil {
++				return e
++			}
++			if len(entries) == 0 {
++				// Wrap a recipient's cursor only after an eligible full scan found
++				// no later record. Retain it during backoff, so a rejected first
++				// record cannot monopolize that recipient on every retry.
++				for _, st := range recipients {
++					if st.eligiblePass && !st.active {
++						st.lastKey = nil
++					}
++				}
++				after = nil
++				exhausted = true
++			}
++			for _, entry := range entries {
++				if active == workers {
++					break
++				}
++				after = entry.Key
+ 				var r record
+ 				if e := json.Unmarshal(entry.Value, &r); e != nil {
+-					errs <- e
+-					return
++					return e
+ 				}
+ 				p, e := protocol.DecodeDirectPayment(r.Payment)
+ 				if e != nil || int(r.Index) >= len(p.Tx.Body.Outputs) {
+-					errs <- errors.New("corrupt delivery record")
+-					return
+-				}
+-				endpoint, ok := q.routes[p.Tx.Body.Outputs[r.Index].Recipient.Owner]
++					return errors.New("corrupt delivery record")
++				}
++				owner := p.Tx.Body.Outputs[r.Index].Recipient.Owner
++				endpoint, ok := q.routes[owner]
+ 				if !ok {
+-					return
+-				}
+-				if send(ctx, q.client, endpoint, r) != nil {
+-					return
+-				}
+-				e = q.db.Update(func(v state.ReadView) ([]state.Change, error) {
+-					o := state.NewOverlay(v)
+-					o.Delete(entry.Key)
+-					o.Set(append([]byte("done/"), entry.Key[len("pending/"):]...), []byte{1})
+-					return o.Changes(), nil
+-				})
+-				if e != nil {
+-					errs <- e
+-				}
+-			}(entry)
+-		}
+-		wg.Wait()
+-		close(errs)
+-		for e := range errs {
+-			return e
+-		}
+-		after = entries[len(entries)-1].Key
++					continue
++				}
++				st := recipients[owner]
++				if st == nil {
++					st = &recipientState{}
++					recipients[owner] = st
++				}
++				if st.active || time.Now().Before(st.retry) {
++					continue
++				}
++				if len(st.lastKey) != 0 && bytes.Compare(entry.Key, st.lastKey) <= 0 {
++					continue
++				}
++				st.lastKey = bytes.Clone(entry.Key)
++				st.eligiblePass = false // This pass advanced; do not wrap after a fast completion.
++				st.active = true
++				active++
++				wg.Add(1)
++				go func(entry state.Entry, r record, owner protocol.PublicKey, endpoint string) {
++					defer wg.Done()
++					res := result{owner: owner}
++					if send(ctx, q.client, endpoint, r) == nil {
++						res.fatal = q.db.Update(func(v state.ReadView) ([]state.Change, error) {
++							o := state.NewOverlay(v)
++							o.Delete(entry.Key)
++							o.Set(append([]byte("done/"), entry.Key[len("pending/"):]...), []byte{1})
++							return o.Changes(), nil
++						})
++						res.delivered = res.fatal == nil
++					}
++					results <- res
++				}(entry, r, owner, endpoint)
++			}
++		}
++		// While capacity remains, continue past busy/offline recipients in the next page.
++		if active < workers && !exhausted {
++			continue
++		}
++		timer := time.NewTimer(100 * time.Millisecond)
++		select {
++		case <-ctx.Done():
++			timer.Stop()
++			return nil
++		case r := <-results:
++			timer.Stop()
++			if e := finish(r); e != nil {
++				return e
++			}
++		case <-q.wake:
++			timer.Stop()
++			after = nil
++		case <-timer.C:
++		}
+ 	}
+ 	return nil
+ }
+ 
+ func send(ctx context.Context, client *http.Client, endpoint string, r record) error {
+ 	req, e := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(r.Payment))
+ 	if e != nil {
+ 		return e
+ 	}
+ 	req.Header.Set("Content-Type", transport.MediaType)
+ 	req.Header.Set("X-Next-Output-Index", strconv.FormatUint(uint64(r.Index), 10))
+ 	req.Header.Set(MetadataHeader, r.Metadata)
+ 	resp, e := client.Do(req)
+ 	if e != nil {
+ 		return e
+--- before/internal/delivery/delivery_test.go
++++ after/internal/delivery/delivery_test.go
+@@ -1,19 +1,20 @@
+ package delivery
+ 
+ import (
+ 	"context"
++	"crypto/ed25519"
+ 	"crypto/x509"
+ 	"encoding/pem"
+ 	"net/http"
+ 	"net/http/httptest"
+ 	"os"
+ 	"path/filepath"
+ 	"strings"
+ 	"sync/atomic"
+ 	"testing"
+ 	"time"
+ 	"utxo/internal/rules"
+ 	"utxo/internal/state"
+ 	"utxo/internal/store"
+ 	"utxo/internal/testkit"
+ 	"utxo/internal/wallet"
+@@ -278,30 +279,34 @@
+ 				break
+ 			}
+ 		}
+ 		entered <- struct{}{}
+ 		<-release
+ 		active.Add(-1)
+ 		w.WriteHeader(503)
+ 	}))
+ 	defer slow.Close()
+ 	defer close(release)
+ 	q, e = New(db, []Route{{Owner: p.Tx.Body.Outputs[0].Recipient.Owner, URL: slow.URL}}, []protocol.OrgConfig{f.Org})
+ 	if e != nil {
+ 		t.Fatal(e)
+ 	}
+ 	for i := 0; i < 8; i++ {
++		seed := protocol.Digest("bounded-recipient", []byte{byte(i)})
++		key := ed25519.NewKeyFromSeed(seed[:])
++		p.Tx.Body.Outputs[0].Recipient = protocol.NewDescriptor(f.Org.Network, protocol.Route{Kind: protocol.OrgRoute, Org: f.Org.Org}, key)
++		q.routes[p.Tx.Body.Outputs[0].Recipient.Owner] = slow.URL
+ 		p.Tx.Body.Nonce[0] = byte(i + 1)
+ 		p.Tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(p.Tx.ID(), f.Owner)}
+ 		p.Certificate.Summary = protocol.SummaryFor(p.Tx, p.Certificate.Summary.Admission)
+ 		p.Certificate.QC.Fact = p.Certificate.Summary.Fact()
+ 		p.Certificate.QC.Votes = nil
+ 		for j := 0; j < 3; j++ {
+ 			p.Certificate.QC.Votes = append(p.Certificate.QC.Votes, protocol.SignSpend(p.Certificate.QC.Fact, uint16(j), f.Keys[j]))
+ 		}
+ 		if e = q.Enqueue(p, ""); e != nil {
+ 			t.Fatal(e)
+ 		}
+ 	}
+ 	ctx, cancel := context.WithCancel(context.Background())
+ 	done := make(chan error, 1)
+ 	go func() { done <- q.Run(ctx) }()
+--- before/internal/delivery/scheduler_test.go
++++ after/internal/delivery/scheduler_test.go
+@@ -0,0 +1,168 @@
++package delivery
++
++import (
++	"context"
++	"crypto/ed25519"
++	"encoding/json"
++	"fmt"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"sync/atomic"
++	"testing"
++	"time"
++	"utxo/internal/state"
++	"utxo/internal/store"
++	"utxo/protocol"
++)
++
++func TestSlowRecipientDoesNotHoldHealthyQueue(t *testing.T) {
++	f, original := fixture(t)
++	db := store.NewMemory()
++	defer db.Close()
++	healthy := make(chan struct{}, 8)
++	var blockedCalls atomic.Int32
++	release := make(chan struct{})
++	blockedOwner := original.Tx.Body.Outputs[0].Recipient.Owner
++	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		raw, _ := io.ReadAll(r.Body)
++		p, e := protocol.DecodeDirectPayment(raw)
++		if e != nil {
++			http.Error(w, e.Error(), 400)
++			return
++		}
++		if p.Tx.Body.Outputs[0].Recipient.Owner == blockedOwner {
++			blockedCalls.Add(1)
++			select {
++			case <-release:
++			case <-r.Context().Done():
++				return
++			}
++		} else {
++			healthy <- struct{}{}
++		}
++		fmt.Fprint(w, protocol.Hash(p.Certificate.Summary.OutputID(0)).String())
++	}))
++	defer srv.Close()
++	defer close(release)
++	var routes []Route
++	for i := 0; i < 9; i++ {
++		p := original
++		p.Tx.Body.Outputs = append([]protocol.Output(nil), original.Tx.Body.Outputs...)
++		p.Tx.Body.Nonce[0] = byte(i + 1)
++		if i > 1 {
++			seed := protocol.Digest("delivery-scheduler-owner", []byte{byte(i)})
++			key := ed25519.NewKeyFromSeed(seed[:])
++			p.Tx.Body.Outputs[0].Recipient = protocol.NewDescriptor(f.Org.Network, protocol.Route{Kind: protocol.OrgRoute, Org: f.Org.Org}, key)
++		}
++		owner := p.Tx.Body.Outputs[0].Recipient.Owner
++		if i != 1 {
++			routes = append(routes, Route{Owner: owner, URL: srv.URL})
++		}
++		p.Tx.Auth = []protocol.OwnerAuth{protocol.SignOwner(p.Tx.ID(), f.Owner)}
++		p.Certificate.Summary = protocol.SummaryFor(p.Tx, original.Certificate.Summary.Admission)
++		p.Certificate.QC.Fact = p.Certificate.Summary.Fact()
++		p.Certificate.QC.Votes = nil
++		for j := 0; j < 3; j++ {
++			p.Certificate.QC.Votes = append(p.Certificate.QC.Votes, protocol.SignSpend(p.Certificate.QC.Fact, uint16(j), f.Keys[j]))
++		}
++		raw, e := p.MarshalBinary()
++		if e != nil {
++			t.Fatal(e)
++		}
++		value, e := json.Marshal(record{Payment: raw})
++		if e != nil {
++			t.Fatal(e)
++		}
++		// Ordered keys isolate scheduler behavior; the first two jobs share an offline recipient.
++		e = db.Update(func(state.ReadView) ([]state.Change, error) {
++			return []state.Change{{Key: []byte(fmt.Sprintf("pending/%04d", i)), Value: value}}, nil
++		})
++		if e != nil {
++			t.Fatal(e)
++		}
++	}
++	q, e := New(db, routes, []protocol.OrgConfig{f.Org})
++	if e != nil {
++		t.Fatal(e)
++	}
++	ctx, cancel := context.WithCancel(context.Background())
++	done := make(chan error, 1)
++	go func() { done <- q.Run(ctx) }()
++	defer func() {
++		cancel()
++		if e := <-done; e != nil {
++			t.Error(e)
++		}
++	}()
++	start := time.Now()
++	deadline := time.NewTimer(time.Second)
++	defer deadline.Stop()
++	for i := 0; i < 7; i++ {
++		select {
++		case <-healthy:
++		case <-deadline.C:
++			t.Fatalf("only %d healthy deliveries escaped blocked recipient", i)
++		}
++	}
++	if n := blockedCalls.Load(); n != 1 {
++		t.Fatalf("same recipient has %d concurrent requests, want 1", n)
++	}
++	t.Logf("seven healthy deliveries completed in %s while blocked recipient remained pending", time.Since(start))
++}
++
++func TestRejectedRecordDoesNotStarveSameRecipient(t *testing.T) {
++	f, p := fixture(t)
++	db := store.NewMemory()
++	defer db.Close()
++	got := make(chan struct{}, 1)
++	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		if r.Header.Get(MetadataHeader) == "reject" {
++			http.Error(w, "reject this record", 400)
++			return
++		}
++		raw, _ := io.ReadAll(r.Body)
++		payment, e := protocol.DecodeDirectPayment(raw)
++		if e != nil {
++			t.Error(e)
++			return
++		}
++		fmt.Fprint(w, protocol.Hash(payment.Certificate.Summary.OutputID(0)).String())
++		select {
++		case got <- struct{}{}:
++		default:
++		}
++	}))
++	defer srv.Close()
++	q, e := New(db, []Route{{Owner: p.Tx.Body.Outputs[0].Recipient.Owner, URL: srv.URL}}, []protocol.OrgConfig{f.Org})
++	if e != nil {
++		t.Fatal(e)
++	}
++	raw, e := p.MarshalBinary()
++	if e != nil {
++		t.Fatal(e)
++	}
++	for i, metadata := range []string{"reject", "reject", "accept"} {
++		value, _ := json.Marshal(record{Payment: raw, Metadata: metadata})
++		e = db.Update(func(state.ReadView) ([]state.Change, error) {
++			return []state.Change{{Key: []byte(fmt.Sprintf("pending/%04d", i)), Value: value}}, nil
++		})
++		if e != nil {
++			t.Fatal(e)
++		}
++	}
++	ctx, cancel := context.WithCancel(context.Background())
++	done := make(chan error, 1)
++	go func() { done <- q.Run(ctx) }()
++	defer func() {
++		cancel()
++		if e := <-done; e != nil {
++			t.Error(e)
++		}
++	}()
++	select {
++	case <-got:
++	case <-time.After(time.Second):
++		t.Fatal("later valid record starved by rejected record for the same recipient")
++	}
++}
