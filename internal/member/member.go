@@ -1,0 +1,466 @@
+package member
+
+import (
+	"bytes"
+	"context"
+	"crypto/ed25519"
+	"encoding/json"
+	"errors"
+	"sync/atomic"
+	"utxo/finality"
+	"utxo/internal/requesttrace"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/internal/store"
+	"utxo/protocol"
+)
+
+type Config struct {
+	EnableInternalPools bool
+	// Optional bounded copies of committed approval summaries; zero disables caching.
+	DirectContinuationEntries int
+	// Optional same-configuration certificate reuse; zero entries disables it.
+	DirectCacheEntries      int
+	ReuseDirectVerification bool
+	// Experiment control: disables only autonomous reconstruction, not INSTALL relay.
+	DisableSourceRecovery bool
+	Committee             finality.Trust
+	Organization          protocol.OrgConfig
+	Index                 uint16
+	Key                   ed25519.PrivateKey
+	Peers                 []protocol.OrgConfig
+	Schedule              rules.Schedule
+	Workers               uint32
+	Direct                *rules.DirectSettings
+}
+type Request = protocol.PaymentRequest
+type Approval = protocol.Approval
+type Member struct {
+	approvalSummaries *approvalSummaryCache
+	directCache       *directCertificateCache
+	cfg               Config
+	db                store.Store
+	peers             map[protocol.Hash]protocol.OrgConfig
+	direct            *rules.DirectPolicy
+	budgetLimited     [6]atomic.Uint64
+	approvedCAL       atomic.Uint64
+	largestCAL        atomic.Uint64
+}
+
+// CALDemand is a read-only, in-memory forecast input. Replay is not new demand.
+func (m *Member) CALDemand() (approved, largest uint64) {
+	return m.approvedCAL.Load(), m.largestCAL.Load()
+}
+
+func (m *Member) noteCALSize(amount uint64) {
+	for old := m.largestCAL.Load(); amount > old; old = m.largestCAL.Load() {
+		if m.largestCAL.CompareAndSwap(old, amount) {
+			return
+		}
+	}
+}
+
+// BudgetLimits counts actual resource rejections, including retried requests.
+func (m *Member) BudgetLimits() (counts [6]uint64) {
+	for i := range counts {
+		counts[i] = m.budgetLimited[i].Load()
+	}
+	return
+}
+
+func New(cfg Config, db store.Store, gen state.Genesis) (*Member, error) {
+	if cfg.EnableInternalPools && cfg.Direct == nil {
+		return nil, protocol.ErrRule
+	}
+	if cfg.Organization.Validate() != nil || cfg.Index >= 4 || len(cfg.Key) != ed25519.PrivateKeySize || cfg.Workers == 0 || cfg.Workers > 256 || cfg.Schedule.Validate() != nil || gen.Network != cfg.Organization.Network {
+		return nil, protocol.ErrRule
+	}
+	if !bytes.Equal(cfg.Key.Public().(ed25519.PublicKey), cfg.Organization.Members[cfg.Index][:]) {
+		return nil, protocol.ErrAuth
+	}
+	if cfg.Committee.Validators != nil {
+		if cfg.Committee.Validate() != nil || cfg.Committee.Network != gen.Network {
+			return nil, protocol.ErrAuth
+		}
+		cfg.Committee.Validators = cfg.Committee.Validators.Copy()
+	}
+	cfg.Key = bytes.Clone(cfg.Key)
+	orgs := append(append([]protocol.OrgConfig{}, cfg.Peers...), cfg.Organization)
+	if err := protocol.ValidateOrganizations(gen.Network, orgs); err != nil {
+		return nil, err
+	}
+	m := &Member{cfg: cfg, db: db, peers: make(map[protocol.Hash]protocol.OrgConfig)}
+	if cfg.DirectContinuationEntries < 0 || cfg.DirectContinuationEntries > 4096 {
+		return nil, protocol.ErrRule
+	}
+	if cfg.DirectContinuationEntries > 0 {
+		m.approvalSummaries = &approvalSummaryCache{limit: cfg.DirectContinuationEntries, entries: make(map[protocol.SpendFactID]protocol.OutputSummary)}
+	}
+	if cfg.DirectCacheEntries < 0 || cfg.DirectCacheEntries > 4096 {
+		return nil, protocol.ErrRule
+	}
+	if cfg.DirectCacheEntries > 0 {
+		m.directCache = newDirectCertificateCache(cfg.DirectCacheEntries, cfg.Organization.Hash())
+	}
+	for _, p := range cfg.Peers {
+		m.peers[p.Hash()] = p
+	}
+	m.peers[cfg.Organization.Hash()] = cfg.Organization
+	if cfg.Direct != nil {
+		p, err := cfg.Direct.Policy(cfg.Schedule, orgs)
+		if err != nil {
+			return nil, err
+		}
+		m.direct = &p
+	}
+	if e := m.bootstrap(gen); e != nil {
+		return nil, e
+	}
+	return m, nil
+}
+func (m *Member) bootstrap(gen state.Genesis) error {
+	if m.direct != nil {
+		known := make(map[protocol.Hash]bool, len(m.peers))
+		for _, org := range m.peers {
+			known[org.Org] = true
+		}
+		for _, binding := range gen.Wallets {
+			if !known[binding.Organization] {
+				return protocol.ErrAuth
+			}
+		}
+		for _, origin := range gen.Outputs {
+			if route := origin.Output.Recipient.Route; route.Kind == protocol.OrgRoute && !known[route.Org] {
+				return protocol.ErrAuth
+			}
+		}
+	}
+	return m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		key := state.Key(state.KeyGenesis)
+		genHash := gen.Hash()
+		orgHash := m.cfg.Organization.Hash()
+		ids := m.cfg.Schedule.IDs()
+		if m.direct != nil {
+			ids = m.direct.Rules()
+		}
+		layout := new(protocol.Encoder)
+		layout.U16(m.cfg.Index)
+		layout.U32(m.cfg.Workers)
+		var committeeHash []byte
+		if m.cfg.Committee.Validators != nil {
+			committeeHash = m.cfg.Committee.Validators.Hash()
+		}
+		hash := protocol.Digest("MEMBER_INITIAL_STATE", genHash[:], orgHash[:], ids.Fee[:], ids.Work[:], ids.Accounting[:], layout.Data(), committeeHash, []byte(m.cfg.Committee.ChainID))
+		if m.direct != nil {
+			key := m.direct.Key.KeyID()
+			hash = protocol.Digest("MEMBER_INITIAL_STATE_V5", hash[:], key[:])
+			if m.direct.C3 != nil {
+				raw, err := json.Marshal(m.direct.C3)
+				if err != nil {
+					return nil, err
+				}
+				hash = protocol.Digest("MEMBER_C3_GENESIS_V1", hash[:], raw)
+			}
+		}
+		if m.cfg.EnableInternalPools {
+			hash = protocol.Digest("MEMBER_INTERNAL_POOLS_V1", hash[:])
+		}
+		if old, found, e := state.Load[protocol.Hash](v, key); e != nil {
+			return nil, e
+		} else if found {
+			if old != hash {
+				return nil, store.ErrIdentity
+			}
+			return nil, nil
+		}
+		o := state.NewOverlay(v)
+		if m.direct != nil {
+			if err := rules.InitializeWalletBindings(o, gen); err != nil {
+				return nil, err
+			}
+		}
+		seen := make(map[protocol.OutputID]bool)
+		for _, g := range gen.Outputs {
+			if seen[g.ID] || g.ID == (protocol.OutputID{}) || g.Fact == (protocol.Hash{}) || g.Output.Amount == 0 || g.Output.Recipient.Verify(gen.Network) != nil {
+				return nil, protocol.ErrRule
+			}
+			seen[g.ID] = true
+			creationKey := state.Key(state.KeyCreation, g.ID[:])
+			if m.direct != nil {
+				creationKey = rules.DirectCreationKey(g.ID, 0)
+			}
+			if e := state.Put(o, creationKey, state.Creation{Output: g.Output, Fact: g.Fact, Final: true}); e != nil {
+				return nil, e
+			}
+		}
+		for _, g := range gen.Grants {
+			if g.Organization != m.cfg.Organization.Hash() {
+				continue
+			}
+			minimum := protocol.ResourceFUEL
+			if m.direct != nil {
+				minimum = protocol.ResourceCAL
+			}
+			if g.ID == (protocol.Hash{}) || g.Key.Kind < minimum || g.Key.Kind > protocol.ResourcePolicy || g.Key.Version == 0 {
+				return nil, protocol.ErrRule
+			}
+			if _, found, e := state.Load[state.Grant](o, state.Key(state.KeyGrant, g.Key.Encode())); e != nil {
+				return nil, e
+			} else if found {
+				return nil, protocol.ErrRule
+			}
+			if e := state.Put(o, state.Key(state.KeyGrant, g.Key.Encode()), g); e != nil {
+				return nil, e
+			}
+			share, e := protocol.GrantShare(g.Amount)
+			if e != nil {
+				return nil, e
+			}
+			for w := uint32(0); w < m.cfg.Workers; w++ {
+				amount := share / uint64(m.cfg.Workers)
+				if uint64(w) < share%uint64(m.cfg.Workers) {
+					amount++
+				}
+				if e = state.Put(o, state.SliceKey(g.Key, w), state.Slice{Available: amount, Generation: 1}); e != nil {
+					return nil, e
+				}
+			}
+		}
+		if e := state.Put(o, key, hash); e != nil {
+			return nil, e
+		}
+		return o.Changes(), nil
+	})
+}
+func (m *Member) verify(c protocol.TXCer) error {
+	p, ok := m.peers[c.Tx.Body.Config]
+	if !ok {
+		return protocol.ErrAuth
+	}
+	return c.Verify(p)
+}
+func (m *Member) Approve(req Request) (Approval, error) {
+	return m.ApproveContext(context.Background(), req)
+}
+func (m *Member) ApproveContext(ctx context.Context, req Request) (Approval, error) {
+	if m.direct != nil {
+		return Approval{}, protocol.ErrUnsupported
+	}
+	tx := req.Tx
+	t := tx.Body
+	cfg := m.cfg.Organization
+	if e := tx.VerifyAuth(); e != nil {
+		return Approval{}, e
+	}
+	if t.Network != cfg.Network || t.Certifier != cfg.Org || t.Epoch != cfg.Epoch || t.Config != cfg.Hash() {
+		return Approval{}, protocol.ErrAuth
+	}
+	vector, e := rules.PrepareVector(t, m.cfg.Schedule)
+	if e != nil {
+		return Approval{}, e
+	}
+	if len(req.Parents) > protocol.MaxInputs {
+		return Approval{}, protocol.ErrEncoding
+	}
+	parents := make(map[protocol.Hash]protocol.TXCer)
+	materials := make([]state.Outbox, 0, len(req.Parents))
+	total := 0
+	for _, c := range req.Parents {
+		if e = m.verify(c); e != nil {
+			return Approval{}, e
+		}
+		raw, e := c.MarshalBinary()
+		if e != nil {
+			return Approval{}, e
+		}
+		total += len(raw)
+		if total > protocol.MaxEvidenceBytes {
+			return Approval{}, protocol.ErrEncoding
+		}
+		id := protocol.Hash(c.QC.Fact)
+		if _, found := parents[id]; found {
+			return Approval{}, protocol.ErrRule
+		}
+		parents[id] = c
+		materials = append(materials, state.Outbox{Fact: c.QC.Fact, Certificate: raw, Origin: c.Tx.Body.Certifier})
+	}
+	inputs := make([]state.Creation, len(t.Inputs))
+	depth := uint32(1)
+	ancestors := uint64(1)
+	usedParents := make(map[protocol.Hash]bool)
+	e = m.db.View(func(v state.ReadView) error {
+		for i, in := range t.Inputs {
+			if in.Kind == protocol.FinalInput {
+				record, found, e := state.Load[state.Creation](v, state.Key(state.KeyCreation, in.Output[:]))
+				if e != nil {
+					return e
+				}
+				if !found || !record.Final || record.Fact != in.Evidence {
+					return rules.ErrMissing
+				}
+				inputs[i] = record
+			} else {
+				c, ok := parents[in.Evidence]
+				if !ok {
+					return rules.ErrMissing
+				}
+				usedParents[in.Evidence] = true
+				found := false
+				for j, id := range c.Effects.Outputs {
+					if id == in.Output {
+						inputs[i] = state.Creation{Output: c.Tx.Body.Outputs[j], Fact: in.Evidence}
+						found = true
+						break
+					}
+				}
+				if !found {
+					return rules.ErrMissing
+				}
+				if c.Effects.Depth >= t.Work.Depth {
+					return rules.ErrLimited
+				}
+				if c.Effects.Depth+1 > depth {
+					depth = c.Effects.Depth + 1
+				}
+				ancestors += uint64(c.Effects.Ancestors)
+				if ancestors > uint64(t.Work.Ancestors) {
+					return rules.ErrLimited
+				}
+			}
+		}
+		return nil
+	})
+	if e != nil {
+		return Approval{}, e
+	}
+	if len(usedParents) != len(parents) {
+		return Approval{}, protocol.ErrRule
+	}
+	if e = rules.ValidateTransfer(tx, inputs); e != nil {
+		return Approval{}, e
+	}
+	requesttrace.Mark(ctx, "validation_complete")
+	effects := protocol.EffectsFor(t, depth, uint32(ancestors))
+	id := t.ID()
+	worker := uint32(id[0]) % m.cfg.Workers
+	var fact protocol.SpendFactID
+	requesttrace.Mark(ctx, "store_enter")
+	e = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		cs, f, err := rules.EvaluatePrepare(v, tx, inputs, vector, effects, worker, materials)
+		fact = f
+		if err == nil {
+			requesttrace.Mark(ctx, "state_checks_complete")
+		}
+		return cs, err
+	})
+	if e != nil {
+		return Approval{}, e
+	}
+	requesttrace.Mark(ctx, "commit_returned")
+	// Signing occurs only after the authoritative storage commit succeeds.
+	result := Approval{Fact: fact, Vote: protocol.SignSpend(fact, m.cfg.Index, m.cfg.Key), Admission: vector, Effects: effects}
+	requesttrace.Mark(ctx, "vote_signed")
+	return result, nil
+}
+func (m *Member) Install(c protocol.TXCer) error {
+	if e := m.verify(c); e != nil {
+		return e
+	}
+	if c.Tx.Body.Certifier != m.cfg.Organization.Org {
+		return protocol.ErrAuth
+	}
+	var installed bool
+	if err := m.db.View(func(v state.ReadView) error {
+		_, err := v.Get(state.Key(state.KeyInstall, c.QC.Fact[:]))
+		if errors.Is(err, state.ErrNotFound) {
+			return nil
+		}
+		installed = err == nil
+		return err
+	}); err != nil {
+		return err
+	}
+	if installed {
+		return nil
+	}
+	raw, e := c.MarshalBinary()
+	if e != nil {
+		return e
+	}
+	return m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		// A competing INSTALL may have committed after the optimistic read.
+		if _, err := v.Get(state.Key(state.KeyInstall, c.QC.Fact[:])); err == nil {
+			return nil, nil
+		} else if !errors.Is(err, state.ErrNotFound) {
+			return nil, err
+		}
+		o := state.NewOverlay(v)
+		for _, id := range c.Effects.Inputs {
+			spend, _, e := state.Load[state.Spend](o, state.Key(state.KeySpend, id[:]))
+			if e != nil {
+				return nil, e
+			}
+			if spend.Consumed != (protocol.SpendFactID{}) && spend.Consumed != c.QC.Fact {
+				return nil, rules.ErrConflict
+			}
+			spend.Consumed = c.QC.Fact
+			if e = state.Put(o, state.Key(state.KeySpend, id[:]), spend); e != nil {
+				return nil, e
+			}
+		}
+		for i, id := range c.Effects.Outputs {
+			creation := state.Creation{Output: c.Tx.Body.Outputs[i], Fact: protocol.Hash(c.QC.Fact)}
+			old, found, e := state.Load[state.Creation](o, state.Key(state.KeyCreation, id[:]))
+			if e != nil {
+				return nil, e
+			}
+			if found {
+				if old.Output != creation.Output {
+					return nil, protocol.ErrRule
+				}
+			} else if e = state.Put(o, state.Key(state.KeyCreation, id[:]), creation); e != nil {
+				return nil, e
+			}
+		}
+		o.Set(state.Key(state.KeyInstall, c.QC.Fact[:]), raw)
+		outboxKey := state.Key(state.KeyOutbox, c.QC.Fact[:])
+		pending, found, e := state.Load[state.Outbox](o, outboxKey)
+		if e != nil {
+			return nil, e
+		}
+		if !found {
+			pending = state.Outbox{Fact: c.QC.Fact, Origin: c.Tx.Body.Certifier}
+		}
+		if pending.Fact != c.QC.Fact {
+			return nil, protocol.ErrAuth
+		}
+		pending.Certificate = raw
+		if e = state.Put(o, outboxKey, pending); e != nil {
+			return nil, e
+		}
+		return o.Changes(), nil
+	})
+}
+func (m *Member) Certificate(f protocol.SpendFactID) (protocol.TXCer, error) {
+	var raw []byte
+	e := m.db.View(func(v state.ReadView) error { b, e := v.Get(state.Key(state.KeyInstall, f[:])); raw = b; return e })
+	if e != nil {
+		return protocol.TXCer{}, e
+	}
+	return protocol.DecodeCertificate(raw)
+}
+func (m *Member) Quota(k protocol.ResourceKey, worker uint32) (state.Slice, error) {
+	var out state.Slice
+	e := m.db.View(func(v state.ReadView) error {
+		x, found, e := state.Load[state.Slice](v, state.SliceKey(k, worker))
+		if e != nil {
+			return e
+		}
+		if !found {
+			return state.ErrNotFound
+		}
+		out = x
+		return nil
+	})
+	return out, e
+}

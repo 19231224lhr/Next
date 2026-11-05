@@ -1,0 +1,142 @@
+package protocol
+
+import (
+	"crypto/ed25519"
+)
+
+type RouteKind uint8
+
+const (
+	OrgRoute       RouteKind = 1
+	CommitteeRoute RouteKind = 2
+)
+
+type Route struct {
+	Kind RouteKind
+	Org  Hash
+}
+
+func (r Route) Validate() error {
+	if r.Kind == OrgRoute && r.Org != (Hash{}) || r.Kind == CommitteeRoute && r.Org == (Hash{}) {
+		return nil
+	}
+	return ErrRule
+}
+func (r Route) encode(e *Encoder) { e.U8(uint8(r.Kind)); e.Fixed(r.Org[:]) }
+func decodeRoute(d *Decoder) (r Route) {
+	r.Kind = RouteKind(d.U8())
+	copy(r.Org[:], d.Fixed(32))
+	return
+}
+
+type ReceiveDescriptor struct {
+	Wire      uint64
+	Network   Hash
+	Owner     PublicKey
+	Route     Route
+	Signature Signature
+}
+
+func (d ReceiveDescriptor) digest() Hash {
+	e := new(Encoder)
+	e.U64(d.Wire)
+	e.Fixed(d.Network[:])
+	e.Fixed(d.Owner[:])
+	d.Route.encode(e)
+	return Digest("RECEIVE", e.Data())
+}
+func NewDescriptor(network Hash, route Route, key ed25519.PrivateKey) ReceiveDescriptor {
+	d := ReceiveDescriptor{Wire: WireVersion, Network: network, Route: route}
+	copy(d.Owner[:], key.Public().(ed25519.PublicKey))
+	h := d.digest()
+	copy(d.Signature[:], ed25519.Sign(key, h[:]))
+	return d
+}
+func (d ReceiveDescriptor) Verify(network Hash) error {
+	if d.Wire != WireVersion || d.Network != network || d.Route.Validate() != nil {
+		return ErrRule
+	}
+	if verifiedReceiveDescriptors.Contains(d) {
+		if descriptorMetricsEnabled {
+			descriptorQueries.Add(1)
+			descriptorHits.Add(1)
+		}
+		return nil
+	}
+	if descriptorMetricsEnabled {
+		descriptorQueries.Add(1)
+		descriptorVerifications.Add(1)
+	}
+	h := d.digest()
+	if !ed25519.Verify(d.Owner[:], h[:], d.Signature[:]) {
+		return ErrAuth
+	}
+	verifiedReceiveDescriptors.Add(d, struct{}{})
+	return nil
+}
+func (d ReceiveDescriptor) encode(e *Encoder) {
+	e.U64(d.Wire)
+	e.Fixed(d.Network[:])
+	e.Fixed(d.Owner[:])
+	d.Route.encode(e)
+	e.Fixed(d.Signature[:])
+}
+func decodeDescriptor(d *Decoder) (v ReceiveDescriptor) {
+	v.Wire = d.U64()
+	copy(v.Network[:], d.Fixed(32))
+	copy(v.Owner[:], d.Fixed(32))
+	v.Route = decodeRoute(d)
+	copy(v.Signature[:], d.Fixed(64))
+	return
+}
+
+type OrgConfig struct {
+	Network, Org Hash
+	Epoch        uint64
+	Members      [4]PublicKey
+}
+
+// ValidateOrganizations fixes one signing authority per consumption route.
+// An identical repeat (a member also in its peer list) is the same authority.
+// Other epochs or member sets require a migration protocol, not enabled here.
+func ValidateOrganizations(network Hash, organizations []OrgConfig) error {
+	seen := make(map[Hash]OrgConfig, len(organizations))
+	for _, org := range organizations {
+		if org.Network != network || org.Validate() != nil {
+			return ErrAuth
+		}
+		if previous, exists := seen[org.Org]; exists && previous != org {
+			return ErrRule
+		}
+		seen[org.Org] = org
+	}
+	return nil
+}
+
+func (c OrgConfig) Validate() error {
+	if c.Network == (Hash{}) || c.Org == (Hash{}) || c.Epoch == 0 {
+		return ErrRule
+	}
+	for i, k := range c.Members {
+		if k == (PublicKey{}) {
+			return ErrAuth
+		}
+		for j := 0; j < i; j++ {
+			if k == c.Members[j] {
+				return ErrAuth
+			}
+		}
+	}
+	return nil
+}
+func (c OrgConfig) Hash() Hash {
+	e := new(Encoder)
+	e.Fixed(c.Network[:])
+	e.Fixed(c.Org[:])
+	e.U64(c.Epoch)
+	e.U16(3)
+	for _, k := range c.Members {
+		e.Fixed(k[:])
+	}
+	return Digest("ORG_CONFIG", e.Data())
+}

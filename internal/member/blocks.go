@@ -1,0 +1,500 @@
+package member
+
+import (
+	"utxo/finality"
+	"utxo/internal/blockfollow"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// LocalProgress contains only this member's own signed obligations and fee plan.
+type LocalProgress struct {
+	Settled           bool
+	Pending           uint32
+	Paid              uint64
+	Recovered         uint64
+	Fee               rules.Escrow
+	C3                *rules.C3Escrow `json:",omitempty"`
+	Height            int64
+	Invalidated       bool                 `json:",omitempty"`
+	SupersededBy      protocol.SpendFactID `json:",omitempty"`
+	InvalidatedHeight int64                `json:",omitempty"`
+	// Positional entries bind to the immutable Approval.Debits (resource,
+	// grant version, worker and cap). Only this record changes during settlement.
+	Applied []uint64 `json:",omitempty"`
+}
+
+// DirectStoreSchema separates the fixed-wallet direct protocol from prior stores.
+const DirectStoreSchema uint64 = 9
+
+func localApplied(a state.Approval, p LocalProgress) ([]uint64, error) {
+	values := p.Applied
+	if values == nil {
+		values = make([]uint64, len(a.Debits))
+		for i, d := range a.Debits {
+			values[i] = d.Applied
+		}
+	}
+	if len(values) != len(a.Debits) {
+		return nil, rules.ErrAccounting
+	}
+	for i, d := range a.Debits {
+		if values[i] < d.Applied || values[i] > d.Cap {
+			return nil, rules.ErrAccounting
+		}
+	}
+	return values, nil
+}
+
+// AppliedDebits is the shared read path for status and offline accounting.
+// Old approvals retain their recorded cumulative amount; it is never reset.
+func AppliedDebits(v state.ReadView, a state.Approval) ([]uint64, error) {
+	var p LocalProgress
+	if a.Direct != nil {
+		var err error
+		p, _, err = state.Load[LocalProgress](v, ProgressKey(a.Fact))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return localApplied(a, p)
+}
+
+func ProgressKey(f protocol.SpendFactID) []byte { return state.Key(122, f[:]) }
+func waitingKey(id protocol.OutputID) []byte    { return state.Key(123, id[:]) }
+
+func (m *Member) finishLocal(o *state.Overlay, a *state.Approval, p *LocalProgress) error {
+	if p.Invalidated {
+		return rules.ErrAccounting
+	}
+	var err error
+	p.Applied, err = localApplied(*a, *p)
+	if err != nil {
+		return err
+	}
+	isC3 := a.Direct != nil && a.Direct.Body.Fee.C3.Enabled()
+	if isC3 {
+		rec, found, err := state.Load[rules.C3Record](o, rules.C3EscrowKey(a.Fact))
+		if err != nil {
+			return err
+		}
+		if found {
+			p.C3 = &rec.Escrow
+		}
+		p.Fee.Closed = p.Settled && p.Pending == 0
+	}
+	if !isC3 && p.Settled && p.Pending == 0 && !p.Fee.Closed {
+		next, err := p.Fee.Complete(rules.FeeClose)
+		if err != nil {
+			return err
+		}
+		p.Fee = next
+	}
+	for i := range a.Debits {
+		d := &a.Debits[i]
+		target := uint64(0)
+		if d.Key.Kind == protocol.ResourceCAL && p.Settled {
+			net, err := protocol.Sub(p.Paid, p.Recovered)
+			if err != nil {
+				return err
+			}
+			target, err = protocol.Sub(d.Cap, net)
+			if err != nil {
+				return err
+			}
+		}
+		if isC3 && d.Key.Kind != protocol.ResourceCAL {
+			if d.Key == a.Direct.Body.Fee.C3.Funding().Key {
+				if p.C3 != nil {
+					target = p.C3.Released
+				}
+			} else if p.Settled && d.Key.Kind != protocol.ResourceFUEL && d.Key.Kind != protocol.ResourcePolicy {
+				target = d.Cap
+			}
+		} else if d.Key.Kind != protocol.ResourceCAL && p.Fee.Closed {
+			target = d.Cap
+			if d.Key.Kind == protocol.ResourceFUEL || d.Key.Kind == protocol.ResourcePolicy {
+				paid, err := protocol.Add(p.Fee.Rewards, p.Fee.Burned)
+				if err != nil {
+					return err
+				}
+				target, err = protocol.Sub(target, paid)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if target < p.Applied[i] || target > d.Cap {
+			return rules.ErrAccounting
+		}
+		delta := target - p.Applied[i]
+		if delta == 0 {
+			continue
+		}
+		key := state.SliceKey(d.Key, d.Worker)
+		slice, found, err := state.Load[state.Slice](o, key)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return rules.ErrMissing
+		}
+		slice.Reserved, err = protocol.Sub(slice.Reserved, delta)
+		if err != nil {
+			return err
+		}
+		slice.Available, err = protocol.Add(slice.Available, delta)
+		if err != nil {
+			return err
+		}
+		p.Applied[i] = target
+		if err = state.Put(o, key, slice); err != nil {
+			return err
+		}
+	}
+	return state.Put(o, ProgressKey(a.Fact), *p)
+}
+func (m *Member) resolveLocal(o *state.Overlay, id protocol.OutputID, paid bool, c3Source ...bool) error {
+	fact, found, err := state.Load[protocol.SpendFactID](o, waitingKey(id))
+	if err != nil || !found {
+		return err
+	}
+	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+	if err != nil {
+		return err
+	}
+	if !found {
+		return rules.ErrMissing
+	}
+	p, found, err := state.Load[LocalProgress](o, ProgressKey(fact))
+	if err != nil {
+		return err
+	}
+	if !found || p.Pending == 0 {
+		return rules.ErrAccounting
+	}
+	p.Pending--
+	if paid && (len(c3Source) == 0 || !c3Source[0]) && (a.Direct == nil || !a.Direct.Body.Fee.C3.Enabled()) {
+		p.Fee.Held, err = protocol.Sub(p.Fee.Held, m.direct.RepairCost)
+		if err != nil {
+			return err
+		}
+		p.Fee.Rewards, err = protocol.Add(p.Fee.Rewards, m.direct.RepairCost)
+		if err != nil {
+			return err
+		}
+	}
+	if err = m.finishLocal(o, &a, &p); err != nil {
+		return err
+	}
+	o.Apply([]state.Change{{Key: waitingKey(id), Delete: true}})
+	return nil
+}
+
+// PrepareBlock decodes and authenticates owned block bytes before entering the writer.
+func (m *Member) PrepareBlock(b finality.VerifiedBlock) (blockfollow.Apply, error) {
+	if m.direct == nil {
+		return nil, protocol.ErrUnsupported
+	}
+	var updates []blockfollow.Apply
+	for _, entry := range b.Transactions() {
+		if entry.Code == 0 && len(entry.Data) > 0 && (protocol.NewDecoder(entry.Data).U16() == 414 || protocol.IsClockTick(entry.Bytes, m.cfg.Organization.Network)) {
+			result, err := protocol.DecodeExecution(entry.Data)
+			if err != nil {
+				return nil, err
+			}
+			for _, credit := range result.C3Credits {
+				if m.direct.C3 == nil {
+					return nil, protocol.ErrAuth
+				}
+				issuer, ok := m.direct.C3Issuer(credit.Organization)
+				if !ok || issuer.Funding.Key != credit.Key || issuer.Funding.Grant != credit.Grant {
+					return nil, protocol.ErrAuth
+				}
+				updates = append(updates, func(o *state.Overlay) error {
+					return rules.ApplyC3Credit(o, credit, m.cfg.Organization.Hash(), m.cfg.Workers)
+				})
+			}
+			if protocol.IsClockTick(entry.Bytes, m.cfg.Organization.Network) {
+				continue
+			}
+		}
+		if entry.Code == 0 && protocol.IsPoolCertificate(entry.Bytes) {
+			if !m.cfg.EnableInternalPools {
+				return nil, protocol.ErrUnsupported
+			}
+			c, err := protocol.DecodePoolCertificate(entry.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			if err = rules.VerifyPoolPublic(c, m.cfg.Organization.Network, m.peers); err != nil {
+				return nil, err
+			}
+			updates = append(updates, func(o *state.Overlay) error {
+				if c.Action.Kind == protocol.PoolDeposit {
+					a := c.Action
+					s, _, err := state.Load[state.Spend](o, rules.DirectSpendKey(a.Input, 0))
+					if err != nil {
+						return err
+					}
+					fact := protocol.SpendFactID(a.ID())
+					if s.Candidate != (protocol.SpendFactID{}) && s.Candidate != fact {
+						if err = m.reclaimPartialByFact(o, s.Candidate, fact, protocol.TxID(a.ID()), a.Input, 0, b.Height()); err != nil {
+							return err
+						}
+					}
+				}
+				return rules.ObservePool(o, c, m.cfg.Organization.Network, m.peers)
+			})
+			continue
+		}
+		if entry.Code == 0 && protocol.IsReserveIncrease(entry.Bytes) {
+			c, err := protocol.DecodeReserveIncrease(entry.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			if c.Network != m.cfg.Organization.Network {
+				return nil, protocol.ErrAuth
+			}
+			updates = append(updates, func(o *state.Overlay) error {
+				return rules.ApplyReserveIncrease(o, c, m.cfg.Organization.Hash(), m.cfg.Workers)
+			})
+			continue
+		}
+		if entry.Code != 0 || len(entry.Data) == 0 {
+			continue
+		}
+		result, effects, err := protocol.DecodePublicExecution(m.cfg.Organization.Network, entry.Bytes, entry.Data)
+		if err != nil {
+			return nil, err
+		}
+		if !result.Applied {
+			continue
+		}
+		for _, fee := range result.FeeOutputs {
+			if fee.Output.Recipient.Verify(m.cfg.Organization.Network) != nil {
+				return nil, protocol.ErrAuth
+			}
+			if fee.Output.Recipient.Route.Org != m.cfg.Organization.Org {
+				continue
+			}
+			updates = append(updates, func(o *state.Overlay) error {
+				id := protocol.OutputIdentity(m.cfg.Organization.Network, fee.Transaction, fee.Index)
+				c := state.Creation{Output: fee.Output, Final: true, Fact: protocol.CreationIdentity(m.cfg.Organization.Network, fee.Transaction, fee.Index, 0)}
+				return state.Put(o, rules.DirectCreationKey(id, 0), c)
+			})
+		}
+		if protocol.IsCompensationDecision(entry.Bytes) {
+			for _, effect := range effects {
+				updates = append(updates, func(o *state.Overlay) error { return m.applyRepairEffect(o, effect) })
+			}
+
+		} else {
+			pay, err := protocol.DecodeDirectSubmission(entry.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			updates = append(updates, func(o *state.Overlay) error { return m.applyPayment(o, pay, result, b.Height()) })
+		}
+	}
+	return func(o *state.Overlay) error {
+		for _, apply := range updates {
+			if err := apply(o); err != nil {
+				return err
+			}
+		}
+		if err := m.expireApprovals(o, b.Time().Unix(), b.Height()); err != nil {
+			return err
+		}
+		return nil
+	}, nil
+}
+
+func (m *Member) applyRepairEffect(o *state.Overlay, effect protocol.RepairEffect) error {
+	if err := m.c3Compensate(o, effect.ParentFact, effect.Output); err != nil {
+		return err
+	}
+	if waiting, found, err := state.Load[protocol.SpendFactID](o, waitingKey(effect.Output)); err != nil {
+		return err
+	} else if found && waiting != effect.ConsumerFact {
+		return rules.ErrAccounting
+	}
+	fact := effect.ParentFact
+	a, found, err := state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+	if err != nil {
+		return err
+	}
+	if found {
+		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+		if err != nil {
+			return err
+		}
+		p.Paid, err = protocol.Add(p.Paid, effect.Amount)
+		if err != nil {
+			return err
+		}
+		if err = m.finishLocal(o, &a, &p); err != nil {
+			return err
+		}
+	}
+	_, sourceC3, err := state.Load[rules.C3Record](o, rules.C3EscrowKey(effect.ParentFact))
+	if err != nil {
+		return err
+	}
+	if err = m.resolveLocal(o, effect.Output, true, sourceC3); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Member) applyPayment(o *state.Overlay, pay protocol.DirectSubmission, result protocol.ExecutionResult, height int64) error {
+	tx := pay.Tx
+	fact := pay.Authorization.Fact
+	if tx.Body.Network != m.cfg.Organization.Network {
+		return protocol.ErrAuth
+	}
+	for _, index := range result.MissingInputs {
+		if int(index) >= len(tx.Body.Inputs) {
+			return protocol.ErrRule
+		}
+		id := tx.Body.Inputs[index].Output
+		for _, input := range pay.InputCertificates {
+			if input.Certificate.Summary.ApprovalDeadline != 0 && input.Certificate.Summary.Config == m.cfg.Organization.Hash() && input.Certificate.Summary.OutputID(input.Index) == id {
+				if err := state.Put(o, registeredApprovalKey(input.Certificate.QC.Fact), true); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if err := m.recoverExposedSources(o, pay.InputCertificates); err != nil {
+		return err
+	}
+	for _, i := range result.MissingInputs {
+		if int(i) >= len(tx.Body.Inputs) {
+			return protocol.ErrRule
+		}
+		id := tx.Body.Inputs[i].Output
+		for _, parent := range pay.InputCertificates {
+			s := parent.Certificate.Summary
+			if s.OutputID(parent.Index) == id && s.C3.Enabled() {
+				f := s.Fact()
+				if err := state.Put(o, state.Key(171, f[:]), s); err != nil {
+					return err
+				}
+				if err := m.c3Event(o, s, rules.C3Open, parent.Index); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	var ownApproval state.Approval
+	var ownApprovalFound, reuseOwnApproval bool
+	if tx.Body.Fee.C3.Enabled() {
+		summary := pay.Summary()
+		var err error
+		var lookupFact protocol.SpendFactID
+		ownApproval, ownApprovalFound, lookupFact, err = m.c3EventWithApproval(o, summary, rules.C3Execute, rules.C3WholeTransaction)
+		if err != nil {
+			return err
+		}
+		// Direct application callers may supply divergent summary/authorization
+		// facts. Preserve the original second-key lookup in that case.
+		reuseOwnApproval = lookupFact == fact
+	}
+	recovered := make(map[uint32]bool, len(result.RecoveredOutputs))
+	var returned uint64
+	for _, i := range result.RecoveredOutputs {
+		if int(i) >= len(tx.Body.Outputs) || recovered[i] {
+			return protocol.ErrRule
+		}
+		recovered[i] = true
+		var err error
+		returned, err = protocol.Add(returned, tx.Body.Outputs[i].Amount)
+		if err != nil {
+			return err
+		}
+	}
+	a, found := ownApproval, ownApprovalFound
+	var err error
+	if !reuseOwnApproval {
+		a, found, err = state.Load[state.Approval](o, state.Key(state.KeyApproval, fact[:]))
+		if err != nil {
+			return err
+		}
+	}
+	if found {
+		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+		if err != nil {
+			return err
+		}
+		if p.Settled {
+			return rules.ErrConflict
+		}
+		if p.Paid > returned {
+			return rules.ErrAccounting
+		}
+		// A signer joining after compensation never occupied the earlier paid
+		// amount. Restore only its own recorded loss, not another member's.
+		p.Recovered = p.Paid
+		p.Settled = true
+		p.Height = height
+		p.Pending = uint32(len(result.MissingInputs))
+		if !tx.Body.Fee.C3.Enabled() {
+			p.Fee, err = rules.NewEscrow(tx.Body.Fee.Maximum, m.direct.Base.Fee)
+			if err != nil {
+				return err
+			}
+			for _, stage := range []rules.FeeAction{rules.FeeRegister, rules.FeeSettle} {
+				p.Fee, err = p.Fee.Complete(stage)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		for _, i := range result.MissingInputs {
+			if int(i) >= len(tx.Body.Inputs) {
+				return protocol.ErrRule
+			}
+			if err = state.Put(o, waitingKey(tx.Body.Inputs[i].Output), fact); err != nil {
+				return err
+			}
+		}
+		if err = m.finishLocal(o, &a, &p); err != nil {
+			return err
+		}
+	}
+	if tx.Body.Config == m.cfg.Organization.Hash() {
+		o.Delete(approvalCollectionKey(fact))
+		if err = state.Put(o, state.Key(state.KeyObserved, fact[:]), true); err != nil {
+			return err
+		}
+		o.Apply([]state.Change{{Key: state.Key(state.KeyOutbox, fact[:]), Delete: true}})
+		for i, in := range tx.Body.Inputs {
+			if err = m.consumePublicInput(o, pay, in.Output, tx.Claims[i].Instance, height); err != nil {
+				return err
+			}
+		}
+	}
+	if tx.Body.Config == m.cfg.Organization.Hash() {
+		for _, in := range tx.Body.Fee.Inputs {
+			if err = m.consumePublicInput(o, pay, in.Output, 0, height); err != nil {
+				return err
+			}
+		}
+	}
+	for i, out := range tx.Body.Outputs {
+		id := pay.Summary().OutputID(uint32(i))
+		if err = m.resolveLocal(o, id, false); err != nil {
+			return err
+		}
+		if recovered[uint32(i)] || out.Recipient.Route.Org != m.cfg.Organization.Org {
+			continue
+		}
+		creation := state.Creation{Output: out, Fact: protocol.CreationIdentity(tx.Body.Network, tx.ID(), uint32(i), 0), Source: protocol.Hash(fact), Final: true}
+		if err = state.Put(o, rules.DirectCreationKey(id, 0), creation); err != nil {
+			return err
+		}
+	}
+	return nil
+}

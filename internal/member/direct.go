@@ -1,0 +1,367 @@
+package member
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+	"utxo/internal/requesttrace"
+	"utxo/internal/rules"
+	"utxo/internal/state"
+	"utxo/protocol"
+)
+
+// ApproveDirect retains the one-round contract: input locks and applicable
+// resource debits commit atomically before the vote is returned. Crash durability
+// depends on the configured store; the fresh-start member experiment uses NoSync.
+func (m *Member) ApproveDirect(ctx context.Context, req protocol.DirectRequest) (protocol.DirectApproval, error) {
+	if m.direct == nil {
+		return protocol.DirectApproval{}, protocol.ErrUnsupported
+	}
+	raw, err := req.MarshalBinary()
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	return m.ApproveDirectBytes(ctx, raw)
+}
+
+// ApproveDirectBytes owns decoding and authentication at the HTTP boundary.
+// Typed callers use the wrapper above; neither entry point trusts parsed input.
+func (m *Member) ApproveDirectBytes(ctx context.Context, raw []byte) (protocol.DirectApproval, error) {
+	if m.direct == nil {
+		return protocol.DirectApproval{}, protocol.ErrUnsupported
+	}
+	req, err := m.decodeDirectRequest(raw)
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	requesttrace.Mark(ctx, "request_decoded")
+	tx := req.Tx
+	t := tx.Body
+	if t.ApprovalDeadline != 0 {
+		now := time.Now().Unix()
+		if now >= t.ApprovalDeadline {
+			return protocol.DirectApproval{}, protocol.ErrExpired
+		}
+		if t.ApprovalDeadline-now > protocol.ApprovalLifetimeSeconds {
+			return protocol.DirectApproval{}, protocol.ErrRule
+		}
+	}
+	cfg := m.cfg.Organization
+	if t.Network != cfg.Network || t.Certifier != cfg.Org || t.Config != cfg.Hash() || t.Epoch != cfg.Epoch {
+		return protocol.DirectApproval{}, protocol.ErrAuth
+	}
+	vector, err := rules.PrepareDirectVector(tx, *m.direct)
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	requesttrace.Mark(ctx, "vector_prepared")
+	summary := protocol.SummaryFor(tx, vector)
+	fact := summary.Fact()
+	type verifiedParent struct {
+		protocol.InputCertificate
+		outputs protocol.VerifiedOutputs
+	}
+	parents := map[protocol.OutputID]verifiedParent{}
+	for _, parent := range req.InputCertificates {
+		c := parent.Certificate
+		if t.Fee.C3.Enabled() && !c.Summary.C3.Enabled() {
+			return protocol.DirectApproval{}, protocol.ErrUnsupported
+		}
+		if err := rules.ValidateC3Summary(c.Summary, *m.direct); err != nil {
+			return protocol.DirectApproval{}, err
+		}
+		org, ok := m.peers[c.Summary.Config]
+		if !ok || c.Summary.Rules != m.direct.Rules() || uint64(parent.Index) >= uint64(len(c.Summary.Outputs)) {
+			return protocol.DirectApproval{}, protocol.ErrAuth
+		}
+		outputs, err := m.directCache.verify(c, org, m.cfg.ReuseDirectVerification)
+		if err != nil {
+			return protocol.DirectApproval{}, protocol.ErrAuth
+		}
+		id := c.Summary.OutputID(parent.Index)
+		if _, exists := parents[id]; exists {
+			return protocol.DirectApproval{}, protocol.ErrRule
+		}
+		parents[id] = verifiedParent{InputCertificate: parent, outputs: outputs}
+	}
+	requesttrace.Mark(ctx, "parents_verified")
+	var totalIn, totalOut uint64
+	used := map[protocol.OutputID]bool{}
+	for i, in := range t.Inputs {
+		claim := tx.Claims[i]
+		if in.Kind == protocol.CertificateInput {
+			p, ok := parents[in.Output]
+			if !ok || in.Evidence != protocol.Hash(p.Certificate.QC.Fact) || p.outputs.VerifyOutput(p.Index, claim.Output) != nil {
+				return protocol.DirectApproval{}, protocol.ErrAuth
+			}
+			used[in.Output] = true
+		}
+		totalIn, err = protocol.Add(totalIn, claim.Output.Amount)
+		if err != nil {
+			return protocol.DirectApproval{}, err
+		}
+	}
+	for _, out := range t.Outputs {
+		totalOut, err = protocol.Add(totalOut, out.Amount)
+		if err != nil {
+			return protocol.DirectApproval{}, err
+		}
+	}
+	if t.Fee.C3.Final() {
+		totalOut, err = protocol.Add(totalOut, t.Fee.Maximum)
+		if err != nil {
+			return protocol.DirectApproval{}, err
+		}
+	}
+	if totalIn != totalOut || len(used) != len(parents) {
+		return protocol.DirectApproval{}, protocol.ErrRule
+	}
+	requesttrace.Mark(ctx, "validation_complete")
+	id := tx.ID()
+	worker := uint32(id[0]) % m.cfg.Workers
+	// Approval material depends only on the authenticated request. Encode it
+	// before taking the store writer; all locks and resource checks stay atomic.
+	a := state.Approval{Fact: fact, Direct: &tx, Admission: vector, DirectParents: req.InputCertificates}
+	for _, allocation := range vector {
+		a.Debits = append(a.Debits, state.Debit{Key: allocation.Key, Cap: allocation.Cap, Worker: worker})
+	}
+	approvalBytes, err := json.Marshal(a)
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	requesttrace.Mark(ctx, "commit_requested")
+	var newCAL uint64
+	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		requesttrace.Mark(ctx, "update_started")
+		o := state.NewOverlay(v)
+		if err := m.checkApprovalTime(o, t.ApprovalDeadline); err != nil {
+			return nil, err
+		}
+		if err := rules.ValidateWalletRoutes(o, tx); err != nil {
+			return nil, err
+		}
+		key := state.Key(state.KeyApproval, fact[:])
+		if _, found, err := state.Load[state.Approval](o, key); err != nil {
+			return nil, err
+		} else if found {
+			p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+			if err != nil {
+				return nil, err
+			}
+			if p.Invalidated {
+				return nil, rules.ErrConflict
+			}
+			return nil, nil
+		}
+		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
+			return nil, err
+		} else if found {
+			return nil, rules.ErrConflict
+		}
+		for i, in := range t.Inputs {
+			claim := tx.Claims[i]
+			key := rules.DirectSpendKey(in.Output, claim.Instance)
+			spend, _, err := state.Load[state.Spend](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if spend.Consumed != (protocol.SpendFactID{}) || (spend.Candidate != (protocol.SpendFactID{}) && spend.Candidate != fact) {
+				return nil, rules.ErrConflict
+			}
+			if in.Kind == protocol.FinalInput {
+				created, found, err := state.Load[state.Creation](o, rules.DirectCreationKey(in.Output, claim.Instance))
+				if err != nil {
+					return nil, err
+				}
+				if !found || !created.Final || created.Fact != in.Evidence || created.Output != claim.Output {
+					return nil, rules.ErrMissing
+				}
+			}
+			spend.Candidate = fact
+			if err = state.Put(o, key, spend); err != nil {
+				return nil, err
+			}
+		}
+
+		if _, err := rules.ValidateDirectFee(o, tx); err != nil {
+			return nil, err
+		}
+		for _, in := range t.Fee.Inputs {
+			key := rules.DirectSpendKey(in.Output, 0)
+			spent, _, err := state.Load[state.Spend](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if spent.Consumed != (protocol.SpendFactID{}) || (spent.Candidate != (protocol.SpendFactID{}) && spent.Candidate != fact) {
+				return nil, rules.ErrConflict
+			}
+			spent.Candidate = fact
+			if err = state.Put(o, key, spent); err != nil {
+				return nil, err
+			}
+		}
+		for i, allocation := range vector {
+			ref := t.Admission[i]
+			g, found, err := state.Load[state.Grant](o, state.Key(state.KeyGrant, allocation.Key.Encode()))
+			if err != nil {
+				return nil, err
+			}
+			if !found || g.ID != ref.Grant || g.Organization != cfg.Hash() || (g.Key.Kind == protocol.ResourcePolicy && g.Subject != t.Subject) {
+				return nil, protocol.ErrAuth
+			}
+			key := state.SliceKey(allocation.Key, worker)
+			slice, found, err := state.Load[state.Slice](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if !found || slice.Available < allocation.Cap {
+				if allocation.Key.Kind == protocol.ResourceCAL {
+					m.noteCALSize(allocation.Cap)
+				}
+				m.budgetLimited[allocation.Key.Kind].Add(1)
+				return nil, rules.ErrLimited
+			}
+			slice.Available -= allocation.Cap
+			slice.Reserved, err = protocol.Add(slice.Reserved, allocation.Cap)
+			if err != nil {
+				return nil, err
+			}
+			if err = state.Put(o, key, slice); err != nil {
+				return nil, err
+			}
+		}
+		o.Set(key, approvalBytes)
+		o.Set(approvalCollectionKey(fact), []byte{1})
+		if t.ApprovalDeadline != 0 {
+			// One ordered queue entry; no full approval scan in the fast path.
+			o.Set(approvalExpiryKey(t.ApprovalDeadline, fact), []byte{1})
+		}
+		requesttrace.Mark(ctx, "update_evaluated")
+		for _, allocation := range vector {
+			if allocation.Key.Kind == protocol.ResourceCAL {
+				newCAL = allocation.Cap
+			}
+		}
+		return o.Changes(), nil
+	})
+	if err != nil {
+		return protocol.DirectApproval{}, err
+	}
+	if newCAL != 0 {
+		m.approvedCAL.Add(newCAL)
+		m.noteCALSize(newCAL)
+	}
+	requesttrace.Mark(ctx, "commit_returned")
+	m.approvalSummaries.put(summary)
+	vote := protocol.SignSpend(fact, m.cfg.Index, m.cfg.Key)
+	requesttrace.Mark(ctx, "vote_signed")
+	return protocol.DirectApproval{Summary: summary, Vote: vote}, nil
+}
+
+// InstallDirect saves a full relay command in the background. It does not
+// reserve a second budget or make an unvoted local output spendable.
+func (m *Member) InstallDirect(payment protocol.DirectPayment) error {
+	_, err := m.InstallDirectClassified(payment)
+	return err
+}
+
+// InstallDirectClassified reports whether this call saved the full payment
+// material. The result is intended for the E5 experiment observer only.
+func (m *Member) InstallDirectClassified(payment protocol.DirectPayment) (bool, error) {
+	requesttrace.Payment("install_enter", payment.Certificate.QC.Fact)
+	if m.direct == nil || payment.Tx.Body.Config != m.cfg.Organization.Hash() {
+		return false, protocol.ErrAuth
+	}
+	if _, err := rules.VerifyDirectPayment(payment, *m.direct); err != nil {
+		return false, err
+	}
+	// Background delivery can warm the next same-organization request. It still
+	// authenticates the complete certificate, never just this member's own vote.
+	if m.directCache != nil && payment.Certificate.Summary.Config == m.cfg.Organization.Hash() {
+		if _, err := m.directCache.verify(payment.Certificate, m.cfg.Organization, true); err != nil {
+			return false, err
+		}
+	}
+	raw, err := payment.MarshalBinary()
+	if err != nil {
+		return false, err
+	}
+	fact := payment.Certificate.QC.Fact
+	requesttrace.Payment("install_store_start", fact)
+	alreadyObserved := false
+	err = m.db.Update(func(v state.ReadView) ([]state.Change, error) {
+		o := state.NewOverlay(v)
+		key := state.Key(state.KeyInstall, fact[:])
+		p, _, err := state.Load[LocalProgress](o, ProgressKey(fact))
+		if err != nil {
+			return nil, err
+		}
+		if p.Invalidated {
+			return nil, rules.ErrConflict
+		}
+		if _, found, err := state.Load[bool](o, state.Key(state.KeyObserved, fact[:])); err != nil {
+			return nil, err
+		} else if found {
+			alreadyObserved = true
+			return nil, nil
+		}
+		if err := m.checkApprovalTime(o, payment.Tx.Body.ApprovalDeadline); err != nil {
+			if _, e := o.Get(registeredApprovalKey(fact)); e != nil {
+				return nil, err
+			}
+		}
+		for i, in := range payment.Tx.Body.Inputs {
+			key := rules.DirectSpendKey(in.Output, payment.Tx.Claims[i].Instance)
+			s, _, err := state.Load[state.Spend](o, key)
+			if err != nil {
+				return nil, err
+			}
+			if s.Consumed != (protocol.SpendFactID{}) && s.Consumed != fact {
+				return nil, rules.ErrConflict
+			}
+			s.Consumed = fact
+			if err = state.Put(o, key, s); err != nil {
+				return nil, err
+			}
+		}
+
+		if _, err := rules.ValidateDirectFee(o, payment.Tx); err != nil {
+			return nil, err
+		}
+		for _, in := range payment.Tx.Body.Fee.Inputs {
+			k := rules.DirectSpendKey(in.Output, 0)
+			spent, _, err := state.Load[state.Spend](o, k)
+			if err != nil {
+				return nil, err
+			}
+			if spent.Consumed != (protocol.SpendFactID{}) && spent.Consumed != fact {
+				return nil, rules.ErrConflict
+			}
+			spent.Consumed = fact
+			if err = state.Put(o, k, spent); err != nil {
+				return nil, err
+			}
+		}
+		o.Set(key, raw)
+		outkey := state.Key(state.KeyOutbox, fact[:])
+		pending, found, err := state.Load[state.Outbox](o, outkey)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			// Give the gateway the first attempt. Persist this once, so repeated
+			// INSTALL and restart cannot postpone member fallback indefinitely.
+			pending = state.Outbox{Fact: fact, Origin: payment.Tx.Body.Certifier,
+				NextSubmitUnixNS: time.Now().Add(2*time.Second + time.Duration(m.cfg.Index)*250*time.Millisecond).UnixNano()}
+		}
+		pending.Certificate = raw
+		if err = state.Put(o, outkey, pending); err != nil {
+			return nil, err
+		}
+		return o.Changes(), nil
+	})
+	if err == nil {
+		requesttrace.Payment("install_store_done", fact)
+	}
+	return err == nil && !alreadyObserved, err
+}
